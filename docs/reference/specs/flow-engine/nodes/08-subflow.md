@@ -52,7 +52,7 @@ The builder offers it as a number field ("Pinned version"), empty meaning the ac
   `end` node
 - `cancelled`: the child ended with status `cancelled`
 - `failed`: the child ended with status `failed`, failed (iteration limit, a handler exception or a node
-  reporting failure), timed out, or the target flow is not active
+  reporting failure), or timed out
 
 The mapping from the child's `end_status` to the handle is 1:1 (`DefaultSubflowResumer::handleFor`).
 A child that stops without an `end` node still hands control back: the engine calls `resumeIfChild` with
@@ -91,7 +91,7 @@ rethrowing; what the parent's own resumed run throws propagates as the parent's 
 5. `SubflowStarterService::start()` (see below), with the evaluated values. If the target flow has no
    active definition, the node returns `Failed` with `error_type = subflow_target_inactive`; if it is pinned
    to a version that does not exist, `Failed` with `error_type = subflow_pinned_version_missing`.
-6. Return `Waiting` with metadata `{flow_id, child_id, timeout}` (plus `flow_version` when pinned).
+6. Return `Waiting` with metadata `{flow_id, child_id, timeout}`, plus `flow_version` when the node is pinned.
 
 `SubflowStarterService::start()` (`app/Domains/Flow/Subflow/`):
 
@@ -111,7 +111,7 @@ rethrowing; what the parent's own resumed run throws propagates as the parent's 
 4. Run the child synchronously: `FlowEngine::runSession($child)`.
 
 Because the starter has already moved the parent (version bump), the engine skips persisting the
-handler's stale `Waiting` result for the parent (see the loop diagram).
+handler's stale result for the parent (see the loop diagram).
 
 The session lock stays on the same `(tenant, contact, assistant)` key throughout; there is no physical
 hand-over.
@@ -205,10 +205,11 @@ definitions stay in `flow_definitions`. Validation concerns only sessions that s
 - `subflow_invalid_input_value`: an input value is not a string; `subflow_invalid_output_source`: an output
   value is not a valid session variable name.
 
+- The call-graph and cross-assistant codes above.
+
 The mapping checks come from `SubflowMappingValidator`, which `SubflowNodeHandler` exposes through
 `NodeConfigValidatorInterface`. They look only at names: whether the child flow ever sets a mapped
 variable is not checked, since its latest active definition is resolved only when it starts.
-- The call-graph and cross-assistant codes above.
 
 A missing target flow is not a publish error: an unknown callee has no edges, and a callee with no active
 definition surfaces at runtime as `subflow_target_inactive`, which fails the node result (the parent session fails; the `failed` handle is for a child that ended failed).

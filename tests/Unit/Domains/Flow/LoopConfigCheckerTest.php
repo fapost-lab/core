@@ -186,6 +186,28 @@ final class LoopConfigCheckerTest extends TestCase
         $this->assertSame([], $result['warnings']);
     }
 
+    public function test_legacy_save_strings_of_send_message_and_call_count_as_writes(): void
+    {
+        foreach ([['send_message', 'save_to'], ['call', 'save_response_to']] as [$type, $key]) {
+            $result = $this->check(
+                nodes: [$this->whileLoop('loop_1', 'done'), $this->node('w', $type, [$key => 'done']), $this->loopEnd('end_1', 'loop_1')],
+                edges: [$this->edge('loop_1', 'w', 'loop'), $this->edge('w', 'end_1')],
+            );
+
+            $this->assertSame([], $result['warnings'], "{$type}.{$key} is a write");
+        }
+    }
+
+    public function test_a_template_node_in_the_body_silences_the_warning(): void
+    {
+        $result = $this->check(
+            nodes: [$this->whileLoop('loop_1', 'done'), $this->node('tpl', 'template'), $this->loopEnd('end_1', 'loop_1')],
+            edges: [$this->edge('loop_1', 'tpl', 'loop'), $this->edge('tpl', 'end_1')],
+        );
+
+        $this->assertSame([], $result['warnings']);
+    }
+
     /**
      * @param  list<array<string, mixed>>  $nodes
      * @param  list<array<string, mixed>>  $edges

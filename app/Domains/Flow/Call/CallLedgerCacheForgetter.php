@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Call;
 
 use App\Domains\Tenancy\Contracts\TenantCacheForgetterInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
+use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 
 use function mb_strlen;
@@ -21,15 +22,15 @@ final readonly class CallLedgerCacheForgetter implements TenantCacheForgetterInt
 {
     private const int BATCH = 500;
 
-    public function __construct(private RedisFactory $redis)
+    public function __construct(private RedisFactory $redis, private ConfigRepository $config)
     {
     }
 
     public function forget(TenantInterface $tenant): void
     {
         $connection = $this->redis->connection();
-        $prefix     = (string) config('database.redis.options.prefix', '');
-        $pattern    = 'flow:call:' . $tenant->getId() . ':*';
+        $prefix     = (string) $this->config->get('database.redis.options.prefix', '');
+        $pattern    = RedisCallExecutionLedger::tenantKeyPrefix((string) $tenant->getId()) . '*';
         $cursor     = null;
 
         // phpredis starts an iteration from null (not 0), matches the pattern against the prefixed key, and the

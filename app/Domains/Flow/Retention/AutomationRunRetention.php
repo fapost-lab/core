@@ -83,6 +83,20 @@ final class AutomationRunRetention
     }
 
     /**
+     * {@see self::isSucceeded()} as a SQL condition over `status` and `end_status`, built from the same enum values so
+     * the two cannot drift.
+     */
+    public static function succeededSql(): string
+    {
+        return sprintf(
+            "(status = '%s' OR (status = '%s' AND COALESCE(end_status, '') = '%s'))",
+            FlowSessionStatus::Completed->value,
+            FlowSessionStatus::Ended->value,
+            EndStatus::Success->value,
+        );
+    }
+
+    /**
      * Parses an environment value, the install default of a setting: a whole number from 0 (keep forever) to
      * {@see self::MAX_DAYS}; anything else, unset included, is `$default`.
      */

@@ -95,7 +95,7 @@ final readonly class AutomationRunPruner
         ?CarbonImmutable $failedCutoff,
         ?array $after,
     ): array {
-        $succeeded = "(status = 'completed' OR (status = 'ended' AND COALESCE(end_status, '') = 'success'))";
+        $succeeded = AutomationRunRetention::succeededSql();
 
         $query = FlowSession::query()
             ->where('tenant_id', $tenantId)

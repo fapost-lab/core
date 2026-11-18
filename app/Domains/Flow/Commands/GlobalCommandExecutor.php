@@ -162,10 +162,9 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
     }
 
     /**
-     * Force-terminate a session bypassing optimistic lock — global commands
-     * are explicitly permitted to break in even when a worker is stuck.
+     * What a command writes to a session it ends: the terminal status, written past the optimistic lock.
      */
-    private function markTerminated(FlowSession $session): void
+    private function forceTerminate(FlowSession $session): void
     {
         $session->newQuery()
             ->whereKey($session->getKey())
@@ -177,6 +176,15 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
 
         // A query write raises no model event, so the live screens are told here.
         $this->activity->touched($session);
+    }
+
+    /**
+     * Force-terminate a session bypassing optimistic lock — global commands
+     * are explicitly permitted to break in even when a worker is stuck.
+     */
+    private function markTerminated(FlowSession $session): void
+    {
+        $this->forceTerminate($session);
 
         $this->operatorRequests->cancelForSession(
             (string) $session->tenant_id,
@@ -207,15 +215,7 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
                 return;
             }
 
-            $parent->newQuery()
-                ->whereKey($parent->getKey())
-                ->update([
-                    'status'          => FlowSessionStatus::TerminatedByUser->value,
-                    'current_node_id' => null,
-                    'updated_at'      => now(),
-                ]);
-
-            $this->activity->touched($parent);
+            $this->forceTerminate($parent);
 
             $parentId = $parent->parent_session_id;
         }

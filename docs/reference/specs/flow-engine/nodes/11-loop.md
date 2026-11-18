@@ -485,7 +485,7 @@ The path read by `condition.left` (a session or contact variable, or a `flow.*` 
 the paths written by the nodes of the loop body (see 06-validation.md for the write shapes); when none matches, the loop
 gets a warning at `nodes.<loop>.config.condition`. It is a warning only, since the condition may change from outside (for
 example an event trigger of another flow writing to the contact). Skipped for a condition on the loop's own iterator
-(`loop_end` advances it), for paths the check cannot follow (`module.*`), and when the body has a Solution node.
+(`loop_end` advances it), for paths the check cannot follow (`module.*`), and when the body has a Solution node or a `template` node (its inner writes are not expanded before publish). Legacy `save_to` (`send_message`) and `save_response_to` (`call`) strings count as writes.
 
 ### 8.6 Variable registry conflicts
 

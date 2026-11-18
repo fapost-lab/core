@@ -33,4 +33,35 @@ enum FlowSessionStatus: string
     {
         return [self::Active, self::WaitingInput, self::PausedSubflow];
     }
+
+    /**
+     * The statuses of a session that is running, waiting, or asleep in a `delay` or a nested subflow, all of which a
+     * parent must treat as a live child. `Pending` is not one: a session is never left there.
+     *
+     * @return list<self>
+     */
+    public static function inFlight(): array
+    {
+        return [self::Active, self::WaitingInput, self::Paused, self::PausedSubflow];
+    }
+
+    /**
+     * The values of {@see self::inFlight()}, for a query.
+     *
+     * @return list<string>
+     */
+    public static function inFlightValues(): array
+    {
+        return array_map(static fn (self $status): string => $status->value, self::inFlight());
+    }
+
+    /**
+     * The statuses a session never leaves.
+     *
+     * @return list<self>
+     */
+    public static function terminal(): array
+    {
+        return [self::Completed, self::Ended, self::Failed, self::Cancelled, self::Expired, self::TerminatedByUser];
+    }
 }

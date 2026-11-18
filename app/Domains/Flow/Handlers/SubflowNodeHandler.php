@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
+use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Exceptions\SubflowPinnedVersionMissingException;
 use App\Domains\Flow\Exceptions\SubflowTargetInactiveException;
@@ -281,14 +282,10 @@ final class SubflowNodeHandler extends AbstractVersionedHandler implements NodeC
     {
         return FlowSession::query()
             ->where('parent_session_id', $parentSessionId)
-            ->whereNotIn('status', [
-                \App\Domains\Flow\Enums\FlowSessionStatus::Ended,
-                \App\Domains\Flow\Enums\FlowSessionStatus::Completed,
-                \App\Domains\Flow\Enums\FlowSessionStatus::Failed,
-                \App\Domains\Flow\Enums\FlowSessionStatus::Cancelled,
-                \App\Domains\Flow\Enums\FlowSessionStatus::Expired,
-                \App\Domains\Flow\Enums\FlowSessionStatus::TerminatedByUser,
-            ])
+            ->whereNotIn('status', array_map(
+                static fn (FlowSessionStatus $status): string => $status->value,
+                FlowSessionStatus::terminal(),
+            ))
             ->exists();
     }
 }

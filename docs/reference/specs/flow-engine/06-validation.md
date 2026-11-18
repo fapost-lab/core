@@ -79,9 +79,12 @@ Annotation nodes (`comment`) are exempt from node-level checks. Per node:
 | `input_missing_save_target` | `input` has a `variable.name` (or legacy `save_to`) |
 | `subflow_missing_flow_id`, `subflow_template_in_flow_id`, `subflow_invalid_timeout` | `subflow.flow_id` is a literal; `timeout` is an ISO 8601 duration |
 | `subflow_invalid_flow_version`, `subflow_pinned_version_missing` | `subflow.flow_version`, when set, is a positive whole number naming a version the target flow published (path `nodes.<id>.config.flow_version` for the second) |
+| `subflow_invalid_input_mapping`, `subflow_invalid_output_mapping` | `SubflowMappingValidator`: `input_mapping` / `output_mapping`, when set, is an object of name to value |
+| `subflow_invalid_input_name`, `subflow_invalid_output_name` | an `input_mapping` / `output_mapping` key is not a valid session variable name (an identifier, not reserved, no `flow.` prefix) |
+| `subflow_invalid_input_value`, `subflow_invalid_output_source` | an `input_mapping` value is not a string; an `output_mapping` value is not a valid session variable name |
 | `subflow_target_is_template` | `subflow.flow_id` does not name a flow template (path `nodes.<id>.config.flow_id`): a template never starts on its own, it is placed with a template node |
 | `loop_invalid_iterator_name`, `loop_reserved_iterator_name`, `loop_count_exceeds_budget` | iterator name is an identifier and not one of `id, language, meta, tenant_id, external_id`; a literal count above 100 is rejected |
-| `loop_iterator_variable_conflict`, `loop_count_not_numeric` | `LoopConfigChecker` (path `nodes.<loop>.config.iterator_name` / `.config.count_source`): no node writes a session variable named like a loop's `iterator_name` or `{iterator_name}_total`; a counted loop's literal `count_source` is a number (a numeric string counts) |
+| `loop_iterator_variable_conflict`, `loop_count_not_numeric` | `LoopConfigChecker` (path `nodes.<loop>.config.iterator_name` / `.config.count_source`): no node writes a session variable named like a loop's `iterator_name` or `{iterator_name}_total` (the `_total` name is checked for counted loops only; a legacy `save_to` / `save_response_to` string counts as a write); a counted loop's literal `count_source` is a number (a numeric string counts) |
 | `list_max_size_invalid` | `ListSizeChecker` (path `nodes.<node>`): a list variable's `properties.max_size` is a whole number from 1 to 1000 and is set only on a list saved to the contact |
 | `loop_end_missing_loop_node_id`, `loop_end_invalid_loop_node_id` | `loop_end.loop_node_id` references an existing `loop` node |
 
@@ -135,10 +138,10 @@ channels gets none. Annotation nodes are skipped.
 condition reads a session or contact variable (or `flow.*` / `contact.*` source) that no node of the loop body writes.
 The body is everything reachable from the `loop` handle up to the loop's own `loop_end`; writes are read from the save
 targets of `input`, `assign` (operations and the legacy form), `send_message`, `call` (`save_to_variable`, `result_mapping`)
-and `subflow` (`output_mapping`). Unlike the other warnings it is produced on every `execute()`, with or without an assistant
+and `subflow` (`output_mapping`); a legacy `save_to` (`send_message`) or `save_response_to` (`call`) string counts as a write. Unlike the other warnings it is produced on every `execute()`, with or without an assistant
 id, and is never an error: the value may change from outside the flow. It is skipped when the condition is on the loop's
 own iterator, on a path the check cannot follow (`module.*`, `rag.*`), or when the body holds a Solution node (it may
-write anything).
+write anything) or a `template` node (its inner writes are not expanded before publish).
 
 `ButtonLimitChecker` emits `channel_button_limit_exceeded` (path `nodes.{id}`) when a keyboard is larger than a
 channel declares in its `ButtonLimits`: one warning per node and per kind of limit (buttons in one message, buttons

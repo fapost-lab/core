@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow\State;
 
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\History\NoOpHistoryWriter;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
 use App\Domains\Flow\State\Exceptions\ContactlessSessionException;
 use App\Domains\Flow\State\Exceptions\ReservedContactPathException;
 use App\Domains\Flow\State\Exceptions\StructuralPathConflictException;
+use App\Domains\Flow\State\Variables\VariableType;
 use App\Domains\Flow\State\Writers\ContactWriter;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Str;
@@ -180,6 +182,40 @@ final class ContactWriterTest extends FeatureTestCase
         $this->assertSame('contact.language', $entry->path);
         $this->assertSame('node-A', $entry->node_id);
         $this->assertSame(['value' => 'fr'], $entry->new_value);
+    }
+
+    public function test_a_list_max_size_is_clamped_to_the_publish_bounds(): void
+    {
+        $this->assertCount(1000, $this->appendItems(5000, 1002));
+        $this->assertCount(1, $this->appendItems(0, 3));
+    }
+
+    /**
+     * Appends `$times` items to a registered list whose stored max_size is `$maxSize`.
+     *
+     * @return list<mixed>
+     */
+    private function appendItems(int $maxSize, int $times): array
+    {
+        $registry = $this->createStub(VariableSchemaRegistryInterface::class);
+        $registry->method('get')->willReturn(VariableType::Array);
+        $registry->method('getProperties')->willReturn(['max_size' => $maxSize]);
+
+        $contact = $this->makeContact();
+        $writer  = new ContactWriter(
+            contact: $contact,
+            sessionId: 'session-1',
+            nodeId: 'node-A',
+            connection: app(ConnectionInterface::class),
+            historyWriter: new NoOpHistoryWriter(),
+            schemaRegistryResolver: static fn (): VariableSchemaRegistryInterface => $registry,
+        );
+
+        for ($i = 0; $i < $times; ++$i) {
+            $writer->write('contact.photos', $i);
+        }
+
+        return $contact->refresh()->attributes['photos'];
     }
 
     /**

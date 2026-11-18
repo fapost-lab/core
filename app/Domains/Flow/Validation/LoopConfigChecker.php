@@ -24,11 +24,12 @@ use InvalidArgumentException;
  *   would fail the session on the first pass.
  * - {@see self::CODE_WHILE_UNCHANGED} (warning): a `while` condition reads a variable that no node of the loop body
  *   writes, so the loop would run until the iteration budget stops it. It is only a warning because the value may
- *   change from outside (another flow writing to the contact); it is skipped when the body holds a Solution node,
- *   which may write anything, and when the condition reads something this check cannot follow (`module.*`, `rag.*`).
+ *   change from outside (another flow writing to the contact); it is skipped when the body holds a Solution node
+ *   or a `template` node, which may write anything, and when the condition reads something this check cannot follow (`module.*`, `rag.*`).
  *
  * Writes are read from the config shapes of the nodes that save a variable: `input`, `assign` (operations and the
- * legacy `target` / `key` form), `send_message` and `call`. Annotation nodes must be removed by the caller.
+ * legacy `target` / `key` form), `send_message` and `call` (including their legacy `save_to` / `save_response_to`
+ * strings) and `subflow` (`output_mapping`). Annotation nodes must be removed by the caller.
  */
 final readonly class LoopConfigChecker
 {
