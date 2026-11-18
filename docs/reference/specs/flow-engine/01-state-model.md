@@ -60,10 +60,10 @@ Writing `contact.<key>` (`ContactWriter::write`, called by `assign`, `input`, `a
    `ReservedContactPathException` (a `RuntimeException`).
 3. `language` and `is_authenticated` are writable canonical columns and take no nested group.
 4. Anything else is written into `attributes`, creating the group on the way.
-5. A leaf and a group on the same path throw `StructuralPathConflictException` (a `RuntimeException`).
+5. A leaf and a group on the same path throw `StructuralPathConflictException` (a `RuntimeException`). Two nodes of one flow that disagree this way are caught at publish as `variable_path_conflict` (`06-validation.md`).
 6. Array-typed variables append, with a circular buffer, instead of replacing.
 
-These are **runtime guards in `ContactWriter`**. They are not checked when the flow is saved; a
+These are **runtime guards in `ContactWriter`**. Apart from the leaf-versus-group case between nodes (rule 5), they are not checked when the flow is saved; a
 violation surfaces when the node runs and, being an exception from a handler, fails the session.
 
 ## 1.3 Nesting depth

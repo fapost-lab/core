@@ -6,12 +6,8 @@ namespace App\Domains\Flow\Validation;
 
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
-use App\Domains\Flow\Enums\AssignTarget;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\LoopNodeHandler;
-use App\Domains\Flow\State\Variables\Variable;
-use App\Domains\Flow\State\Variables\VariableStorage;
-use InvalidArgumentException;
 
 /**
  * Catches loop mistakes at publish that would otherwise show up as a runtime failure or an endless loop
@@ -38,8 +34,10 @@ final readonly class LoopConfigChecker
 
     public const string CODE_WHILE_UNCHANGED = 'loop_while_condition_unchanged';
 
-    public function __construct(private NodeHandlerRegistryInterface $registry)
-    {
+    public function __construct(
+        private NodeHandlerRegistryInterface $registry,
+        private NodeWriteCollector $writes = new NodeWriteCollector(),
+    ) {
     }
 
     /**
@@ -176,7 +174,7 @@ final readonly class LoopConfigChecker
                 return [];
             }
 
-            foreach ($this->writtenPaths($node) as $written) {
+            foreach ($this->writes->paths($node) as $written) {
                 // Writing `contact.photos` changes `contact.photos.length`, writing `flow.resp` changes `flow.resp.status`.
                 if ($watched === $written || str_starts_with($watched, $written . '.')) {
                     return [];
@@ -212,7 +210,7 @@ final readonly class LoopConfigChecker
                 ? $left['variable']
                 : ['name' => $left['name'] ?? null, 'storage' => $left['storage'] ?? null, 'group' => $left['group'] ?? null];
 
-            return $this->variablePath($variable);
+            return $this->writes->variablePath($variable);
         }
 
         if ('source' === ($left['ref'] ?? null) && is_string($left['source'] ?? null)) {
@@ -291,7 +289,7 @@ final readonly class LoopConfigChecker
         $writes = [];
 
         foreach ($nodeMap as $nodeId => $node) {
-            foreach ($this->writtenPaths($node) as $path) {
+            foreach ($this->writes->paths($node) as $path) {
                 if (str_starts_with($path, 'flow.')) {
                     $writes[mb_substr($path, 5)][] = (string) $nodeId;
                 }
@@ -299,116 +297,5 @@ final readonly class LoopConfigChecker
         }
 
         return $writes;
-    }
-
-    /**
-     * State paths a node saves a value to, from the config shapes of the nodes that declare variables.
-     *
-     * @param  array<string, mixed>  $node
-     *
-     * @return list<string>
-     */
-    private function writtenPaths(array $node): array
-    {
-        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
-        $paths  = [];
-
-        $add = function (mixed $raw) use (&$paths): void {
-            $path = is_array($raw) ? $this->variablePath($raw) : null;
-
-            if (null !== $path) {
-                $paths[] = $path;
-            }
-        };
-
-        switch ($node['type'] ?? null) {
-            case 'input':
-                $add($config['variable'] ?? null);
-
-                if (is_string($config['save_to'] ?? null) && 1 === preg_match('/^(flow|contact)(\.\w+)+$/', $config['save_to'])) {
-                    $paths[] = $config['save_to'];
-                } elseif (is_string($config['save_to'] ?? null) && 1 === preg_match('/^\w+$/', $config['save_to'])) {
-                    $paths[] = 'flow.' . $config['save_to'];
-                }
-
-                break;
-            case 'assign':
-                foreach (is_array($config['operations'] ?? null) ? $config['operations'] : [] as $operation) {
-                    $add(is_array($operation) ? ($operation['variable'] ?? null) : null);
-                }
-
-                if (is_string($config['key'] ?? null) && '' !== $config['key']) {
-                    $paths[] = (AssignTarget::Contact->value === ($config['target'] ?? null) ? 'contact.' : 'flow.') . $config['key'];
-                }
-
-                break;
-            case 'send_message':
-                $add($config['save_to_variable'] ?? null);
-                $paths = [...$paths, ...$this->legacyPath($config['save_to'] ?? null)];
-
-                break;
-            case 'call':
-                $add($config['save_to_variable'] ?? null);
-                $paths = [...$paths, ...$this->legacyPath($config['save_response_to'] ?? null)];
-
-                foreach (is_array($config['result_mapping'] ?? null) ? $config['result_mapping'] : [] as $mapping) {
-                    $add(is_array($mapping) ? ($mapping['to'] ?? null) : null);
-                }
-
-                break;
-            case 'subflow':
-                // The output mapping copies child variables into this flow's session: `{here: child}`.
-                foreach (is_array($config['output_mapping'] ?? null) ? array_keys($config['output_mapping']) : [] as $name) {
-                    if (is_string($name) && '' !== $name) {
-                        $paths[] = 'flow.' . $name;
-                    }
-                }
-
-                break;
-            default:
-                break;
-        }
-
-        return $paths;
-    }
-
-    /**
-     * A legacy `save_to` string: `flow.x`, `contact.x` or a bare name (a session variable).
-     *
-     * @return list<string>
-     */
-    private function legacyPath(mixed $raw): array
-    {
-        if (! is_string($raw)) {
-            return [];
-        }
-
-        if (1 === preg_match('/^(flow|contact)(\.\w+)+$/', $raw)) {
-            return [$raw];
-        }
-
-        return 1 === preg_match('/^\w+$/', $raw) ? ['flow.' . $raw] : [];
-    }
-
-    /**
-     * @param  array<string, mixed>  $raw  a variable as the builder stores it
-     */
-    private function variablePath(array $raw): ?string
-    {
-        try {
-            $variable = Variable::tryFromArray($raw);
-        } catch (InvalidArgumentException) {
-            return null;
-        }
-
-        if (! $variable instanceof Variable) {
-            return null;
-        }
-
-        if (VariableStorage::Session === $variable->storage) {
-            return 'flow.' . $variable->name;
-        }
-
-        return null === $variable->group ? "contact.{$variable->name}" : "contact.{$variable->group}.{$variable->name}";
     }
 }
