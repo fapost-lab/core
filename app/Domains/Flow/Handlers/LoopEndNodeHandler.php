@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
+use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
+use App\Domains\Flow\Enums\NodeContextRequirement;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
@@ -23,7 +25,7 @@ use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
  * Idempotent: the increment is persisted atomically with the navigation advance
  * under optimistic lock, so job retries cannot double-increment.
  */
-final class LoopEndNodeHandler extends AbstractVersionedHandler
+final class LoopEndNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
 {
     final public const string TYPE = 'loop_end';
 
@@ -52,6 +54,11 @@ final class LoopEndNodeHandler extends AbstractVersionedHandler
     public function configSchema(): array
     {
         return [];
+    }
+
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::Any;
     }
 
     /**

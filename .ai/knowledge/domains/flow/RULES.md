@@ -139,10 +139,20 @@ broken.
   contactless run's assistant only from `FlowRunOrigin`, never from the current assistant, and a subflow
   child copies `run_kind` and `trigger_id`. Why: an empty id turns a per-contact read or lock into a
   tenant-wide one, and an ambient assistant attaches a run to whichever assistant a job resolved.
-  Known gaps: `OperandResolver` reads `module.*` operands past the reader, and `SubflowTimeoutSweeper`
-  lets the lock-scope error end its pass — both before any trigger starts a contactless run
+  `OperandResolver` reads `module.*` operands through the context's reader too. Known gap:
+  `SubflowTimeoutSweeper` lets the lock-scope error end its pass — before any trigger starts a contactless run
   (`adr-20261118-contactless-runs-in-flow-sessions`). Enforced: `ContactlessFlowSessionTest`,
-  `ScopedStateReaderTest`, `ContactWriterTest`, `LockScopeTest`.
+  `ScopedStateReaderTest`, `ContactWriterTest`, `LockScopeTest`, `OperandResolverModuleTest`.
+- **A node that needs a contact is never published into a flow whose trigger gives none.** A handler declares
+  `contact`, `none` or `any` through `DeclaresContextRequirementInterface`; one that declares nothing (every Solution
+  node) needs a contact. Under a `schedule`, `webhook` or `api` trigger, validate and publish refuse such a node, and
+  any node whose config reads `contact.*` or `module.*` or uses a contact variable, with `node_needs_contact` at
+  `nodes.<id>`. Declare `any` only for a handler checked never to use `NodeExecutionContext::$contactId`,
+  `$platform` or the contact writer without a contact, and never hands them on; `call` stays `contact` until
+  Foundation's `CallContext` takes a nullable id, `subflow` until its target is followed. Known gap: a trigger
+  changed on draft save goes live before any publish runs this check.
+  Why: a contactless run reaches a contact through an empty id or dies on a typed error nobody watches
+  (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`.
 - **New built-in state namespaces go into the foundation `StateNamespace` enum.** Core keeps no enum of
   its own (ADR-0002). The runtime list is `StateNamespacesInterface` (`StateNamespaceRegistry`: built-ins plus
   Solution namespaces, frozen at boot); readers (`ScopedStateReader`, `OperandResolver`) and the branch

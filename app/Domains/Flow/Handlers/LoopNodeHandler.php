@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
+use App\Domains\Flow\Enums\NodeContextRequirement;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\OperandResolver;
 use App\Domains\Flow\Handlers\Support\OperatorComparator;
@@ -30,7 +32,7 @@ use RuntimeException;
  * State written by this handler lives in the `flow.*` namespace, which is open
  * to all handlers ({@see SystemStateNamespacePolicy}).
  */
-final class LoopNodeHandler extends AbstractVersionedHandler
+final class LoopNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
 {
     final public const string TYPE = 'loop';
 
@@ -86,6 +88,11 @@ final class LoopNodeHandler extends AbstractVersionedHandler
                 'iterator_name' => self::DEFAULT_ITERATOR_NAME,
             ],
         ];
+    }
+
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::Any;
     }
 
     /**

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
+use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
+use App\Domains\Flow\Enums\NodeContextRequirement;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
@@ -19,7 +21,7 @@ use Fapost\Support\Builder\Schema\Schema;
  *
  * Writes no state and has no side effect. `template_output@1` stays registered for good: published definitions keep it.
  */
-final class TemplateOutputNodeHandler extends AbstractVersionedHandler
+final class TemplateOutputNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
 {
     final public const string TYPE = 'template_output';
 
@@ -66,6 +68,11 @@ final class TemplateOutputNodeHandler extends AbstractVersionedHandler
                     ->placeholder('Operator returned'),
             ])
             ->toArray();
+    }
+
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::Any;
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

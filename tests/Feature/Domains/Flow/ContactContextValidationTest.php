@@ -1,0 +1,365 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Domains\Flow;
+
+use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
+use App\Domains\Flow\Enums\NodeContextRequirement;
+use App\Domains\Flow\Exceptions\FlowValidationException;
+use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Services\PublishFlowService;
+use App\Domains\Flow\Services\ValidateFlowService;
+use App\Domains\Flow\Validation\ContactContextChecker;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use Fapost\Foundation\Contracts\NodeHandlerInterface;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionResult;
+use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\FeatureTestCase;
+
+/**
+ * A flow whose trigger gives no contact (schedule, webhook, API) cannot be validated or published while a node in it
+ * needs a contact: a contact node type, an undeclared (Solution) node, a `contact.*` or `module.*` read, or a contact
+ * variable. The error names the node. A message or event trigger, or no trigger at all, keeps every node allowed.
+ */
+final class ContactContextValidationTest extends FeatureTestCase
+{
+    private const array SCHEDULE = ['type' => 'schedule', 'is_active' => true, 'priority' => 100, 'config' => ['cron' => '0 9 * * *', 'timezone' => 'UTC']];
+
+    private const array MESSAGE = ['type' => 'message', 'is_active' => true, 'priority' => 100, 'config' => ['keywords' => ['hi']]];
+
+    private string $tenantId;
+
+    private Assistant $assistant;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->tenantId = (string) Str::uuid();
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: $this->tenantId, schemaName: 'main'));
+
+        $registry = $this->app->make(NodeHandlerRegistry::class);
+        $registry->register(ContactFreeTestHandler::class);
+        $registry->register(UndeclaredTestHandler::class);
+
+        $this->assistant = Assistant::factory()->create(['tenant_id' => $this->tenantId, 'default_language' => 'en']);
+        $this->app->make(CurrentAssistantInterface::class)->set($this->assistant);
+    }
+
+    /**
+     * @return iterable<string, array{0: array<string, mixed>, 1: string}>
+     */
+    public static function nodesThatNeedAContact(): iterable
+    {
+        yield 'a contact node type' => [
+            ['type' => 'send_message', 'config' => ['content_type' => 'text', 'text' => ['en' => 'Hi']]],
+            "the node type 'send_message' reaches the contact of the run",
+        ];
+        yield 'a node that declares nothing' => [
+            ['type' => 'undeclared_test', 'config' => []],
+            "the node type 'undeclared_test' reaches the contact of the run",
+        ];
+        yield 'a contact placeholder' => [
+            ['type' => 'assign', 'config' => ['operations' => [['variable' => ['name' => 'greeting', 'storage' => 'session'], 'value' => 'Hi {{ contact.name }}']]]],
+            "it reads 'contact.name'",
+        ];
+        yield 'a module placeholder' => [
+            ['type' => 'assign', 'config' => ['operations' => [['variable' => ['name' => 'dept', 'storage' => 'session'], 'value' => '{{module.hr.department}}']]]],
+            "it reads 'module.hr.department'",
+        ];
+        yield 'a legacy contact path' => [
+            ['type' => 'branch', 'config' => ['rules' => [['left' => 'contact.age', 'operator' => 'gt', 'right' => 18]]]],
+            "it reads 'contact.age'",
+        ];
+        yield 'a source operand on the contact' => [
+            ['type' => 'branch', 'config' => ['rules' => [['left' => ['ref' => 'source', 'source' => 'contact', 'field' => 'age']]]]],
+            "it reads 'contact'",
+        ];
+        yield 'a contact variable written by assign' => [
+            ['type' => 'assign', 'config' => ['operations' => [['variable' => ['name' => 'tier', 'storage' => 'contact'], 'value' => 'gold']]]],
+            "it uses the contact variable 'tier'",
+        ];
+        yield 'a call node, which hands the contact id to its transport' => [
+            ['type' => 'call', 'config' => ['url' => 'https://example.com/hook']],
+            "the node type 'call' reaches the contact of the run",
+        ];
+        yield 'a bare contact placeholder' => [
+            ['type' => 'assign', 'config' => ['operations' => [['variable' => ['name' => 'who', 'storage' => 'session'], 'value' => '{{contact}}']]]],
+            "it reads 'contact'",
+        ];
+        yield 'a source operand on a module' => [
+            ['type' => 'branch', 'config' => ['rules' => [['left' => ['ref' => 'source', 'source' => 'module', 'field' => 'hr.department']]]]],
+            "it reads 'module'",
+        ];
+        yield 'a legacy assign to the contact' => [
+            ['type' => 'assign', 'config' => ['target' => 'contact', 'key' => 'tier', 'value' => 'gold']],
+            'it writes to the contact',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     */
+    #[DataProvider('nodesThatNeedAContact')]
+    public function test_a_node_that_needs_a_contact_is_refused_under_a_schedule_trigger(array $node, string $reason): void
+    {
+        $errors = $this->contactErrors(['n1' => ['id' => 'n1', 'version' => 1, ...$node]], self::SCHEDULE);
+
+        $this->assertCount(1, $errors);
+        $this->assertSame('nodes.n1', $errors[0]->path);
+        $this->assertStringContainsString("Node 'n1' ({$node['type']}) needs a contact: {$reason}.", $errors[0]->message);
+        $this->assertStringContainsString('schedule trigger', $errors[0]->message);
+    }
+
+    public function test_nodes_that_need_no_contact_pass_under_a_schedule_trigger(): void
+    {
+        $errors = $this->contactErrors([
+            'branch' => ['id' => 'branch', 'type' => 'branch', 'version' => 1, 'config' => [
+                'rules' => [['left' => 'flow.order_id', 'operator' => 'eq', 'right' => '{{flow.expected}}']],
+                'note'  => 'contact.us is plain text here',
+            ]],
+            'assign' => ['id' => 'assign', 'type' => 'assign', 'version' => 1, 'config' => ['operations' => [['variable' => ['name' => 'n', 'storage' => 'session'], 'value' => 1]]]],
+            'delay'  => ['id' => 'delay', 'type' => 'delay', 'version' => 1, 'config' => ['seconds' => 60]],
+            'free'   => ['id' => 'free', 'type' => 'contact_free_test', 'version' => 1, 'config' => []],
+            'end'    => ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], self::SCHEDULE);
+
+        $this->assertSame([], $errors);
+    }
+
+    public function test_a_message_trigger_a_deleted_trigger_and_no_trigger_allow_contact_nodes(): void
+    {
+        $nodes = ['ask' => ['id' => 'ask', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text', 'text' => ['en' => 'Hi']]]];
+
+        $this->assertSame([], $this->contactErrors($nodes, self::MESSAGE));
+        $this->assertSame([], $this->contactErrors($nodes, ['_delete' => true]));
+        $this->assertSame([], $this->contactErrors($nodes, null));
+    }
+
+    public function test_webhook_and_api_triggers_give_no_contact_and_an_event_trigger_does(): void
+    {
+        $nodes = ['ask' => ['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]];
+
+        $this->assertCount(1, $this->contactErrors($nodes, ['type' => 'webhook']));
+        $this->assertCount(1, $this->contactErrors($nodes, ['type' => 'api']));
+        $this->assertSame([], $this->contactErrors($nodes, ['type' => 'event']));
+    }
+
+    public function test_without_a_trigger_in_the_request_the_stored_trigger_of_the_flow_decides(): void
+    {
+        $draft = $this->draft([['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]]);
+        $nodes = ['ask' => $draft->nodes[0]];
+
+        $this->assertSame([], $this->contactErrors($nodes, null, $draft->flow_id), 'no stored trigger: a contact');
+
+        $this->storeTrigger($draft, ['type' => 'schedule', 'is_active' => false, 'config' => self::SCHEDULE['config']]);
+
+        $this->assertCount(1, $this->contactErrors($nodes, null, $draft->flow_id), 'an inactive schedule trigger counts');
+        $this->assertSame([], $this->contactErrors($nodes, self::MESSAGE, $draft->flow_id), 'the request trigger wins');
+    }
+
+    public function test_publish_refuses_a_contact_node_in_a_flow_with_a_schedule_trigger_and_allows_it_with_a_message_trigger(): void
+    {
+        $nodes = [
+            ['id' => 'work', 'type' => 'undeclared_test', 'version' => 1, 'config' => []],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [['id' => 'e1', 'from' => 'work', 'to' => 'end', 'handle' => 'default']];
+
+        $scheduled = $this->draft($nodes, $edges);
+        $this->storeTrigger($scheduled, self::SCHEDULE);
+
+        try {
+            $this->app->make(PublishFlowService::class)->execute($scheduled->flow_id);
+            $this->fail('The publish should be refused.');
+        } catch (FlowValidationException $exception) {
+            $refusal = array_values(array_filter($exception->errors, static fn ($error): bool => ContactContextChecker::CODE === $error->code));
+
+            $this->assertCount(1, $refusal);
+            $this->assertSame('nodes.work', $refusal[0]->path);
+        }
+
+        $conversational = $this->draft($nodes, $edges);
+        $this->storeTrigger($conversational, self::MESSAGE);
+
+        $definition = $this->app->make(PublishFlowService::class)->execute($conversational->flow_id);
+
+        $this->assertSame(1, $definition->version);
+    }
+
+    public function test_a_template_publish_that_puts_a_contact_node_into_a_scheduled_host_is_refused(): void
+    {
+        $template = FlowDraft::factory()->template()->create([
+            'tenant_id'    => $this->tenantId,
+            'assistant_id' => $this->assistant->getKey(),
+            'nodes'        => [
+                ['id' => 't-in', 'type' => 'contact_free_test', 'version' => 1, 'config' => []],
+                ['id' => 't-done', 'type' => 'template_output', 'version' => 1, 'config' => ['name' => 'done', 'label' => 'Done']],
+            ],
+            'edges' => [['id' => 'te1', 'from' => 't-in', 'to' => 't-done', 'handle' => 'default']],
+        ]);
+        $this->app->make(PublishFlowService::class)->execute($template->flow_id);
+
+        $host = $this->draft(
+            [
+                ['id' => 'ref', 'type' => 'template', 'version' => 1, 'config' => ['template_flow_id' => $template->flow_id, 'outputs' => [['name' => 'done', 'label' => 'Done']]]],
+                ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            [['id' => 'he1', 'from' => 'ref', 'to' => 'end', 'handle' => 'done']],
+        );
+        $this->storeTrigger($host, self::SCHEDULE);
+        $this->app->make(PublishFlowService::class)->execute($host->flow_id);
+
+        $template->refresh();
+        $template->update(['nodes' => [
+            ['id' => 't-in', 'type' => 'undeclared_test', 'version' => 1, 'config' => []],
+            $template->nodes[1],
+        ]]);
+
+        try {
+            $this->app->make(PublishFlowService::class)->execute($template->flow_id);
+            $this->fail('The template publish should be refused: its scheduled host would hold a contact node.');
+        } catch (FlowValidationException $exception) {
+            $this->assertSame(['template_breaks_flow'], array_values(array_unique(array_map(static fn ($error): string => $error->code, $exception->errors))));
+            $this->assertStringContainsString('needs a contact', $exception->errors[0]->message);
+        }
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $nodes
+     * @param  array<string, mixed>|null            $trigger
+     *
+     * @return list<\App\Domains\Flow\DTOs\FlowValidationErrorDto>
+     */
+    private function contactErrors(array $nodes, ?array $trigger, ?string $flowId = null): array
+    {
+        $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $nodes, trigger: $trigger, flowId: $flowId);
+
+        return array_values(array_filter($result->errors, static fn ($error): bool => ContactContextChecker::CODE === $error->code));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $nodes
+     * @param  list<array<string, mixed>>  $edges
+     */
+    private function draft(array $nodes, array $edges = []): FlowDraft
+    {
+        return FlowDraft::factory()->create([
+            'tenant_id'    => $this->tenantId,
+            'assistant_id' => $this->assistant->getKey(),
+            'nodes'        => $nodes,
+            'edges'        => $edges,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $trigger
+     */
+    private function storeTrigger(FlowDraft $draft, array $trigger): void
+    {
+        FlowTrigger::query()->create([
+            'tenant_id'    => $draft->tenant_id,
+            'assistant_id' => $draft->assistant_id,
+            'flow_id'      => $draft->flow_id,
+            'type'         => $trigger['type'],
+            'is_active'    => $trigger['is_active'] ?? true,
+            'priority'     => $trigger['priority'] ?? 100,
+            'config'       => $trigger['config'],
+        ]);
+    }
+}
+
+/**
+ * A node that declares it needs no contact.
+ */
+final class ContactFreeTestHandler implements NodeHandlerInterface, DeclaresContextRequirementInterface
+{
+    public function type(): string
+    {
+        return 'contact_free_test';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Contact-free test';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::None;
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
+    }
+}
+
+/**
+ * A node that declares nothing, like every Solution node today: it counts as needing a contact.
+ */
+final class UndeclaredTestHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'undeclared_test';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Undeclared test';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
+    }
+}
