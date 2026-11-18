@@ -21,6 +21,9 @@ export interface ChannelsTranslations {
     secret_token: string
     secret_token_help: string
     secret_token_keep: string
+    secret_saved: string
+    secret_not_set: string
+    secret_saved_placeholder: string
     generate: string
     show: string
     hide: string
@@ -111,7 +114,7 @@ export interface SetupStep {
 /** The setup guide of every channel type, by type, before the channel exists (its URL is not known yet). */
 export type SetupByType = Record<string, SetupStep[]>
 
-/** A channel as the edit page receives it. The token and the secret token are never sent. */
+/** A channel as the edit page receives it. The token and the secret token are never sent, only whether each is stored. */
 export interface EditableChannel {
   id: string
   type: string
@@ -124,6 +127,8 @@ export interface EditableChannel {
   webhookHash: string
   handle: string | null
   url: string | null
+  hasToken: boolean
+  hasSecretToken: boolean
   /** The stored value of each editable setting, by key. */
   settings: Record<string, SettingValue>
   /** The setup guide with this channel's webhook URL; empty when the integration has none. */

@@ -32,6 +32,10 @@ platform needs beyond the two above.
 
 The platform is chosen when the channel is created and cannot be changed afterwards.
 
+When you edit a channel, the token and the secret token are never shown again. Each field says
+whether a value is **Saved** or **Not set**; leave it empty to keep the stored value, or type a
+new one to replace it.
+
 <Warning>
   Saving a channel contacts the provider and registers the webhook. Saving always
   succeeds: if the provider refuses (a token that does not belong to a real bot,
