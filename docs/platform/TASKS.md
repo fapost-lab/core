@@ -89,7 +89,7 @@
   - [x] 7.2 Properties-конфликты между flow (array `item_type` drift теперь блокирует publish — `variable_properties_conflict`; `max_size` не в node config, остаётся registry-only)
   - [x] `.length` резолвер для array-переменных в условиях (`OperandResolver` — `contact.photos.length` → count)
   - [x] Budget: `flow.execution.max_iterations` + publish-error на literal count > 100
-  - Остаток (V1.x, warning-only): 8.5 (while condition не меняется), 8.7 (static number check), UI редактирования `max_size`, `{{…length}}` в TemplateEngine — спека `.ai/specs/flow-engine-v1x/`
+  - Остаток (V1.x, warning-only): UI редактирования `max_size`, `{{…length}}` в TemplateEngine — спека `.ai/specs/flow-engine-v1x/`
 - [x] `emit_event` — event-chain start завершён: `DispatchFlowTriggerEventJob` теперь фанит `StartFlowFromEventJob` на каждый подписанный event-триггер (было — только лог); flow стартует для emitting-контакта, payload доступен как `flow.event.*`; выровнен формат имени события (trigger `event_name` теперь принимает dotted/mixed-case как emit `event_type`) — [specs/flow-engine/nodes/07-emit-event](../reference/specs/flow-engine/nodes/07-emit-event.md)
 - [-] `rag_query` — handler/registry/validation готовы; Feature: RAG ещё предстоит — спека `.ai/specs/ai-solution/`
 - [ ] `form` — сбор данных через веб-форму (TMA / hosted) вместо цепочки `input` — спека `.ai/specs/forms-data-collection/`

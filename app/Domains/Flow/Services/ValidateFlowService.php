@@ -26,6 +26,7 @@ use App\Domains\Flow\Validation\ButtonLimitChecker;
 use App\Domains\Flow\Validation\ChannelCapabilityChecker;
 use App\Domains\Flow\Validation\ContactContextChecker;
 use App\Domains\Flow\Validation\FlowGraphStructureValidator;
+use App\Domains\Flow\Validation\LoopConfigChecker;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -53,6 +54,7 @@ final readonly class ValidateFlowService
         private ?ButtonLimitChecker $buttonLimitChecker = null,
         private ?FlowGraphStructureValidator $graphValidator = null,
         private ?ContactContextChecker $contactContext = null,
+        private ?LoopConfigChecker $loopConfig = null,
     ) {
     }
 
@@ -119,6 +121,14 @@ final readonly class ValidateFlowService
         // (publish), the stored trigger of the flow decides. Skipped when the checker was not injected (legacy unit tests).
         if (null !== $this->contactContext) {
             array_push($errors, ...$this->contactContext->check($this->withoutAnnotations($nodeMap), $trigger, $flowId));
+        }
+
+        // Loop mistakes that would otherwise surface at runtime: iterator/variable clash, non-numeric count, a while
+        // condition nothing in the body changes (a warning). Skipped when the checker was not injected (legacy unit tests).
+        if (null !== $this->loopConfig) {
+            $loopFindings = $this->loopConfig->check($this->withoutAnnotations($nodeMap), $edges);
+            array_push($errors, ...$loopFindings['errors']);
+            array_push($warnings, ...$loopFindings['warnings']);
         }
 
         if (null !== $assistantId) {
