@@ -411,10 +411,12 @@ USER root
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY --chown=www-data:www-data composer.overlay.json ./
 
-RUN php tools/composer-overlay.php --require-overlay -- --no-dev --no-scripts --optimize-autoloader \
+RUN --mount=type=secret,id=composer_auth,required=true \
+    export COMPOSER_AUTH="$(cat /run/secrets/composer_auth)" COMPOSER_CACHE_DIR=/tmp/composer-cache \
+    && php tools/composer-overlay.php --require-overlay -- --no-dev --no-scripts --optimize-autoloader \
     && COMPOSER=composer.local.json composer run-script post-autoload-dump --no-interaction \
-    && chown -R www-data:www-data vendor bootstrap/cache composer.local.json composer.local.lock \
-    && rm -f /usr/bin/composer
+    && chown -R www-data:www-data bootstrap/cache composer.local.json composer.local.lock \
+    && rm -rf /tmp/composer-cache /usr/bin/composer
 USER www-data
 
 # Fail the build when a Solution's manifest is wrong; needs no database.
@@ -423,8 +425,14 @@ RUN php artisan platform:update --validate-only
 
 `post-autoload-dump` runs package discovery, so a Plugin's service provider is found. A
 Solution's provider is not: Core boots it from the manifest, and only when the manifest is valid.
-A private package repository needs Composer credentials at build time; pass them as
-a build secret (`COMPOSER_AUTH`), never as a file copied into the image.
+`vendor/` already belongs to `www-data` in the Core image, so the example re-owns only the files the
+build step created; re-owning `vendor/` would copy all of it into a new layer. A private package
+repository needs Composer credentials at build time; pass them as a build secret, never as a file
+copied into the image. The mount is `required=true` so the build fails instead of resolving without
+credentials, and Composer's cache lives in a temporary directory removed in the same `RUN`, so
+neither the credentials nor the cache reach a layer. Build with
+`docker build --secret id=composer_auth,src=auth.json .`, where `auth.json` holds the
+`COMPOSER_AUTH` JSON.
 
 ## Publish a new version
 
