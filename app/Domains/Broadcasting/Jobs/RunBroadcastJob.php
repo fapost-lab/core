@@ -8,6 +8,7 @@ use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\RecipientStatus;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Services\BroadcastRecipientResolver;
+use App\Domains\Broadcasting\Services\BroadcastService;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
@@ -124,34 +125,7 @@ final class RunBroadcastJob implements ShouldQueue, TenantAccessGatedJob
             $tenant = app(TenantRepositoryInterface::class)->getById($this->tenantId);
 
             app(TenantSwitcher::class)->runForTenant($tenant, function (): void {
-                $changed = Broadcast::query()
-                    ->whereKey($this->broadcastId)
-                    ->where('status', BroadcastStatus::Running->value)
-                    ->update([
-                        'status'       => BroadcastStatus::Failed->value,
-                        'stop_reason'  => BroadcastStatus::STOP_REASON_RUN_FAILED,
-                        'completed_at' => Carbon::now(),
-                    ]);
-
-                if (0 === $changed) {
-                    return;
-                }
-
-                // Rows materialized but never dispatched (the crash hit before or during fan-out) would
-                // stay Pending forever; skip them here. Dispatched ones skip themselves and find a
-                // non-Pending row if this ran first.
-                $skipped = DB::table('broadcast_recipients')
-                    ->where('broadcast_id', $this->broadcastId)
-                    ->where('status', RecipientStatus::Pending->value)
-                    ->update([
-                        'status'     => RecipientStatus::Skipped->value,
-                        'error'      => BroadcastStatus::STOP_REASON_RUN_FAILED,
-                        'updated_at' => Carbon::now(),
-                    ]);
-
-                if ($skipped > 0) {
-                    Broadcast::query()->whereKey($this->broadcastId)->increment('skipped_count', $skipped);
-                }
+                app(BroadcastService::class)->failRun($this->broadcastId);
             });
         } catch (Throwable $inner) {
             Log::error('Could not mark failed broadcast run', [

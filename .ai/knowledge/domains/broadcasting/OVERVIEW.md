@@ -15,7 +15,7 @@ paths:
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-reviewed_at: 2026-10-15
+reviewed_at: 2026-11-18
 ---
 # Broadcasting
 
@@ -40,7 +40,8 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
 ## Entry points
 
 - `Services/BroadcastDispatcher.php`, `Services/BroadcastRecipientResolver.php`.
-- Jobs on `messaging.broadcast`: `Jobs/RunBroadcastJob.php`, `Jobs/SendBroadcastRecipientJob.php`.
+- Jobs on `messaging.broadcast`: `Jobs/RunBroadcastJob.php`, `Jobs/SendBroadcastRecipientJob.php`. A run that exhausts its attempts
+  reaches `BroadcastService::failRun()` from `RunBroadcastJob::failed()`, a queue path with no console user.
 - Console UI: `app/Http/Controllers/Console/BroadcastController.php` over
   `Services/BroadcastService.php` (the console's writes and the send guard), with the requests in
   `app/Http/Requests/Console/*Broadcast*` and the pages in `resources/js/pages/Console/Broadcasts`.

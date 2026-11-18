@@ -11,6 +11,7 @@ use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\BroadcastTarget;
+use App\Domains\Broadcasting\Enums\RecipientStatus;
 use App\Domains\Broadcasting\Exceptions\BroadcastAlreadyStartedException;
 use App\Domains\Broadcasting\Exceptions\BroadcastChangedException;
 use App\Domains\Broadcasting\Exceptions\BroadcastNotEditableException;
@@ -260,6 +261,50 @@ final readonly class BroadcastService
             }
 
             return $cancelled;
+        });
+    }
+
+    /**
+     * Ends a run whose launching job crashed: a still-Running broadcast becomes Failed and its still-Pending
+     * recipients are skipped (counted in skipped_count). A Cancelled or Completed broadcast is left alone.
+     * A recipient already in flight is not touched: its job finds the Failed status on the next check, or, when
+     * it was past that check, moves the unit out of skipped_count on finishing (see SendBroadcastRecipientJob).
+     * Callable from a queue job: it does not depend on the current assistant, only on the tenant being switched.
+     *
+     * @return bool false when the broadcast was not running
+     */
+    public function failRun(string $broadcastId): bool
+    {
+        return DB::transaction(function () use ($broadcastId): bool {
+            $failed = Broadcast::query()
+                ->whereKey($broadcastId)
+                ->where('status', BroadcastStatus::Running->value)
+                ->update([
+                    'status'       => BroadcastStatus::Failed->value,
+                    'stop_reason'  => BroadcastStatus::STOP_REASON_RUN_FAILED,
+                    'completed_at' => Carbon::now(),
+                ]) > 0;
+
+            if (! $failed) {
+                return false;
+            }
+
+            // Rows materialized but never dispatched (the crash hit before or during fan-out) would stay
+            // Pending forever; dispatched ones skip themselves and find a non-Pending row if this ran first.
+            $skipped = DB::table('broadcast_recipients')
+                ->where('broadcast_id', $broadcastId)
+                ->where('status', RecipientStatus::Pending->value)
+                ->update([
+                    'status'     => RecipientStatus::Skipped->value,
+                    'error'      => BroadcastStatus::STOP_REASON_RUN_FAILED,
+                    'updated_at' => Carbon::now(),
+                ]);
+
+            if ($skipped > 0) {
+                Broadcast::query()->whereKey($broadcastId)->increment('skipped_count', $skipped);
+            }
+
+            return true;
         });
     }
 
