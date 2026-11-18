@@ -13,14 +13,14 @@ variable gets a publish warning or error naming the node.
 - [ ] Loop-aware iteration budget instead of the shared `max_iterations = 100`
 - [ ] `{{x.length}}` in templates and a `max_size` editor in the builder
 
-- [ ] `block-invalid-flow-graphs` — Publishing refuses a structurally broken graph — duplicate ids, dangling edges, duplicate `(from, handle)`, not exactly one entry, orphans, variable-contract breaks: the errors `flow:audit-graph` only reports today
+- [x] `block-invalid-flow-graphs` — Publishing refuses a structurally broken graph — duplicate ids, dangling edges, duplicate `(from, handle)`, not exactly one entry, orphans, variable-contract breaks: the errors `flow:audit-graph` only reports today
 
 ## Phase 2 — Calls that can be retried safely
 
 Goal: a `call` to a flaky endpoint can be retried without duplicating its effect. Done when: a call
 retried after a timeout reaches the remote system with the same idempotency key and attempt number.
 
-- [ ] Outbound idempotency for `call`: `attempt_number` and Redis dedup with a TTL above queue retention
+- [x] `call-outbound-idempotency` — Outbound idempotency for `call`: `attempt_number` and Redis dedup with a TTL above queue retention
 - [ ] `call` retry with backoff (after: outbound idempotency — a retry without it duplicates side effects)
 - [ ] `call` `strict_mapping` and generic `success_statuses`
 
@@ -29,11 +29,11 @@ retried after a timeout reaches the remote system with the same idempotency key 
 Goal: a subflow behaves like a function. Done when: a parent passes values into a subflow and reads
 its results without sharing session variables, against a pinned version of the child.
 
-- [ ] Subflow `input_mapping` / `output_mapping`
+- [ ] `subflow-io-mapping` — Subflow `input_mapping` / `output_mapping`
 - [ ] Subflow pinned to a target version
 - [ ] Design-time leaf-vs-group variable path check
 
-- [ ] `subflow-orphan-parents` — A subflow parent never stays `paused_subflow` without a live child — any end of the child returns control to the parent, and the sweeper does not count a live child as dead
+- [x] `subflow-orphan-parents` — A subflow parent never stays `paused_subflow` without a live child — any end of the child returns control to the parent, and the sweeper does not count a live child as dead
 
 ## Phase 4 — Engine and node capabilities
 
@@ -46,7 +46,7 @@ engine, and a Solution can register a bot command.
 
 ## Waves
 
-1. Publish-time loop checks: iterator-vs-session variable conflict, unchanging while condition, static numeric count; Outbound idempotency for `call`: `attempt_number` and Redis dedup with a TTL above queue retention; Subflow `input_mapping` / `output_mapping`
+1. Publish-time loop checks: iterator-vs-session variable conflict, unchanging while condition, static numeric count; `call-outbound-idempotency`; `subflow-io-mapping`
 2. Loop-aware iteration budget instead of the shared `max_iterations = 100`; `call` retry with backoff; Subflow pinned to a target version
 3. `{{x.length}}` in templates and a `max_size` editor in the builder; `call` `strict_mapping` and generic `success_statuses`; Design-time leaf-vs-group variable path check
 4. Per-tenant expression engine: setting, boot validation, snapshot at save (ADR-08); `auth_request` by phone, SMS and email

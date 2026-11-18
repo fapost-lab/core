@@ -10,7 +10,7 @@ Goal: the engine runs a flow that has no contact, safely and once. Done when: a 
 contactless run that crosses several execution segments, a killed and retried segment continues the same
 run instead of starting a second one, and a run past its deadline is moved to `failed`.
 
-- [ ] `flow-contactless-sessions` — Sessions without a contact or assistant: `contact_id` and `assistant_id` nullable (history outlives an assistant), a run kind and `trigger_id` on the session, the state reader and writer fail with a typed error
+- [x] `flow-contactless-sessions` — Sessions without a contact or assistant: `contact_id` and `assistant_id` nullable (history outlives an assistant), a run kind and `trigger_id` on the session, the state reader and writer fail with a typed error
 - [ ] `flow-contact-context` — Contact context checked at publish: handlers declare `contact | none | any` (default `contact`), publish refuses a contact node, a `contact.*` expression or a contact write in a flow whose triggers give no contact; `contactId` nullable in a Foundation minor release (after: `flow-contactless-sessions` — the check guards a run that must first exist)
 - [ ] `flow-segmented-execution` — Idempotent, segmented execution: a fire key under a unique index, segments re-dispatched as jobs, a queue and supervisor of their own (after: `flow-contactless-sessions` — the fire key lives on the session)
 - [ ] `flow-run-deadline-sweeper` — Run deadline sweeper: overdue runs move to `failed` with a reason and free their trigger (after: `flow-segmented-execution` — the deadline is per run, the sweeper also picks up lost `pending` runs)
