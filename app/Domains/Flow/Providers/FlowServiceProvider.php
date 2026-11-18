@@ -111,6 +111,7 @@ use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Repositories\FlowTriggerRepository;
 use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
+use App\Domains\Flow\Retention\AutomationRunRetention;
 use App\Domains\Flow\Routing\DropPolicy;
 use App\Domains\Flow\Routing\DropPolicyInterface;
 use App\Domains\Flow\Routing\MessageRouter;
@@ -245,6 +246,32 @@ final class FlowServiceProvider extends ServiceProvider
             unit: 'hours',
             min: 168,
             max: 720,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: AutomationRunRetention::SUCCEEDED_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.automation_runs.succeeded_retention_days',
+            fallback: AutomationRunRetention::DEFAULT_SUCCEEDED_DAYS,
+            label: 'Succeeded automation runs retention',
+            description: 'How many days a finished automation run that succeeded is kept, with its history and logs, for every tenant. The daily flow:prune-automation-runs deletes older ones; deleting is irreversible. 0 keeps them forever. Conversation sessions are never pruned.',
+            group: 'Flow',
+            unit: 'days',
+            min: 0,
+            max: AutomationRunRetention::MAX_DAYS,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: AutomationRunRetention::FAILED_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.automation_runs.failed_retention_days',
+            fallback: AutomationRunRetention::DEFAULT_FAILED_DAYS,
+            label: 'Failed automation runs retention',
+            description: 'How many days any other finished automation run (failed, expired, cancelled, terminated) is kept, with its history and logs, for every tenant. The daily flow:prune-automation-runs deletes older ones; deleting is irreversible. 0 keeps them forever.',
+            group: 'Flow',
+            unit: 'days',
+            min: 0,
+            max: AutomationRunRetention::MAX_DAYS,
         ));
 
         // Seed Core's system translation keys. Features and Solutions register
