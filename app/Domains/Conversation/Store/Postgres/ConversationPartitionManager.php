@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Conversation\Store\Postgres;
 
+use App\Domains\Shared\Infrastructure\PostgresMonthlyPartitions;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\DatabaseManager;
-use InvalidArgumentException;
 
 /**
  * Creates, lists and drops the monthly range partitions of conversation_messages
@@ -21,10 +21,11 @@ final readonly class ConversationPartitionManager
 {
     private const string PREFIX = 'conversation_messages_';
 
-    private const string NAME_PATTERN = '/^conversation_messages_\d{4}_\d{2}$/';
+    private const string PARENT_TABLE = 'conversation_messages';
 
     public function __construct(
         private DatabaseManager $database,
+        private PostgresMonthlyPartitions $partitions = new PostgresMonthlyPartitions(),
     ) {
     }
 
@@ -63,61 +64,24 @@ final readonly class ConversationPartitionManager
             return [];
         }
 
-        $rows = $this->database->connection()->select(
-            <<<'SQL'
-SELECT child.relname AS partition_name
-FROM pg_inherits
-INNER JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
-INNER JOIN pg_class child ON pg_inherits.inhrelid = child.oid
-INNER JOIN pg_namespace parent_ns ON parent.relnamespace = parent_ns.oid
-INNER JOIN pg_namespace child_ns ON child.relnamespace = child_ns.oid
-WHERE parent.relname = 'conversation_messages'
-  AND parent_ns.nspname = current_schema()
-  AND child_ns.nspname = current_schema()
-  AND child.relname ~ '^conversation_messages_[0-9]{4}_[0-9]{2}$'
-ORDER BY child.relname
-SQL
-        );
-
-        return array_values(array_map(
-            static fn (object $row): string => (string)$row->partition_name,
-            $rows,
-        ));
+        return $this->partitions->list($this->database->connection(), self::PARENT_TABLE);
     }
 
     /**
-     * Drops one monthly partition of the CURRENT schema, schema-qualified so a
-     * search_path change cannot redirect it. Runs in a transaction with
-     * `lock_timeout = 5s`: DROP TABLE needs an ACCESS EXCLUSIVE lock, and a
-     * long-running reader must not make every insert queue behind it. A lock
-     * timeout surfaces as an exception; the next daily run retries.
+     * Drops one monthly partition of the CURRENT schema, schema-qualified, in a
+     * transaction with `lock_timeout = 5s`: DROP TABLE needs an ACCESS EXCLUSIVE
+     * lock, and a long-running reader must not make every insert queue behind it.
+     * A lock timeout surfaces as an exception; the next daily run retries.
      */
     public function dropPartition(string $name): void
     {
-        if (1 !== preg_match(self::NAME_PATTERN, $name)) {
-            throw new InvalidArgumentException("Invalid partition name: {$name}");
-        }
+        $this->partitions->assertPartitionName(self::PARENT_TABLE, $name);
 
         if (! $this->isPostgres()) {
             return;
         }
 
-        $connection = $this->database->connection();
-        $row        = $connection->selectOne('SELECT current_schema() AS schema_name');
-        $schema     = $row->schema_name ?? null;
-
-        if (! is_string($schema)) {
-            return;
-        }
-
-        if (1 !== preg_match('/^[a-z][a-z0-9_]*$/', $schema)) {
-            throw new InvalidArgumentException("Invalid schema name: {$schema}");
-        }
-
-        $connection->transaction(static function () use ($connection, $schema, $name): void {
-            $connection->statement("SET LOCAL lock_timeout = '5s'");
-            $connection->statement("DROP TABLE IF EXISTS \"{$schema}\".\"{$name}\"");
-        });
+        $this->partitions->drop($this->database->connection(), self::PARENT_TABLE, $name);
     }
 
     private function isPostgres(): bool

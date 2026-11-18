@@ -12,7 +12,7 @@ paths:
   - config/conversation.php
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-18
 ---
 # Conversation
 
@@ -55,7 +55,8 @@ are created only on write (`ensureMonthlyPartition` in the store). Retention is 
 `conversations:prune` (`app/Console/Commands/PruneConversationMessagesCommand.php`): when the
 platform setting `conversation.retention_days` (default from env `CONVERSATION_RETENTION_DAYS`, one
 value per install, 0 = keep forever) is positive, it drops, per active tenant schema, the monthly partitions that lie wholly older than the
-cutoff (`Retention/PartitionRetention`), so a message lives retention to retention + ~31 days. Threads
+cutoff (`Retention/PartitionRetention`), so a message lives retention to retention + ~31 days. Each drop runs under `lock_timeout` 5s
+(`Shared/Infrastructure/PostgresMonthlyPartitions`); on a timeout the tenant is marked ✘ and the next run retries. Threads
 and media are not touched. The dedup index
 `conversation_messages_idem_unique` includes `created_at`, the partition key.
 

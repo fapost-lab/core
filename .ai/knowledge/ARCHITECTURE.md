@@ -51,8 +51,9 @@ neither `Domains/Solution` nor `Infrastructure` (`SolutionBoundariesTest`). `app
 Audit domain who is acting (it knows Staff and the support session) and records sign-ins and Tenancy's workspace
 deletion events, so every domain may call the audit trail while Audit itself depends on none of them.
 
-`Presale` (the public site's lead form) and `Shared` (base model concerns) carry no domain
-logic and have no knowledge pack.
+`Presale` (the public site's lead form) and `Shared` (base model concerns, and the Postgres
+monthly-partition helper `Shared/Infrastructure/PostgresMonthlyPartitions` that Flow and Conversation
+both use to list and drop partitions) carry no domain logic and have no knowledge pack.
 
 Domain folders are bounded contexts in naming more than in isolation: Flow reads Contact, Staff,
 Assistant and Media models directly, and import cycles exist (for example Contact↔Flow through
