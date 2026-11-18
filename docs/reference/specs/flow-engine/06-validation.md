@@ -83,6 +83,7 @@ Annotation nodes (`comment`) are exempt from node-level checks. Per node:
 | `loop_invalid_iterator_name`, `loop_reserved_iterator_name`, `loop_count_exceeds_budget` | iterator name is an identifier and not one of `id, language, meta, tenant_id, external_id`; a literal count above 100 is rejected |
 | `loop_iterator_variable_conflict`, `loop_count_not_numeric` | `LoopConfigChecker` (path `nodes.<loop>.config.iterator_name` / `.config.count_source`): no node writes a session variable named like a loop's `iterator_name` or `{iterator_name}_total`; a counted loop's literal `count_source` is a number (a numeric string counts) |
 | `list_max_size_invalid` | `ListSizeChecker` (path `nodes.<node>`): a list variable's `properties.max_size` is a whole number from 1 to 1000 and is set only on a list saved to the contact |
+| `variable_path_conflict` | `VariablePathConflictChecker` (path `nodes.<first writer of the single value>`): one state path is written as a single value by one node and as a group by another (`contact.profile` and `contact.profile.name`; legacy `flow.a` and an `assign` key `a.b`). Covers `input`, `send_message`, `assign` (variable contract and legacy `target` + `key`), `call` (`save_to_variable`, `save_response_to`, `result_mapping`), `subflow` `output_mapping` keys, the legacy `save_to` string and a `loop`'s counter (`flow.<iterator>`, `flow.<iterator>_total`). Session and contact are separate namespaces; only writes are compared. The runtime guard stays |
 | `loop_end_missing_loop_node_id`, `loop_end_invalid_loop_node_id` | `loop_end.loop_node_id` references an existing `loop` node |
 
 Graph-level checks (need `edges`):
@@ -181,5 +182,6 @@ Then the call-graph index, the tenant variable schema and the tenant event regis
 
 - A session needs exactly one derived entry node; `FlowGraphResolver::resolveEntryNode()` throws
   `InvalidFlowGraphException::missingEntryNode()` otherwise.
-- Reserved contact keys, group depth and structural path conflicts are enforced at write time by
-  `ContactWriter`, not at save time.
+- Reserved contact keys and group depth are enforced at write time by `ContactWriter`, not at save time.
+  A leaf-versus-group clash between two nodes is reported earlier as `variable_path_conflict`; the
+  `StructuralPathConflictException` stays as the guard for what validation cannot see (a stored value).

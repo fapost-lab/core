@@ -30,6 +30,7 @@ use App\Domains\Flow\Validation\ContactContextChecker;
 use App\Domains\Flow\Validation\FlowGraphStructureValidator;
 use App\Domains\Flow\Validation\ListSizeChecker;
 use App\Domains\Flow\Validation\LoopConfigChecker;
+use App\Domains\Flow\Validation\VariablePathConflictChecker;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -59,6 +60,7 @@ final readonly class ValidateFlowService
         private ?ContactContextChecker $contactContext = null,
         private ?LoopConfigChecker $loopConfig = null,
         private ?ListSizeChecker $listSize = null,
+        private ?VariablePathConflictChecker $variablePaths = null,
     ) {
     }
 
@@ -139,6 +141,11 @@ final readonly class ValidateFlowService
         // A list variable's max_size must be a whole number in range. Skipped when the checker was not injected.
         if (null !== $this->listSize) {
             array_push($errors, ...$this->listSize->check($this->withoutAnnotations($nodeMap)));
+        }
+
+        // One path written as a single value by one node and as a group by another. Skipped when the checker was not injected.
+        if (null !== $this->variablePaths) {
+            array_push($errors, ...$this->variablePaths->check($this->withoutAnnotations($nodeMap)));
         }
 
         if (null !== $assistantId) {
