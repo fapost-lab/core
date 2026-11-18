@@ -12,9 +12,9 @@ fixture Solution creates its own tables in a tenant schema, runs a scheduled job
 serves a console page from a prebuilt bundle and answers a flow action with data about the
 calling contact — installed into the SaaS image from a private package.
 
-- [ ] Solution migrations in the tenant schema — `registerMigrations` implemented: a Solution's
-      tables are created in each tenant schema where it is active, and what deactivation does to
-      them is decided
+- [x] Solution migrations in the tenant schema — a Solution's tables are created in each tenant
+      schema where it is active, declared in the manifest rather than through `registerMigrations`,
+      and what deactivation does to them is decided (#369)
 - [ ] Solution schedule — `registerSchedule` implemented, running per tenant where the Solution
       is active, under the worker-safety rules
 - [ ] Solution routes — `registerRoutes` implemented for the console pages and endpoints a
