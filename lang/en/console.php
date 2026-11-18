@@ -626,6 +626,10 @@ return [
             'failed'    => 'Failed',
             'cancelled' => 'Cancelled',
         ],
+        'stop_reasons' => [
+            'run_failed'    => 'The run was interrupted, so the remaining recipients were skipped.',
+            'limit_reached' => 'Stopped: the sending limit was reached.',
+        ],
         'targets' => [
             'all'     => 'All contacts',
             'tags'    => 'By tags',

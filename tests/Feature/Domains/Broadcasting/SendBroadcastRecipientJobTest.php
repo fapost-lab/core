@@ -162,6 +162,38 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
         $this->assertSame(0, $broadcast->skipped_count);
         $this->assertSame(0, $broadcast->failed_count);
         $this->assertSame(BroadcastStatus::Failed, $broadcast->status);
+        $this->assertCountsMatchTotal($broadcast);
+    }
+
+    public function test_a_run_that_fails_after_the_send_finished_leaves_the_settled_recipient_alone(): void
+    {
+        [$broadcast, $recipient] = $this->scenario();
+        $broadcast->update(['total_recipients' => 1]);
+        $this->fakeSender(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        $this->send($recipient);
+        app(BroadcastService::class)->failRun((string) $broadcast->getKey());
+
+        $broadcast->refresh();
+        $this->assertSame(RecipientStatus::Sent, $recipient->fresh()->status);
+        $this->assertSame(1, $broadcast->sent_count);
+        $this->assertSame(0, $broadcast->skipped_count);
+        $this->assertCountsMatchTotal($broadcast);
+    }
+
+    public function test_settling_a_recipient_twice_counts_it_once(): void
+    {
+        [$broadcast, $recipient] = $this->scenario();
+        $broadcast->update(['total_recipients' => 1]);
+        $service = app(BroadcastService::class);
+
+        $this->assertTrue($service->settleRecipient((string) $broadcast->getKey(), (string) $recipient->getKey(), RecipientStatus::Sent, 'sent_count'));
+        $this->assertFalse($service->settleRecipient((string) $broadcast->getKey(), (string) $recipient->getKey(), RecipientStatus::Failed, 'failed_count'));
+
+        $broadcast->refresh();
+        $this->assertSame(1, $broadcast->sent_count);
+        $this->assertSame(0, $broadcast->failed_count);
+        $this->assertCountsMatchTotal($broadcast);
     }
 
     public function test_a_failure_after_the_run_failed_is_counted_once_as_failed(): void
@@ -188,6 +220,15 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
         $this->assertSame(RecipientStatus::Failed, $recipient->fresh()->status);
         $this->assertSame(1, $broadcast->failed_count);
         $this->assertSame(0, $broadcast->skipped_count);
+        $this->assertCountsMatchTotal($broadcast);
+    }
+
+    private function assertCountsMatchTotal(Broadcast $broadcast): void
+    {
+        $this->assertSame(
+            $broadcast->total_recipients,
+            $broadcast->sent_count + $broadcast->failed_count + $broadcast->skipped_count,
+        );
     }
 
     private function send(BroadcastRecipient $recipient): void

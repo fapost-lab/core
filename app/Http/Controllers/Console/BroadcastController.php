@@ -229,14 +229,16 @@ final class BroadcastController extends Controller
         $isDraft = BroadcastStatus::Draft === $broadcast->status;
 
         return [
-            'id'      => (string) $id,
-            'name'    => $broadcast->name,
-            'target'  => $broadcast->target_type->value,
-            'status'  => $broadcast->status->value,
-            'sent'    => $broadcast->sent_count,
-            'total'   => $broadcast->total_recipients,
-            'failed'  => $broadcast->failed_count,
-            'skipped' => $broadcast->skipped_count,
+            'id'     => (string) $id,
+            'name'   => $broadcast->name,
+            'target' => $broadcast->target_type->value,
+            'status' => $broadcast->status->value,
+            // Why a failed or stopped run ended; the row shows it next to the status.
+            'stopReason' => $broadcast->stop_reason,
+            'sent'       => $broadcast->sent_count,
+            'total'      => $broadcast->total_recipients,
+            'failed'     => $broadcast->failed_count,
+            'skipped'    => $broadcast->skipped_count,
             // Only a draft carries the revision to confirm; nothing else can be sent.
             'revision' => $isDraft ? $this->broadcasts->revision($broadcast) : null,
             // What the revision covers, for the confirmation to show: the base-language text, plain and short.

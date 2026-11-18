@@ -41,9 +41,10 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
 
 - `Services/BroadcastDispatcher.php`, `Services/BroadcastRecipientResolver.php`.
 - Jobs on `messaging.broadcast`: `Jobs/RunBroadcastJob.php`, `Jobs/SendBroadcastRecipientJob.php`. A run that exhausts its attempts
-  reaches `BroadcastService::failRun()` from `RunBroadcastJob::failed()`, a queue path with no console user.
+  reaches `BroadcastService::failRun()` from `RunBroadcastJob::failed()`, a queue path with no console user;
+  `SendBroadcastRecipientJob` records each outcome through `BroadcastService::settleRecipient()`, the other queue-path entry.
 - Console UI: `app/Http/Controllers/Console/BroadcastController.php` over
   `Services/BroadcastService.php` (the console's writes and the send guard), with the requests in
-  `app/Http/Requests/Console/*Broadcast*` and the pages in `resources/js/pages/Console/Broadcasts`.
+  `app/Http/Requests/Console/*Broadcast*` and the pages in `resources/js/pages/Console/Broadcasts`. The list shows a row's `stop_reason` under its status.
 - `Support/BroadcastMessage.php` cleans the message and checks the base language, for the console's
   request and service.

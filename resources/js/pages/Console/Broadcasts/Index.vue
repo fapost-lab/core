@@ -199,6 +199,7 @@ function deleteOne(): void {
 
       <template #cell-status="{ row }">
         <StatusDot :tone="TONES[row.status]">{{ t.statuses[row.status] }}</StatusDot>
+        <p v-if="row.stopReason && t.stop_reasons[row.stopReason]" class="mt-0.5 text-xs text-muted-foreground">{{ t.stop_reasons[row.stopReason] }}</p>
       </template>
 
       <template #cell-progress="{ row }">
