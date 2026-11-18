@@ -109,7 +109,8 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
             $contact   = $recipient->contact;
             $channel   = Channel::query()->find($recipient->channel_id);
 
-            if (BroadcastStatus::Cancelled === $broadcast->status) {
+            if (BroadcastStatus::Cancelled === $broadcast->status || BroadcastStatus::Failed === $broadcast->status) {
+                // A Failed run (its launching job crashed) skips its remaining recipients with its stop_reason too.
                 // Also the way a run stopped by a limit ends for everyone after the first refusal: no send
                 // is attempted, so the operator is not asked once per remaining recipient.
                 $this->finish($recipient, RecipientStatus::Skipped, 'skipped_count', $broadcast->stop_reason);

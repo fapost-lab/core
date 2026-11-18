@@ -66,10 +66,14 @@ receives.
 starts it once: a broadcast that is already running or finished is never
 started again.
 
-A broadcast moves from **Draft** to **Running** to **Completed**.
+A broadcast moves from **Draft** to **Running** to **Completed**. If the run
+cannot start or crashes while it is being prepared, the broadcast becomes
+**Failed**: nothing more is sent, the recipients not yet reached are *Skipped*
+with the reason `run_failed`, and the cause is in the application log. A failed
+broadcast cannot be sent again; check the log, then compose a new one.
 **Cancel** stops a running broadcast: what was already delivered stays
 delivered, and the recipients still waiting are skipped. A broadcast that has
-finished or been cancelled cannot be sent again; compose a new one.
+finished, failed or been cancelled cannot be sent again; compose a new one.
 
 Any broadcast that is not running can be deleted, together with its delivery
 records. A running one has to be cancelled first.

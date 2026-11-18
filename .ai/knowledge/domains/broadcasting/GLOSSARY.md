@@ -11,14 +11,13 @@ paths:
   - "app/Domains/Broadcasting/**"
   - "database/migrations/tenant/*broadcast*"
   - "tests/Feature/Domains/Broadcasting/**"
-reviewed_at: 2026-10-10
+reviewed_at: 2026-11-18
 ---
 # Broadcasting glossary
 
 ## Broadcast
 
-A one-off message to an audience. Status: `Draft` → `Running` → `Completed`, or `Cancelled`.
-`Failed` exists in the enum but nothing sets it. Informal synonyms: campaign, mailing.
+A one-off message to an audience. Status: `Draft` → `Running` → `Completed`, `Cancelled`, or `Failed` (the launching `RunBroadcastJob` crashed; `stop_reason` `run_failed`). Informal synonyms: campaign, mailing.
 
 ## Target
 

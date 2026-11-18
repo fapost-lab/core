@@ -16,7 +16,7 @@ paths:
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-reviewed_at: 2026-10-15
+reviewed_at: 2026-11-18
 ---
 # Broadcasting rules
 
@@ -46,6 +46,11 @@ broken.
 - **A send job acts only on a `Pending` recipient,** and only the last recipient to finish flips
   the broadcast to `Completed`, through a conditional update (`SendBroadcastRecipientJob`).
 - **Every job runs inside `TenantSwitcher::runForTenant()`.**
+
+- **A crashed run fails the broadcast.** When `RunBroadcastJob` exhausts its attempts, `failed()`
+  moves Running → Failed with `stop_reason` `run_failed` by one conditional update (a Cancelled or
+  Completed run is left alone); later recipient jobs of a Failed broadcast skip like Cancelled ones.
+  Enforced: `RunBroadcastJobTest`, `SendBroadcastRecipientJobTest`.
 
 - **A volume refusal cancels the run.** The first recipient refused for `outbound_messages` is
   Skipped with the reason and the broadcast moves Running → Cancelled with `stop_reason`

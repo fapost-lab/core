@@ -77,6 +77,27 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
         $this->assertSame(1, $broadcast->fresh()->skipped_count);
     }
 
+    public function test_skips_recipient_when_broadcast_run_failed(): void
+    {
+        $sender = $this->fakeSenderCapturing(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        [$broadcast, $recipient] = $this->scenario();
+        $broadcast->update([
+            'status'      => BroadcastStatus::Failed->value,
+            'stop_reason' => BroadcastStatus::STOP_REASON_RUN_FAILED,
+        ]);
+
+        $this->send($recipient);
+
+        $recipient->refresh();
+        $this->assertSame(RecipientStatus::Skipped, $recipient->status);
+        $this->assertSame('run_failed', $recipient->error);
+        $this->assertCount(0, $sender->sent);
+        $broadcast->refresh();
+        $this->assertSame(1, $broadcast->skipped_count);
+        $this->assertSame(BroadcastStatus::Failed, $broadcast->status);
+    }
+
     public function test_delivers_the_locale_matching_the_contacts_language(): void
     {
         $sender = $this->fakeSenderCapturing(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
