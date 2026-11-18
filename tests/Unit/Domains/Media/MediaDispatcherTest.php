@@ -103,6 +103,31 @@ final class MediaDispatcherTest extends TestCase
         $this->assertTrue($result->alreadyDelivered);
     }
 
+    public function test_an_unknown_kind_from_a_reporting_uploader_is_stored_and_the_ref_is_reused(): void
+    {
+        $blob    = $this->makeBlob('blob-unk');
+        $media   = $this->makeMedia($blob);
+        $channel = $this->makeChannel('channel-unk', ChannelTypeEnum::Telegram);
+
+        $cached = new MediaChannelRef();
+        $cached->forceFill(['blob_id' => 'blob-unk', 'channel_id' => 'channel-unk', 'provider_file_id' => 'x-id', 'provider_kind' => 'sticker', 'expires_at' => null]);
+
+        $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
+        $refs->shouldReceive('find')->twice()->andReturn(null, $cached);
+        $refs->shouldReceive('upsert')->once()->with('blob-unk', 'channel-unk', 'x-id', null, 'sticker')->andReturn(new MediaChannelRef());
+
+        $uploader = Mockery::mock(ChannelMediaUploaderInterface::class, ReportsProviderKind::class);
+        $uploader->shouldReceive('channelType')->andReturn('telegram');
+        $uploader->shouldReceive('upload')->once()->andReturn(new UploadResult('x-id', null, '3', 'sticker'));
+
+        $dispatcher = $this->makeDispatcher($refs, new ChannelMediaUploaderRegistry([$uploader]));
+
+        $dispatcher->ensureUploadedToChannel($media, $channel);
+        $second = $dispatcher->ensureUploadedToChannel($media, $channel);
+
+        $this->assertSame('x-id', $second->providerFileId);
+    }
+
     public function test_a_ref_without_a_kind_is_reused_for_an_uploader_that_does_not_report_one(): void
     {
         $blob    = $this->makeBlob('blob-v');

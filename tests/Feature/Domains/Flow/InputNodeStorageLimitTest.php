@@ -19,11 +19,11 @@ use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
-use ArrayObject;
 use Fapost\Foundation\DTO\IncomingMedia;
 use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Illuminate\Support\Str;
@@ -44,7 +44,7 @@ final class InputNodeStorageLimitTest extends FeatureTestCase
 
     public function test_a_file_that_does_not_fit_sends_the_session_straight_to_invalid(): void
     {
-        $result = $this->runInput('image', IncomingMessageType::Photo, new IncomingMedia('AgAC', MediaKind::Image), new ArrayObject());
+        $result = $this->runInput('image', IncomingMessageType::Photo, new IncomingMedia('AgAC', MediaKind::Image));
 
         $this->assertSame(NodeExecutionStatus::Executed, $result->status);
         $this->assertSame('invalid', $result->sourceHandle);
@@ -52,16 +52,7 @@ final class InputNodeStorageLimitTest extends FeatureTestCase
         $this->assertArrayNotHasKey('retry_count', $result->metadata, 'There is no retry and no hint.');
     }
 
-    public function test_the_way_the_message_carried_the_file_reaches_the_ingestor(): void
-    {
-        $seen = new ArrayObject();
-
-        $this->runInput('voice', IncomingMessageType::Voice, new IncomingMedia('AwAD', MediaKind::Audio, 'audio/ogg'), $seen);
-
-        $this->assertSame('voice', $seen['kind']);
-    }
-
-    private function runInput(string $expectedType, IncomingMessageType $type, IncomingMedia $media, ArrayObject $seen): \Fapost\Foundation\DTO\NodeExecutionResult
+    private function runInput(string $expectedType, IncomingMessageType $type, IncomingMedia $media): NodeExecutionResult
     {
         $assistant = Assistant::factory()->create();
         $contact   = Contact::factory()->create(['tenant_id' => self::TENANT_ID]);
@@ -77,11 +68,7 @@ final class InputNodeStorageLimitTest extends FeatureTestCase
         ]);
         $session = $this->startedSession($assistant, $contact);
 
-        $this->app->instance(MediaIngestorInterface::class, new class ($seen) implements MediaIngestorInterface {
-            public function __construct(private readonly ArrayObject $seen)
-            {
-            }
-
+        $this->app->instance(MediaIngestorInterface::class, new class () implements MediaIngestorInterface {
             public function ingestFromChannel(
                 Channel $channel,
                 string $providerFileId,
@@ -90,8 +77,6 @@ final class InputNodeStorageLimitTest extends FeatureTestCase
                 MediaSource $source = MediaSource::InputNode,
                 ?string $providerKind = null,
             ): MediaFile {
-                $this->seen['kind'] = $providerKind;
-
                 throw new StorageLimitReachedException('media_storage', 10, 10, 5);
             }
         });

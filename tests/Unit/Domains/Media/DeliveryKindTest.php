@@ -39,16 +39,31 @@ final class DeliveryKindTest extends TestCase
         $this->assertSame($expected, DeliveryKind::of($mime));
     }
 
-    public function test_the_stored_provider_kind_decides_the_message_type_over_the_format(): void
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function storedKinds(): array
     {
-        $this->assertSame('document', DeliveryKind::payloadType('document', 'audio/wav'));
-        $this->assertSame('voice', DeliveryKind::payloadType('voice', 'audio/ogg'));
+        return [
+            'a WAV stored as a document' => ['document', 'audio/wav'],
+            'an inbound voice note'      => ['voice', 'audio/ogg'],
+            'a JPEG sent as a document'  => ['document', 'image/jpeg'],
+        ];
     }
 
-    public function test_an_inbound_voice_note_and_a_jpeg_sent_as_a_document_go_back_the_way_they_came(): void
+    #[DataProvider('storedKinds')]
+    public function test_the_stored_provider_kind_decides_the_message_type_over_the_format(string $kind, string $mime): void
     {
-        $this->assertSame('voice', DeliveryKind::payloadType('voice', 'audio/ogg'));
-        $this->assertSame('document', DeliveryKind::payloadType('document', 'image/jpeg'));
+        $this->assertSame($kind, DeliveryKind::payloadType($kind, $mime));
+    }
+
+    public function test_a_voice_message_keeps_its_caption(): void
+    {
+        $payload = DeliveryKind::fileIdPayload('voice', 'AwAD', 'Listen');
+
+        $this->assertSame('voice', $payload->type);
+        $this->assertSame('Listen', $payload->text);
+        $this->assertSame(['voice' => 'AwAD'], $payload->media);
     }
 
     public function test_without_a_usable_stored_kind_the_format_decides(): void
