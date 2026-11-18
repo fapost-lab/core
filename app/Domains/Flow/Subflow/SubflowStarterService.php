@@ -63,6 +63,9 @@ final readonly class SubflowStarterService
     }
 
     /**
+     * @param  array<string, mixed>  $input  The child's starting session variables (`flow.<name>`), from the node's
+     *                                       `input_mapping`; empty for a node without one.
+     *
      * @throws SubflowTargetInactiveException  If the target flow has no active definition.
      */
     public function start(
@@ -70,6 +73,7 @@ final readonly class SubflowStarterService
         string $childFlowId,
         DateInterval $timeout,
         string $subflowNodeId,
+        array $input = [],
     ): FlowSession {
         $definition = $this->definitions->findLatestActiveByFlowId($childFlowId);
 
@@ -89,6 +93,7 @@ final readonly class SubflowStarterService
             $subflowNodeId,
             $childExpiresAt,
             $parentExpiresAt,
+            $input,
         ): FlowSession {
             // Pause parent first — if engine starts the child synchronously and the
             // child writes any state, the parent must already be in paused_subflow
@@ -119,7 +124,7 @@ final readonly class SubflowStarterService
                 'current_node_id'       => $entryNode,
                 'parent_session_id'     => (string)$parent->getKey(),
                 'parent_resume_node_id' => $subflowNodeId,
-                'state'                 => [],
+                'state'                 => [] === $input ? [] : SubflowMapping::withSessionVariables([], $input),
                 'status'                => FlowSessionStatus::Active,
                 'version'               => 1,
                 'expires_at'            => $childExpiresAt,
