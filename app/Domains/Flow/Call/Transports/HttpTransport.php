@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Call\Transports;
 
+use App\Domains\Flow\Call\CallAttempt;
 use App\Domains\Flow\Call\Egress\EgressDeniedException;
 use App\Domains\Flow\Call\Egress\GuardedHttpClient;
 use Fapost\Foundation\Flow\Call\CallContext;
@@ -32,7 +33,8 @@ use Psr\Log\LoggerInterface;
  *  - headers       (array; merged with parameter headers)
  *  - success_when  ("2xx" | "any_response" | "2xx_or_4xx"; default "2xx")
  *
- * Idempotency-Key header is set automatically from {@code $context->idempotencyKey}
+ * Idempotency-Key header is set automatically from {@code $context->idempotencyKey}, and
+ * {@see CallAttempt::HEADER} from the attempt number the call node passes in the options,
  * unless the caller supplied one explicitly. Transport-level failures (DNS, timeout,
  * TLS) always end in error regardless of success_when.
  *
@@ -68,6 +70,12 @@ final readonly class HttpTransport implements CallTransportInterface
         $optionHeaders = is_array($request->options['headers'] ?? null) ? $request->options['headers'] : [];
         $headers       = array_replace($optionHeaders, $headers);
         $headers['Idempotency-Key'] ??= $context->idempotencyKey;
+
+        $attempt = $request->options[CallAttempt::OPTION] ?? null;
+
+        if (is_int($attempt) && $attempt > 0) {
+            $headers[CallAttempt::HEADER] ??= (string) $attempt;
+        }
 
         $timeout     = (int) ($request->options['timeout'] ?? 10);
         $successWhen = (string) ($request->options['success_when'] ?? '2xx');

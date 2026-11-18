@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Tenancy;
 
 use App\Domains\Conversation\Retention\PartitionRetention;
+use App\Domains\Flow\Call\RedisCallExecutionLedger;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
@@ -88,12 +89,14 @@ final class PlatformSettingsTest extends FeatureTestCase
         $definitions = $this->settings()->definitions();
         $keys        = array_map(static fn (PlatformSettingDefinition $d): string => $d->key, $definitions);
 
-        $this->assertSame(['audit.retention_days', PartitionRetention::SETTING, self::ITERATIONS, self::REDIRECT], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
-        $this->assertSame(300, $definitions[2]->default);
-        $this->assertSame(10, $definitions[2]->min);
-        $this->assertSame(10000, $definitions[2]->max);
-        $this->assertFalse($definitions[2]->hostModeOnly);
-        $this->assertTrue($definitions[3]->hostModeOnly);
+        $this->assertSame(['audit.retention_days', PartitionRetention::SETTING, RedisCallExecutionLedger::TTL_SETTING, self::ITERATIONS, self::REDIRECT], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
+        $this->assertSame(300, $definitions[3]->default);
+        $this->assertSame(10, $definitions[3]->min);
+        $this->assertSame(10000, $definitions[3]->max);
+        $this->assertFalse($definitions[3]->hostModeOnly);
+        $this->assertSame(192, $definitions[2]->default);
+        $this->assertSame(168, $definitions[2]->min, 'The call dedup window may not drop below the failed-job retention.');
+        $this->assertTrue($definitions[4]->hostModeOnly);
     }
 
     public function test_a_refused_change_writes_nothing(): void
@@ -214,7 +217,7 @@ final class PlatformSettingsTest extends FeatureTestCase
         $contract->update([self::REDIRECT => 3], 'operator:9');
 
         $this->assertSame(3, $this->settings()->integer(self::REDIRECT));
-        $this->assertCount(4, $contract->definitions());
+        $this->assertCount(5, $contract->definitions());
         $this->assertSame('operator:9', PlatformSettingEvent::query()->sole()->changed_by);
     }
 

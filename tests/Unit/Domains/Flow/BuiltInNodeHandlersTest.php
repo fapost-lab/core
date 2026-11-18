@@ -53,6 +53,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Tests\Support\FakeUsageMeter;
+use Tests\Support\InMemoryCallExecutionLedger;
 use Tests\Support\UsageGates;
 use Tests\TestCase;
 
@@ -1092,7 +1093,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_call_unknown_transport_routes_to_error(): void
     {
-        $handler = new CallNodeHandler(new CallTransportRegistry(), new TemplateRenderer(), new VariableResolver(), UsageGates::quota());
+        $handler = new CallNodeHandler(new CallTransportRegistry(), new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger());
 
         $result = $handler->execute([
             'id'     => 'call-u',
@@ -1336,9 +1337,10 @@ final class BuiltInNodeHandlersTest extends TestCase
     public function test_call_unit_key_differs_per_pass_of_a_loop_and_repeats_on_a_retry(): void
     {
         $meter   = FakeUsageMeter::allowing();
-        $handler = $this->makeCallHandler(new FakeCallTransport('http', CallResult::ok([], ['status_code' => 200])), $meter);
+        $handler = $this->makeCallHandler(new FakeCallTransport('http', CallResult::error('transport_failure')), $meter);
         $node    = ['id' => 'call-x', 'config' => ['transport' => 'http', 'target' => 'GET https://x.test']];
 
+        // A failed call is not recorded, so a retry is sent again and spends the same unit.
         foreach (['session-1:call-x:3', 'session-1:call-x:4', 'session-1:call-x:3'] as $engineKey) {
             $handler->execute($node, [], new NodeExecutionContext(
                 tenantId: 'tenant-1',
@@ -1628,7 +1630,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $registry = new CallTransportRegistry();
         $registry->register($transport);
 
-        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter));
+        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger());
     }
 
     private function makeHandler(

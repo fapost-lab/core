@@ -7,12 +7,14 @@ namespace App\Domains\Flow\Providers;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Conversation\Events\OperatorRequestStateChanged;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Call\CallExecutionLedgerInterface;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Call\Egress\AddressClassifier;
 use App\Domains\Flow\Call\Egress\EgressGuardMiddleware;
 use App\Domains\Flow\Call\Egress\EgressPolicy;
 use App\Domains\Flow\Call\Egress\GuardedHttpClient;
 use App\Domains\Flow\Call\Egress\HostResolverInterface;
+use App\Domains\Flow\Call\RedisCallExecutionLedger;
 use App\Domains\Flow\Call\Transports\HandlerTransport;
 use App\Domains\Flow\Call\Transports\HttpTransport;
 use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
@@ -229,6 +231,19 @@ final class FlowServiceProvider extends ServiceProvider
             max: 10000,
         ));
 
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: RedisCallExecutionLedger::TTL_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.call.dedup_ttl_hours',
+            fallback: 192,
+            label: 'Call de-duplication window',
+            description: 'How long the call node remembers a successful call, so that a retried step is not sent to the remote system again. Keep it above the failed-job retention (7 days): a failed step can be retried by hand until then.',
+            group: 'Flow',
+            unit: 'hours',
+            min: 168,
+            max: 720,
+        ));
+
         // Seed Core's system translation keys. Features and Solutions register
         // their own keys through the same catalog from their providers.
         // Idempotent so the test bootstrap can boot the provider repeatedly.
@@ -432,6 +447,8 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->singleton(HostResolverInterface::class, DnsHostResolver::class);
         $this->app->singleton(EgressGuardMiddleware::class);
         $this->app->singleton(GuardedHttpClient::class);
+        // Scoped: it reads a platform setting.
+        $this->app->scoped(CallExecutionLedgerInterface::class, RedisCallExecutionLedger::class);
         $this->app->singleton(HttpTransport::class);
         $this->app->singleton(HandlerTransport::class);
         $this->app->singleton(BuiltinCommandsRegistry::class);

@@ -1923,6 +1923,7 @@ return [
         ],
         'fields' => [
             'flow_execution_max_iterations' => ['label' => 'Maximum flow iterations', 'description' => 'How many steps one flow run may take before it is stopped, which protects against endless loops.'],
+            'flow_call_dedup_ttl_hours'     => ['label' => 'Call de-duplication window', 'description' => 'How many hours the call node remembers a successful call, so a retried step is not sent again. Keep it above 7 days (168 hours).'],
             'conversation_retention_days'   => ['label' => 'Conversation retention', 'description' => 'How many days a message transcript is kept, for every tenant. 0 keeps it forever. A message lives between this many days and about 31 days more; dropping is irreversible. Threads and media are never touched.'],
             'tenancy_rename_redirect_days'  => ['label' => 'Rename redirect period', 'description' => 'How many days the old address of a renamed tenant keeps redirecting to the new one.'],
         ],

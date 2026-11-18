@@ -127,6 +127,15 @@ broken.
   `Idempotency-Key`) would swallow every call after the first; the engine key changes with each
   persisted step and survives a queue retry of the same step. The `call_executions` unit uses the
   same value. Enforced: `CallNodeExecutionKeyTest`.
+- **A repeated execution of a `call` step is replayed from the ledger, never re-sent; every send carries an
+  attempt number.** The node asks `CallExecutionLedgerInterface` for an earlier success of the key before calling
+  the transport and records a success after it (a failure is never recorded, so it stays retryable); a Redis
+  failure never blocks the call; the builder's test call stays outside the ledger; the attempt number travels in
+  `CallRequest::$options` under a key the node always overwrites. The dedup window is the platform setting
+  `flow.call_dedup_ttl_hours`, at least the failed-job retention. A replay is checked before, and is never
+  refused by, the `call_executions` quota. Why: otherwise a retried step creates a
+  second record at the remote system (`adr-20261118-call-outbound-idempotency-strategy`). Enforced:
+  `CallNodeIdempotencyTest`, `RedisCallExecutionLedgerRedisTest`, `HttpTransportTest`.
 - **Running the engine outside `FlowOrchestrator` requires the session lock** through
   `FlowExecutionGuard`, keyed like `MessageRouter` (`contact->tenant_id`, contact, assistant),
   with the session re-read under the lock; a busy lock throws `SessionLockTimeoutException` and

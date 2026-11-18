@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
+use App\Domains\Flow\Call\CallAttempt;
+use App\Domains\Flow\Call\CallExecutionLedgerInterface;
+use App\Domains\Flow\Call\CallOutcome;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
@@ -61,6 +64,8 @@ final class CallNodeHandler extends AbstractVersionedHandler
     private const string ERROR_CODE_META      = 'error_code';
     private const string IDEMPOTENCY_KEY_META = 'idempotency_key';
     private const string STATUS_CODE_META     = 'status_code';
+    private const string ATTEMPT_META         = 'attempt_number';
+    private const string DEDUPLICATED_META    = 'deduplicated';
 
     private const string ERROR_SOLUTION_INACTIVE = 'solution_inactive';
 
@@ -76,6 +81,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
         private readonly TemplateRenderer $templates,
         private readonly VariableResolverInterface $variableResolver,
         private readonly PeriodQuota $quota,
+        private readonly CallExecutionLedgerInterface $ledger,
     ) {
     }
 
@@ -183,7 +189,8 @@ final class CallNodeHandler extends AbstractVersionedHandler
 
         $callContext = $this->buildContext($context);
         $request     = new CallRequest(target: $target, parameters: $parameters, options: $options);
-        $result      = $this->transports->get($transportId)->execute($request, $callContext);
+        $outcome     = $this->dispatch($transportId, $request, $callContext);
+        $result      = $outcome->result;
 
         $stateChanges = [];
         $this->applyResponse($config, $result, $context, $stateChanges);
@@ -196,6 +203,8 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 self::STATUS_CODE_META     => $result->metadata['status_code'] ?? null,
                 self::ERROR_CODE_META      => $result->errorCode,
                 self::IDEMPOTENCY_KEY_META => $callContext->idempotencyKey,
+                self::ATTEMPT_META         => $outcome->attempt,
+                self::DEDUPLICATED_META    => $outcome->replayed ? true : null,
             ], static fn (mixed $v): bool => null !== $v),
             // The flow log keeps only this field; without it the author would not see why the call was refused.
             errorMessage: in_array($result->errorCode, [self::ERROR_SOLUTION_INACTIVE, self::ERROR_SOLUTION_NOT_READY], true)
@@ -319,7 +328,8 @@ final class CallNodeHandler extends AbstractVersionedHandler
         }
 
         $callContext = $this->buildContext($context);
-        $result      = $this->transports->get(self::DEFAULT_TRANSPORT)->execute($request, $callContext);
+        $outcome     = $this->dispatch(self::DEFAULT_TRANSPORT, $request, $callContext);
+        $result      = $outcome->result;
 
         $stateChanges = [];
         $variable     = $this->resolveVariable($config['save_to_variable'] ?? null);
@@ -341,8 +351,43 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 self::STATUS_CODE_META     => $result->metadata['status_code'] ?? null,
                 self::ERROR_CODE_META      => $result->errorCode,
                 self::IDEMPOTENCY_KEY_META => $callContext->idempotencyKey,
+                self::ATTEMPT_META         => $outcome->attempt,
+                self::DEDUPLICATED_META    => $outcome->replayed ? true : null,
             ], static fn (mixed $v): bool => null !== $v),
         );
+    }
+
+    /**
+     * Sends the call, or replays the outcome of an earlier successful execution of the same key.
+     *
+     * A repeated execution of one step (the queue retried it after the worker died, or the session save lost a
+     * race) must not repeat the effect at the remote system, so a stored success is returned without calling the
+     * transport. Otherwise the send is counted, and its number travels to the transport as the attempt number
+     * (overwriting whatever the flow author put under that option); only a success is recorded, because a failure
+     * has to stay retryable. See `adr-20261118-call-outbound-idempotency-strategy`.
+     */
+    private function dispatch(string $transportId, CallRequest $request, CallContext $callContext): CallOutcome
+    {
+        $earlier = $this->ledger->completed($callContext->tenantId, $callContext->idempotencyKey);
+
+        if (null !== $earlier) {
+            return new CallOutcome($earlier, null, true);
+        }
+
+        $attempt = $this->ledger->startAttempt($callContext->tenantId, $callContext->idempotencyKey);
+        $request = new CallRequest(
+            target: $request->target,
+            parameters: $request->parameters,
+            options: [...$request->options, CallAttempt::OPTION => $attempt],
+        );
+
+        $result = $this->transports->get($transportId)->execute($request, $callContext);
+
+        if ($result->success) {
+            $this->ledger->complete($callContext->tenantId, $callContext->idempotencyKey, $result);
+        }
+
+        return new CallOutcome($result, $attempt, false);
     }
 
     /**
@@ -353,6 +398,12 @@ final class CallNodeHandler extends AbstractVersionedHandler
      */
     private function refuseWhenVolumeUsedUp(NodeExecutionContext $context): ?NodeExecutionResult
     {
+        // A replay sends nothing and its unit was spent by the first run: it must not be refused when the
+        // period has rolled over and the tenant is at its limit.
+        if (null !== $this->ledger->completed($context->tenantId, $this->executionKey($context))) {
+            return null;
+        }
+
         $decision = $this->quota->consume(
             self::LIMIT_KEY,
             UsageUnitKey::make('call:', $this->executionKey($context)),
