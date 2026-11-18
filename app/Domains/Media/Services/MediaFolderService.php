@@ -86,17 +86,34 @@ final readonly class MediaFolderService
     }
 
     /**
+     * Moves are serialised per tenant: the subtree and depth checks read the tree and the write changes it, so two
+     * concurrent moves (A into B, B into A) would each pass on the tree as it was and together close a `parent_id`
+     * cycle cut off from the root. One transaction-scoped advisory lock per tenant is taken before anything is read
+     * (a lock on rows would have to cover the whole ancestor chain in a stable order, and the chain is only known
+     * after reading it; a single lock key cannot deadlock). Moves are rare, so the wait is not felt. The lock is
+     * PostgreSQL's; SQLite allows one writer at a time anyway. The parent is re-read under the lock, since the model
+     * the caller holds may predate a move that just committed.
+     *
      * @throws MediaFolderRuleException
      */
     public function move(MediaFolder $folder, ?MediaFolder $parent, string $attribute = 'parent_id'): MediaFolder
     {
-        if (null !== $parent && $this->isInSubtree($parent, $folder)) {
-            throw new MediaFolderRuleException($attribute, MediaFolderRuleException::OWN_SUBTREE);
-        }
+        return $folder->getConnection()->transaction(function () use ($folder, $parent, $attribute): MediaFolder {
+            $this->lockTree($folder);
 
-        $this->assertRoomUnder($parent, $attribute, $this->height($folder));
+            // Both models may predate a move that just committed; a stale folder would have only its path rewritten.
+            $folder = $folder->fresh() ?? throw (new ModelNotFoundException())->setModel(MediaFolder::class, [$folder->id]);
+            $parent = $this->reread($parent, $attribute);
+            $chain  = null === $parent ? [] : $this->ancestorChain($parent);
 
-        return $this->media->moveFolder($folder, $parent);
+            if (in_array($folder->id, array_map(static fn (MediaFolder $f): string => $f->id, $chain), true)) {
+                throw new MediaFolderRuleException($attribute, MediaFolderRuleException::OWN_SUBTREE);
+            }
+
+            $this->assertRoomAtDepth(count($chain), $attribute, $this->height($folder));
+
+            return $this->media->moveFolder($folder, $parent);
+        });
     }
 
     /**
@@ -122,11 +139,15 @@ final readonly class MediaFolderService
      */
     public function deleteMovingContents(MediaFolder $folder, ?MediaFolder $target): void
     {
-        if (null !== $target && $this->isInSubtree($target, $folder)) {
-            throw new MediaFolderRuleException('move_to', MediaFolderRuleException::OWN_SUBTREE);
-        }
-
         $folder->getConnection()->transaction(function () use ($folder, $target): void {
+            $this->lockTree($folder);
+
+            $target = $this->reread($target, 'move_to');
+
+            if (null !== $target && $this->isInSubtree($target, $folder)) {
+                throw new MediaFolderRuleException('move_to', MediaFolderRuleException::OWN_SUBTREE);
+            }
+
             // One statement, not a walk in chunks: paging by offset over the column being changed skips rows, and the
             // skipped files would fall to the root through the foreign key. A file has no observers to miss.
             MediaFile::query()
@@ -200,17 +221,10 @@ final readonly class MediaFolderService
      */
     public function breadcrumbs(MediaFolder $folder): array
     {
-        $crumbs = [];
-        $cursor = $folder;
-
-        while (null !== $cursor) {
-            array_unshift($crumbs, ['id' => $cursor->id, 'name' => $cursor->name]);
-            $cursor = null === $cursor->parent_id
-                ? null
-                : MediaFolder::query()->where('tenant_id', $folder->tenant_id)->whereKey($cursor->parent_id)->first();
-        }
-
-        return $crumbs;
+        return array_map(
+            static fn (MediaFolder $ancestor): array => ['id' => $ancestor->id, 'name' => $ancestor->name],
+            array_reverse($this->ancestorChain($folder)),
+        );
     }
 
     /**
@@ -218,8 +232,8 @@ final readonly class MediaFolderService
      */
     public function isInSubtree(MediaFolder $candidate, MediaFolder $folder): bool
     {
-        foreach ($this->ancestorIds($candidate) as $id) {
-            if ($id === $folder->id) {
+        foreach ($this->ancestorChain($candidate) as $ancestor) {
+            if ($ancestor->id === $folder->id) {
                 return true;
             }
         }
@@ -245,38 +259,71 @@ final readonly class MediaFolderService
      */
     private function assertRoomUnder(?MediaFolder $parent, string $attribute, int $height = 1): void
     {
-        if (null !== $parent && $this->depth($parent) + $height > $this->maxDepth) {
+        $this->assertRoomAtDepth(null === $parent ? 0 : count($this->ancestorChain($parent)), $attribute, $height);
+    }
+
+    private function assertRoomAtDepth(int $parentDepth, string $attribute, int $height): void
+    {
+        if ($parentDepth > 0 && $parentDepth + $height > $this->maxDepth) {
             throw new MediaFolderRuleException($attribute, MediaFolderRuleException::TOO_DEEP, $this->maxDepth);
         }
     }
 
     /**
-     * A root folder is at depth 1; counted through `parent_id`: that is the tree, and `path_cache` is only a derived breadcrumb.
+     * The folder as it is now; a refusal on the field when it was deleted since it was loaded.
+     *
+     * @throws MediaFolderRuleException
      */
-    private function depth(MediaFolder $folder): int
+    private function reread(?MediaFolder $folder, string $attribute): ?MediaFolder
     {
-        return count($this->ancestorIds($folder));
+        if (null === $folder) {
+            return null;
+        }
+
+        return $folder->fresh() ?? throw new MediaFolderRuleException(
+            $attribute,
+            'parent_id' === $attribute ? MediaFolderRuleException::PARENT_NOT_FOUND : MediaFolderRuleException::NOT_FOUND,
+        );
     }
 
     /**
-     * The folder itself, then its parent and so on up to the root.
-     *
-     * @return list<string>
+     * Takes the tenant's tree lock until the surrounding transaction ends; see {@see self::move()}.
      */
-    private function ancestorIds(MediaFolder $folder): array
+    private function lockTree(MediaFolder $folder): void
     {
-        $ids    = [$folder->id];
+        $connection = $folder->getConnection();
+
+        if ('pgsql' === $connection->getDriverName()) {
+            $connection->select('select pg_advisory_xact_lock(hashtext(?))', ['media-folder-tree:' . $folder->tenant_id]);
+        }
+    }
+
+    /**
+     * The folder itself, then its parent and so on up to the root, walked through `parent_id` (that is the tree;
+     * `path_cache` is only a derived breadcrumb), so a root folder is at depth 1 and the chain is as long as its depth.
+     * One walk serves breadcrumbs, depth and the subtree check; a loop already in the data ends it.
+     *
+     * @return non-empty-list<MediaFolder>
+     */
+    private function ancestorChain(MediaFolder $folder): array
+    {
+        $chain  = [$folder];
+        $seen   = [$folder->id => true];
         $cursor = $folder->parent_id;
 
-        while (null !== $cursor && ! in_array($cursor, $ids, true)) {
-            $ids[]  = $cursor;
-            $cursor = MediaFolder::query()
-                ->where('tenant_id', $folder->tenant_id)
-                ->whereKey($cursor)
-                ->value('parent_id');
+        while (null !== $cursor && ! isset($seen[$cursor])) {
+            $parent = MediaFolder::query()->where('tenant_id', $folder->tenant_id)->whereKey($cursor)->first();
+
+            if (null === $parent) {
+                break;
+            }
+
+            $seen[$cursor] = true;
+            $chain[]       = $parent;
+            $cursor        = $parent->parent_id;
         }
 
-        return $ids;
+        return $chain;
     }
 
     /**

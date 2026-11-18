@@ -196,10 +196,74 @@ final class MediaApiTest extends FeatureTestCase
             ->assertJsonValidationErrors(['parent_id']);
         $this->assertNull(MediaFolder::query()->findOrFail($top)->parent_id);
 
-        // A single folder still fits at depth 10.
+        // Mid has height 2, so it would reach depth 11.
         $this->patchJson("/media/folders/{$mid}", ['parent_id' => $parentId])->assertUnprocessable();
+
+        // A single folder still fits at depth 10.
         $leaf = $this->postJson('/media/folders', ['name' => 'Single'])->json('data.id');
         $this->patchJson("/media/folders/{$leaf}", ['parent_id' => $parentId])->assertOk();
+    }
+
+    public function test_move_judges_the_parent_by_the_tree_as_it_is_now_not_by_the_model_it_was_given(): void
+    {
+        $a = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'A', 'path_cache' => '/A']);
+        $b = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'B', 'path_cache' => '/B']);
+
+        // B is read before a concurrent move of B into A commits; the stale model still shows it at the root.
+        $staleB = MediaFolder::query()->findOrFail($b->id);
+        MediaFolder::query()->whereKey($b->id)->update(['parent_id' => $a->id]);
+
+        $this->expectException(MediaFolderRuleException::class);
+
+        try {
+            $this->app->make(MediaFolderService::class)->move($a, $staleB);
+        } finally {
+            $this->assertNull(MediaFolder::query()->findOrFail($a->id)->parent_id);
+        }
+    }
+
+    public function test_move_of_a_stale_folder_model_leaves_parent_and_path_consistent(): void
+    {
+        $service = $this->app->make(MediaFolderService::class);
+        $a       = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'A', 'path_cache' => '/A']);
+        $b       = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'B', 'path_cache' => '/B']);
+        $x       = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'X', 'path_cache' => '/X']);
+
+        // X is loaded at the root, then another request moves it under A; ours asks for B.
+        $stale = MediaFolder::query()->findOrFail($x->id);
+        $service->move($x, $a);
+
+        $service->move($stale, $b);
+
+        $moved = MediaFolder::query()->findOrFail($x->id);
+        $this->assertSame($b->id, $moved->parent_id);
+        $this->assertSame('/B/X', $moved->path_cache);
+    }
+
+    public function test_move_into_a_parent_deleted_since_it_was_loaded_is_a_field_error(): void
+    {
+        $a = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'A', 'path_cache' => '/A']);
+        $b = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'B', 'path_cache' => '/B']);
+        MediaFolder::query()->whereKey($b->id)->delete();
+
+        try {
+            $this->app->make(MediaFolderService::class)->move($a, $b);
+            $this->fail('A deleted parent must be refused.');
+        } catch (MediaFolderRuleException $e) {
+            $this->assertSame('parent_id', $e->attribute);
+        }
+    }
+
+    public function test_breadcrumbs_run_from_the_root_down_through_three_levels(): void
+    {
+        $a = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'A', 'path_cache' => '/A']);
+        $b = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'B', 'parent_id' => $a->id, 'path_cache' => '/A/B']);
+        $c = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'C', 'parent_id' => $b->id, 'path_cache' => '/A/B/C']);
+
+        $this->assertSame(
+            [['id' => $a->id, 'name' => 'A'], ['id' => $b->id, 'name' => 'B'], ['id' => $c->id, 'name' => 'C']],
+            $this->app->make(MediaFolderService::class)->breadcrumbs($c),
+        );
     }
 
     public function test_non_empty_folder_delete_requires_force(): void

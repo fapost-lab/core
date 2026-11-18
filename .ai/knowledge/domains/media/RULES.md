@@ -114,5 +114,8 @@ own storage — so a later per-blob router and a move command can tell where a b
   `moveFolder`, so `path_cache` follows) into a target or the root. Each entry point decides when to
   ask: REST `DELETE /media/folders/{id}` answers 409 for a non-empty folder without `force=true`
   and then moves the contents to the root; the admin screen asks where the contents go. A refusal
-  is `MediaFolderRuleException`, a 422 on the named field. Enforced: `MediaApiTest`,
-  `AdminMediaConsoleTest`.
+  is `MediaFolderRuleException`, a 422 on the named field. Moving and deleting folders are
+  serialised per tenant by a transaction-scoped advisory lock on Postgres, and the moved folder and
+  the new parent are re-read under it, so a stale model cannot close a `parent_id` cycle or leave a
+  folder under the wrong parent. Enforced: `MediaApiTest`, `AdminMediaConsoleTest` (the lock itself
+  is not tested).
