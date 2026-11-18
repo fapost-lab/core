@@ -22,6 +22,8 @@ use Psr\Log\LoggerInterface;
  * failed → failed). Inconsistencies (parent missing, parent not in
  * paused_subflow) are logged but never throw — the child is already terminal.
  * A lost optimistic lock on the parent is retried once; a second conflict propagates.
+ * On `success` it hands back the variables the node's `output_mapping` names,
+ * read from the child's final state ({@see SubflowMapping::outputs()}).
  */
 final readonly class DefaultSubflowResumer implements SubflowResumerInterface
 {
@@ -84,10 +86,14 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
             ],
         );
 
+        $outputs = SubflowNodeHandler::HANDLE_SUCCESS === $sourceHandle
+            ? $this->outputsFor($parent, $child, $subflowNodeId)
+            : [];
+
         $engine = ($this->engineResolver)();
 
         try {
-            $engine->resumeAfterSubflow($parent, $sourceHandle);
+            $engine->resumeAfterSubflow($parent, $sourceHandle, $outputs);
         } catch (FlowConcurrencyException $conflict) {
             // The child is already terminal and nothing re-runs it, so losing the parent's optimistic lock
             // on the resume save would leave the parent in paused_subflow with no child. Retry once, but only
@@ -105,8 +111,35 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
                 'error'     => $conflict->getMessage(),
             ]);
 
-            $engine->resumeAfterSubflow($parent, $sourceHandle);
+            $engine->resumeAfterSubflow($parent, $sourceHandle, $outputs);
         }
+    }
+
+    /**
+     * The parent's variables the subflow node's `output_mapping` takes from the child. Read from the parent's own
+     * definition snapshot, and only while the parent still waits on the node that started this child.
+     *
+     * @return array<string, mixed>
+     */
+    private function outputsFor(FlowSession $parent, FlowSession $child, string $subflowNodeId): array
+    {
+        if ('' === $subflowNodeId || $child->parent_resume_node_id !== $subflowNodeId) {
+            return [];
+        }
+
+        $nodes = $parent->flowDefinition?->nodes;
+
+        foreach (is_array($nodes) ? $nodes : [] as $node) {
+            if (! is_array($node) || ($node['id'] ?? null) !== $subflowNodeId) {
+                continue;
+            }
+
+            $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+            return SubflowMapping::outputs($config, is_array($child->state) ? $child->state : []);
+        }
+
+        return [];
     }
 
     private function handleFor(string $endStatus): string

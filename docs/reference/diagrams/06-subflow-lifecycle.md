@@ -21,9 +21,10 @@ sequenceDiagram
     FO->>FE: resume(parentSession, message)
 
     FE->>SH: execute(subflowConfig, state, context)
-    SH->>ST: start(parent, flow_id, timeout, subflowNodeId)
+    SH->>SH: evaluate input_mapping against the parent's state
+    SH->>ST: start(parent, flow_id, timeout, subflowNodeId, input)
     ST->>DB: UPDATE parent: status = paused_subflow<br/>(expires_at extended past the child's)
-    ST->>DB: CREATE child FlowSession<br/>parent_session_id = parent.id<br/>parent_resume_node_id = subflow node id<br/>flow_definition_id = latest active of flow_id<br/>status = active
+    ST->>DB: CREATE child FlowSession<br/>parent_session_id = parent.id<br/>parent_resume_node_id = subflow node id<br/>flow_definition_id = latest active of flow_id<br/>state = flow.* from input_mapping, status = active
     ST->>FE: runSession(child) (synchronously)
     FE->>FE: child runs to its first wait point<br/>(or straight to its end node)
     ST-->>SH: child session
@@ -44,8 +45,9 @@ sequenceDiagram
     FE->>FE: child's end node: persistEnd<br/>status = ended, end_status = success|cancelled|failed
     FE->>SR: resumeIfChild(child, endStatus)
     SR->>DB: LOAD parent by parent_session_id
-    SR->>FE: resumeAfterSubflow(parent, handle = end_status)
-    FE->>DB: parent: current_node_id = edge(subflow node, handle).to<br/>status = active (or completed if no edge)
+    SR->>SR: on success: output_mapping over the child's state
+    SR->>FE: resumeAfterSubflow(parent, handle = end_status, outputs)
+    FE->>DB: parent: current_node_id = edge(subflow node, handle).to<br/>status = active (or completed if no edge)<br/>state.flow += outputs
     FE->>FE: executeLoop(parent): parent continues<br/>synchronously, inside the same tick
     FE-->>U: reply from the parent flow
 ```
@@ -92,8 +94,11 @@ sequenceDiagram
   its own parent `failed`). A child counts as live while `active`, `waiting_input`, `paused` (a `delay`) or
   `paused_subflow`; a nested chain is failed bottom-up. Each parent is handled under
   its session lock; a busy lock is skipped until the next sweep.
-- **No output mapping:** variables are not copied from the child's state to the parent
-  automatically (the child starts with an empty `state`).
+- **Input and output mapping:** only what the node maps crosses between the sessions. The handler
+  evaluates `input_mapping` against the parent's state and the starter creates the child with those
+  `flow.*` variables (an empty `state` without one). On the `success` handle only, the resumer reads
+  `output_mapping` from the parent's own definition and the child's final state and passes the values to
+  `resumeAfterSubflow()`, which writes them in the same save that advances the parent.
 
 ## Related
 

@@ -9,6 +9,10 @@
 >   `PublishFlowService`.
 > - The routing rule "`paused_subflow` → route to child" is realised by the child being the selected active session. The
 >   explicit `RouteToSubflowChild` branch was removed (2026-10); `paused_subflow` maps to `DropBusy` defensively.
+> - The V1.1 parameters exist (2026-11, node still `subflow@1`): `input_mapping` and `output_mapping` are objects of
+>   bare session variable names, not paths — `input_mapping` maps a child variable to an expression over the parent,
+>   `output_mapping` a parent variable to a child variable — and outputs reach only the parent's `flow.*`, on `success`
+>   only. The node spec `docs/reference/specs/flow-engine/nodes/08-subflow.md` describes the shipped behaviour.
 
 **Status:** Accepted
 **Date:** Апрель 2026

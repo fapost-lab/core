@@ -218,7 +218,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         return $session;
     }
 
-    public function resumeAfterSubflow(FlowSession $parent, string $sourceHandle): FlowSession
+    public function resumeAfterSubflow(FlowSession $parent, string $sourceHandle, array $outputs = []): FlowSession
     {
         $parent->refresh();
 
@@ -233,12 +233,18 @@ final readonly class FlowEngine implements FlowEngineInterface
 
         $nextNodeId = $this->graphResolver->resolveNextNode($definition, $resumeNode, $sourceHandle);
 
-        $this->connection->transaction(function () use ($parent, $nextNodeId): void {
+        $this->connection->transaction(function () use ($parent, $nextNodeId, $outputs): void {
+            $patch = [
+                'status'          => null !== $nextNodeId ? FlowSessionStatus::Active : FlowSessionStatus::Completed,
+                'current_node_id' => $nextNodeId,
+            ];
+
+            if ([] !== $outputs) {
+                $patch['state'] = \App\Domains\Flow\Subflow\SubflowMapping::withSessionVariables($parent->state ?? [], $outputs);
+            }
+
             try {
-                $parent->saveWithOptimisticLock([
-                    'status'          => null !== $nextNodeId ? FlowSessionStatus::Active : FlowSessionStatus::Completed,
-                    'current_node_id' => $nextNodeId,
-                ]);
+                $parent->saveWithOptimisticLock($patch);
             } catch (OptimisticLockConflictException $exception) {
                 throw FlowConcurrencyException::forSession((string)$parent->getKey(), $exception);
             }

@@ -85,6 +85,10 @@ interface FlowEngineInterface
      * Resume a parent session after its subflow child reached an end node.
      * The engine resolves the next node from {@code current_node_id} via
      * {@code $sourceHandle}, advances the parent, and continues executing.
+     *
+     * @param  array<string, mixed>  $outputs  Session variables (`flow.<name>` => value) the child hands back through
+     *                                         the node's `output_mapping`, written in the same save that advances
+     *                                         the parent; empty when nothing is mapped or the child did not succeed.
      */
-    public function resumeAfterSubflow(FlowSession $parent, string $sourceHandle): FlowSession;
+    public function resumeAfterSubflow(FlowSession $parent, string $sourceHandle, array $outputs = []): FlowSession;
 }

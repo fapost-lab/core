@@ -114,7 +114,7 @@ in a draft.
 | | Template | Subflow |
 |---|---|---|
 | Session | Same session as the flow | Separate child session |
-| Variables | Shared with the flow | Its own empty `flow.*` |
+| Variables | Shared with the flow | Its own `flow.*`; values passed in and taken back by mapping |
 | Exits | Named by the template | Fixed: success, cancelled, failed |
 | Timeout | None | Yes |
 | Version used | Copied at the flow's publish; edits republish the flow | Latest published version at start |

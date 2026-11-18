@@ -153,7 +153,21 @@ Runs another flow, and **pauses this one until it finishes**.
 
 This is how a piece of conversation gets reused — an address collection, an
 identity check — without copying it into every flow that needs it. The parent
-resumes with whatever the child produced.
+continues on `success`, `cancelled` or `failed`, after how the child ended.
+
+The child has its own session variables (`flow.*`); contact data is shared. Two
+optional lists move values between them:
+
+- **Pass to the child flow** sets a child variable when the child starts. The value
+  is text or an expression over this flow, such as `{{flow.user_id}}`; a value that
+  is only one expression keeps its type, so a list stays a list.
+- **Take back from the child flow** copies a child variable into a variable of this
+  flow when the child ends with `success`, before the flow continues. A child
+  variable that was never set arrives empty. Nothing is copied on `cancelled` or
+  `failed`.
+
+Names are variable names without the `flow.` prefix. Publishing refuses a name that
+is not a valid variable name.
 
 ### Template
 
