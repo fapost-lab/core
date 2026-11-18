@@ -33,7 +33,7 @@ use App\Domains\Tenancy\Settings\TenantSettings;
  * A session a command ends takes its pending operator request with it: the
  * thread goes back to the bot instead of waiting for an operator forever (the
  * bot stays silent while it waits). A thread an operator already handles is
- * left to them.
+ * left to them. The parents a subflow chain left waiting in `paused_subflow` are ended with it.
  */
 final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInterface
 {
@@ -184,5 +184,40 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
             (string) $session->contact_id,
             (string) $session->getKey(),
         );
+
+        $this->terminateWaitingAncestors($session);
+    }
+
+    /**
+     * A command ends the whole conversation, not only its leaf: the parents a subflow left in
+     * `paused_subflow` would otherwise wait for a child that no longer exists and sit next to the
+     * session the next message starts, until the timeout sweeper reaches them.
+     */
+    private function terminateWaitingAncestors(FlowSession $session): void
+    {
+        $seen     = [(string) $session->getKey()];
+        $parentId = $session->parent_session_id;
+
+        while (is_string($parentId) && '' !== $parentId && !in_array($parentId, $seen, true)) {
+            $seen[] = $parentId;
+
+            $parent = FlowSession::query()->find($parentId);
+
+            if (!$parent instanceof FlowSession || FlowSessionStatus::PausedSubflow !== $parent->status) {
+                return;
+            }
+
+            $parent->newQuery()
+                ->whereKey($parent->getKey())
+                ->update([
+                    'status'          => FlowSessionStatus::TerminatedByUser->value,
+                    'current_node_id' => null,
+                    'updated_at'      => now(),
+                ]);
+
+            $this->activity->touched($parent);
+
+            $parentId = $parent->parent_session_id;
+        }
     }
 }

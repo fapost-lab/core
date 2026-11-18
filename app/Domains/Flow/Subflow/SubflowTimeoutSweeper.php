@@ -22,11 +22,14 @@ use Throwable;
  * schedule (default every minute) and:
  *
  *  • For each parent in {@code paused_subflow} whose {@code expires_at} has
- *    passed: force-end any still-running child as {@code failed} and let
+ *    passed (deepest sessions first, so a nested chain unwinds bottom-up):
+ *    force-end any still-living child (running, waiting, asleep in a `delay`
+ *    or itself paused on a nested subflow) as {@code failed} and let
  *    {@see SubflowResumerInterface} route the parent through its
  *    {@code failed} handle.
  *
- *  • For each parent in {@code paused_subflow} with no live child (orphan):
+ *  • For each parent in {@code paused_subflow} with no live child — a child is live while it is
+ *    active, waiting for input, paused on a delay or paused on a nested subflow (orphan):
  *    mark the parent as {@code expired}. Should not normally happen because
  *    {@see SubflowStarterService} extends parent expiry past child + buffer,
  *    but we recover gracefully if the invariant is ever broken.
@@ -42,6 +45,9 @@ use Throwable;
  */
 final readonly class SubflowTimeoutSweeper
 {
+    /** Subflow chains are at most 3 deep (ADR-11); the bound only guards against a corrupt parent loop. */
+    private const int MAX_CHAIN_DEPTH = 5;
+
     public function __construct(
         private ConnectionInterface $connection,
         private SubflowResumerInterface $resumer,
@@ -65,6 +71,7 @@ final readonly class SubflowTimeoutSweeper
             ->where('status', FlowSessionStatus::PausedSubflow->value)
             ->whereNotNull('expires_at')
             ->where('expires_at', '<', $now)
+            ->orderByDesc('created_at')
             ->get();
 
         foreach ($expiredParents as $parent) {
@@ -120,6 +127,10 @@ final readonly class SubflowTimeoutSweeper
             ->whereIn('status', [
                 FlowSessionStatus::Active->value,
                 FlowSessionStatus::WaitingInput->value,
+                // A child sleeping in a `delay` node, or itself waiting on a nested subflow, is alive: its
+                // own expiry (or its child's) decides, not this parent's.
+                FlowSessionStatus::Paused->value,
+                FlowSessionStatus::PausedSubflow->value,
             ])
             ->latest('created_at')
             ->first();
@@ -127,10 +138,23 @@ final readonly class SubflowTimeoutSweeper
         if (null === $liveChild) {
             $this->markExpired($parent);
 
+            // An orphan that is itself a child must not leave its own parent waiting for it.
+            if (null !== $parent->parent_session_id && '' !== $parent->parent_session_id) {
+                try {
+                    $this->resumer->resumeIfChild($parent, EndStatus::Failed->value);
+                } catch (Throwable $exception) {
+                    $this->logger->warning('flow.subflow.timeout.orphan_hand_back_failed', [
+                        'parent_id' => (string) $parent->getKey(),
+                        'error'     => $exception->getMessage(),
+                    ]);
+                }
+            }
+
             return 'expired';
         }
 
         try {
+            $this->failLiveDescendants($liveChild);
             $this->forceFailChild($liveChild);
             $this->resumer->resumeIfChild($liveChild, EndStatus::Failed->value);
 
@@ -143,6 +167,32 @@ final readonly class SubflowTimeoutSweeper
             ]);
 
             return null;
+        }
+    }
+
+    /**
+     * A child that is itself paused on a nested subflow takes its own live children with it: left running
+     * they would later "return" into a parent that has already moved on. The expiry bounds the whole chain.
+     */
+    private function failLiveDescendants(FlowSession $session, int $depth = 0): void
+    {
+        if (FlowSessionStatus::PausedSubflow !== $session->status || $depth >= self::MAX_CHAIN_DEPTH) {
+            return;
+        }
+
+        $descendants = FlowSession::query()
+            ->where('parent_session_id', $session->getKey())
+            ->whereIn('status', [
+                FlowSessionStatus::Active->value,
+                FlowSessionStatus::WaitingInput->value,
+                FlowSessionStatus::Paused->value,
+                FlowSessionStatus::PausedSubflow->value,
+            ])
+            ->get();
+
+        foreach ($descendants as $descendant) {
+            $this->failLiveDescendants($descendant, $depth + 1);
+            $this->forceFailChild($descendant);
         }
     }
 

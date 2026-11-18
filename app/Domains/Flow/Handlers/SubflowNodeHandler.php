@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
+use App\Domains\Flow\Exceptions\SubflowTargetInactiveException;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Subflow\SubflowStarterService;
 use Exception;
@@ -16,7 +17,6 @@ use Fapost\Support\Builder\Schema\Fields\DurationField;
 use Fapost\Support\Builder\Schema\Fields\FlowPickerField;
 use Fapost\Support\Builder\Schema\Schema;
 use Fapost\Support\Builder\Schema\Section;
-use RuntimeException;
 
 /**
  * Synchronous subflow invocation. Pauses the parent session and starts a
@@ -128,7 +128,7 @@ final class SubflowNodeHandler extends AbstractVersionedHandler
 
         try {
             $child = $this->starter->start($parent, $flowId, $duration, $context->nodeId);
-        } catch (RuntimeException $exception) {
+        } catch (SubflowTargetInactiveException $exception) {
             return new NodeExecutionResult(
                 status: NodeExecutionStatus::Failed,
                 metadata: ['error' => $exception->getMessage(), 'error_type' => 'subflow_target_inactive'],

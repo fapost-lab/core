@@ -137,6 +137,113 @@ final class SubflowTimeoutSweeperTest extends FeatureTestCase
         $this->assertSame(FlowSessionStatus::PausedSubflow, $parent->status);
     }
 
+    public function test_expired_parent_whose_child_sleeps_in_a_delay_is_not_expired_as_an_orphan(): void
+    {
+        $parentDefinition = $this->failedExitParentDefinition();
+        $childDefinition  = $this->createDefinition([
+            ['id' => 'c-delay', 'type' => 'delay', 'version' => 1, 'config' => []],
+        ], []);
+
+        $parent = $this->createSession([
+            'flow_definition_id' => $parentDefinition->getKey(),
+            'current_node_id'    => 'p-sub',
+            'status'             => FlowSessionStatus::PausedSubflow,
+            'expires_at'         => Carbon::now()->subMinutes(5),
+        ]);
+        $child = $this->createSession([
+            'flow_definition_id' => $childDefinition->getKey(),
+            'current_node_id'    => 'c-delay',
+            'status'             => FlowSessionStatus::Paused,
+            'parent_session_id'  => $parent->getKey(),
+        ]);
+
+        $report = $this->app->make(SubflowTimeoutSweeper::class)->sweep();
+
+        $this->assertSame(1, $report['forced_failures']);
+        $this->assertSame(0, $report['orphans_expired']);
+        $this->assertSame(EndStatus::Failed->value, $child->refresh()->end_status);
+        $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
+    }
+
+    public function test_a_nested_chain_unwinds_bottom_up_instead_of_expiring_the_top_parent_as_an_orphan(): void
+    {
+        $topDefinition  = $this->failedExitParentDefinition();
+        $midDefinition  = $this->failedExitParentDefinition();
+        $leafDefinition = $this->createDefinition([
+            ['id' => 'l1', 'type' => 'input', 'version' => 1, 'config' => []],
+        ], []);
+
+        $top = $this->createSession([
+            'flow_definition_id' => $topDefinition->getKey(),
+            'current_node_id'    => 'p-sub',
+            'status'             => FlowSessionStatus::PausedSubflow,
+            'expires_at'         => Carbon::now()->subMinutes(5),
+            'created_at'         => Carbon::now()->subMinutes(30),
+        ]);
+        $mid = $this->createSession([
+            'flow_definition_id' => $midDefinition->getKey(),
+            'current_node_id'    => 'p-sub',
+            'status'             => FlowSessionStatus::PausedSubflow,
+            'expires_at'         => Carbon::now()->subMinutes(5),
+            'parent_session_id'  => $top->getKey(),
+            'created_at'         => Carbon::now()->subMinutes(20),
+        ]);
+        $leaf = $this->createSession([
+            'flow_definition_id' => $leafDefinition->getKey(),
+            'current_node_id'    => 'l1',
+            'status'             => FlowSessionStatus::WaitingInput,
+            'parent_session_id'  => $mid->getKey(),
+            'created_at'         => Carbon::now()->subMinutes(10),
+        ]);
+
+        $report = $this->app->make(SubflowTimeoutSweeper::class)->sweep();
+
+        $this->assertSame(0, $report['orphans_expired']);
+        $this->assertSame(EndStatus::Failed->value, $leaf->refresh()->end_status);
+        $this->assertSame(FlowSessionStatus::Ended, $mid->refresh()->status);
+        $this->assertSame(FlowSessionStatus::Ended, $top->refresh()->status);
+        $this->assertSame(EndStatus::Failed->value, $top->end_status);
+    }
+
+    public function test_an_orphan_that_is_itself_a_child_hands_its_own_parent_the_failed_exit(): void
+    {
+        $topDefinition = $this->failedExitParentDefinition();
+        $midDefinition = $this->createDefinition([
+            ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['timeout' => 'PT1H']],
+        ], []);
+
+        $top = $this->createSession([
+            'flow_definition_id' => $topDefinition->getKey(),
+            'current_node_id'    => 'p-sub',
+            'status'             => FlowSessionStatus::PausedSubflow,
+            'expires_at'         => Carbon::now()->addHour(),
+        ]);
+        $mid = $this->createSession([
+            'flow_definition_id' => $midDefinition->getKey(),
+            'current_node_id'    => 'p-sub',
+            'status'             => FlowSessionStatus::PausedSubflow,
+            'expires_at'         => Carbon::now()->subMinutes(5),
+            'parent_session_id'  => $top->getKey(),
+        ]);
+
+        $this->app->make(SubflowTimeoutSweeper::class)->sweep();
+
+        $this->assertSame(FlowSessionStatus::Expired, $mid->refresh()->status);
+        $this->assertSame(FlowSessionStatus::Ended, $top->refresh()->status);
+        $this->assertSame(EndStatus::Failed->value, $top->end_status);
+    }
+
+    private function failedExitParentDefinition(): FlowDefinition
+    {
+        return $this->createDefinition(
+            nodes: [
+                ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['timeout' => 'PT1H']],
+                ['id' => 'p-fail', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'failed']],
+            ],
+            edges: [['id' => 'e1', 'from' => 'p-sub', 'to' => 'p-fail', 'handle' => 'failed']],
+        );
+    }
+
     /**
      * @param  array<int, array<string, mixed>>  $nodes
      * @param  array<int, array<string, mixed>>  $edges

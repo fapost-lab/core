@@ -11,7 +11,7 @@ flowchart TD
     START([start / resume / runSession]) --> BUDGET
 
     BUDGET{iterations ><br/>flow.execution.max_iterations<br/>platform setting, default 100}
-    BUDGET -- yes --> ERR_BUDGET([session = failed<br/>FlowExecutionLimitExceededException])
+    BUDGET -- yes --> ERR_BUDGET([session = failed<br/>subflow child: hand failed exit to parent, return<br/>otherwise FlowExecutionLimitExceededException])
     BUDGET -- no --> CUR
 
     CUR{session.current_node_id<br/>set?}
@@ -43,7 +43,7 @@ flowchart TD
     EXECUTE[NodeHandler::execute<br/>nodeConfig, state, context] --> THROWS
 
     THROWS{handler threw?}
-    THROWS -- yes --> MARK_FAILED([session = failed,<br/>failed flow log, rethrow])
+    THROWS -- yes --> MARK_FAILED([session = failed,<br/>failed flow log<br/>subflow child: hand failed exit to parent, return<br/>otherwise rethrow])
     THROWS -- no --> RESULT
 
     RESULT[NodeExecutionResult<br/>status, sourceHandle, stateChanges,<br/>logResolved, metadata,<br/>errorMessage, resumeAt] --> NEXT
@@ -71,7 +71,7 @@ flowchart TD
 
     LOG[Write flow log, non-fatal] --> RESUME_PARENT
 
-    RESUME_PARENT[end node: SubflowResumerInterface<br/>.resumeIfChild] --> STOP
+    RESUME_PARENT[end node, or no end node (completed: success,<br/>failed: failed): SubflowResumerInterface<br/>.resumeIfChild] --> STOP
 
     STOP{status Waiting, Delayed,<br/>Failed or Finished,<br/>or no next node?}
     STOP -- yes --> STOPPED([stop, session is parked or finished])
@@ -105,10 +105,10 @@ flowchart TD
 
 | Condition | Result |
 |-----------|--------|
-| Iteration budget exceeded (platform setting `flow.execution.max_iterations`, default from env `FLOW_MAX_ITERATIONS`, 100) | session `failed`, `FlowExecutionLimitExceededException` |
+| Iteration budget exceeded (platform setting `flow.execution.max_iterations`, default from env `FLOW_MAX_ITERATIONS`, 100) | session `failed`, `FlowExecutionLimitExceededException`; a subflow child instead hands its parent the `failed` exit and the run returns |
 | No current node / node not in the graph / node without type | `InvalidFlowGraphException::sessionHasNoCurrentNode()` / `missingNode()` / `nodeMissingType()` |
 | No handler for `type@version` | `HandlerNotFoundException` |
-| Handler throws | session `failed`, failed flow log, exception rethrown to the queue retry policy |
+| Handler throws | session `failed`, failed flow log, exception rethrown to the queue retry policy; a subflow child instead hands its parent the `failed` exit and the run returns |
 | Session lock lost mid-run | `SessionLockLostException`, the run is abandoned |
 | Optimistic-lock conflict on save | `FlowConcurrencyException` (the orchestrator retries) |
 
