@@ -85,7 +85,7 @@ media — with no Slack code in Core. (Viber until 2026-10-26: parked until a cu
 Goal: someone outside the project can write a connector. Done when: the published docs describe the
 connector contract with Telegram (built in) and Slack (a package) as references.
 
-- [ ] Published docs — `docs/site/extending/channel-drivers.mdx` rewritten from "a new provider is a Core
+- [x] Published docs — `docs/site/extending/channel-drivers.mdx` rewritten from "a new provider is a Core
       change" to the connector contract, with Telegram and Slack as references (after: Slack end to end —
       the docs describe the contract the outsider proved)
 - [ ] fog: the Telegram Mini App's host — waits on `telegram-mini-app-strategy-idea`; Telegram stays in
