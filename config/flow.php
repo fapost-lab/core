@@ -9,6 +9,13 @@ return [
         'max_iterations' => (int) env('FLOW_MAX_ITERATIONS', 100),
     ],
 
+    // Only the default of the platform setting `flow.call_dedup_ttl_hours`: how long the `call` node remembers a
+    // successful call, so a retried step is not sent again. Keep it above the failed-job retention
+    // (`horizon.trim.failed`, 7 days); the setting's minimum is 168 hours.
+    'call' => [
+        'dedup_ttl_hours' => (int) env('FLOW_CALL_DEDUP_TTL_HOURS', 192),
+    ],
+
     /*
      * Session execution lock — ADR Message Routing & Concurrency Control
      * § "Distributed Lock Strategy". One lock per (tenant, contact, assistant),

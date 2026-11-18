@@ -15,6 +15,9 @@
 >   `IncomingMessageJob::shouldRetry` retries only `engine_lock_timeout`.
 > - Outbound dedup **does exist**: `MessageSender` reserves the idempotency key with Redis `SET NX` (24h TTL), contrary to
 >   the "no dedup in V1" amendment near the end of this ADR.
+> - Outbound idempotency for `call` (the "Idempotency Strategy" this ADR left for V1.x) is decided in
+>   `.ai/knowledge/adr/20261118-call-outbound-idempotency-strategy.md`: the call node keeps a Redis record of a
+>   successful call and an attempt number, so a retried step is not sent again.
 > - A `paused_subflow` session is never classified: `findActiveForContact` selects only active, waiting and paused
 >   sessions, so the waiting child is resumed instead. `SessionStateRouter` maps `paused_subflow` to `DropBusy`
 >   defensively, not to a silent drop.

@@ -5,7 +5,7 @@ Calls an external or internal service. Combines Integration (HTTP) and Action (i
 **Type:** `call`
 **Version:** 1
 **Class:** `app/Domains/Flow/Handlers/CallNodeHandler.php` (category `Integration`)
-**Idempotent:** the call carries an idempotency key: the engine's execution key plus `:` and the node id (new on each loop pass, the same on a queue retry of the step)
+**Idempotent:** the call carries an idempotency key: the engine's execution key plus `:` and the node id (new on each loop pass, the same on a queue retry of the step), and an attempt number. A repeated execution of a step whose call already succeeded is replayed from a Redis record, not sent again (see "Outbound idempotency")
 
 ## Config
 
@@ -59,7 +59,7 @@ it POSTs `url` through the `http` transport with `{session_id, contact_id, state
 - `error`: transport error, action exception, or an unknown transport id
 
 The node always returns `Executed`; a failed call does not fail the session, it takes `error`.
-Metadata carries `status_code`, `error_code` and `idempotency_key` when present.
+Metadata carries `status_code`, `error_code`, `idempotency_key`, `attempt_number` and, for a replayed call, `deduplicated` when present.
 
 ## `success_when` policy (HTTP transport)
 
@@ -118,7 +118,7 @@ and the proxy must refuse private ranges itself.
 
 A refusal is logged as a warning (tenant, session, node, host, reason, resolved addresses; never the
 URL path or query). The `call_executions` unit is consumed before the transport runs, so a refused
-call still counts. `CallTester` (builder test call) uses the same transport and returns the same
+call still counts. A replayed step (see "Outbound idempotency") is neither asked nor counted again. `CallTester` (builder test call) uses the same transport and returns the same
 `error_code`.
 
 ## Behavior
@@ -131,11 +131,34 @@ call still counts. `CallTester` (builder test call) uses the same transport and 
 4. Build `CallRequest{target, parameters, options}` and `CallContext{tenantId, contactId, sessionId,
    nodeId, idempotencyKey = "{engineKey}:{nodeId}"}`. The engine key changes with each persisted step, so
    every pass of a loop gets a new key, and it stays the same when the queue retries the step; the node
-   id is a defensive suffix. There is no attempt counter. Idempotency of the session run comes from
-   the session lock; remote de-duplication is up to the receiver through the `Idempotency-Key` header.
-5. Call `transport->execute()`; it returns a `CallResult`.
+   id is a defensive suffix.
+5. Ask the ledger for an earlier success of that key and, if there is one, use it as the result (steps 6
+   and 7 run on it); otherwise count the send, pass its number to the transport as `options.attempt_number`
+   (the node overwrites that key, a flow author cannot set it), call `transport->execute()` and, on a
+   `success`, record the result. See "Outbound idempotency".
 6. Apply the response (see below), always, success or error.
 7. Return `Executed` with `success` or `error`.
+
+## Outbound idempotency
+
+`adr-20261118-call-outbound-idempotency-strategy`. The node, not the transport, owns the key, the attempt
+number and the record (`CallExecutionLedgerInterface`, Redis implementation `RedisCallExecutionLedger`).
+
+- **Key:** `{engineKey}:{nodeId}`, as above.
+- **Attempt number:** one more for every time the key is actually sent (Redis `flow:call:{tenant}:{key}:attempts`),
+  starting at 1. The HTTP transport sends it as the `X-FaPost-Attempt-Number` header (a header the flow sets itself
+  wins) next to `Idempotency-Key`. The `handler` transport cannot receive it until Foundation's `CallContext` has
+  a field for it. Node metadata carries `attempt_number`.
+- **Record:** after a `success`, the whole result (payload, error code, metadata) is kept under
+  `flow:call:{tenant}:{key}:done`. A repeated execution of the same key (the queue retried the step after the worker
+  died, or the session save lost a race) finds it, does not call the transport and continues with the stored
+  result, so variables and the handle are the same; its metadata has `deduplicated: true`. A failed call is not
+  recorded and stays retryable; an execution that died in flight leaves only the attempt counter, so the next run
+  sends again with the same key.
+- **Window:** the platform setting `flow.call_dedup_ttl_hours` (default 192 hours, from `FLOW_CALL_DEDUP_TTL_HOURS`;
+  minimum 168 = the failed-job retention, maximum 720).
+- **Limits:** a result over 256 KiB is not recorded; a Redis failure is logged and the call is sent anyway. The
+  builder's test call never uses the ledger. Request headers and parameters are never stored.
 
 **There is no retry.** The `transport_options.retry` block seen in older drafts is not implemented; a
 failed call goes to `error` and the flow decides what to do.
@@ -181,7 +204,7 @@ See [04-call-transport-layer.md](../04-call-transport-layer.md), section 4.3.
 - methods GET, POST, PUT, DELETE, PATCH
 - parameter keys: `body.*`, `query.*`, `headers.*`, `auth.bearer`, `auth.basic.username`, `auth.basic.password`
 - the response goes to `CallResult.payload` (parsed JSON for a JSON `Content-Type`, otherwise raw text)
-- the idempotency key goes into the `Idempotency-Key` header
+- the idempotency key goes into the `Idempotency-Key` header, the attempt number into `X-FaPost-Attempt-Number`
 
 `handler`:
 - `target` is an action id

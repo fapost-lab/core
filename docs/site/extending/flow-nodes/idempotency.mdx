@@ -38,6 +38,14 @@ the effect, and check it on entry. This works when the effect is local.
 **A provider-supplied idempotency key.** Most payment and messaging APIs accept
 one. Use it rather than inventing a guard around a call that already supports it.
 
+## What the `call` node does for you
+
+The built-in `call` node sends an `Idempotency-Key` header (the same value when the queue
+runs the step again, a new one on each pass of a loop) and an `X-FaPost-Attempt-Number`
+header. It also remembers a call that succeeded for about a week, and when the same step
+runs again it reuses that result instead of sending the request a second time. A call
+that failed is sent again with the same key and the next attempt number.
+
 ## What not to rely on
 
 Do not rely on "this rarely happens". Retries are routine, not exceptional.

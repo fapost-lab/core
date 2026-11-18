@@ -15,6 +15,7 @@ Without protection that means a double transition through the graph, a double se
 | **2. Distributed lock** | Redis lock `session_lock:{tenant}:{contact}:{assistant}` (`LockScope`), TTL 30s, kept alive by a heartbeat. `MessageRouter` acquires it through `LockAcquisitionPolicy`: 3 attempts, 2s apart. |
 | **3. Optimistic locking** | `flow_sessions.version`. `saveWithOptimisticLock()` runs `UPDATE ... WHERE version = N`; 0 rows raises `OptimisticLockConflictException`, and `FlowOrchestrator` makes 3 attempts in total with a growing delay between them. |
 | **4. Outbound idempotency** | `MessageSender` reserves Redis `msg:sent:{idempotency_key}` (`SET NX`, 24h) before delivery and releases it if delivery fails, so a retried job never sends the same message twice. |
+| **5. `call` idempotency** | The `call` node records a successful call in Redis (`flow:call:{tenant}:{key}:done`, window `flow.call_dedup_ttl_hours`, default 8 days) and replays it when the same step runs again; every send carries `Idempotency-Key` and an attempt number. `adr-20261118-call-outbound-idempotency-strategy`. |
 
 ### When the lock is not acquired
 
@@ -33,8 +34,9 @@ Without protection that means a double transition through the graph, a double se
 Every handler must be safe to retry. The execution context carries an `idempotencyKey` derived from the inbound update.
 
 - `send_message` — passes the key to the sender, so `MessageSender` drops a repeat delivery.
-- `call` — the HTTP transport sets the `Idempotency-Key` header from `$context->idempotencyKey` unless the config
-  sets one.
+- `call` — the node keeps a Redis record of a call that succeeded and replays it instead of sending again (layer 5);
+  the HTTP transport sets `Idempotency-Key` from `$context->idempotencyKey` and `X-FaPost-Attempt-Number` from the
+  attempt number, unless the config sets one.
 - `set_tag`, `rag_query` — idempotent by nature.
 - `assign` — idempotent for scalar targets (assigning the same value again changes nothing), but **not** for array
   targets: a session array variable appends, so a re-run appends the value again.

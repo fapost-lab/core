@@ -58,6 +58,10 @@ final readonly class CallResult
 `CallContext` carries identifiers, not a tenant or session object. The idempotency key is
 the engine's execution key plus `:` and the node id (new on each loop pass, the same on a queue retry of the step) (see [nodes/06-call.md](nodes/06-call.md)).
 
+The attempt number is not in `CallContext` (Foundation owns it): the call node passes it in
+`CallRequest::$options['attempt_number']` (`App\Domains\Flow\Call\CallAttempt::OPTION`). A transport never keeps
+idempotency state of its own: the node's ledger decides whether a call is sent at all.
+
 ## 4.3 Built-in transports
 
 Registered in `FlowServiceProvider` through `CallTransportRegistry`.
@@ -68,7 +72,7 @@ Registered in `FlowServiceProvider` through `CallTransportRegistry`.
 - Parameters are bucketed by prefix: `body.*`, `query.*`, `headers.*`, `auth.bearer`,
   `auth.basic.username` / `auth.basic.password`. Options: `timeout` (seconds, default 10), `headers`,
   `success_when`, `body_raw` (a pre-built JSON string that wins over `body.*`).
-- The `Idempotency-Key` header is set from `CallContext::$idempotencyKey` unless the caller supplied one.
+- The `Idempotency-Key` header is set from `CallContext::$idempotencyKey`, and `X-FaPost-Attempt-Number` from `options.attempt_number`, unless the caller supplied one.
 - Response parsing: JSON when the `Content-Type` is JSON, otherwise raw text.
 - The success boundary is `options.success_when`: `2xx` (default), `any_response`, `2xx_or_4xx`.
   Transport-level failures (DNS, timeout, TLS) are always errors with code `transport_failure`.

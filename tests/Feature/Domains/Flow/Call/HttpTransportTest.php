@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow\Call;
 
+use App\Domains\Flow\Call\CallAttempt;
 use App\Domains\Flow\Call\Transports\HttpTransport;
 use Fapost\Foundation\Flow\Call\CallContext;
 use Fapost\Foundation\Flow\Call\CallRequest;
@@ -304,6 +305,32 @@ final class HttpTransportTest extends TestCase
         $named = $transport->execute(new CallRequest(target: 'GET http://rebind.example.com:9/'), $this->context());
         $this->assertSame('egress_denied', $named->errorCode);
         $this->assertSame('loopback', $named->metadata['reason']);
+    }
+
+    public function test_the_attempt_number_is_sent_as_a_header_and_the_callers_header_wins(): void
+    {
+        Http::fake(['*' => Http::response([], 200, ['Content-Type' => 'application/json'])]);
+
+        $transport = $this->app->make(HttpTransport::class);
+        $transport->execute(
+            new CallRequest(target: 'POST https://api.example.com/users', options: [CallAttempt::OPTION => 3]),
+            $this->context(),
+        );
+        $transport->execute(
+            new CallRequest(
+                target: 'POST https://api.example.com/users',
+                parameters: ['headers.X-FaPost-Attempt-Number' => 'mine'],
+                options: [CallAttempt::OPTION => 3],
+            ),
+            $this->context(),
+        );
+        $transport->execute(new CallRequest(target: 'POST https://api.example.com/users'), $this->context());
+
+        $recorded = Http::recorded();
+        $this->assertSame('3', $recorded[0][0]->header(CallAttempt::HEADER)[0]);
+        $this->assertSame('session-1:node-1:1', $recorded[0][0]->header('Idempotency-Key')[0]);
+        $this->assertSame('mine', $recorded[1][0]->header(CallAttempt::HEADER)[0]);
+        $this->assertSame([], $recorded[2][0]->header(CallAttempt::HEADER));
     }
 
     private function context(string $idempotencyKey = 'session-1:node-1:1'): CallContext

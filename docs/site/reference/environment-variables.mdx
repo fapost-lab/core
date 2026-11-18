@@ -51,6 +51,7 @@ value stored in the database wins over them, and resetting the stored value brin
 | Variable | Default | Platform setting |
 |---|---|---|
 | `FLOW_MAX_ITERATIONS` | `100` | `flow.execution.max_iterations`: how many nodes one flow run may pass through before the session fails |
+| `FLOW_CALL_DEDUP_TTL_HOURS` | `192` | `flow.call_dedup_ttl_hours`: how many hours the `call` node remembers a successful call, so a retried step is not sent again |
 | `TENANCY_RENAME_REDIRECT_DAYS` | `30` | `tenancy.rename.redirect_days`, described above |
 | `AUDIT_RETENTION_DAYS` | `365` | `audit.retention_days`: how many days an entry of the [activity log](/using/activity-log) is kept, for every tenant; `0` keeps it forever. A value that is not a whole number from 0 to 3650 is ignored |
 
