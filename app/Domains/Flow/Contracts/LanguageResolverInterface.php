@@ -9,5 +9,9 @@ use App\Domains\Flow\Models\FlowSession;
 
 interface LanguageResolverInterface
 {
-    public function resolve(Contact $contact, FlowSession $session): string;
+    /**
+     * The session's own language first, then the contact's, then the tenant's fallback. A contactless session
+     * ({@code $contact} null) skips the contact.
+     */
+    public function resolve(?Contact $contact, FlowSession $session): string;
 }

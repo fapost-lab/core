@@ -6,6 +6,7 @@ namespace App\Domains\Flow\State\Readers;
 
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\State\Exceptions\ContactlessSessionException;
 use Fapost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
 use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 
@@ -25,6 +26,10 @@ use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
  *  - module.<name>.<...>      → DataAccessor registered under `module.<name>`, get(<...>)
  *  - flow|system|rag|call.*   → flow_sessions.state.<namespace>.<...>
  *  - <solution id>.*          → the same, for a namespace a Solution registered (StateNamespacesInterface)
+ *
+ * A contactless session ({@code $contact} null) reads every session namespace as usual, but `contact.*` and
+ * `module.*` (an accessor is asked for a contact) throw {@see ContactlessSessionException}: the path is not missing,
+ * it cannot exist for this kind of run, and a null would hide that until something downstream breaks.
  */
 final readonly class ScopedStateReader implements ScopedStateReaderInterface
 {
@@ -33,7 +38,7 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
      */
     public function __construct(
         private array $sessionState,
-        private Contact $contact,
+        private ?Contact $contact,
         private DataAccessorRegistryInterface $accessors,
         private StateNamespacesInterface $namespaces,
     ) {
@@ -50,14 +55,22 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
         $rest      = $segments[1] ?? '';
 
         return match ($namespace) {
-            'contact'                       => $this->readContact($rest),
-            'module'                        => $this->readModule($rest),
+            'contact'                       => $this->readContact($this->contactFor($path), $rest),
+            'module'                        => $this->readModule($this->contactFor($path), $rest),
             'flow', 'system', 'rag', 'call' => $this->readSession($namespace, $rest),
             default                         => $this->namespaces->has($namespace) ? $this->readSession($namespace, $rest) : null,
         };
     }
 
-    private function readContact(string $rest): mixed
+    /**
+     * @throws ContactlessSessionException
+     */
+    private function contactFor(string $path): Contact
+    {
+        return $this->contact ?? throw ContactlessSessionException::forRead($path);
+    }
+
+    private function readContact(Contact $contact, string $rest): mixed
     {
         if ('' === $rest) {
             return null;
@@ -72,13 +85,13 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
             in_array($head, ['id', 'tenant_id', 'external_id', 'platform', 'language', 'is_authenticated'], true)
             && null === $tail
         ) {
-            return $this->contact->getAttribute($head);
+            return $contact->getAttribute($head);
         }
 
-        $attributes = is_array($this->contact->attributes) ? $this->contact->attributes : [];
+        $attributes = is_array($contact->attributes) ? $contact->attributes : [];
 
         if (null === $tail) {
-            return $attributes[$head] ?? $this->readProfileFallback($head);
+            return $attributes[$head] ?? $this->readProfileFallback($contact, $head);
         }
 
         $group = $attributes[$head] ?? null;
@@ -95,15 +108,15 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
      * attributes always wins (the caller checks it first); this only fills the gap from the channel
      * profile in `meta` (filled from the inbound payload) or the `platform` column.
      */
-    private function readProfileFallback(string $field): mixed
+    private function readProfileFallback(Contact $contact, string $field): mixed
     {
-        $meta = is_array($this->contact->meta) ? $this->contact->meta : [];
+        $meta = is_array($contact->meta) ? $contact->meta : [];
 
         $value = match ($field) {
             'name'     => $this->fullName($meta),
             'username' => $meta['username'] ?? null,
             'phone'    => $meta['phone'] ?? $meta['phone_number'] ?? null,
-            'channel'  => $this->contact->platform,
+            'channel'  => $contact->platform,
             default    => null,
         };
 
@@ -126,7 +139,7 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
         return '' === $full ? null : $full;
     }
 
-    private function readModule(string $rest): mixed
+    private function readModule(Contact $contact, string $rest): mixed
     {
         if ('' === $rest) {
             return null;
@@ -142,8 +155,8 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
 
         return $this->accessors->resolve($prefix)->get(
             key: $key,
-            contactId: (string) $this->contact->getKey(),
-            tenantId: (string) $this->contact->tenant_id,
+            contactId: (string) $contact->getKey(),
+            tenantId: (string) $contact->tenant_id,
         );
     }
 

@@ -41,10 +41,10 @@ final class PruneFlowLogsCommandTest extends TestCase
         $beta  = $this->tenant('beta');
 
         $this->connectionFor($alpha, ['flow_logs_2026_02', 'flow_logs_2026_03', 'flow_logs_2026_04'])
-            ->shouldReceive('statement')->once()->with('DROP TABLE IF EXISTS flow_logs_2026_02');
+            ->shouldReceive('statement')->once()->with('DROP TABLE IF EXISTS "tenant_x"."flow_logs_2026_02"');
 
         $this->connectionFor($beta, ['flow_logs_2026_01', 'flow_logs_2026_04'])
-            ->shouldReceive('statement')->once()->with('DROP TABLE IF EXISTS flow_logs_2026_01');
+            ->shouldReceive('statement')->once()->with('DROP TABLE IF EXISTS "tenant_x"."flow_logs_2026_01"');
 
         $this->bindCommand([$alpha, $beta]);
 
@@ -84,7 +84,7 @@ final class PruneFlowLogsCommandTest extends TestCase
         $this->connections[spl_object_id($alpha)] = $broken;
 
         $this->connectionFor($beta, ['flow_logs_2026_02'])
-            ->shouldReceive('statement')->once()->with('DROP TABLE IF EXISTS flow_logs_2026_02');
+            ->shouldReceive('statement')->once()->with('DROP TABLE IF EXISTS "tenant_x"."flow_logs_2026_02"');
 
         $this->bindCommand([$alpha, $beta]);
 
@@ -93,6 +93,25 @@ final class PruneFlowLogsCommandTest extends TestCase
             ->expectsOutput('✔ beta: dropped 1')
             ->expectsOutput('Dropped partitions: 1')
             ->assertFailed();
+    }
+
+    public function test_it_reads_the_partition_month_correctly_on_the_31st(): void
+    {
+        // 2026-03-31: createFromFormat('Y_m') without '!' would carry the day
+        // over, and '2026_02' would overflow into March.
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-03-31 00:00:00 UTC'));
+
+        $alpha = $this->tenant('alpha');
+
+        $connection = $this->connectionFor($alpha, ['flow_logs_2026_01', 'flow_logs_2026_02', 'flow_logs_2026_03']);
+        $connection->shouldReceive('statement')->once()->with('DROP TABLE IF EXISTS "tenant_x"."flow_logs_2026_01"');
+        $connection->shouldReceive('statement')->once()->with('DROP TABLE IF EXISTS "tenant_x"."flow_logs_2026_02"');
+
+        $this->bindCommand([$alpha]);
+
+        $this->artisan('logs:prune-flow')
+            ->expectsOutput('✔ alpha: dropped 2')
+            ->assertSuccessful();
     }
 
     /**
@@ -149,6 +168,8 @@ final class PruneFlowLogsCommandTest extends TestCase
             static fn (string $name): object => (object)['partition_name' => $name],
             $partitionNames,
         ));
+
+        $connection->shouldReceive('selectOne')->andReturn((object)['schema_name' => 'tenant_x']);
 
         $this->connections[spl_object_id($tenant)] = $connection;
 

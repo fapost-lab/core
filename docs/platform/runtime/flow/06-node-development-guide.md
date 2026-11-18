@@ -309,8 +309,9 @@ validate; validation runs on an explicit validate request and atomically on publ
 **`FlowGraphStructureValidator`** is a structural validator that returns the same
 `FlowValidationErrorDto` list and never throws: no duplicate node ids, edges point at existing nodes,
 no duplicate handle on one node, exactly one derived entry node, no orphans, and the variable contract
-(`variable_contract_*`, `branch_rules_*`). The save / validate / publish pipeline does not call it yet;
-only `php artisan flow:audit-graph` does. See `docs/reference/specs/flow-engine/06-validation.md`.
+(`variable_contract_*`, `branch_rules_*`). `ValidateFlowService::execute()` calls it, so validate and
+publish refuse what it reports (save-draft still does not validate); `php artisan flow:audit-graph` runs it
+over stored flows. See `docs/reference/specs/flow-engine/06-validation.md`.
 
 Neither validates "at least one `end` node".
 

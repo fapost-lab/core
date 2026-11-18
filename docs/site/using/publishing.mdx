@@ -24,6 +24,11 @@ Run **Validate** in the [builder](/using/flow-builder) first. It catches the
 problems that are cheap to fix before publishing and expensive after: a required
 field left empty, an outcome wired to nothing, a structure that cannot complete.
 
+Publishing runs the same checks and refuses a flow whose graph is broken: a connection that points at a step
+that no longer exists, two connections leaving one step on the same outcome, more or fewer than one step that
+nothing leads into (the step the flow starts at), or steps that cannot be reached from the start. A flow with
+no steps cannot be published either.
+
 ## The version badge
 
 The builder shows the flow's published version — `Published v1` — and the

@@ -25,7 +25,7 @@ final class FlowSessionSchemaTest extends FeatureTestCase
 
         $this->assertSame('assistants', $foreignKeys->get('assistant_id')['table']);
         $this->assertSame('id', $foreignKeys->get('assistant_id')['to']);
-        $this->assertSame('cascade', $foreignKeys->get('assistant_id')['on_delete']);
+        $this->assertSame('set null', $foreignKeys->get('assistant_id')['on_delete']);
 
         $this->assertSame('contacts', $foreignKeys->get('contact_id')['table']);
         $this->assertSame('id', $foreignKeys->get('contact_id')['to']);

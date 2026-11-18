@@ -245,7 +245,7 @@ final readonly class FlowGraphStructureValidator
             return [];
         }
 
-        return $this->variableShapeErrors($nodeId, $config['variable'], 'variable', 'config.variable')[1];
+        return $this->variableShapeErrors($nodeId, $config['variable'], 'variable', 'config.variable', unsetAllowed: true)[1];
     }
 
     /**
@@ -275,6 +275,7 @@ final readonly class FlowGraphStructureValidator
             $config['save_to_variable'],
             'save_to_variable',
             'config.save_to_variable',
+            unsetAllowed: true,
         )[1];
     }
 
@@ -333,6 +334,7 @@ final readonly class FlowGraphStructureValidator
                 $variableConfig,
                 "operations[{$index}].variable",
                 "{$path}.variable",
+                unsetAllowed: false,
             );
 
             array_push($errors, ...$shapeErrors);
@@ -419,6 +421,7 @@ final readonly class FlowGraphStructureValidator
                         $variableConfig,
                         "rules[{$index}].left.variable",
                         "config.rules.{$index}.left.variable",
+                        unsetAllowed: true,
                     )[1]);
                 }
 
@@ -471,10 +474,22 @@ final readonly class FlowGraphStructureValidator
     }
 
     /**
+     * A variable object with no name is "no save target": the runtime reads it as such and does not fail
+     * (`Variable::tryFromArray()` returns null), and the builder keeps `{type, storage}` defaults in a draft the
+     * author has not filled in yet. Where `$unsetAllowed` (`input`, `send_message`, branch rules) that is not an
+     * error here: an `input` without a target is `input_missing_save_target` in `ValidateFlowService`. An `assign`
+     * operation without a target throws at runtime, so there it stays invalid. A name with no storage is always
+     * invalid: the author meant to save the value, and it would be dropped.
+     *
      * @return array{0: Variable|null, 1: list<FlowValidationErrorDto>}
      */
-    private function variableShapeErrors(string $nodeId, mixed $raw, string $field, string $pathSuffix): array
-    {
+    private function variableShapeErrors(
+        string $nodeId,
+        mixed $raw,
+        string $field,
+        string $pathSuffix,
+        bool $unsetAllowed,
+    ): array {
         $path = "nodes.{$nodeId}.{$pathSuffix}";
 
         if (! is_array($raw)) {
@@ -483,6 +498,12 @@ final readonly class FlowGraphStructureValidator
                 'variable_contract_invalid',
                 "Node {$nodeId} {$field} must be an object describing a variable.",
             )]];
+        }
+
+        $name = $raw['name'] ?? null;
+
+        if ($unsetAllowed && (null === $name || '' === $name)) {
+            return [null, []];
         }
 
         try {

@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-11-12
+reviewed_at: 2026-11-18
 ---
 # Flow rules
 
@@ -142,6 +142,16 @@ broken.
   the queue retries. `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
   `StartFlowFromEventJob` and `SubflowTimeoutSweeper` follow it (`tests/Feature/Redis`); the sweeper skips a parent whose lock
   is busy and retries on its next run.
+- **A contactless session never reaches a contact through an empty id.** Without a contact,
+  `ScopedStateReader` refuses `contact.*` and `module.*`, `ContactWriter` refuses every write and
+  `LockScope` refuses the scope, all with `ContactlessSessionException`; `FlowEngine::start()` takes a
+  contactless run's assistant only from `FlowRunOrigin`, never from the current assistant, and a subflow
+  child copies `run_kind` and `trigger_id`. Why: an empty id turns a per-contact read or lock into a
+  tenant-wide one, and an ambient assistant attaches a run to whichever assistant a job resolved.
+  Known gaps: `OperandResolver` reads `module.*` operands past the reader, and `SubflowTimeoutSweeper`
+  lets the lock-scope error end its pass — both before any trigger starts a contactless run
+  (`adr-20261118-contactless-runs-in-flow-sessions`). Enforced: `ContactlessFlowSessionTest`,
+  `ScopedStateReaderTest`, `ContactWriterTest`, `LockScopeTest`.
 - **New built-in state namespaces go into the foundation `StateNamespace` enum.** Core keeps no enum of
   its own (ADR-0002). The runtime list is `StateNamespacesInterface` (`StateNamespaceRegistry`: built-ins plus
   Solution namespaces, frozen at boot); readers (`ScopedStateReader`, `OperandResolver`) and the branch

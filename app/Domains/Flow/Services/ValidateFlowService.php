@@ -24,6 +24,7 @@ use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Flow\Validation\ButtonLimitChecker;
 use App\Domains\Flow\Validation\ChannelCapabilityChecker;
+use App\Domains\Flow\Validation\FlowGraphStructureValidator;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -49,6 +50,7 @@ final readonly class ValidateFlowService
         private ?PlatformSettingsReaderInterface $platformSettings = null,
         private ?ChannelCapabilityChecker $capabilityChecker = null,
         private ?ButtonLimitChecker $buttonLimitChecker = null,
+        private ?FlowGraphStructureValidator $graphValidator = null,
     ) {
     }
 
@@ -104,6 +106,12 @@ final readonly class ValidateFlowService
         $this->validateButtonEdgesMatchExistingButtons($nodeMap, $edges, $errors);
         $this->validateButtonValueTypes($nodeMap, $errors);
         $this->validateTrigger($trigger, $errors, $flowId);
+
+        // Annotation nodes are stripped inside, so a draft and an already stripped publish are checked alike.
+        // Skipped when the validator was not injected (legacy unit tests that build the service by hand).
+        if (null !== $this->graphValidator) {
+            array_push($errors, ...$this->graphValidator->validate($nodes, $edges));
+        }
 
         if (null !== $assistantId) {
             $channelNodes = $this->withoutAnnotations($nodeMap);

@@ -7,6 +7,7 @@ namespace Tests\Feature\Domains\Flow\State;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\History\NoOpHistoryWriter;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
+use App\Domains\Flow\State\Exceptions\ContactlessSessionException;
 use App\Domains\Flow\State\Exceptions\ReservedContactPathException;
 use App\Domains\Flow\State\Exceptions\StructuralPathConflictException;
 use App\Domains\Flow\State\Writers\ContactWriter;
@@ -117,6 +118,22 @@ final class ContactWriterTest extends FeatureTestCase
 
         $this->expectException(InvalidArgumentException::class);
         $writer->write('flow.attempts', 1);
+    }
+
+    public function test_a_contactless_session_refuses_every_contact_write(): void
+    {
+        $writer = new ContactWriter(
+            contact: null,
+            sessionId: 'session-1',
+            nodeId: 'node-A',
+            connection: app(ConnectionInterface::class),
+            historyWriter: new NoOpHistoryWriter(),
+        );
+
+        $this->expectException(ContactlessSessionException::class);
+        $this->expectExceptionMessage('contact.language');
+
+        $writer->write('contact.language', 'fr');
     }
 
     public function test_writes_emit_history_when_writer_records(): void

@@ -16,7 +16,9 @@ use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
+use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Enums\EndStatus;
+use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Exceptions\FlowExecutionLimitExceededException;
@@ -46,6 +48,7 @@ use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Database\ConnectionInterface;
+use InvalidArgumentException;
 use LogicException;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -87,24 +90,37 @@ final readonly class FlowEngine implements FlowEngineInterface
      */
     public function start(
         FlowDefinition $definition,
-        Contact $contact,
+        ?Contact $contact,
         array $initialState = [],
+        ?FlowRunOrigin $origin = null,
     ): FlowSession {
+        $origin ??= null === $contact ? FlowRunOrigin::automation() : FlowRunOrigin::conversation();
+
+        if (null === $contact && FlowRunKind::Automation !== $origin->kind) {
+            throw new InvalidArgumentException('A flow session without a contact can only be an automation run.');
+        }
+
         $entry = $this->graphResolver->resolveEntryNode($definition);
 
-        $assistant = $this->currentAssistant->get();
+        // A conversation belongs to the assistant the contact talks to; a contactless run only to the one its origin
+        // names, never to whichever assistant the current job happened to resolve.
+        $assistantId = null !== $contact
+            ? (string)$this->currentAssistant->get()->getKey()
+            : $origin->assistantId;
 
-        $baseState = $this->buildBaseState($definition, $contact, (string)$assistant->getKey(), $initialState);
+        $baseState = $this->buildBaseState($definition, $contact, $assistantId, $initialState);
 
         $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
-            'tenant_id'          => $contact->tenant_id,
-            'assistant_id'       => $assistant->getKey(),
-            'contact_id'         => $contact->getKey(),
+            'tenant_id'          => null !== $contact ? $contact->tenant_id : $definition->tenant_id,
+            'assistant_id'       => $assistantId,
+            'contact_id'         => $contact?->getKey(),
             'flow_definition_id' => $definition->getKey(),
             'flow_version'       => $definition->version,
             'current_node_id'    => $entry,
             'state'              => $baseState,
             'status'             => FlowSessionStatus::Active,
+            'run_kind'           => $origin->kind,
+            'trigger_id'         => $origin->triggerId,
             'version'            => 1,
         ]));
 
@@ -133,7 +149,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         $session->refresh();
 
         $definition = $this->definitions->findById($session->flow_definition_id);
-        $contact    = $this->contactService->findById($session->contact_id);
+        $contact    = $this->sessionContact($session);
 
         $this->executeLoop($definition, $session, $message, $contact);
         $session->refresh();
@@ -194,7 +210,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         $session->refresh();
 
         $definition = $this->definitions->findById($session->flow_definition_id);
-        $contact    = $this->contactService->findById($session->contact_id);
+        $contact    = $this->sessionContact($session);
 
         $this->executeLoop($definition, $session, null, $contact, $resumedAfterDelay);
         $session->refresh();
@@ -207,7 +223,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         $parent->refresh();
 
         $definition = $this->definitions->findById($parent->flow_definition_id);
-        $contact    = $this->contactService->findById($parent->contact_id);
+        $contact    = $this->sessionContact($parent);
         $resumeNode = (string) ($parent->current_node_id ?? '');
 
         if ('' === $resumeNode) {
@@ -237,6 +253,14 @@ final readonly class FlowEngine implements FlowEngineInterface
         return $parent;
     }
 
+    /**
+     * The contact of a session, or null for a contactless run.
+     */
+    private function sessionContact(FlowSession $session): ?Contact
+    {
+        return null !== $session->contact_id ? $this->contactService->findById($session->contact_id) : null;
+    }
+
     private function afterCommit(callable $callback): void
     {
         $this->afterCommitDispatcher->afterCommit($callback);
@@ -253,18 +277,21 @@ final readonly class FlowEngine implements FlowEngineInterface
      */
     private function buildBaseState(
         FlowDefinition $definition,
-        Contact $contact,
-        string $assistantId,
+        ?Contact $contact,
+        ?string $assistantId,
         array $initialState,
     ): array {
-        $system = [
+        // A contactless run has no contact to record and no channel the contact talked on.
+        $system = array_filter([
             SystemStateKeys::STARTED_AT_LEAF  => now()->toIso8601String(),
             'flow_definition_id'              => (string)$definition->getKey(),
-            'contact_id'                      => (string)$contact->getKey(),
+            'contact_id'                      => null !== $contact ? (string)$contact->getKey() : null,
             SystemStateKeys::RETRY_COUNT_LEAF => 0,
-        ];
+        ], static fn (mixed $value): bool => null !== $value);
 
-        $channel = $this->channelProjector->project((string)$contact->getKey(), $assistantId);
+        $channel = null !== $contact && null !== $assistantId
+            ? $this->channelProjector->project((string)$contact->getKey(), $assistantId)
+            : [];
 
         if ([] !== $channel) {
             $system[SystemStateKeys::CHANNEL_LEAF] = $channel;
@@ -280,7 +307,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         FlowDefinition $definition,
         FlowSession $session,
         ?IncomingMessage $incoming,
-        Contact $contact,
+        ?Contact $contact,
         bool $resumedAfterDelay = false,
     ): void {
         $maxIterations         = $this->platformSettings->integer(FlowEngineInterface::MAX_ITERATIONS_SETTING);
@@ -348,7 +375,9 @@ final readonly class FlowEngine implements FlowEngineInterface
                     throw HandlerNotFoundException::forTypeAndVersion($type, $version, $exception);
                 }
 
-                $platform         = $incomingStep?->platform ?? $contact->platform;
+                // Foundation's context still requires strings: a contactless run passes '' for the platform and the
+                // contact id until NodeExecutionContext makes them nullable (task flow-contact-context).
+                $platform         = $incomingStep?->platform ?? $contact?->platform ?? '';
                 $resolvedLanguage = $this->languageResolver->resolve($contact, $session);
 
                 $idempotencyKey = null !== $incomingStep
@@ -381,7 +410,7 @@ final readonly class FlowEngine implements FlowEngineInterface
 
                 $handlerContext = new FoundationNodeExecutionContext(
                     tenantId: $session->tenant_id,
-                    contactId: $session->contact_id,
+                    contactId: $session->contact_id ?? '',
                     sessionId: (string)$session->getKey(),
                     nodeId: $nodeId,
                     idempotencyKey: $idempotencyKey,
