@@ -12,9 +12,12 @@ use App\Domains\Channels\Telegram\Dto\SendVideoDto;
 use App\Domains\Channels\Telegram\Dto\SendVoiceDto;
 use App\Domains\Channels\Telegram\Dto\SetWebhookDto;
 use App\Domains\Channels\Telegram\Exceptions\TelegramApiException;
+use GuzzleHttp\Psr7\StreamDecoratorTrait;
+use GuzzleHttp\Psr7\Utils;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Psr\Http\Message\StreamInterface;
 use Throwable;
 
 /**
@@ -329,22 +332,40 @@ final readonly class TelegramBotApiClient
         string $filename,
         ?string $caption,
     ): array {
+        // Guzzle closes a body stream once a request has been sent, which would make the retry fail with
+        // "Invalid resource type: resource (closed)". The source is therefore held here and handed to the
+        // request through a decorator that ignores close(), and it is rewound before every further attempt.
+        $source = Utils::streamFor($stream);
+        $body   = new class ($source) implements StreamInterface {
+            use StreamDecoratorTrait;
+
+            public function __construct(private readonly StreamInterface $stream)
+            {
+            }
+
+            public function close(): void
+            {
+            }
+        };
+
         $request = Http::retry(
             3,
             100,
-            static function (Throwable $exception): bool {
-                if ($exception instanceof ConnectionException) {
-                    return true;
+            static function (Throwable $exception) use ($source): bool {
+                $retryable = $exception instanceof ConnectionException
+                    || ($exception instanceof RequestException && $exception->response->serverError());
+
+                // A stream that cannot be rewound cannot be sent a second time: an empty body would follow.
+                if (! $retryable || ! $source->isSeekable()) {
+                    return false;
                 }
 
-                if ($exception instanceof RequestException) {
-                    return $exception->response->serverError();
-                }
+                $source->rewind();
 
-                return false;
+                return true;
             },
         )
-            ->attach($fileField, $stream, $filename)
+            ->attach($fileField, $body, $filename)
             ->asMultipart();
 
         try {
