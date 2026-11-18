@@ -82,6 +82,8 @@ final readonly class FlowEngine implements FlowEngineInterface
         private DelayResumeSchedulerInterface $delayResumeScheduler,
         private SolutionAvailabilityInterface $solutionAvailability,
         private StateNamespacesInterface $stateNamespaces,
+        private ExecutionSegment $segment,
+        private SegmentHandOff $handOff,
     ) {
     }
 
@@ -121,6 +123,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             'status'             => FlowSessionStatus::Active,
             'run_kind'           => $origin->kind,
             'trigger_id'         => $origin->triggerId,
+            'fire_key'           => $origin->fireKey,
             'version'            => 1,
         ]));
 
@@ -311,9 +314,46 @@ final readonly class FlowEngine implements FlowEngineInterface
     }
 
     /**
+     * Runs the session's steps inside the current execution segment.
+     *
+     * Every call — the outermost one of a job and the ones nested in it (a subflow child inside its parent's step, a
+     * parent resumed inside its child's last step) — shares one {@see ExecutionSegment}. An automation run whose
+     * segment ran out stops at its saved position; once the outermost call returns, the run is handed to a new job
+     * ({@see SegmentHandOff}). Never from a nested call: on a sync queue the continuation would run inside the
+     * segment that just ran out.
+     *
      * @throws Throwable
      */
     private function executeLoop(
+        FlowDefinition $definition,
+        FlowSession $session,
+        ?IncomingMessage $incoming,
+        ?Contact $contact,
+        bool $resumedAfterDelay = false,
+    ): void {
+        $this->segment->enter();
+
+        try {
+            $this->runSteps($definition, $session, $incoming, $contact, $resumedAfterDelay);
+        } catch (Throwable $exception) {
+            // The job fails and is retried from the saved position; no continuation is queued.
+            $this->segment->leave();
+
+            throw $exception;
+        }
+
+        $stopped = $this->segment->leave();
+
+        if (null !== $stopped) {
+            // The new segment id goes on the run's root, and the job is queued only after that commit.
+            $this->handOff->handOn($stopped);
+        }
+    }
+
+    /**
+     * @throws Throwable
+     */
+    private function runSteps(
         FlowDefinition $definition,
         FlowSession $session,
         ?IncomingMessage $incoming,
@@ -325,28 +365,13 @@ final readonly class FlowEngine implements FlowEngineInterface
         $incomingStep          = $incoming;
         $resumedAfterDelayStep = $resumedAfterDelay;
 
-        while (true) {
-            if (++$iterations > $maxIterations) {
-                $this->connection->transaction(function () use ($session): void {
-                    try {
-                        $session->saveWithOptimisticLock([
-                            'status' => FlowSessionStatus::Failed,
-                        ]);
-                    } catch (OptimisticLockConflictException $exception) {
-                        throw FlowConcurrencyException::forSession((string)$session->getKey(), $exception);
-                    }
+        $automation = FlowRunKind::Automation === $session->run_kind;
 
-                    $this->afterCommit(function () use ($session): void {
-                        $this->analyticsWriter->record(
-                            new AnalyticsEvent(
-                                tenantId: (string)$session->tenant_id,
-                                eventType: AnalyticsEventType::FlowFailed,
-                                payload: ['session_id' => (string)$session->getKey()],
-                                occurredAt: new DateTimeImmutable(),
-                            )
-                        );
-                    });
-                });
+        while (true) {
+            // An automation run counts its steps over all its segments: a loop with no exit would otherwise start a
+            // fresh count in every segment and dispatch itself forever.
+            if (++$iterations > $maxIterations || ($automation && $session->step_count >= $maxIterations)) {
+                $this->persistStepLimitFailure($session);
 
                 // A child that hit the limit hands control back to its parent, as it does when it ends. The
                 // failure is then dealt with (like the volume limit), so the job does not fail and retry.
@@ -355,6 +380,12 @@ final readonly class FlowEngine implements FlowEngineInterface
                 }
 
                 throw new FlowExecutionLimitExceededException();
+            }
+
+            if ($automation && $this->segmentRanOut($session)) {
+                $this->segment->stopAt($session);
+
+                break;
             }
 
             $currentNodeId = $session->current_node_id;
@@ -517,7 +548,11 @@ final readonly class FlowEngine implements FlowEngineInterface
                 }
             }
 
-            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId): void {
+            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId, $automation): void {
+                if ($automation) {
+                    $this->countRunStep($session);
+                }
+
                 if ($skipPersist) {
                     // No-op: state already reflects the most recent write.
                 } elseif (null !== $endStatus) {
@@ -572,6 +607,8 @@ final readonly class FlowEngine implements FlowEngineInterface
                 };
             }
 
+            $this->segment->countStep();
+
             $incomingStep          = null;
             $resumedAfterDelayStep = false;
 
@@ -609,6 +646,65 @@ final readonly class FlowEngine implements FlowEngineInterface
         $this->subflowResumer->resumeIfChild($session, EndStatus::Failed->value);
 
         return true;
+    }
+
+    /**
+     * Record the failure of a session that reached the step limit; the caller hands a child back or stops the job.
+     */
+    private function persistStepLimitFailure(FlowSession $session): void
+    {
+        $this->connection->transaction(function () use ($session): void {
+            try {
+                $session->saveWithOptimisticLock([
+                    'status' => FlowSessionStatus::Failed,
+                ]);
+            } catch (OptimisticLockConflictException $exception) {
+                throw FlowConcurrencyException::forSession((string)$session->getKey(), $exception);
+            }
+
+            $this->afterCommit(function () use ($session): void {
+                $this->analyticsWriter->record(
+                    new AnalyticsEvent(
+                        tenantId: (string)$session->tenant_id,
+                        eventType: AnalyticsEventType::FlowFailed,
+                        payload: ['session_id' => (string)$session->getKey()],
+                        occurredAt: new DateTimeImmutable(),
+                    )
+                );
+            });
+        });
+    }
+
+    /**
+     * True when an `active` automation session must stop before its next node: the segment ran at least one step and
+     * reached its step or time budget. Its position — the next node — is already saved.
+     */
+    private function segmentRanOut(FlowSession $session): bool
+    {
+        if (FlowSessionStatus::Active !== $session->status) {
+            return false;
+        }
+
+        // The bounds hold for an installation default too: the settings store checks only a stored value, and a
+        // budget past the job timeout would have every attempt killed mid-segment.
+        return $this->segment->exhausted(
+            max(1, $this->platformSettings->integer(FlowEngineInterface::SEGMENT_STEPS_SETTING)),
+            min(
+                FlowEngineInterface::MAX_SEGMENT_SECONDS,
+                max(1, $this->platformSettings->integer(FlowEngineInterface::SEGMENT_SECONDS_SETTING)),
+            ),
+        );
+    }
+
+    /**
+     * One more step of an automation session, in the transaction of the step itself. The column is not part of the
+     * optimistic lock: the step's own write bumps the version.
+     */
+    private function countRunStep(FlowSession $session): void
+    {
+        $session->newQuery()->whereKey($session->getKey())->increment('step_count');
+        $session->setAttribute('step_count', (int) $session->step_count + 1);
+        $session->syncOriginalAttribute('step_count');
     }
 
     /**

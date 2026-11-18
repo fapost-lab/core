@@ -67,8 +67,20 @@ it: `system.sent_messages`, `system.set_tag.<node>`, `system.staff_notified.*`, 
 ## Session lock
 
 A Redis lock `session_lock:<tenant>:<contact>:<assistant>` with a heartbeat, taken through
-`FlowExecutionGuard` so one contact's session runs on one worker at a time. `LockScope` refuses an
-empty contact (`ContactlessSessionException`): a contactless run has no session lock yet.
+`FlowExecutionGuard` so one contact's session runs on one worker at a time. A contactless run takes its
+trigger's lock, `session_lock:<tenant>:trigger:<trigger>`; `LockScope::ofSession()` picks between them and refuses
+a session with neither (`ContactlessSessionException`).
+
+## Fire key
+
+What fired a trigger — a schedule slot, an event id, a webhook delivery id — kept on the session as `fire_key`,
+unique with `trigger_id`, so a trigger starts one run per fire.
+
+## Execution segment
+
+The part of an automation run one queue job executes: at most `flow.automation.segment_steps` steps or
+`flow.automation.segment_seconds` seconds, after which the run continues in a new job carrying the `segment_id`
+of the run's root session (`adr-20261118-segmented-automation-runs`). Informal synonym: segment.
 
 ## Routing decision
 

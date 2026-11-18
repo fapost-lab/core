@@ -14,8 +14,9 @@ use Closure;
 
 /**
  * Guards flow execution with the session lock described in ADR Message Routing
- * & Concurrency Control: one lock per (tenant, contact, assistant), held for
- * the whole execution rather than per node.
+ * & Concurrency Control: one lock per (tenant, contact, assistant) — or, for a
+ * contactless automation run, per (tenant, trigger) — held for the whole
+ * execution rather than per node.
  *
  * Built on {@see SessionLockManager} — not Laravel's Lock facade — because the
  * heartbeat needs explicit TTL extension, which the framework API does not
@@ -44,8 +45,11 @@ final readonly class FlowExecutionGuard implements FlowExecutionGuardInterface
         string $assistantId,
         Closure $callback,
     ): mixed {
-        $scope = new LockScope($tenantId, $contactId, $assistantId);
+        return $this->runInScope(new LockScope($tenantId, $contactId, $assistantId), $callback);
+    }
 
+    public function runInScope(LockScope $scope, Closure $callback): mixed
+    {
         // Already ours (routing pipeline acquired it) — do not re-acquire.
         if ($this->registry->holds($scope)) {
             return $callback();

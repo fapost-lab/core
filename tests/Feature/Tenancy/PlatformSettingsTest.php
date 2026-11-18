@@ -90,16 +90,26 @@ final class PlatformSettingsTest extends FeatureTestCase
         $definitions = $this->settings()->definitions();
         $keys        = array_map(static fn (PlatformSettingDefinition $d): string => $d->key, $definitions);
 
-        $this->assertSame(['audit.retention_days', PartitionRetention::SETTING, AutomationRunRetention::FAILED_SETTING, AutomationRunRetention::SUCCEEDED_SETTING, RedisCallExecutionLedger::TTL_SETTING, self::ITERATIONS, self::REDIRECT], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
-        $this->assertSame(300, $definitions[5]->default);
-        $this->assertSame(10, $definitions[5]->min);
-        $this->assertSame(10000, $definitions[5]->max);
-        $this->assertFalse($definitions[5]->hostModeOnly);
-        $this->assertSame(192, $definitions[4]->default);
-        $this->assertSame(168, $definitions[4]->min, 'The call dedup window may not drop below the failed-job retention.');
-        $this->assertTrue($definitions[6]->hostModeOnly);
-        $this->assertSame(30, $definitions[2]->default);
-        $this->assertSame(7, $definitions[3]->default);
+        $this->assertSame([
+            'audit.retention_days',
+            PartitionRetention::SETTING,
+            FlowEngineInterface::SEGMENT_SECONDS_SETTING,
+            FlowEngineInterface::SEGMENT_STEPS_SETTING,
+            AutomationRunRetention::FAILED_SETTING,
+            AutomationRunRetention::SUCCEEDED_SETTING,
+            RedisCallExecutionLedger::TTL_SETTING,
+            self::ITERATIONS,
+            self::REDIRECT,
+        ], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
+        $this->assertSame(300, $definitions[7]->default);
+        $this->assertSame(10, $definitions[7]->min);
+        $this->assertSame(10000, $definitions[7]->max);
+        $this->assertFalse($definitions[7]->hostModeOnly);
+        $this->assertSame(192, $definitions[6]->default);
+        $this->assertSame(168, $definitions[6]->min, 'The call dedup window may not drop below the failed-job retention.');
+        $this->assertTrue($definitions[8]->hostModeOnly);
+        $this->assertSame(30, $definitions[4]->default);
+        $this->assertSame(7, $definitions[5]->default);
     }
 
     public function test_a_refused_change_writes_nothing(): void
@@ -220,7 +230,7 @@ final class PlatformSettingsTest extends FeatureTestCase
         $contract->update([self::REDIRECT => 3], 'operator:9');
 
         $this->assertSame(3, $this->settings()->integer(self::REDIRECT));
-        $this->assertCount(7, $contract->definitions());
+        $this->assertCount(9, $contract->definitions());
         $this->assertSame('operator:9', PlatformSettingEvent::query()->sole()->changed_by);
     }
 

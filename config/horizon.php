@@ -228,6 +228,24 @@ return [
             'timeout'             => 120,
             'nice'                => 0,
         ],
+        // Automation runs (flow sessions started by a trigger, not a message): their starts and execution segments.
+        // Apart from `sync.external` and the conversation path. The job timeout (60 s) stays below the `redis`
+        // connection's `retry_after` (90 s), so a running segment is never reserved twice; a segment stops after at
+        // most 30 s (platform setting `flow.automation.segment_seconds`), leaving room for the slowest node.
+        'automations' => [
+            'connection'          => 'redis',
+            'queue'               => ['flow.automations'],
+            'balance'             => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses'        => 1,
+            'maxProcesses'        => 2,
+            'maxTime'             => 0,
+            'maxJobs'             => 0,
+            'memory'              => 128,
+            'tries'               => 3,
+            'timeout'             => 60,
+            'nice'                => 0,
+        ],
         'low' => [
             'connection'          => 'redis',
             'queue'               => ['messaging.broadcast', 'messaging.system', 'messaging.logging'],
@@ -318,6 +336,12 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
+            'automations' => [
+                'minProcesses'    => 1,
+                'maxProcesses'    => 3,
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 3,
+            ],
             'low' => [
                 'minProcesses'    => 1,
                 'maxProcesses'    => 3,
@@ -346,6 +370,10 @@ return [
                 'maxProcesses' => 2,
             ],
             'medium' => [
+                'minProcesses' => 1,
+                'maxProcesses' => 1,
+            ],
+            'automations' => [
                 'minProcesses' => 1,
                 'maxProcesses' => 1,
             ],

@@ -113,7 +113,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   (`adr-20261005-extension-packages-own-landlord-tables`, amended 2026-10-08).
 - **Cross-domain asynchronous work goes through named queues** separated by purpose:
   `flow.execution`, `messaging.broadcast`, `messaging.system`, `messaging.logging`,
-  `scheduled.triggers`; `messaging.transactional` and `sync.external` are reserved and have no
+  `scheduled.triggers`, `flow.automations`; `messaging.transactional` and `sync.external` are reserved and have no
   producer today.
 - **The Flow runtime is constructed, not looked up.** The engine, handlers, orchestration, registry,
   routing, state and subflow code receive collaborators through constructors; node handlers are
@@ -133,7 +133,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
    `flow.execution` job (`messaging.transactional` is reserved and has no job); the transcript is persisted on `messaging.logging`.
 2. **Triggers and wake-ups.** Scheduled and event triggers start sessions from jobs on
    `scheduled.triggers`; a `delay` node wakes its session through `ResumeDelayedFlowSessionJob`
-   on `flow.execution`, and send-message timeouts through `ResumeTimedOutSendMessageNodeJob`.
+   on `flow.execution`, and send-message timeouts through `ResumeTimedOutSendMessageNodeJob`. An automation run
+   (a flow started by a trigger, not a message) starts and continues in segments on `flow.automations`
+   (`StartAutomationRunJob`, `ContinueAutomationRunJob`).
 3. **Broadcast fan-out.** `BroadcastDispatcher` → `RunBroadcastJob` → `SendBroadcastRecipientJob`
    on `messaging.broadcast`, throttled by backpressure before the provider limit is hit.
 

@@ -27,7 +27,7 @@ final class ContactlessSessionException extends RuntimeException
     public static function forLockScope(string $tenantId): self
     {
         return new self(sprintf(
-            "A session lock needs a contact; a flow session of tenant '%s' runs without one.",
+            "A session lock needs a contact or a trigger; a flow session of tenant '%s' has neither.",
             $tenantId,
         ));
     }

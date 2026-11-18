@@ -21,6 +21,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null         $contact_id    null for a contactless run (always an automation)
  * @property FlowRunKind         $run_kind
  * @property string|null         $trigger_id    the trigger that fired the run; no foreign key
+ * @property string|null         $fire_key      what fired the trigger (a slot, an event id); unique with trigger_id
+ * @property int                 $step_count    steps of an automation session over all its segments
+ * @property string|null         $segment_id    the one continuation allowed to run an automation session next
  * @property string              $flow_definition_id  FK to {@see FlowDefinition::$id} — immutable
  *           definition snapshot for this session (specific version row), not only logical
  *           {@see FlowDefinition::$flow_id}
@@ -71,6 +74,9 @@ final class FlowSession extends BaseModel
         'status',
         'run_kind',
         'trigger_id',
+        'fire_key',
+        'step_count',
+        'segment_id',
         'end_status',
         'parent_session_id',
         'parent_resume_node_id',
@@ -84,7 +90,8 @@ final class FlowSession extends BaseModel
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'run_kind' => 'conversation',
+        'run_kind'   => 'conversation',
+        'step_count' => 0,
     ];
 
     /**
@@ -168,6 +175,7 @@ final class FlowSession extends BaseModel
             'status'     => FlowSessionStatus::class,
             'run_kind'   => FlowRunKind::class,
             'version'    => 'integer',
+            'step_count' => 'integer',
             'expires_at' => 'datetime',
         ];
     }

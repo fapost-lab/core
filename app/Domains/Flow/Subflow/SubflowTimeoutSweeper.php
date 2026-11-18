@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Subflow;
 
+use App\Domains\Flow\Concurrency\LockScope;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
 use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Services\SegmentHandOff;
 use DateTimeInterface;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -34,10 +36,13 @@ use Throwable;
  *    {@see SubflowStarterService} extends parent expiry past child + buffer,
  *    but we recover gracefully if the invariant is ever broken.
  *
- * Each parent is handled under its session lock ({@see FlowExecutionGuardInterface}),
- * the one an inbound message for the same contact takes, and re-read under it:
+ * Each parent is handled under its session lock ({@see FlowExecutionGuardInterface},
+ * {@see LockScope::ofSession()}): the one an inbound message for the same contact
+ * takes, or the trigger's for a contactless run. It is re-read under it:
  * the child may have been answered, or the parent resumed, since the query. A
  * parent whose lock is busy is skipped and logged; the next sweep retries it.
+ * A parent that cannot be handled at all (a contactless one without a trigger)
+ * is skipped with a warning, and the pass goes on to the next.
  *
  * Tenant context is owned by the caller (typically a console command iterating
  * over active tenants); the sweeper runs queries against the current
@@ -52,6 +57,7 @@ final readonly class SubflowTimeoutSweeper
         private ConnectionInterface $connection,
         private SubflowResumerInterface $resumer,
         private FlowExecutionGuardInterface $guard,
+        private SegmentHandOff $handOff,
         private LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -76,16 +82,24 @@ final readonly class SubflowTimeoutSweeper
 
         foreach ($expiredParents as $parent) {
             try {
-                $outcome = $this->guard->run(
-                    tenantId: (string) $parent->tenant_id,
-                    contactId: (string) $parent->contact_id,
-                    assistantId: (string) $parent->assistant_id,
-                    callback: fn (): ?string => $this->sweepParent($parent, $now),
+                $outcome = $this->guard->runInScope(
+                    LockScope::ofSession($parent),
+                    fn (): ?string => $this->sweepParent($parent, $now),
                 );
             } catch (SessionLockTimeoutException) {
                 $this->logger->info('flow.subflow.timeout.lock_busy', [
                     'parent_id' => (string) $parent->getKey(),
                 ]);
+
+                continue;
+            } catch (Throwable $exception) {
+                // One parent never ends the pass: a contactless parent without a trigger has no lock, and whatever
+                // else breaks for one parent must not leave every later parent of the tenant unswept.
+                $this->logger->warning('flow.subflow.timeout.parent_skipped', [
+                    'parent_id' => (string) $parent->getKey(),
+                    'error'     => $exception->getMessage(),
+                ]);
+                $this->handOnIfStranded($parent);
 
                 continue;
             }
@@ -147,6 +161,7 @@ final readonly class SubflowTimeoutSweeper
                         'parent_id' => (string) $parent->getKey(),
                         'error'     => $exception->getMessage(),
                     ]);
+                    $this->handOnIfStranded($parent);
                 }
             }
 
@@ -165,6 +180,7 @@ final readonly class SubflowTimeoutSweeper
                 'child_id'  => (string) $liveChild->getKey(),
                 'error'     => $exception->getMessage(),
             ]);
+            $this->handOnIfStranded($parent);
 
             return null;
         }
@@ -193,6 +209,23 @@ final readonly class SubflowTimeoutSweeper
         foreach ($descendants as $descendant) {
             $this->failLiveDescendants($descendant, $depth + 1);
             $this->forceFailChild($descendant);
+        }
+    }
+
+    /**
+     * A resume that broke off after moving an automation run on (a lost lock) leaves it `active` with no job to run
+     * it, and no later pass picks it up (a pass looks only at `paused_subflow` parents): hand it to the automation
+     * queue. Never ends the pass.
+     */
+    private function handOnIfStranded(FlowSession $parent): void
+    {
+        try {
+            $this->handOff->handOnIfStranded($parent);
+        } catch (Throwable $exception) {
+            $this->logger->warning('flow.subflow.timeout.hand_on_failed', [
+                'parent_id' => (string) $parent->getKey(),
+                'error'     => $exception->getMessage(),
+            ]);
         }
     }
 

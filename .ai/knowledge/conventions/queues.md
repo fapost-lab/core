@@ -10,7 +10,7 @@ paths:
   - "app/Domains/Broadcasting/**"
   - "app/Domains/Messaging/**"
 summary: Queues are split by purpose (flow.execution, messaging.*, scheduled.triggers, sync.external); rate limits and backpressure are preventive, not reactive.
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-18
 ---
 # Messaging and queues
 
@@ -28,6 +28,7 @@ messaging.broadcast    - low-priority broadcasts / fan-out
 messaging.system       - service notifications
 messaging.logging      - conversation capture, written outside the delivery path
 scheduled.triggers     - scheduled/event trigger fan-out
+flow.automations       - automation runs: their start and each execution segment
 sync.external          - external synchronisations
 ```
 
@@ -68,6 +69,11 @@ Queue assignment by purpose, as it exists in the codebase today:
   `FetchConversationMediaJob.php`, `UpdateConversationDeliveryStatusJob.php`.
 - `scheduled.triggers`: `app/Jobs/Flow/StartFlowFromEventJob.php` and `DispatchFlowTriggerEventJob`
   (queued through `app/Domains/Flow/Events/QueuedFlowTriggerEventPublisher.php`).
+- `flow.automations`: `app/Jobs/Flow/StartAutomationRunJob.php` and `ContinueAutomationRunJob.php` (an automation
+  run's delay wake-up stays on `flow.execution` and runs at most one segment there), served by the
+  `automations` supervisor on `redis`. Their 60 s timeout stays below the connection's `retry_after` (90 s) — a
+  segment reserved twice would repeat its `call`s — and the segment budget (at most 30 s) leaves room for the slowest
+  node under it (`adr-20261118-segmented-automation-runs`, `HorizonAutomationsSupervisorTest`).
 - `tenancy.decommission`: `app/Domains/Tenancy/Jobs/DecommissionTenantJob.php`, on the `redis-long` connection
   (`retry_after` 1800 s above the job's 1500 s timeout) and its own one-process `removal` supervisor: removing a
   tenant drops a schema and deletes media, and must neither be re-reserved mid-run nor hold up messaging.
@@ -80,8 +86,8 @@ after a provider starts rejecting sends.
 
 `config/horizon.php`'s `defaults` groups queues into `high`/`medium`/`low` supervisors by
 latency sensitivity (`flow.execution` and `messaging.transactional` on `high`;
-`sync.external` and `scheduled.triggers` on `medium`; the broadcast/system/logging queues on
-`low`), which is a capacity policy layered on top of the purpose split above, not a
+`sync.external` and `scheduled.triggers` on `medium`; `flow.automations` on its own `automations`;
+the broadcast/system/logging queues on `low`), which is a capacity policy layered on top of the purpose split above, not a
 replacement for it.
 
 ## Rationale

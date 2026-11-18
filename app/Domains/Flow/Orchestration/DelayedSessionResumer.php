@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Orchestration;
 
+use App\Domains\Flow\Concurrency\LockScope;
 use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Services\SegmentHandOff;
 use App\Domains\Flow\State\SystemStateKeys;
 use DateTimeInterface;
 use Illuminate\Support\Carbon;
@@ -28,7 +30,8 @@ use Illuminate\Support\Carbon;
  *    tell this apart from a first visit on its own, so the engine passes
  *    {@see \Fapost\Foundation\DTO\NodeExecutionContext::$resumedAfterDelay}.
  *
- * Runs outside the routing pipeline, so it claims the session lock itself and
+ * Runs outside the routing pipeline, so it claims the session lock itself — the
+ * contact's, or the trigger's for a contactless automation run — and
  * re-reads the session under it: an inbound message may have moved the flow on
  * while the resume was queued, and a loop may have re-scheduled the same node.
  * Anything other than "still parked on this node for this resume_at" (in
@@ -42,6 +45,7 @@ final readonly class DelayedSessionResumer
         private FlowExecutionGuardInterface $guard,
         private FlowEngineInterface $engine,
         private DelayResumeSchedulerInterface $scheduler,
+        private SegmentHandOff $handOff,
     ) {
     }
 
@@ -53,16 +57,18 @@ final readonly class DelayedSessionResumer
             return;
         }
 
-        $this->guard->run(
-            tenantId: (string)$session->tenant_id,
-            contactId: (string)$session->contact_id,
-            assistantId: (string)$session->assistant_id,
-            callback: function () use ($session, $nodeId, $resumeAt): void {
+        $this->guard->runInScope(
+            LockScope::ofSession($session),
+            function () use ($session, $nodeId, $resumeAt): void {
                 $session->refresh();
 
                 $resumedAfterDelay = $this->resolveResumedAfterDelay($session, $nodeId, $resumeAt);
 
                 if (null === $resumedAfterDelay) {
+                    // A retry of a wake-up that broke off after moving an automation run on (a lost lock) finds
+                    // the run `active` with no job left to run it: hand it to the automation queue.
+                    $this->handOff->handOnIfStranded($session);
+
                     return;
                 }
 
@@ -113,11 +119,9 @@ final readonly class DelayedSessionResumer
             return $session;
         }
 
-        return $this->guard->run(
-            tenantId: (string)$session->tenant_id,
-            contactId: (string)$session->contact_id,
-            assistantId: (string)$session->assistant_id,
-            callback: function () use ($session, $nodeId, $resumeAt): FlowSession {
+        return $this->guard->runInScope(
+            LockScope::ofSession($session),
+            function () use ($session, $nodeId, $resumeAt): FlowSession {
                 $session->refresh();
 
                 if (! $this->isPausedAwaitingResume($session, $nodeId, $resumeAt)) {
