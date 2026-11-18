@@ -18,6 +18,8 @@ use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Models\ContactTag;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 
 final class RunBroadcastJobTest extends FeatureTestCase
@@ -126,6 +128,57 @@ final class RunBroadcastJobTest extends FeatureTestCase
 
         $this->assertSame(1, $broadcast->fresh()->total_recipients);
         Bus::assertDispatchedTimes(SendBroadcastRecipientJob::class, 1);
+    }
+
+    public function test_failed_handler_marks_a_running_broadcast_failed_with_reason(): void
+    {
+        $channel   = $this->channel();
+        $broadcast = $this->runningBroadcast((string) $channel->assistant_id);
+
+        (new RunBroadcastJob(self::TENANT_ID, (string) $broadcast->getKey()))->failed(new RuntimeException('boom'));
+
+        $broadcast->refresh();
+        $this->assertSame(BroadcastStatus::Failed, $broadcast->status);
+        $this->assertSame(BroadcastStatus::STOP_REASON_RUN_FAILED, $broadcast->stop_reason);
+        $this->assertNotNull($broadcast->completed_at);
+    }
+
+    public function test_failed_handler_skips_recipients_that_were_never_dispatched(): void
+    {
+        $channel   = $this->channel();
+        $broadcast = $this->runningBroadcast((string) $channel->assistant_id);
+        $contact   = $this->contact();
+
+        foreach (['pending', 'sent'] as $status) {
+            DB::table('broadcast_recipients')->insert([
+                'id'           => (string) Str::ulid()->toRfc4122(),
+                'tenant_id'    => self::TENANT_ID,
+                'broadcast_id' => $broadcast->getKey(),
+                'contact_id'   => 'pending' === $status ? $contact->getKey() : $this->contact()->getKey(),
+                'channel_id'   => $channel->getKey(),
+                'status'       => $status,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+        }
+
+        (new RunBroadcastJob(self::TENANT_ID, (string) $broadcast->getKey()))->failed(new RuntimeException('boom'));
+
+        $rows = DB::table('broadcast_recipients')->where('broadcast_id', $broadcast->getKey())->pluck('status', 'status')->all();
+        $this->assertSame(['sent' => 'sent', 'skipped' => 'skipped'], $rows);
+        $this->assertSame('run_failed', DB::table('broadcast_recipients')->where('status', 'skipped')->value('error'));
+        $this->assertSame(1, $broadcast->fresh()->skipped_count);
+    }
+
+    public function test_failed_handler_leaves_a_cancelled_broadcast_alone(): void
+    {
+        $channel   = $this->channel();
+        $broadcast = $this->runningBroadcast((string) $channel->assistant_id);
+        $broadcast->update(['status' => BroadcastStatus::Cancelled->value]);
+
+        (new RunBroadcastJob(self::TENANT_ID, (string) $broadcast->getKey()))->failed(new RuntimeException('boom'));
+
+        $this->assertSame(BroadcastStatus::Cancelled, $broadcast->fresh()->status);
     }
 
     private function runJob(Broadcast $broadcast): void

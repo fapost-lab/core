@@ -20,8 +20,10 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Fan-out orchestrator for a broadcast run. Resolves the audience, materializes
@@ -102,6 +104,62 @@ final class RunBroadcastJob implements ShouldQueue, TenantAccessGatedJob
             $this->materializeRecipients($broadcast, $recipients);
             $this->fanOut($broadcast, max(1, $settings->broadcast_chunk_size));
         });
+    }
+
+    /**
+     * Called once the run has exhausted its attempts. Without it the broadcast would stay Running
+     * with no progress forever; here it is marked Failed (only if still Running, so a Cancelled or
+     * Completed run is left alone) and its still-Pending recipients are skipped. The status change
+     * also halts recipient jobs already dispatched, see {@see SendBroadcastRecipientJob}.
+     */
+    public function failed(Throwable $exception): void
+    {
+        Log::error('Broadcast run failed', [
+            'tenant_id'    => $this->tenantId,
+            'broadcast_id' => $this->broadcastId,
+            'exception'    => $exception,
+        ]);
+
+        try {
+            $tenant = app(TenantRepositoryInterface::class)->getById($this->tenantId);
+
+            app(TenantSwitcher::class)->runForTenant($tenant, function (): void {
+                $changed = Broadcast::query()
+                    ->whereKey($this->broadcastId)
+                    ->where('status', BroadcastStatus::Running->value)
+                    ->update([
+                        'status'       => BroadcastStatus::Failed->value,
+                        'stop_reason'  => BroadcastStatus::STOP_REASON_RUN_FAILED,
+                        'completed_at' => Carbon::now(),
+                    ]);
+
+                if (0 === $changed) {
+                    return;
+                }
+
+                // Rows materialized but never dispatched (the crash hit before or during fan-out) would
+                // stay Pending forever; skip them here. Dispatched ones skip themselves and find a
+                // non-Pending row if this ran first.
+                $skipped = DB::table('broadcast_recipients')
+                    ->where('broadcast_id', $this->broadcastId)
+                    ->where('status', RecipientStatus::Pending->value)
+                    ->update([
+                        'status'     => RecipientStatus::Skipped->value,
+                        'error'      => BroadcastStatus::STOP_REASON_RUN_FAILED,
+                        'updated_at' => Carbon::now(),
+                    ]);
+
+                if ($skipped > 0) {
+                    Broadcast::query()->whereKey($this->broadcastId)->increment('skipped_count', $skipped);
+                }
+            });
+        } catch (Throwable $inner) {
+            Log::error('Could not mark failed broadcast run', [
+                'tenant_id'    => $this->tenantId,
+                'broadcast_id' => $this->broadcastId,
+                'exception'    => $inner,
+            ]);
+        }
     }
 
     /**
