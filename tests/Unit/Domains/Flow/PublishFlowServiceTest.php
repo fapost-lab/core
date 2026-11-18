@@ -660,6 +660,81 @@ final class PublishFlowServiceTest extends TestCase
         }
     }
 
+    public function test_publish_rejects_a_node_unreachable_from_the_entry(): void
+    {
+        $codes = $this->publishRejectionCodes(
+            '00000000-0000-0000-0000-000000000961',
+            [
+                ['id' => 'a', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                ['id' => 'b', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                ['id' => 'c', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                ['id' => 'd', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+            ],
+            [
+                ['id' => 'e1', 'from' => 'a', 'to' => 'b', 'handle' => 'default'],
+                // c and d feed each other: both have an incoming edge, neither is reachable from a.
+                ['id' => 'e2', 'from' => 'c', 'to' => 'd', 'handle' => 'default'],
+                ['id' => 'e3', 'from' => 'd', 'to' => 'c', 'handle' => 'default'],
+            ],
+        );
+
+        $this->assertContains('orphan_node', $codes);
+    }
+
+    public function test_publish_rejects_two_entry_nodes(): void
+    {
+        $codes = $this->publishRejectionCodes(
+            '00000000-0000-0000-0000-000000000962',
+            [
+                ['id' => 'a', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                ['id' => 'b', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+            ],
+            [],
+        );
+
+        $this->assertContains('entry_node_count', $codes);
+    }
+
+    public function test_publish_rejects_an_edge_to_a_missing_node_and_a_repeated_handle(): void
+    {
+        $codes = $this->publishRejectionCodes(
+            '00000000-0000-0000-0000-000000000963',
+            [
+                ['id' => 'a', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                ['id' => 'b', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+            ],
+            [
+                ['id' => 'e1', 'from' => 'a', 'to' => 'b', 'handle' => 'default'],
+                ['id' => 'e2', 'from' => 'a', 'to' => 'b', 'handle' => 'default'],
+                ['id' => 'e3', 'from' => 'b', 'to' => 'ghost', 'handle' => 'default'],
+            ],
+        );
+
+        $this->assertContains('duplicate_edge_handle', $codes);
+        $this->assertContains('edge_unknown_node', $codes);
+    }
+
+    public function test_publish_accepts_a_send_message_whose_save_variable_is_still_unset(): void
+    {
+        $flowId = '00000000-0000-0000-0000-000000000964';
+
+        FlowDraft::factory()->create([
+            'flow_id' => $flowId,
+            'nodes'   => [
+                ['id' => 'a', 'type' => 'send_message', 'version' => 1, 'config' => [
+                    'content_type'     => 'text',
+                    'save_to_variable' => ['type' => 'text', 'storage' => 'session'],
+                ]],
+                ['id' => 'b', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            'edges' => [['id' => 'e1', 'from' => 'a', 'to' => 'b', 'handle' => 'default']],
+        ]);
+
+        $definition = app(PublishFlowService::class)->execute($flowId);
+
+        $this->assertTrue($definition->is_active);
+    }
+
     public function test_publish_registers_emit_event_names_into_tenant_wide_registry(): void
     {
         $this->createTenantEventsTable();
@@ -710,6 +785,27 @@ final class PublishFlowServiceTest extends TestCase
         $events = app(TenantEventRepositoryInterface::class)->getEventNamesByTenant($tenantId);
 
         $this->assertContains('lead.qualified', $events);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $nodes
+     * @param  list<array<string, mixed>>  $edges
+     *
+     * @return list<string>
+     */
+    private function publishRejectionCodes(string $flowId, array $nodes, array $edges): array
+    {
+        FlowDraft::factory()->create(['flow_id' => $flowId, 'nodes' => $nodes, 'edges' => $edges]);
+
+        try {
+            app(PublishFlowService::class)->execute($flowId);
+        } catch (FlowValidationException $exception) {
+            $this->assertNull(FlowDefinition::query()->where('flow_id', $flowId)->first(), 'A refused publish writes nothing.');
+
+            return array_map(static fn (FlowValidationErrorDto $error): string => $error->code, $exception->errors);
+        }
+
+        $this->fail('Expected FlowValidationException was not thrown.');
     }
 
     private function createTenantEventsTable(): void

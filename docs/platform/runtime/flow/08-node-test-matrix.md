@@ -15,7 +15,7 @@ There is no per-node `Unit/.../<Node>HandlerTest.php` convention. What exists to
 | Unit | `tests/Unit/Domains/Flow/NodeHandlerRegistryTest.php` | `type@version` registration, duplicates, `supportedVersions()`, freezing, a fresh instance per `resolve()` |
 | Unit | `tests/Unit/Domains/Flow/NodeHandlerSchemaSectionsTest.php` | `configSchema()` shape |
 | Unit | `tests/Unit/Domains/Flow/FlowGraphStructureValidatorTest.php` | the structural graph validator |
-| Unit | `tests/Unit/Domains/Flow/ValidateFlowServiceTest.php` | per-node config rules and graph rules that the builder shows |
+| Unit | `tests/Unit/Domains/Flow/ValidateFlowServiceTest.php` | per-node config rules and graph rules that the builder shows (structural graph and variable-contract rules are in `FlowGraphStructureValidatorTest`, reached through the same service) |
 | Feature | `tests/Feature/Domains/Flow/*NodeHandlerTest.php` | handlers that touch the database or queue: `AuthRequestNodeHandlerTest`, `NotifyNodeHandlerTest`, `SetTagNodeHandlerTest`, `LoopNodeHandlerTest` |
 | Feature | `tests/Feature/Domains/Flow/FlowEngineTest.php`, `LoopEngineTest.php`, `DelayNodeResumeTest.php`, `V1WiringSmokeTest.php` | a node running inside the real flow loop |
 | Feature | `tests/Feature/Domains/Flow/NodeHandlerScopedDependenciesTest.php` | handlers are built per scope, never keep a stale scoped dependency |
