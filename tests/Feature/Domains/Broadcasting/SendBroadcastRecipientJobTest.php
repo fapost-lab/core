@@ -10,6 +10,7 @@ use App\Domains\Broadcasting\Enums\RecipientStatus;
 use App\Domains\Broadcasting\Jobs\SendBroadcastRecipientJob;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Models\BroadcastRecipient;
+use App\Domains\Broadcasting\Services\BroadcastService;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
@@ -130,6 +131,63 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
 
         $this->assertCount(1, $sender->sent);
         $this->assertSame('Hello!', $sender->sent[0]->payload->text);
+    }
+
+    public function test_a_send_in_flight_when_the_run_fails_moves_its_unit_out_of_skipped(): void
+    {
+        [$broadcast, $recipient] = $this->scenario();
+        $broadcast->update(['total_recipients' => 1]);
+
+        $this->app->instance(MessageSenderInterface::class, new class ((string) $broadcast->getKey()) implements MessageSenderInterface {
+            public function __construct(private readonly string $broadcastId)
+            {
+            }
+
+            public function send(OutboundMessage $message): DeliveryResult
+            {
+                // The run's failed() handler lands while the send is in flight.
+                app(BroadcastService::class)->failRun($this->broadcastId);
+
+                return new DeliveryResult(sent: true, providerMessageId: 'pmid-1');
+            }
+        });
+
+        $this->send($recipient);
+
+        $recipient->refresh();
+        $broadcast->refresh();
+        $this->assertSame(RecipientStatus::Sent, $recipient->status);
+        $this->assertSame('pmid-1', $recipient->provider_message_id);
+        $this->assertSame(1, $broadcast->sent_count);
+        $this->assertSame(0, $broadcast->skipped_count);
+        $this->assertSame(0, $broadcast->failed_count);
+        $this->assertSame(BroadcastStatus::Failed, $broadcast->status);
+    }
+
+    public function test_a_failure_after_the_run_failed_is_counted_once_as_failed(): void
+    {
+        [$broadcast, $recipient] = $this->scenario();
+        $broadcast->update(['total_recipients' => 1]);
+
+        $this->app->instance(MessageSenderInterface::class, new class ((string) $broadcast->getKey()) implements MessageSenderInterface {
+            public function __construct(private readonly string $broadcastId)
+            {
+            }
+
+            public function send(OutboundMessage $message): DeliveryResult
+            {
+                app(BroadcastService::class)->failRun($this->broadcastId);
+
+                return new DeliveryResult(sent: false, error: 'nope');
+            }
+        });
+
+        $this->send($recipient);
+
+        $broadcast->refresh();
+        $this->assertSame(RecipientStatus::Failed, $recipient->fresh()->status);
+        $this->assertSame(1, $broadcast->failed_count);
+        $this->assertSame(0, $broadcast->skipped_count);
     }
 
     private function send(BroadcastRecipient $recipient): void

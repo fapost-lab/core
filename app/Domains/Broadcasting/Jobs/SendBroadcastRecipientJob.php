@@ -28,6 +28,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 /**
@@ -208,14 +209,36 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
         ?string $error = null,
         ?string $providerMessageId = null,
     ): void {
-        $recipient->update([
+        $values = [
             'status'              => $status->value,
             'error'               => $error,
             'provider_message_id' => $providerMessageId,
             'sent_at'             => RecipientStatus::Sent === $status ? Carbon::now() : null,
-        ]);
+            'updated_at'          => Carbon::now(),
+        ];
 
-        Broadcast::query()->whereKey($recipient->broadcast_id)->increment($counter);
+        $recipients = DB::table('broadcast_recipients')->where('id', $recipient->getKey());
+
+        // Only a still-Pending row is ours to settle.
+        $settled = (clone $recipients)
+            ->where('status', RecipientStatus::Pending->value)
+            ->update($values) > 0;
+
+        if ($settled) {
+            Broadcast::query()->whereKey($recipient->broadcast_id)->increment($counter);
+        } elseif (RecipientStatus::Skipped !== $status) {
+            // The run failed while this send was in flight and its failure skipped the row (already counted
+            // in skipped_count). The send really happened, so move the unit to the real outcome.
+            $reclaimed = (clone $recipients)
+                ->where('status', RecipientStatus::Skipped->value)
+                ->where('error', BroadcastStatus::STOP_REASON_RUN_FAILED)
+                ->update($values) > 0;
+
+            if ($reclaimed) {
+                Broadcast::query()->whereKey($recipient->broadcast_id)->decrement('skipped_count');
+                Broadcast::query()->whereKey($recipient->broadcast_id)->increment($counter);
+            }
+        }
 
         $this->completeIfDone((string) $recipient->broadcast_id);
     }
