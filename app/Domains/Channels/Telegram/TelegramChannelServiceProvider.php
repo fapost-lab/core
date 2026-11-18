@@ -43,6 +43,7 @@ final class TelegramChannelServiceProvider extends AbstractConnectorServiceProvi
         $this->app->bind(TelegramDocumentDeliveryAction::class);
         $this->app->bind(TelegramVideoDeliveryAction::class);
         $this->app->bind(TelegramVoiceDeliveryAction::class);
+        $this->app->bind(TelegramAudioDeliveryAction::class);
         $this->app->bind(TelegramRemoveKeyboardDeliveryAction::class);
         $this->app->bind(TelegramInboundNormalizer::class);
         $this->app->bind(TelegramSender::class);
@@ -93,6 +94,7 @@ final class TelegramChannelServiceProvider extends AbstractConnectorServiceProvi
             TelegramDocumentDeliveryAction::class,
             TelegramVideoDeliveryAction::class,
             TelegramVoiceDeliveryAction::class,
+            TelegramAudioDeliveryAction::class,
             TelegramRemoveKeyboardDeliveryAction::class,
         ], 'channels.telegram_delivery');
     }

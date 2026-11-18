@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Media\Services;
 
 use Fapost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Messaging\MessagePayload;
 
 /**
  * How a file is sent to a messenger: as a photo, a video or audio only in the formats messengers play inline,
@@ -35,6 +36,36 @@ final class DeliveryKind
         'audio/wav'       => MediaKind::Audio,
         'audio/x-wav'     => MediaKind::Audio,
     ];
+
+    /** @var list<string> */
+    private const array PAYLOAD_TYPES = ['photo', 'video', 'audio', 'voice', 'document'];
+
+    /**
+     * The message type a cached file id is sent as: the kind the provider reported when it stored the file, or, for
+     * a ref that has none, the one the file's format dictates.
+     */
+    public static function payloadType(?string $providerKind, string $mimeType): string
+    {
+        if (null !== $providerKind && in_array($providerKind, self::PAYLOAD_TYPES, true)) {
+            return $providerKind;
+        }
+
+        return match (self::of($mimeType)) {
+            MediaKind::Image => 'photo',
+            MediaKind::Video => 'video',
+            MediaKind::Audio => 'audio',
+            default          => 'document',
+        };
+    }
+
+    /**
+     * The outgoing payload for a provider file id sent by the given message type (see {@see self::payloadType()}).
+     * A voice message has no caption in Telegram.
+     */
+    public static function fileIdPayload(string $type, string $providerFileId, string $caption): MessagePayload
+    {
+        return new MessagePayload(type: $type, text: 'voice' === $type ? '' : $caption, media: [$type => $providerFileId]);
+    }
 
     public static function of(string $mimeType): MediaKind
     {

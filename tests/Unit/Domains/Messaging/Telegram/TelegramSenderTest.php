@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Messaging\Telegram;
 
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Channels\Telegram\TelegramAudioDeliveryAction;
 use App\Domains\Channels\Telegram\TelegramBotApiClientFactory;
 use App\Domains\Channels\Telegram\TelegramDeliveryResolver;
 use App\Domains\Channels\Telegram\TelegramDocumentDeliveryAction;
@@ -216,6 +217,34 @@ final class TelegramSenderTest extends TestCase
             && 'https://example.com/audio.ogg' === $request['voice']);
     }
 
+    public function test_audio_payload_maps_to_send_audio_with_its_caption(): void
+    {
+        Http::fake([
+            'https://api.telegram.org/*' => Http::response([
+                'ok'     => true,
+                'result' => ['message_id' => 104],
+            ], 200),
+        ]);
+
+        $result = $this->sender()->deliver(new OutboundMessage(
+            idempotencyKey: 'idem-audio',
+            tenantId: 'tenant-1',
+            channelId: 'channel-1',
+            channelType: 'telegram',
+            chatId: 'chat-1',
+            payload: new MessagePayload(
+                type: 'audio',
+                text: 'Listen',
+                media: ['audio' => 'cached-audio-id'],
+            ),
+        ), $this->channel('bot-token'));
+
+        $this->assertTrue($result->sent);
+        Http::assertSent(static fn (Request $request): bool => str_contains((string) $request->url(), 'sendAudio')
+            && 'cached-audio-id' === $request['audio']
+            && 'Listen' === $request['caption']);
+    }
+
     public function test_a_channel_without_a_token_is_not_sent_through(): void
     {
         Http::fake();
@@ -263,6 +292,7 @@ final class TelegramSenderTest extends TestCase
                 new TelegramDocumentDeliveryAction(),
                 new TelegramVideoDeliveryAction(),
                 new TelegramVoiceDeliveryAction(),
+                new TelegramAudioDeliveryAction(),
             ]),
         );
     }

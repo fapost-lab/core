@@ -21,7 +21,7 @@ paths:
   - "app/Http/Requests/Admin/*Media*"
   - "resources/js/pages/Console/Media/**"
   - routes/media-public.php
-reviewed_at: 2026-10-16
+reviewed_at: 2026-11-18
 ---
 # Media
 
@@ -40,7 +40,7 @@ definitions reference which file, so a file in use is not deleted silently.
   uploader and downloader adapters, through the container tags `media.channel.uploader` and
   `media.channel.downloader`.
 - **A channel receives media in one of two ways, decided by Media's dispatcher.** A channel with an uploader
-  (Telegram) gets a provider file id, cached per blob and channel. A channel that can only fetch media by URL
+  (Telegram) gets a provider file id, cached per blob and channel together with the kind the provider stored it as (resent by that kind, see the rules). A channel that can only fetch media by URL
   (Viber) declares a link policy and gets a signed public link minted per send, never cached and never stored;
   it reaches the payload as `media.url` with `mime_type`, `size`, `file_name` and `kind`. The channel never mints
   links.

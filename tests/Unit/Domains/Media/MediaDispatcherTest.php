@@ -27,6 +27,7 @@ use Fapost\Foundation\Media\ChannelMediaUploaderInterface;
 use Fapost\Foundation\Media\DTO\UploadResult;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Media\MediaBlobReadInterface;
+use Fapost\Foundation\Media\ReportsProviderKind;
 use Mockery;
 use Tests\TestCase;
 
@@ -50,6 +51,7 @@ final class MediaDispatcherTest extends TestCase
             'blob_id'          => 'blob-1',
             'channel_id'       => 'channel-1',
             'provider_file_id' => 'provider-x',
+            'provider_kind'    => 'photo',
             'expires_at'       => null,
             'uploaded_at'      => CarbonImmutable::now(),
         ]);
@@ -67,6 +69,62 @@ final class MediaDispatcherTest extends TestCase
         $this->assertFalse($result->alreadyDelivered);
     }
 
+    public function test_a_ref_without_a_stored_kind_is_not_reused_for_an_uploader_that_reports_one_and_the_new_upload_stores_the_kind(): void
+    {
+        $blob    = $this->makeBlob('blob-legacy');
+        $media   = $this->makeMedia($blob);
+        $channel = $this->makeChannel('channel-legacy', ChannelTypeEnum::Telegram);
+
+        $legacy = new MediaChannelRef();
+        $legacy->forceFill([
+            'blob_id'          => 'blob-legacy',
+            'channel_id'       => 'channel-legacy',
+            'provider_file_id' => 'old-voice-id',
+            'provider_kind'    => null,
+            'expires_at'       => null,
+        ]);
+
+        $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
+        $refs->shouldReceive('find')->andReturn($legacy);
+        $refs->shouldReceive('upsert')->once()
+            ->with('blob-legacy', 'channel-legacy', 'new-audio-id', null, 'audio')
+            ->andReturn(new MediaChannelRef());
+
+        $uploader = Mockery::mock(ChannelMediaUploaderInterface::class, ReportsProviderKind::class);
+        $uploader->shouldReceive('channelType')->andReturn('telegram');
+        $uploader->shouldReceive('upload')->once()->andReturn(new UploadResult('new-audio-id', null, '5', 'audio'));
+
+        $dispatcher = $this->makeDispatcher($refs, new ChannelMediaUploaderRegistry([$uploader]));
+
+        $result = $dispatcher->ensureUploadedToChannel($media, $channel);
+
+        $this->assertSame('new-audio-id', $result->providerFileId);
+        $this->assertSame('audio', $result->providerKind);
+        $this->assertTrue($result->alreadyDelivered);
+    }
+
+    public function test_a_ref_without_a_kind_is_reused_for_an_uploader_that_does_not_report_one(): void
+    {
+        $blob    = $this->makeBlob('blob-v');
+        $media   = $this->makeMedia($blob);
+        $channel = $this->makeChannel('channel-v', 'viber');
+
+        $ref = new MediaChannelRef();
+        $ref->forceFill(['blob_id' => 'blob-v', 'channel_id' => 'channel-v', 'provider_file_id' => 'v-id', 'expires_at' => null]);
+
+        $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
+        $refs->shouldReceive('find')->andReturn($ref);
+        $refs->shouldNotReceive('upsert');
+
+        $uploader = Mockery::mock(ChannelMediaUploaderInterface::class);
+        $uploader->shouldReceive('channelType')->andReturn('viber');
+        $uploader->shouldNotReceive('upload');
+
+        $result = $this->makeDispatcher($refs, new ChannelMediaUploaderRegistry([$uploader]))->ensureUploadedToChannel($media, $channel);
+
+        $this->assertSame('v-id', $result->providerFileId);
+    }
+
     public function test_uploads_when_no_ref_exists_and_caches_result(): void
     {
         $blob    = $this->makeBlob('blob-2');
@@ -75,7 +133,7 @@ final class MediaDispatcherTest extends TestCase
 
         $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
         $refs->shouldReceive('find')->with('blob-2', 'channel-2')->andReturnNull();
-        $refs->shouldReceive('upsert')->once()->with('blob-2', 'channel-2', 'provider-y', null)->andReturn(
+        $refs->shouldReceive('upsert')->once()->with('blob-2', 'channel-2', 'provider-y', null, null)->andReturn(
             new MediaChannelRef()
         );
 
@@ -119,7 +177,7 @@ final class MediaDispatcherTest extends TestCase
 
         $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
         $refs->shouldReceive('find')->andReturn($ref);
-        $refs->shouldReceive('upsert')->once()->with('blob-3', 'channel-3', 'provider-new', null)->andReturn(
+        $refs->shouldReceive('upsert')->once()->with('blob-3', 'channel-3', 'provider-new', null, null)->andReturn(
             new MediaChannelRef()
         );
 
@@ -164,6 +222,38 @@ final class MediaDispatcherTest extends TestCase
         $this->assertSame('tg-file-id', $result->providerFileId);
         $this->assertTrue($result->alreadyDelivered);
         $this->assertSame('12345', $result->deliveredMessageId);
+    }
+
+    public function test_stores_the_kind_the_provider_reported_and_returns_it_on_a_cache_hit(): void
+    {
+        $blob    = $this->makeBlob('blob-kind');
+        $media   = $this->makeMedia($blob);
+        $channel = $this->makeChannel('channel-kind', ChannelTypeEnum::Telegram);
+
+        $cached = new MediaChannelRef();
+        $cached->forceFill([
+            'blob_id'          => 'blob-kind',
+            'channel_id'       => 'channel-kind',
+            'provider_file_id' => 'tg-doc',
+            'provider_kind'    => 'document',
+        ]);
+
+        $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
+        $refs->shouldReceive('find')->twice()->andReturn(null, $cached);
+        $refs->shouldReceive('upsert')->once()->with('blob-kind', 'channel-kind', 'tg-doc', null, 'document')->andReturn(new MediaChannelRef());
+
+        $uploader = Mockery::mock(ChannelMediaUploaderInterface::class);
+        $uploader->shouldReceive('channelType')->andReturn('telegram');
+        $uploader->shouldReceive('upload')->once()->andReturn(new UploadResult('tg-doc', null, '9', 'document'));
+
+        $dispatcher = $this->makeDispatcher($refs, new ChannelMediaUploaderRegistry([$uploader]));
+
+        $first = $dispatcher->ensureUploadedToChannel($media, $channel);
+        $this->assertSame('document', $first->providerKind);
+
+        $second = $dispatcher->ensureUploadedToChannel($media, $channel);
+        $this->assertSame('tg-doc', $second->providerFileId);
+        $this->assertSame('document', $second->providerKind);
     }
 
     public function test_throws_when_no_uploader_registered_for_channel_type(): void

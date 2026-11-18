@@ -19,6 +19,7 @@ use App\Domains\Media\DTO\PublicMediaLink;
 use App\Domains\Media\Exceptions\MediaDeletedException;
 use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
+use App\Domains\Media\Services\DeliveryKind;
 use App\Domains\Messaging\OutboundVolumeGate;
 use Fapost\Foundation\Flow\Enums\KeyboardMode;
 use Fapost\Foundation\Media\DTO\UploadContext;
@@ -82,9 +83,12 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             // go on to MessageSender, the operator sees the same unit again and counts it once.
             $this->volumeGate->admitKey($this->idempotencyKey($sessionId, $payload));
 
-            $dispatch                    = $this->resolveMediaDispatch($payload, $channel, $chatId, $tenantId);
+            $media                       = $this->resolveMedia($payload, $tenantId);
+            $dispatch                    = $this->dispatchMedia($media, $payload, $channel, $chatId);
             $payload['provider_file_id'] = $dispatch->providerFileId;
-            $publicLink                  = $dispatch->publicLink;
+            // The upload chose its method by the file's format, not by the node's type; a cached id must go out the same way.
+            $payload['delivery_kind'] = DeliveryKind::payloadType($dispatch->providerKind, (string)($media->blob->mime_type ?? ''));
+            $publicLink               = $dispatch->publicLink;
 
             if ($dispatch->alreadyDelivered) {
                 // Upload-as-send (Telegram cache miss): the media dispatcher already
@@ -176,18 +180,14 @@ final readonly class FlowMessageSender implements MessageSenderInterface
     }
 
     /**
-     * Resolve the media file referenced by the node payload through the dispatcher.
-     *
-     * For upload-as-send providers (Telegram cache miss) the dispatcher returns
-     * `alreadyDelivered = true` — the bytes were shipped to the recipient as part of
-     * the upload and the sender pipeline must skip its own send.
+     * Load the media file referenced by the node payload.
      *
      * Queries MediaFile directly with tenantId to avoid a scoped-in-singleton
      * dependency issue: FlowMessageSender is a singleton while MediaService is scoped.
      *
      * @param  array<string, mixed>  $payload
      */
-    private function resolveMediaDispatch(array $payload, Channel $channel, string $chatId, string $tenantId): DispatchResult
+    private function resolveMedia(array $payload, string $tenantId): MediaFile
     {
         $mediaFileId = is_string($payload['media_file_id'] ?? null) ? $payload['media_file_id'] : null;
 
@@ -209,6 +209,20 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             throw MediaDeletedException::forId($mediaFileId);
         }
 
+        return $media;
+    }
+
+    /**
+     * Resolve the provider-side file through the dispatcher.
+     *
+     * For upload-as-send providers (Telegram cache miss) the dispatcher returns
+     * `alreadyDelivered = true` — the bytes were shipped to the recipient as part of
+     * the upload and the sender pipeline must skip its own send.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function dispatchMedia(MediaFile $media, array $payload, Channel $channel, string $chatId): DispatchResult
+    {
         $caption = is_string($payload['caption'] ?? null) ? $payload['caption'] : null;
 
         return $this->mediaDispatcher->ensureUploadedToChannel(
@@ -227,6 +241,12 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             return $this->toLinkPayload($payload, $contentType, $publicLink);
         }
 
+        $deliveryKind = $payload['delivery_kind'] ?? null;
+
+        if ($contentType->requiresMediaUrl() && is_string($deliveryKind)) {
+            return $this->toFileIdPayload($payload, $deliveryKind);
+        }
+
         return match ($contentType) {
             SendMessageContentType::Text => new MessagePayload(
                 type: 'text',
@@ -241,27 +261,22 @@ final readonly class FlowMessageSender implements MessageSenderInterface
                     sessionId: (string)$payload['session_id'],
                 ),
             ),
-            SendMessageContentType::Image => new MessagePayload(
-                type: 'photo',
-                text: (string)($payload['caption'] ?? ''),
-                media: ['photo' => (string)$payload['provider_file_id']],
-            ),
-            SendMessageContentType::Document => new MessagePayload(
-                type: 'document',
-                text: (string)($payload['caption'] ?? ''),
-                media: ['document' => (string)$payload['provider_file_id']],
-            ),
-            SendMessageContentType::Video => new MessagePayload(
-                type: 'video',
-                text: (string)($payload['caption'] ?? ''),
-                media: ['video' => (string)$payload['provider_file_id']],
-            ),
-            SendMessageContentType::Voice => new MessagePayload(
-                type: 'voice',
-                text: '',
-                media: ['voice' => (string)$payload['provider_file_id']],
-            ),
+            // Media content types leave through toFileIdPayload; send() always sets a delivery kind for them.
+            SendMessageContentType::Image,
+            SendMessageContentType::Document,
+            SendMessageContentType::Video,
+            SendMessageContentType::Voice => throw new RuntimeException('Media send payload has no delivery kind.'),
         };
+    }
+
+    /**
+     * A cached or just-minted file id, sent by the kind the provider stored it as, or by the one its format dictates ({@see DeliveryKind::payloadType()}) when no kind is stored, whatever the node says.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function toFileIdPayload(array $payload, string $type): MessagePayload
+    {
+        return DeliveryKind::fileIdPayload($type, (string)$payload['provider_file_id'], (string)($payload['caption'] ?? ''));
     }
 
     /**

@@ -93,6 +93,7 @@ final class FetchConversationMediaJob implements ShouldQueue
                 channel: $channel,
                 providerFileId: $providerFileId,
                 source: MediaSource::Conversation,
+                providerKind: is_string($descriptor['provider_kind'] ?? null) ? $descriptor['provider_kind'] : null,
             )->loadMissing('blob');
 
             return [

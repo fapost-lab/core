@@ -116,6 +116,14 @@ unchanged. See [Buttons and capabilities](/extending/connectors#buttons-and-capa
 
 - `ChannelMediaUploaderInterface` uploads the file and gives the provider's id back. Telegram
   works this way.
+
+  A provider can store a file as another kind than the method asked for (Telegram answers a WAV
+  sent as audio with a `document`), and a cached file id has to be sent by the method that
+  matches it. An uploader whose provider may do this puts the kind it got back in
+  `UploadResult::$providerKind` and implements the marker `ReportsProviderKind`. Core keeps the
+  kind with the cached id and sends by it. For a marked uploader, a cached id with no kind
+  predates this and is uploaded again once, so the kind gets stored. An uploader without the
+  marker keeps its cached ids as they are.
 - A provider that accepts pictures, video and files only as a URL it fetches itself registers
   `ChannelMediaLinkPolicyInterface` instead. Core then puts a signed public link to the file in
   the outgoing payload, issued just before delivery: `media.url`, with `mime_type`, `size`

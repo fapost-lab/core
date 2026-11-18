@@ -22,7 +22,7 @@ paths:
   - "app/Http/Requests/Admin/*Media*"
   - "resources/js/pages/Console/Media/**"
   - routes/media-public.php
-reviewed_at: 2026-10-16
+reviewed_at: 2026-11-18
 ---
 # Media rules
 
@@ -35,6 +35,15 @@ broken.
   loser of a race deletes its copy. Enforced: `EloquentMediaBlobRepository`, `MediaUploaderTest`.
 - **An expired or missing channel ref triggers a re-upload; a soft-deleted file cannot be
   dispatched.** Enforced: `MediaDispatcherTest`.
+- **A cached ref keeps the kind the provider stored the file as (`media_channel_refs.provider_kind`), and a resend
+  goes by it.** A file id cannot be sent by another method than the one that minted it (a voice id through
+  `sendAudio` is refused), and the provider may answer with another kind than the method asked for (a WAV sent as
+  audio can come back as a `document`). The uploader reports it in `UploadResult::$providerKind`; the inbound path
+  stores how the message carried the file (`MediaIngestor`, `provider_kind` in the transcript descriptor).
+  `DeliveryKind::payloadType()` picks the message type: the stored kind, else the format's. An uploader that
+  implements Foundation's `ReportsProviderKind` (Telegram's) has a ref without a kind treated as a cache miss and
+  uploaded again once, since a migration cannot backfill it; an uploader without the marker keeps its refs.
+  Enforced: `MediaDispatcherTest`, `DeliveryKindTest`, `MediaIngestorTest`, `MediaChannelRefRepositoryTest`.
 - **The storage disk is built per call: the tenant's `media.storage` when it names a driver,
   otherwise the installation's `config('media.storage')` (`MEDIA_STORAGE_DRIVER`, `MEDIA_S3_*`)** —
   local by default, s3 (endpoint and path-style for MinIO) optional, anything else throws; a tenant

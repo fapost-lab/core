@@ -565,6 +565,92 @@ final class FlowMessageSenderTest extends FeatureTestCase
         $this->assertSame('msg:' . $captured, $meter->units[0]->unitKey);
     }
 
+    public function test_a_cached_mp3_in_a_voice_node_goes_out_as_audio_with_its_caption(): void
+    {
+        [$tenantId, $contact, $session, $mediaFile] = $this->mediaScenario('f');
+        $mediaFile->blob->forceFill(['mime_type' => 'audio/mpeg'])->save();
+
+        $sender = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('send')->once()->withArgs(
+                fn ($message): bool => 'audio' === $message->payload->type
+                                       && 'mp3-id' === ($message->payload->media['audio'] ?? null)
+                                       && 'Listen' === $message->payload->text
+            )->andReturn(new DeliveryResult(sent: true, providerMessageId: 'p'));
+        });
+        $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
+        $dispatcher->shouldReceive('ensureUploadedToChannel')->once()->andReturn(
+            new DispatchResult(providerFileId: 'mp3-id', alreadyDelivered: false),
+        );
+
+        $flowSender = new FlowMessageSender($sender, $dispatcher, $this->recordingLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+
+        $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
+            'node_id'         => 'node-m',
+            'idempotency_key' => 'idem-mp3',
+            'session_id'      => (string) $session->getKey(),
+            'content_type'    => 'voice',
+            'media_file_id'   => $mediaFile->id,
+            'caption'         => 'Listen',
+        ]);
+    }
+
+    public function test_a_cached_id_goes_out_by_the_kind_telegram_stored_it_as(): void
+    {
+        [$tenantId, $contact, $session, $mediaFile] = $this->mediaScenario('g');
+        $mediaFile->blob->forceFill(['mime_type' => 'audio/wav'])->save();
+
+        $sender = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('send')->once()->withArgs(
+                fn ($message): bool => 'document' === $message->payload->type
+                                       && 'wav-doc' === ($message->payload->media['document'] ?? null)
+            )->andReturn(new DeliveryResult(sent: true, providerMessageId: 'p'));
+        });
+        $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
+        $dispatcher->shouldReceive('ensureUploadedToChannel')->once()->andReturn(
+            new DispatchResult(providerFileId: 'wav-doc', alreadyDelivered: false, providerKind: 'document'),
+        );
+
+        $flowSender = new FlowMessageSender($sender, $dispatcher, $this->recordingLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+
+        $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
+            'node_id'         => 'node-m',
+            'idempotency_key' => 'idem-wav',
+            'session_id'      => (string) $session->getKey(),
+            'content_type'    => 'voice',
+            'media_file_id'   => $mediaFile->id,
+            'caption'         => null,
+        ]);
+    }
+
+    public function test_a_heic_file_in_an_image_node_goes_out_as_a_document_by_its_cached_id(): void
+    {
+        [$tenantId, $contact, $session, $mediaFile] = $this->mediaScenario('e');
+        $mediaFile->blob->forceFill(['mime_type' => 'image/heic'])->save();
+
+        $sender = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('send')->once()->withArgs(
+                fn ($message): bool => 'document' === $message->payload->type
+                                       && 'heic-doc-id' === ($message->payload->media['document'] ?? null)
+                                       && ! isset($message->payload->media['photo'])
+            )->andReturn(new DeliveryResult(sent: true, providerMessageId: 'p'));
+        });
+        $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
+        $dispatcher->shouldReceive('ensureUploadedToChannel')->once()->andReturn(
+            new DispatchResult(providerFileId: 'heic-doc-id', alreadyDelivered: false),
+        );
+
+        $flowSender = new FlowMessageSender($sender, $dispatcher, $this->recordingLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+
+        $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
+            'node_id'         => 'node-m',
+            'idempotency_key' => 'idem-heic',
+            'session_id'      => (string) $session->getKey(),
+            'content_type'    => 'image',
+            'media_file_id'   => $mediaFile->id,
+            'caption'         => null,
+        ]);
+    }
+
     /**
      * @return array{0: string, 1: Contact, 2: FlowSession, 3: MediaFile}
      */

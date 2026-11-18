@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Telegram;
 
 use App\Domains\Channels\SecretRedactor;
+use App\Domains\Channels\Telegram\Dto\SendAudioDto;
 use App\Domains\Channels\Telegram\Dto\SendDocumentDto;
 use App\Domains\Channels\Telegram\Dto\SendMessageDto;
 use App\Domains\Channels\Telegram\Dto\SendPhotoDto;
@@ -72,6 +73,17 @@ final readonly class TelegramBotApiClient
     {
         return $this->request(
             'sendVideo',
+            array_filter($dto->toArray(), static fn (mixed $value): bool => null !== $value)
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function sendAudio(SendAudioDto $dto): array
+    {
+        return $this->request(
+            'sendAudio',
             array_filter($dto->toArray(), static fn (mixed $value): bool => null !== $value)
         );
     }
