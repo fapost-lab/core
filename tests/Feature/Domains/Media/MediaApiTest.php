@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Media;
 
 use App\Domains\Media\Contracts\MediaUploaderInterface;
+use App\Domains\Media\Exceptions\MediaFolderRuleException;
 use App\Domains\Media\Models\MediaBlob;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFileReference;
 use App\Domains\Media\Models\MediaFolder;
+use App\Domains\Media\Services\MediaFolderService;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
@@ -77,6 +79,127 @@ final class MediaApiTest extends FeatureTestCase
         $response = $this->postJson('/media/folders', ['name' => 'TooDeep', 'parent_id' => $parentId]);
 
         $response->assertUnprocessable();
+    }
+
+    public function test_moving_a_folder_leaves_a_same_named_sibling_subtree_alone(): void
+    {
+        $this->actingAs($this->makeAdmin());
+
+        $a1   = $this->postJson('/media/folders', ['name' => 'A'])->json('data.id');
+        $a2   = $this->postJson('/media/folders', ['name' => 'A'])->json('data.id');
+        $sub1 = $this->postJson('/media/folders', ['name' => 'Sub', 'parent_id' => $a1])->json('data.id');
+        $sub2 = $this->postJson('/media/folders', ['name' => 'Sub', 'parent_id' => $a2])->json('data.id');
+        $leaf = $this->postJson('/media/folders', ['name' => 'Leaf', 'parent_id' => $sub2])->json('data.id');
+        $dest = $this->postJson('/media/folders', ['name' => 'Dest'])->json('data.id');
+
+        $this->patchJson("/media/folders/{$sub1}", ['parent_id' => $dest])->assertOk();
+
+        $this->assertSame('/Dest/Sub', MediaFolder::query()->findOrFail($sub1)->path_cache);
+        $this->assertSame('/A/Sub', MediaFolder::query()->findOrFail($sub2)->path_cache);
+        $this->assertSame('/A/Sub/Leaf', MediaFolder::query()->findOrFail($leaf)->path_cache);
+
+        $keep     = $this->postJson('/media/folders', ['name' => 'Sub', 'parent_id' => $a1])->json('data.id');
+        $keepLeaf = $this->postJson('/media/folders', ['name' => 'Leaf', 'parent_id' => $keep])->json('data.id');
+
+        $this->deleteJson("/media/folders/{$a1}?force=true")->assertNoContent();
+
+        $this->assertSame('/Sub', MediaFolder::query()->findOrFail($keep)->path_cache);
+        $this->assertSame('/Sub/Leaf', MediaFolder::query()->findOrFail($keepLeaf)->path_cache);
+        $this->assertSame('/A/Sub', MediaFolder::query()->findOrFail($sub2)->path_cache);
+        $this->assertSame('/A/Sub/Leaf', MediaFolder::query()->findOrFail($leaf)->path_cache);
+    }
+
+    public function test_delete_moving_contents_beyond_the_depth_limit_is_refused_by_subfolder_height(): void
+    {
+        $this->actingAs($this->makeAdmin());
+
+        $parentId = null;
+        for ($i = 1; $i <= 9; $i++) {
+            $parentId = $this->postJson('/media/folders', ['name' => "L{$i}", 'parent_id' => $parentId])->json('data.id');
+        }
+
+        $doomed = $this->postJson('/media/folders', ['name' => 'Doomed'])->json('data.id');
+        $child  = $this->postJson('/media/folders', ['name' => 'Child', 'parent_id' => $doomed])->json('data.id');
+        $this->postJson('/media/folders', ['name' => 'Grand', 'parent_id' => $child])->assertCreated();
+
+        $service = app(MediaFolderService::class);
+
+        try {
+            $service->deleteMovingContents($service->find($doomed), $service->find($parentId));
+            $this->fail('The move should have been refused.');
+        } catch (MediaFolderRuleException $exception) {
+            $this->assertSame(MediaFolderRuleException::TOO_DEEP, $exception->reason);
+        }
+
+        $this->assertNotNull(MediaFolder::query()->find($doomed));
+        $this->assertSame($doomed, MediaFolder::query()->findOrFail($child)->parent_id);
+    }
+
+    public function test_folder_tree_lists_each_folder_before_its_own_subtree_even_with_same_names(): void
+    {
+        $this->actingAs($this->makeAdmin());
+
+        $a1 = $this->postJson('/media/folders', ['name' => 'A'])->json('data.id');
+        $this->postJson('/media/folders', ['name' => 'A']);
+        $this->postJson('/media/folders', ['name' => 'A B']);
+        $x = $this->postJson('/media/folders', ['name' => 'X', 'parent_id' => $a1])->json('data.id');
+
+        $ids  = array_column(app(MediaFolderService::class)->tree(), 'id');
+        $rows = array_column(app(MediaFolderService::class)->tree(), null, 'id');
+
+        $this->assertCount(4, $ids);
+        $this->assertSame($x, $ids[array_search($a1, $ids, true) + 1]);
+        $this->assertSame(1, $rows[$x]['depth']);
+        $this->assertSame(0, $rows[$a1]['depth']);
+    }
+
+    public function test_renaming_a_folder_does_not_touch_folders_that_only_match_a_like_pattern(): void
+    {
+        $this->actingAs($this->makeAdmin());
+
+        $under = $this->postJson('/media/folders', ['name' => 'a_b'])->json('data.id');
+        $pct   = $this->postJson('/media/folders', ['name' => '50%'])->json('data.id');
+        $pctC  = $this->postJson('/media/folders', ['name' => 'C', 'parent_id' => $pct])->json('data.id');
+        $five  = $this->postJson('/media/folders', ['name' => '50x'])->json('data.id');
+        $fiveC = $this->postJson('/media/folders', ['name' => 'C', 'parent_id' => $five])->json('data.id');
+        $other = $this->postJson('/media/folders', ['name' => 'axb'])->json('data.id');
+        $child = $this->postJson('/media/folders', ['name' => 'C', 'parent_id' => $under])->json('data.id');
+        $odd   = $this->postJson('/media/folders', ['name' => 'C', 'parent_id' => $other])->json('data.id');
+
+        $this->patchJson("/media/folders/{$under}", ['name' => 'z'])->assertOk();
+
+        $this->assertSame('/z/C', MediaFolder::query()->findOrFail($child)->path_cache);
+        $this->assertSame('/axb/C', MediaFolder::query()->findOrFail($odd)->path_cache);
+
+        $this->patchJson("/media/folders/{$pct}", ['name' => 'half'])->assertOk();
+
+        $this->assertSame('/half/C', MediaFolder::query()->findOrFail($pctC)->path_cache);
+        $this->assertSame('/50x/C', MediaFolder::query()->findOrFail($fiveC)->path_cache);
+    }
+
+    public function test_moving_a_deep_subtree_beyond_the_depth_limit_is_rejected(): void
+    {
+        $this->actingAs($this->makeAdmin());
+
+        $parentId = null;
+        for ($i = 1; $i <= 9; $i++) {
+            $parentId = $this->postJson('/media/folders', ['name' => "L{$i}", 'parent_id' => $parentId])->json('data.id');
+        }
+
+        $top = $this->postJson('/media/folders', ['name' => 'Top'])->json('data.id');
+        $mid = $this->postJson('/media/folders', ['name' => 'Mid', 'parent_id' => $top])->json('data.id');
+        $this->postJson('/media/folders', ['name' => 'Bottom', 'parent_id' => $mid])->assertCreated();
+
+        // L9 is at depth 9; Top has height 3, so it would reach depth 12.
+        $this->patchJson("/media/folders/{$top}", ['parent_id' => $parentId])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['parent_id']);
+        $this->assertNull(MediaFolder::query()->findOrFail($top)->parent_id);
+
+        // A single folder still fits at depth 10.
+        $this->patchJson("/media/folders/{$mid}", ['parent_id' => $parentId])->assertUnprocessable();
+        $leaf = $this->postJson('/media/folders', ['name' => 'Single'])->json('data.id');
+        $this->patchJson("/media/folders/{$leaf}", ['parent_id' => $parentId])->assertOk();
     }
 
     public function test_non_empty_folder_delete_requires_force(): void
