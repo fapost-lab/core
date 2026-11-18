@@ -9,9 +9,10 @@ return [
         'max_iterations' => (int) env('FLOW_MAX_ITERATIONS', 100),
     ],
 
-    // Only the default of the platform setting `flow.call_dedup_ttl_hours`: how long the `call` node remembers a
-    // successful call, so a retried step is not sent again. Keep it above the failed-job retention
-    // (`horizon.trim.failed`, 7 days); the setting's minimum is 168 hours.
+    // Only the default of the platform setting `flow.call.dedup_ttl_hours`: how long the `call` node remembers a
+    // successful call, so a retried step is not sent again. Keep it above Horizon's failed-job
+    // retention (`horizon.trim.failed`, 7 days); the setting's minimum is 168 hours. A retry from the `failed_jobs` table
+    // past the window re-sends with the same key.
     'call' => [
         'dedup_ttl_hours' => (int) env('FLOW_CALL_DEDUP_TTL_HOURS', 192),
     ],

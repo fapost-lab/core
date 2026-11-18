@@ -10,6 +10,7 @@ use DateTimeImmutable;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
+use Mockery;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Feature\FeatureTestCase;
 
@@ -74,6 +75,32 @@ final class RedisCallExecutionLedgerRedisTest extends FeatureTestCase
         $ledger->complete($this->tenant, $this->key, CallResult::ok(str_repeat('x', RedisCallExecutionLedger::MAX_RECORD_BYTES + 1)));
 
         $this->assertNull($ledger->completed($this->tenant, $this->key));
+    }
+
+    public function test_forgetting_a_tenant_removes_its_records_and_only_its_own(): void
+    {
+        $ledger = $this->ledger();
+        $other  = 'other-' . $this->tenant;
+
+        $ledger->complete($this->tenant, $this->key, CallResult::ok(['a' => 1]));
+        $ledger->complete($this->tenant, 'second-key', CallResult::ok(['b' => 2]));
+        $ledger->startAttempt($this->tenant, $this->key);
+        $ledger->complete($other, $this->key, CallResult::ok(['c' => 3]));
+
+        $tenant = Mockery::mock(\App\Domains\Tenancy\Contracts\TenantInterface::class);
+        $tenant->shouldReceive('getId')->andReturn($this->tenant);
+
+        $forgetters = iterator_to_array($this->app->tagged('tenancy.cache_forgetters'));
+        $this->assertNotEmpty(array_filter($forgetters, static fn (object $f): bool => $f instanceof \App\Domains\Flow\Call\CallLedgerCacheForgetter));
+
+        $this->app->make(\App\Domains\Flow\Call\CallLedgerCacheForgetter::class)->forget($tenant);
+
+        $this->assertNull($ledger->completed($this->tenant, $this->key));
+        $this->assertNull($ledger->completed($this->tenant, 'second-key'));
+        $this->assertSame(0, (int) Redis::connection()->exists($this->redisKey('attempts')));
+        $this->assertNotNull($ledger->completed($other, $this->key));
+
+        Redis::connection()->del("flow:call:{$other}:{$this->key}:done");
     }
 
     public function test_a_payload_that_cannot_be_encoded_is_not_stored(): void

@@ -155,8 +155,9 @@ number and the record (`CallExecutionLedgerInterface`, Redis implementation `Red
   result, so variables and the handle are the same; its metadata has `deduplicated: true`. A failed call is not
   recorded and stays retryable; an execution that died in flight leaves only the attempt counter, so the next run
   sends again with the same key.
-- **Window:** the platform setting `flow.call_dedup_ttl_hours` (default 192 hours, from `FLOW_CALL_DEDUP_TTL_HOURS`;
-  minimum 168 = the failed-job retention, maximum 720).
+- **Window:** the platform setting `flow.call.dedup_ttl_hours` (default 192 hours, from `FLOW_CALL_DEDUP_TTL_HOURS`;
+  minimum 168 = Horizon's failed-job retention, maximum 720). A retry from the `failed_jobs` table past the window
+  re-sends with the same `Idempotency-Key`.
 - **Limits:** a result over 256 KiB is not recorded; a Redis failure is logged and the call is sent anyway. The
   builder's test call never uses the ledger. Request headers and parameters are never stored.
 

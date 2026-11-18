@@ -22,7 +22,7 @@ use Throwable;
  */
 final readonly class RedisCallExecutionLedger implements CallExecutionLedgerInterface
 {
-    public const string TTL_SETTING = 'flow.call_dedup_ttl_hours';
+    public const string TTL_SETTING = 'flow.call.dedup_ttl_hours';
 
     public const int MAX_RECORD_BYTES = 262144;
 
@@ -105,10 +105,12 @@ final readonly class RedisCallExecutionLedger implements CallExecutionLedgerInte
             return;
         }
 
-        if (mb_strlen($encoded) > self::MAX_RECORD_BYTES) {
+        // The cap is in bytes ('8bit'). The encoding escapes non-ASCII, so characters and bytes coincide today; the
+        // explicit unit keeps the cap right should the flags change.
+        if (mb_strlen($encoded, '8bit') > self::MAX_RECORD_BYTES) {
             $this->logger->warning('call dedup record skipped: result too large', [
                 'tenant_id' => $tenantId,
-                'bytes'     => mb_strlen($encoded),
+                'bytes'     => mb_strlen($encoded, '8bit'),
             ]);
 
             return;

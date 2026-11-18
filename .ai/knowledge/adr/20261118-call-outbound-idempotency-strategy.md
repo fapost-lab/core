@@ -48,9 +48,12 @@ new field there needs a release.
    remote header still protects it.
 5. **Redis trouble never blocks a call.** A failed read, increment or write is logged and the call is sent as
    before this decision (at-least-once with the header).
-6. **The window is a platform setting.** `flow.call_dedup_ttl_hours`, default 192 (8 days), minimum 168
+6. **The window is a platform setting.** `flow.call.dedup_ttl_hours`, default 192 (8 days), minimum 168
    (7 days), maximum 720. The floor is the Horizon failed-job retention (`horizon.trim.failed`, 7 days) plus
-   a day of grace: a failed step can be retried by hand up to then, and its call must still be recognised.
+   a day of grace: a failed step can be retried from Horizon's failed-job view up to then, and its call must
+   still be recognised. That retention trims only Horizon's Redis view: the `failed_jobs` table is not pruned
+   by Core, so `queue:retry` can run a step after the window, and the call is then sent again with the same
+   `Idempotency-Key` (the point 5 fallback; the remote header still protects it).
    The `.env` value `FLOW_CALL_DEDUP_TTL_HOURS` is only the installation's default (`conventions/runtime-settings`).
 7. **A replay is outside the call quota.** The `call_executions` unit was spent by the first run, so a replayed
    execution neither consumes a unit nor can be refused with `limit_reached` (for example after the period rolled
@@ -82,7 +85,8 @@ new field there needs a release.
 
 - A retried step no longer repeats a call that already succeeded, whatever the receiver does with the header.
 - Response bodies (and response headers) of successful calls sit in Redis for the window, under a key with the
-  tenant id. Request headers and parameters, which carry credentials, are never stored.
+  tenant id. Request headers and parameters, which carry credentials, are never stored. When a tenant is
+  removed completely, `CallLedgerCacheForgetter` (tagged `tenancy.cache_forgetters`) deletes `flow:call:{tenant}:*`.
 - The retry task builds on `attempt_number` and the ledger instead of adding its own counter.
 - Three docs change with it: `nodes/06-call.md`, `04-call-transport-layer.md`, `08-concurrency-idempotency.md`.
 - Foundation's `CallContext` and `ActionHandlerInterface` stay unchanged; moving the attempt number into

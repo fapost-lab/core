@@ -181,16 +181,17 @@ final class CallNodeHandler extends AbstractVersionedHandler
         $options    = $this->templates->render($rawOptions, $context, $state);
         $options    = is_array($options) ? $options : [];
 
-        $refused = $this->refuseWhenVolumeUsedUp($context);
+        $callContext = $this->buildContext($context);
+        $earlier     = $this->ledger->completed($callContext->tenantId, $callContext->idempotencyKey);
+        $refused     = $this->refuseWhenVolumeUsedUp($context, $earlier);
 
         if (null !== $refused) {
             return $refused;
         }
 
-        $callContext = $this->buildContext($context);
-        $request     = new CallRequest(target: $target, parameters: $parameters, options: $options);
-        $outcome     = $this->dispatch($transportId, $request, $callContext);
-        $result      = $outcome->result;
+        $request = new CallRequest(target: $target, parameters: $parameters, options: $options);
+        $outcome = $this->dispatch($transportId, $request, $callContext, $earlier);
+        $result  = $outcome->result;
 
         $stateChanges = [];
         $this->applyResponse($config, $result, $context, $stateChanges);
@@ -321,15 +322,16 @@ final class CallNodeHandler extends AbstractVersionedHandler
             ],
         );
 
-        $refused = $this->refuseWhenVolumeUsedUp($context);
+        $callContext = $this->buildContext($context);
+        $earlier     = $this->ledger->completed($callContext->tenantId, $callContext->idempotencyKey);
+        $refused     = $this->refuseWhenVolumeUsedUp($context, $earlier);
 
         if (null !== $refused) {
             return $refused;
         }
 
-        $callContext = $this->buildContext($context);
-        $outcome     = $this->dispatch(self::DEFAULT_TRANSPORT, $request, $callContext);
-        $result      = $outcome->result;
+        $outcome = $this->dispatch(self::DEFAULT_TRANSPORT, $request, $callContext, $earlier);
+        $result  = $outcome->result;
 
         $stateChanges = [];
         $variable     = $this->resolveVariable($config['save_to_variable'] ?? null);
@@ -365,11 +367,12 @@ final class CallNodeHandler extends AbstractVersionedHandler
      * transport. Otherwise the send is counted, and its number travels to the transport as the attempt number
      * (overwriting whatever the flow author put under that option); only a success is recorded, because a failure
      * has to stay retryable. See `adr-20261118-call-outbound-idempotency-strategy`.
+     *
+     * `$earlier` is the ledger's answer for this execution, looked up once by the caller so that the quota check
+     * and the send decide on the same record.
      */
-    private function dispatch(string $transportId, CallRequest $request, CallContext $callContext): CallOutcome
+    private function dispatch(string $transportId, CallRequest $request, CallContext $callContext, ?CallResult $earlier): CallOutcome
     {
-        $earlier = $this->ledger->completed($callContext->tenantId, $callContext->idempotencyKey);
-
         if (null !== $earlier) {
             return new CallOutcome($earlier, null, true);
         }
@@ -396,11 +399,11 @@ final class CallNodeHandler extends AbstractVersionedHandler
      * The unit is the execution key ({@see self::executionKey()}), the same value the transport gets as
      * {@see CallContext::$idempotencyKey}: new on every pass of a loop, unchanged when the queue retries the step.
      */
-    private function refuseWhenVolumeUsedUp(NodeExecutionContext $context): ?NodeExecutionResult
+    private function refuseWhenVolumeUsedUp(NodeExecutionContext $context, ?CallResult $earlier): ?NodeExecutionResult
     {
         // A replay sends nothing and its unit was spent by the first run: it must not be refused when the
         // period has rolled over and the tenant is at its limit.
-        if (null !== $this->ledger->completed($context->tenantId, $this->executionKey($context))) {
+        if (null !== $earlier) {
             return null;
         }
 
