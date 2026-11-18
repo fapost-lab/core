@@ -41,6 +41,8 @@ Calls an external or internal service. Combines Integration (HTTP) and Action (i
 | `transport_options` | object | no | Transport options, rendered, then passed through (`timeout`, `headers`, `success_when`, `body_raw`) |
 | `save_to_variable` | Variable | no | Writes the whole response object `{status, body, headers}` to one variable |
 | `result_mapping` | list of `{from, to}` | no | Each entry copies one response path into a `Variable` (`to`) |
+| `success_statuses` | list | no | Statuses that count as success, for every transport that reports one. Absent: the transport's own rule (`success_when`). See "`success_statuses`" |
+| `strict_mapping` | boolean | no | `true`: a mapped path missing from a successful response sends the node to `error` instead of writing null. Default `false`. See "Strict mapping" |
 
 A node with neither `transport` nor `target` is a **legacy** node and runs through `executeLegacy()`:
 it POSTs `url` through the `http` transport with `{session_id, contact_id, state}` from
@@ -56,7 +58,7 @@ it POSTs `url` through the `http` transport with `{session_id, contact_id, state
 ## Output handles
 
 - `success`: the call succeeded (by the `success_when` policy for HTTP)
-- `error`: transport error, action exception, or an unknown transport id
+- `error`: transport error, action exception, or an unknown transport id; a status the policy rejects; a missing mapped path under `strict_mapping`
 
 The node always returns `Executed`; a failed call does not fail the session, it takes `error`.
 Metadata carries `status_code`, `error_code`, `idempotency_key`, `attempt_number` and, for a replayed call, `deduplicated` when present.
@@ -70,6 +72,21 @@ Metadata carries `status_code`, `error_code`, `idempotency_key`, `attempt_number
 | `"2xx"` (default) | 200-299 -> `success`; everything else -> `error` |
 | `"any_response"` | any HTTP response, including 4xx and 5xx -> `success`; only a transport failure -> `error` |
 | `"2xx_or_4xx"` | 2xx and 4xx -> `success` (for APIs where 4xx is business meaning); 5xx -> `error` |
+
+## `success_statuses`
+
+A literal list (not templates) of the response statuses that count as success: a number (`404`), a class (`"2xx"`) or
+a range (`"400-404"`), 100 to 599, at most 20 entries. When set it **replaces** the transport's own verdict in both
+directions: a listed status takes `success` even if `success_when` would have refused it, and an unlisted one takes `error`
+even if it was a 2xx (`error_code` is `http_4xx`, `http_5xx` or `http_other`). The response is mapped and saved the same
+way either way. A result that carries no status (a transport failure, `egress_denied`, a `handler` action) keeps the
+transport's verdict, so the option is only meaningful for a transport that puts `status_code` in the result metadata
+(`http` today). The builder's test call applies the same verdict.
+
+The verdict is the node's, so it decides what the outbound ledger records: a listed status is a finished call and is
+replayed, not sent again, on a repeated execution; an unlisted one is not recorded and stays retryable (see
+"Outbound idempotency"). Validation at publish: `call_invalid_success_statuses` (a malformed list) and
+`call_invalid_strict_mapping` (not a boolean), both errors.
 
 ### Failure boundary
 
@@ -181,7 +198,7 @@ A response bag is built for `result_mapping.from` paths:
 
 - `save_to_variable` writes `{status, body, headers}` as one value.
 - Each `result_mapping` entry writes `data_get($bag, from)` into the variable `to`.
-- A missing path writes `null`; it never fails the node.
+- A missing path writes `null`; it never fails the node, unless `strict_mapping` is on (below).
 - A `session` variable lands in `stateChanges` (`flow.<name>`). A `contact` variable is written
   immediately through `ContactWriterInterface`; if the writer is unavailable the node throws
   `InvalidNodeConfigException`.
@@ -195,7 +212,13 @@ call -> success
     default -> continue
 ```
 
-A strict mode that fails on a missing path is not built.
+### Strict mapping
+
+With `strict_mapping: true`, a `result_mapping` path that is absent from the response of a **successful** call sends the node
+to `error` (`error_code = mapping_missing`, metadata `missing_paths`, flow log `mapping_missing: <paths>`) and no mapping
+entry is written; `save_to_variable` still is. A path is missing only when it does not exist: a present `null`, `""` or `[]`
+is a value. An error response is mapped leniently as before: it already takes `error`, and its body rarely has the success
+shape. The call was sent and succeeded, so a replay of it fails the same way and does not send again.
 
 ## Built-in transports
 
@@ -214,14 +237,16 @@ See [04-call-transport-layer.md](../04-call-transport-layer.md), section 4.3.
 
 ## Validation
 
-`ValidateFlowService` has no call-specific rules beyond the schema (no required fields are declared).
+`ValidateFlowService` has no call-specific rules beyond the schema (no required fields are declared) and the handler's own
+`validate()`: the `success_statuses` list and the `strict_mapping` flag (see above).
 An unknown transport, a malformed target or an invalid `success_when` surfaces at runtime as the
 `error` handle. There is a builder "test call" endpoint (`CallTestController`, `CallTester`) for
 trying a request before publishing.
 
 Tests: `tests/Unit/Domains/Flow/BuiltInNodeHandlersTest.php`,
 `tests/Unit/Domains/Flow/Call/HandlerTransportTest.php`,
-`tests/Feature/Domains/Flow/Call/HttpTransportTest.php`, `CallTesterTest.php`.
+`tests/Feature/Domains/Flow/Call/HttpTransportTest.php`, `CallTesterTest.php`,
+`CallNodeSuccessStatusesAndStrictMappingTest.php`, `tests/Unit/Domains/Flow/Call/CallSuccessStatusesTest.php`.
 
 ---
 

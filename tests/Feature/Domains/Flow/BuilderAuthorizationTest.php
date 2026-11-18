@@ -9,6 +9,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
 use Database\Seeders\TenantAclSeeder;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
@@ -120,6 +121,21 @@ final class BuilderAuthorizationTest extends FeatureTestCase
             ->postJson('/builder/call/test', ['config' => ['transport' => 'http']]);
 
         $this->assertNotSame(403, $response->getStatusCode());
+    }
+
+    public function test_call_test_endpoint_passes_success_statuses_to_the_tester(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 409)]);
+
+        $this->actingAs($this->userWithFlowPermissions())
+            ->postJson('/builder/call/test', ['config' => [
+                'transport'        => 'http',
+                'target'           => 'POST https://api.example.com/users',
+                'success_statuses' => [409],
+            ]])
+            ->assertOk()
+            ->assertJsonPath('data.success', true)
+            ->assertJsonPath('data.status_code', 409);
     }
 
     private function assertFlowEndpointsForbidden(User $user, FlowDraft $draft): void

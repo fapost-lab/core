@@ -36,6 +36,22 @@ final class CallTesterTest extends TestCase
         $this->assertNull($result['error_code']);
     }
 
+    public function test_success_statuses_decide_the_verdict_like_the_node_does(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response(['error' => 'exists'], 409)]);
+
+        $config = ['transport' => 'http', 'target' => 'POST https://api.example.com/users'];
+
+        $plain   = app(CallTester::class)->run($config, []);
+        $allowed = app(CallTester::class)->run([...$config, 'success_statuses' => [200, 409]], []);
+
+        $this->assertFalse($plain['success']);
+        $this->assertSame('http_4xx', $plain['error_code']);
+        $this->assertTrue($allowed['success']);
+        $this->assertNull($allowed['error_code']);
+        $this->assertSame(409, $allowed['status_code']);
+    }
+
     public function test_unknown_transport_returns_error_result(): void
     {
         $result = app(CallTester::class)->run(['transport' => 'nope', 'target' => 'GET https://x'], []);

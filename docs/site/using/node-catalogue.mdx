@@ -247,6 +247,16 @@ It reports whether the call succeeded, so the flow can respond to a failure
 rather than pretending it did not happen. Failed calls are retried before the
 failure outcome is taken; how many times is a tenant setting.
 
+By default an HTTP response counts as a success when its status is 2xx. **Success
+statuses** (for example `200, 409, 3xx, 400-404`) replaces that rule: a listed status takes
+the success outcome and an unlisted one the failure outcome. The **Test call** applies the
+same rule.
+
+Field mapping writes `null` for a path the response does not contain. With **Strict**
+switched on, a successful call whose response lacks a mapped path takes the failure outcome
+instead, with `error_code = mapping_missing` (the flow log shows `mapping_missing: <paths>`),
+and none of the mapped variables is written.
+
 Each run of the block counts against the tenant's call executions for the
 period, and so does every **Test call** in the builder. When they are used up the
 call is not made and the flow takes the failure outcome, with
