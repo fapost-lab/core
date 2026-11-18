@@ -28,11 +28,17 @@ ignores any such keys. Coordination between parent and child goes through `conta
 
 ## Output handles
 
-- `success`: the child ended through an `end` node with status `success`
+- `success`: the child ended through an `end` node with status `success`, or ran off its graph without an
+  `end` node
 - `cancelled`: the child ended with status `cancelled`
-- `failed`: the child ended with status `failed`, or timed out, or the target flow is not active
+- `failed`: the child ended with status `failed`, failed (iteration limit, a handler exception or a node
+  reporting failure), timed out, or the target flow is not active
 
 The mapping from the child's `end_status` to the handle is 1:1 (`DefaultSubflowResumer::handleFor`).
+A child that stops without an `end` node still hands control back: the engine calls `resumeIfChild` with
+`success` when it runs off its graph and `failed` when it fails, so a parent never waits in `paused_subflow`
+without a living child. When a failed child hands back, the engine records the failure and returns instead of
+rethrowing; what the parent's own resumed run throws propagates as the parent's own.
 
 ## V1 limits
 
@@ -99,9 +105,13 @@ there is no `ended_at` column) and then calls `SubflowResumerInterface::resumeIf
 3. Record a `SubflowReturned` history event on the parent.
 4. Call `FlowEngine::resumeAfterSubflow($parent, $handle)`: resolve the next node from the parent's
    current node (still the subflow node) and the handle, set the parent `active` (or `completed` when
-   there is no edge for that handle) and run the parent's loop, synchronously.
+   there is no edge for that handle) and run the parent's loop, synchronously. A parent that completes
+   this way hands its own parent `success` when it is itself a child. A lost optimistic lock on the parent
+   is retried once, only while the parent still waits on the same subflow node.
 
-An inconsistent state never throws: the child is already terminal.
+A missing or not-paused parent is logged and never throws: the child is already terminal. A global
+command that ends a session (`/reset`, `/cancel`, a start-flow command) also ends every `paused_subflow`
+ancestor, so the chain never outlives its leaf.
 
 ## Timeout handling
 
@@ -110,9 +120,12 @@ The command `flow:sweep-subflow-timeouts` (`SweepSubflowTimeoutsCommand`) runs e
 active tenant. For every parent in `paused_subflow` whose `expires_at` has passed, under the parent's
 session lock and after re-reading it:
 
-- **A live child exists** (`active` or `waiting_input`): force-end the child as `ended` with
-  `end_status = failed`, then `resumeIfChild($child, 'failed')`, so the parent continues on `failed`.
-- **No live child (an orphan parent):** mark the parent `expired` with `current_node_id = null`. This
+- **A live child exists** (`active`, `waiting_input`, `paused` on a `delay`, or `paused_subflow` on a
+  nested subflow): force-end the child's live descendants, then the child itself, as `ended` with
+  `end_status = failed` (a nested chain unwinds bottom-up), then `resumeIfChild($child, 'failed')`, so the
+  parent continues on `failed`.
+- **No live child (an orphan parent):** mark the parent `expired` with `current_node_id = null`, and, when
+  it is itself a child, hand its own parent `failed`. This
   should not happen because the starter extends the parent's expiry past the child's, but the sweeper
   recovers if the invariant breaks.
 - A parent whose lock is busy is skipped and retried on the next sweep.

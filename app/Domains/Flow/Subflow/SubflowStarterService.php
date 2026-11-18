@@ -10,6 +10,7 @@ use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
+use App\Domains\Flow\Exceptions\SubflowTargetInactiveException;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowGraphResolver;
@@ -18,7 +19,6 @@ use DateInterval;
 use Exception;
 use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Database\ConnectionInterface;
-use RuntimeException;
 
 /**
  * Builds out the subflow lifecycle when a {@code subflow} node executes.
@@ -63,7 +63,7 @@ final readonly class SubflowStarterService
     }
 
     /**
-     * @throws RuntimeException  If the target flow has no active definition.
+     * @throws SubflowTargetInactiveException  If the target flow has no active definition.
      */
     public function start(
         FlowSession $parent,
@@ -74,7 +74,7 @@ final readonly class SubflowStarterService
         $definition = $this->definitions->findLatestActiveByFlowId($childFlowId);
 
         if (null === $definition) {
-            throw new RuntimeException(
+            throw new SubflowTargetInactiveException(
                 "Subflow target '{$childFlowId}' has no active flow_definition for tenant.",
             );
         }

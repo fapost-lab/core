@@ -246,6 +246,10 @@ final readonly class FlowEngine implements FlowEngineInterface
 
         if (null !== $nextNodeId) {
             $this->executeLoop($definition, $parent, null, $contact);
+        } else {
+            // No edge for that handle: the parent just ran off its graph. When it is itself a child, its own
+            // parent must not keep waiting for it (a plain finish, as for any session that runs off its graph).
+            $this->subflowResumer->resumeIfChild($parent, EndStatus::Success->value);
         }
 
         $parent->refresh();
@@ -337,6 +341,12 @@ final readonly class FlowEngine implements FlowEngineInterface
                         );
                     });
                 });
+
+                // A child that hit the limit hands control back to its parent, as it does when it ends. The
+                // failure is then dealt with (like the volume limit), so the job does not fail and retry.
+                if ($this->handBackFailedChild($session)) {
+                    return;
+                }
 
                 throw new FlowExecutionLimitExceededException();
             }
@@ -447,7 +457,14 @@ final readonly class FlowEngine implements FlowEngineInterface
 
                     return;
                 } catch (Throwable $handlerException) {
-                    $this->markSessionFailed($session, $nodeId, $type, $version, $handlerException);
+                    // Hand back only when the failure was recorded: if another worker moved the session on,
+                    // the parent is theirs to resume. A child that handed back is dealt with and does not
+                    // rethrow: rethrowing would fail the job, and its retry would feed the same message to the
+                    // already-advanced parent (or, in a synchronous start, make the parent's own run fail).
+                    if ($this->markSessionFailed($session, $nodeId, $type, $version, $handlerException)
+                        && $this->handBackFailedChild($session)) {
+                        return;
+                    }
 
                     throw $handlerException;
                 }
@@ -483,12 +500,10 @@ final readonly class FlowEngine implements FlowEngineInterface
             // and runs the child synchronously. If the child reaches an end node
             // during this execution tick, DefaultSubflowResumer will already have
             // advanced the parent to its post-subflow position. Trying to persist
-            // the stale Waiting result here would either lose that progress or
+            // the stale result here would either lose that progress or
             // raise an OptimisticLockConflict. Skip persistence in that scenario.
             $skipPersist = false;
-            if (SubflowNodeHandler::TYPE === $type
-                && NodeExecutionStatus::Waiting === $result->status
-            ) {
+            if (SubflowNodeHandler::TYPE === $type) {
                 $latest = FlowSession::query()->find($session->getKey());
                 if (null !== $latest && $latest->version !== $session->version) {
                     $skipPersist = true;
@@ -541,6 +556,14 @@ final readonly class FlowEngine implements FlowEngineInterface
 
             if (null !== $endStatus) {
                 $this->subflowResumer->resumeIfChild($session, $endStatus);
+            } elseif (!$skipPersist) {
+                // No `end` node was reached: the flow ran off its graph (a plain finish) or a node reported a
+                // failure. Either way a child must still hand control back to its parent.
+                match ($session->status) {
+                    FlowSessionStatus::Completed => $this->subflowResumer->resumeIfChild($session, EndStatus::Success->value),
+                    FlowSessionStatus::Failed    => $this->subflowResumer->resumeIfChild($session, EndStatus::Failed->value),
+                    default                      => null,
+                };
             }
 
             $incomingStep          = null;
@@ -562,6 +585,27 @@ final readonly class FlowEngine implements FlowEngineInterface
     }
 
     /**
+     * Hands a child that failed back to its parent's `failed` exit, exactly as an ended child does. What the
+     * parent's resumed run raises is the parent's own failure (it has already recorded it) and propagates
+     * unchanged: swallowing it here would let the child rethrow its own exception, retry the job and repeat
+     * the parent's side effects.
+     *
+     * @return bool true when the session is a child and its parent was resumed
+     */
+    private function handBackFailedChild(FlowSession $session): bool
+    {
+        $parentId = $session->parent_session_id;
+
+        if (!is_string($parentId) || '' === $parentId) {
+            return false;
+        }
+
+        $this->subflowResumer->resumeIfChild($session, EndStatus::Failed->value);
+
+        return true;
+    }
+
+    /**
      * Best-effort failure persistence when a handler throws an unhandled exception.
      *
      * Marks the session as failed and records a FlowFailed analytics event in its
@@ -576,7 +620,9 @@ final readonly class FlowEngine implements FlowEngineInterface
         string $nodeType,
         int $nodeVersion,
         Throwable $handlerException,
-    ): void {
+    ): bool {
+        $persisted = false;
+
         try {
             $this->connection->transaction(function () use ($session): void {
                 $session->saveWithOptimisticLock([
@@ -594,6 +640,8 @@ final readonly class FlowEngine implements FlowEngineInterface
                     );
                 });
             });
+
+            $persisted = true;
         } catch (Throwable $persistException) {
             $this->logger->warning('Failed to persist flow session failure state after handler exception.', [
                 'session_id' => (string)$session->getKey(),
@@ -614,6 +662,8 @@ final readonly class FlowEngine implements FlowEngineInterface
             resolved: null,
             error: ['message' => $handlerException->getMessage()],
         ));
+
+        return $persisted;
     }
 
     /**

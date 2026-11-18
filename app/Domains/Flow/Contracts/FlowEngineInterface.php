@@ -14,7 +14,8 @@ interface FlowEngineInterface
 {
     /**
      * The platform setting that caps the steps of one engine run (env default `FLOW_MAX_ITERATIONS`);
-     * past it the session fails with `FlowExecutionLimitExceededException`.
+     * past it the session fails with `FlowExecutionLimitExceededException`, except a subflow child, which hands
+     * its parent the `failed` exit and returns.
      */
     public const string MAX_ITERATIONS_SETTING = 'flow.execution.max_iterations';
 

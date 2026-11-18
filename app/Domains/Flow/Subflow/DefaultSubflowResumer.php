@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Subflow;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\Models\FlowSession;
@@ -20,6 +21,7 @@ use Psr\Log\LoggerInterface;
  * to a parent output handle 1:1 (success → success, cancelled → cancelled,
  * failed → failed). Inconsistencies (parent missing, parent not in
  * paused_subflow) are logged but never throw — the child is already terminal.
+ * A lost optimistic lock on the parent is retried once; a second conflict propagates.
  */
 final readonly class DefaultSubflowResumer implements SubflowResumerInterface
 {
@@ -82,7 +84,29 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
             ],
         );
 
-        ($this->engineResolver)()->resumeAfterSubflow($parent, $sourceHandle);
+        $engine = ($this->engineResolver)();
+
+        try {
+            $engine->resumeAfterSubflow($parent, $sourceHandle);
+        } catch (FlowConcurrencyException $conflict) {
+            // The child is already terminal and nothing re-runs it, so losing the parent's optimistic lock
+            // on the resume save would leave the parent in paused_subflow with no child. Retry once, but only
+            // when the parent still waits on the same subflow node: a conflict raised later, inside the
+            // parent's resumed run, means it already moved on and applying the handle again would misroute it.
+            $parent->refresh();
+
+            if (FlowSessionStatus::PausedSubflow !== $parent->status || $parent->current_node_id !== $subflowNodeId) {
+                throw $conflict;
+            }
+
+            $this->logger->info('flow.subflow.resume.conflict_retry', [
+                'child_id'  => (string)$child->getKey(),
+                'parent_id' => (string)$parent->getKey(),
+                'error'     => $conflict->getMessage(),
+            ]);
+
+            $engine->resumeAfterSubflow($parent, $sourceHandle);
+        }
     }
 
     private function handleFor(string $endStatus): string

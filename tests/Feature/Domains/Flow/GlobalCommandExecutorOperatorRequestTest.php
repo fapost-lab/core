@@ -104,6 +104,31 @@ final class GlobalCommandExecutorOperatorRequestTest extends FeatureTestCase
         $this->assertSame(FlowSessionStatus::TerminatedByUser, $session->fresh()->status);
     }
 
+    public function test_a_command_ends_the_whole_subflow_chain_not_only_the_leaf(): void
+    {
+        $leaf  = $this->activeSession();
+        $mid   = $this->activeSession();
+        $top   = $this->activeSession();
+        $other = $this->activeSession();
+        $mid->forceFill(['status' => FlowSessionStatus::PausedSubflow, 'parent_session_id' => (string) $top->getKey()])->save();
+        $top->forceFill(['status' => FlowSessionStatus::PausedSubflow])->save();
+        $leaf->forceFill(['parent_session_id' => (string) $mid->getKey()])->save();
+
+        $this->sessions->shouldReceive('findActiveForContact')->once()->andReturn($leaf);
+        $this->operatorRequests->shouldReceive('cancelForSession')->once()->andReturnTrue();
+
+        $this->executor()->execute(
+            new ResolvedCommand('/reset', CommandActionType::TerminateSession),
+            $this->contact,
+            (string) $this->assistant->getKey(),
+        );
+
+        $this->assertSame(FlowSessionStatus::TerminatedByUser, $leaf->fresh()->status);
+        $this->assertSame(FlowSessionStatus::TerminatedByUser, $mid->fresh()->status);
+        $this->assertSame(FlowSessionStatus::TerminatedByUser, $top->fresh()->status);
+        $this->assertSame(FlowSessionStatus::WaitingInput, $other->fresh()->status);
+    }
+
     public function test_an_informational_command_leaves_the_session_and_its_request_alone(): void
     {
         $this->sessions->shouldNotReceive('findActiveForContact');

@@ -81,9 +81,16 @@ sequenceDiagram
   `PublishFlowService` (`subflow_cross_assistant`).
 - **End status to handle:** the parent continues on the handle named after the child's `end_status`:
   `success`, `cancelled` or `failed` (`SubflowNodeHandler::HANDLE_*`).
+- **A child that stops without its own `end` node** still hands control back, so a parent is never left in
+  `paused_subflow` without a living child: running off the graph takes `success`; an exhausted iteration
+  budget, a handler exception or a node reporting failure takes `failed` (the engine records the failure and
+  returns instead of rethrowing). `/reset`, `/cancel`, tenant terminate commands and a start-flow command end the whole `paused_subflow`
+  chain, not only the leaf. A lost optimistic lock on the parent while resuming is retried once.
 - **Timeouts:** `config.timeout` is an ISO 8601 duration (default `PT24H`). When the parent's
   `expires_at` passes, `SubflowTimeoutSweeper` force-ends a live child as `failed` and resumes the
-  parent on `failed`; a parent with no live child is marked `expired`. Each parent is handled under
+  parent on `failed`; a parent with no live child is marked `expired` (and, if it is itself a child, hands
+  its own parent `failed`). A child counts as live while `active`, `waiting_input`, `paused` (a `delay`) or
+  `paused_subflow`; a nested chain is failed bottom-up. Each parent is handled under
   its session lock; a busy lock is skipped until the next sweep.
 - **No output mapping:** variables are not copied from the child's state to the parent
   automatically (the child starts with an empty `state`).

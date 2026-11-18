@@ -10,6 +10,7 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
@@ -22,6 +23,7 @@ use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -53,6 +55,8 @@ final class SubflowLifecycleTest extends FeatureTestCase
 
         $registry = $this->app->make(NodeHandlerRegistry::class);
         $registry->register(MarkerTestHandler::class);
+        $registry->register(FailedResultTestHandler::class);
+        $registry->register(ThrowingTestHandler::class);
 
         $this->assistant = Assistant::factory()->create([
             'tenant_id'        => $this->tenantId,
@@ -347,6 +351,151 @@ final class SubflowLifecycleTest extends FeatureTestCase
         $this->assertSame(FlowSessionStatus::Failed, $parent->status);
     }
 
+    public function test_child_that_runs_off_its_graph_returns_to_the_parent_through_the_success_handle(): void
+    {
+        $parent = $this->runParentWithChildNodes([
+            ['id' => 'c-mark', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'child-ran']],
+        ], []);
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->status);
+        $this->assertSame(EndStatus::Success->value, $parent->end_status);
+        $this->assertSame('branch-success', $parent->state['flow']['marker'] ?? null);
+    }
+
+    public function test_child_whose_node_reports_a_failure_returns_to_the_parent_through_the_failed_handle(): void
+    {
+        $parent = $this->runParentWithChildNodes([
+            ['id' => 'c-fail', 'type' => 'failed_result_test', 'version' => 1, 'config' => []],
+        ], []);
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->status);
+        $this->assertSame('branch-failed', $parent->state['flow']['marker'] ?? null);
+    }
+
+    public function test_child_whose_handler_throws_in_the_parents_own_tick_routes_the_parent_through_failed_without_rethrowing(): void
+    {
+        $parent = $this->runParentWithChildNodes([
+            ['id' => 'c-boom', 'type' => 'throwing_test', 'version' => 1, 'config' => []],
+        ], []);
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->status);
+        $this->assertSame('branch-failed', $parent->state['flow']['marker'] ?? null);
+        $this->assertSame(
+            FlowSessionStatus::Failed,
+            FlowSession::query()->where('parent_session_id', $parent->getKey())->firstOrFail()->status,
+        );
+    }
+
+    public function test_a_failure_on_the_parents_failed_exit_surfaces_as_its_own_exception_without_a_second_chain(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [['id' => 'c-boom', 'type' => 'throwing_test', 'version' => 1, 'config' => ['message' => 'child-boom']]],
+            edges: [],
+        );
+        $parentDefinition = $this->createDefinition(
+            flowId: (string) Str::uuid(),
+            nodes: [
+                ['id' => 'p-sub',  'type' => 'subflow',      'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H']],
+                ['id' => 'p-boom', 'type' => 'throwing_test', 'version' => 1, 'config' => ['message' => 'parent-boom']],
+            ],
+            edges: [['id' => 'p-e1', 'from' => 'p-sub', 'to' => 'p-boom', 'handle' => 'failed']],
+        );
+
+        try {
+            $this->app->make(FlowEngineInterface::class)->start($parentDefinition, $this->contact);
+            $this->fail('The parent\'s own exception must surface.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('parent-boom', $exception->getMessage());
+            $this->assertNotInstanceOf(FlowConcurrencyException::class, $exception);
+        }
+
+        $parent = FlowSession::query()
+            ->where('contact_id', $this->contact->getKey())
+            ->whereNull('parent_session_id')
+            ->sole();
+
+        $this->assertSame(FlowSessionStatus::Failed, $parent->status);
+        $this->assertSame(1, FlowSession::query()->where('parent_session_id', $parent->getKey())->count());
+    }
+
+    public function test_a_middle_session_that_runs_off_its_graph_hands_the_outer_parent_the_success_exit(): void
+    {
+        $leafFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $leafFlowId,
+            nodes: [['id' => 'c-fail', 'type' => 'failed_result_test', 'version' => 1, 'config' => []]],
+            edges: [],
+        );
+        // The middle flow has no `failed` edge on its subflow node, so it runs off its graph.
+        $middleFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $middleFlowId,
+            nodes: [['id' => 'b-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $leafFlowId, 'timeout' => 'PT1H']]],
+            edges: [],
+        );
+        $outerDefinition = $this->createDefinition(
+            flowId: (string) Str::uuid(),
+            nodes: [
+                ['id' => 'a-sub', 'type' => 'subflow',     'version' => 1, 'config' => ['flow_id' => $middleFlowId, 'timeout' => 'PT1H']],
+                ['id' => 'a-ok',  'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'outer-resumed']],
+                ['id' => 'a-end', 'type' => 'end',         'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'a-e1', 'from' => 'a-sub', 'to' => 'a-ok',  'handle' => 'success'],
+                ['id' => 'a-e2', 'from' => 'a-ok',  'to' => 'a-end', 'handle' => 'default'],
+            ],
+        );
+
+        $this->app->make(FlowEngineInterface::class)->start($outerDefinition, $this->contact);
+
+        $outer = FlowSession::query()
+            ->where('contact_id', $this->contact->getKey())
+            ->whereNull('parent_session_id')
+            ->sole();
+
+        $this->assertSame(FlowSessionStatus::Ended, $outer->status);
+        $this->assertSame('outer-resumed', $outer->state['flow']['marker'] ?? null);
+    }
+
+    /**
+     * Starts a parent whose subflow node calls a child made of the given nodes; the parent has a marker on
+     * each of its success / failed exits.
+     *
+     * @param  array<int, array<string, mixed>>  $childNodes
+     * @param  array<int, array<string, mixed>>  $childEdges
+     */
+    private function runParentWithChildNodes(array $childNodes, array $childEdges): FlowSession
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(flowId: $childFlowId, nodes: $childNodes, edges: $childEdges);
+
+        $parentDefinition = $this->createDefinition(
+            flowId: (string) Str::uuid(),
+            nodes: [
+                ['id' => 'p-sub', 'type' => 'subflow',     'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H']],
+                ['id' => 'p-ok',  'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'branch-success']],
+                ['id' => 'p-bad', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'branch-failed']],
+                ['id' => 'p-end', 'type' => 'end',         'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'p-e1', 'from' => 'p-sub', 'to' => 'p-ok',  'handle' => 'success'],
+                ['id' => 'p-e2', 'from' => 'p-sub', 'to' => 'p-bad', 'handle' => 'failed'],
+                ['id' => 'p-e3', 'from' => 'p-ok',  'to' => 'p-end', 'handle' => 'default'],
+                ['id' => 'p-e4', 'from' => 'p-bad', 'to' => 'p-end', 'handle' => 'default'],
+            ],
+        );
+
+        $this->app->make(FlowEngineInterface::class)->start($parentDefinition, $this->contact);
+
+        return FlowSession::query()
+            ->where('contact_id', $this->contact->getKey())
+            ->whereNull('parent_session_id')
+            ->latest('created_at')
+            ->firstOrFail();
+    }
+
     /**
      * @param  array<int, array<string, mixed>>  $nodes
      * @param  array<int, array<string, mixed>>  $edges
@@ -418,5 +567,84 @@ final class MarkerTestHandler implements NodeHandlerInterface
                 ? ['flow.marker' => $marker]
                 : [],
         );
+    }
+}
+
+
+final class FailedResultTestHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'failed_result_test';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Failed Result Test';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return new NodeExecutionResult(status: NodeExecutionStatus::Failed);
+    }
+}
+
+final class ThrowingTestHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'throwing_test';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Throwing Test';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        $message = $nodeConfig['config']['message'] ?? 'boom';
+
+        throw new RuntimeException(is_string($message) ? $message : 'boom');
     }
 }
