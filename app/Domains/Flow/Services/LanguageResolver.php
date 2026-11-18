@@ -17,7 +17,7 @@ final readonly class LanguageResolver implements LanguageResolverInterface
     ) {
     }
 
-    public function resolve(Contact $contact, FlowSession $session): string
+    public function resolve(?Contact $contact, FlowSession $session): string
     {
         $sessionLanguage = data_get($session->state, SystemStateKeys::LANGUAGE);
 
@@ -25,7 +25,7 @@ final readonly class LanguageResolver implements LanguageResolverInterface
             return $sessionLanguage;
         }
 
-        if (is_string($contact->language) && '' !== $contact->language) {
+        if (null !== $contact && is_string($contact->language) && '' !== $contact->language) {
             return $contact->language;
         }
 

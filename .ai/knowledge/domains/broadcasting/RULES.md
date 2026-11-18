@@ -43,13 +43,18 @@ broken.
 - **Recipients are written once:** `insertOrIgnore` plus a unique `(broadcast_id, contact_id)`.
 - **Backpressure is checked before any recipient row is written;** the run re-queues itself with
   a 30-second delay (`RunBroadcastJob`). No test covers it.
-- **A send job acts only on a `Pending` recipient,** and only the last recipient to finish flips
+- **A send job starts only from a `Pending` recipient,** and only the last recipient to finish flips
   the broadcast to `Completed`, through a conditional update (`SendBroadcastRecipientJob`).
+  `finish()` settles the row only from `Pending`; if a failed run skipped it (`Skipped`,
+  `run_failed`) while its send was already in flight, `finish()` takes the row back to the real
+  outcome and moves that one unit from `skipped_count` to the matching counter, so the counters
+  never exceed `total_recipients`. Enforced: `SendBroadcastRecipientJobTest`.
 - **Every job runs inside `TenantSwitcher::runForTenant()`.**
 
 - **A crashed run fails the broadcast.** When `RunBroadcastJob` exhausts its attempts, `failed()`
-  moves Running → Failed with `stop_reason` `run_failed` by one conditional update (a Cancelled or
-  Completed run is left alone); later recipient jobs of a Failed broadcast skip like Cancelled ones.
+  calls `BroadcastService::failRun()`, which moves Running → Failed with `stop_reason` `run_failed`
+  by one conditional update (a Cancelled or Completed run is left alone) and skips the still-Pending
+  recipients; later recipient jobs of a Failed broadcast skip like Cancelled ones.
   Enforced: `RunBroadcastJobTest`, `SendBroadcastRecipientJobTest`.
 
 - **A volume refusal cancels the run.** The first recipient refused for `outbound_messages` is

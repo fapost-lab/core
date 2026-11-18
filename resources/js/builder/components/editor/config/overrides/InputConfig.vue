@@ -172,6 +172,8 @@ function onTypeChange(newType: string) {
     const patch: Record<string, unknown> = {
         expected_type: newType,
         variable:      compileVariable(updatedVariable),
+        // A legacy `save_to` next to `variable` is a conflict that publish refuses.
+        save_to:       undefined,
     }
     if (Object.keys(validation.value).length > 0) {
         patch.validation = {}

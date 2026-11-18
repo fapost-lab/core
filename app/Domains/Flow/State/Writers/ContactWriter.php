@@ -7,6 +7,7 @@ namespace App\Domains\Flow\State\Writers;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\History\HistoryWriterInterface;
+use App\Domains\Flow\State\Exceptions\ContactlessSessionException;
 use App\Domains\Flow\State\Exceptions\ReservedContactPathException;
 use App\Domains\Flow\State\Exceptions\StructuralPathConflictException;
 use App\Domains\Flow\State\Variables\VariableType;
@@ -27,6 +28,9 @@ use InvalidArgumentException;
  * Each {@see write()} call is committed inside its own DB transaction (per ADR
  * State Writer Semantics — independent transactions Contact ↔ Session, retry
  * is the recovery story for partial state).
+ *
+ * On a contactless session ({@code $contact} null) every write throws {@see ContactlessSessionException} before
+ * anything is written; the engine still passes a writer, so a handler never calls a method on null.
  */
 final readonly class ContactWriter implements ContactWriterInterface
 {
@@ -44,7 +48,7 @@ final readonly class ContactWriter implements ContactWriterInterface
      *         When null the writer falls back to replace for all paths (safe for legacy callers).
      */
     public function __construct(
-        private Contact $contact,
+        private ?Contact $contact,
         private string $sessionId,
         private string $nodeId,
         private ConnectionInterface $connection,
@@ -58,6 +62,8 @@ final readonly class ContactWriter implements ContactWriterInterface
         if (! str_starts_with($path, 'contact.')) {
             throw new InvalidArgumentException("ContactWriter only handles 'contact.*' paths; got '{$path}'.");
         }
+
+        $contact = $this->contact ?? throw ContactlessSessionException::forWrite($path);
 
         $segments = explode('.', $path);
         $count    = count($segments);
@@ -83,23 +89,23 @@ final readonly class ContactWriter implements ContactWriterInterface
 
         $tail = 3 === $count ? $segments[2] : null;
 
-        $this->connection->transaction(function () use ($head, $tail, $value, $path): void {
-            $oldValue = $this->readCurrent($head, $tail);
-            $this->applyWrite($head, $tail, $value);
-            $this->emitHistory($path, $oldValue, $value);
+        $this->connection->transaction(function () use ($contact, $head, $tail, $value, $path): void {
+            $oldValue = $this->readCurrent($contact, $head, $tail);
+            $this->applyWrite($contact, $head, $tail, $value);
+            $this->emitHistory($contact, $path, $oldValue, $value);
         });
     }
 
-    private function readCurrent(string $head, ?string $tail): mixed
+    private function readCurrent(Contact $contact, string $head, ?string $tail): mixed
     {
         if (in_array($head, self::WRITABLE_COLUMNS, true)) {
             /** @var mixed $current */
-            $current = $this->contact->getAttribute($head);
+            $current = $contact->getAttribute($head);
 
             return $current;
         }
 
-        $attributes = is_array($this->contact->attributes) ? $this->contact->attributes : [];
+        $attributes = is_array($contact->attributes) ? $contact->attributes : [];
 
         if (null === $tail) {
             return $attributes[$head] ?? null;
@@ -110,7 +116,7 @@ final readonly class ContactWriter implements ContactWriterInterface
         return is_array($group) ? ($group[$tail] ?? null) : null;
     }
 
-    private function applyWrite(string $head, ?string $tail, mixed $value): void
+    private function applyWrite(Contact $contact, string $head, ?string $tail, mixed $value): void
     {
         if (in_array($head, self::WRITABLE_COLUMNS, true)) {
             if (null !== $tail) {
@@ -119,20 +125,20 @@ final readonly class ContactWriter implements ContactWriterInterface
                 );
             }
 
-            $this->contact->setAttribute($head, $value);
-            $this->contact->save();
+            $contact->setAttribute($head, $value);
+            $contact->save();
 
             return;
         }
 
         // For array-type variables, append rather than replace (spec §5.2).
         if ($this->isArrayVariable(null === $tail ? null : $head, null === $tail ? $head : $tail)) {
-            $this->applyArrayAppend($head, $tail, $value);
+            $this->applyArrayAppend($contact, $head, $tail, $value);
 
             return;
         }
 
-        $attributes = is_array($this->contact->attributes) ? $this->contact->attributes : [];
+        $attributes = is_array($contact->attributes) ? $contact->attributes : [];
 
         if (null === $tail) {
             // contact.<head> = leaf
@@ -141,8 +147,8 @@ final readonly class ContactWriter implements ContactWriterInterface
             }
 
             $attributes[$head] = $value;
-            $this->contact->setAttribute('attributes', $attributes);
-            $this->contact->save();
+            $contact->setAttribute('attributes', $attributes);
+            $contact->save();
 
             return;
         }
@@ -158,21 +164,21 @@ final readonly class ContactWriter implements ContactWriterInterface
         $group             = is_array($existing) ? $existing : [];
         $group[$tail]      = $value;
         $attributes[$head] = $group;
-        $this->contact->setAttribute('attributes', $attributes);
-        $this->contact->save();
+        $contact->setAttribute('attributes', $attributes);
+        $contact->save();
     }
 
     /**
      * Append $value to the array at contact.<head> or contact.<head>.<tail>.
      * Applies circular-buffer logic when the array reaches max_size.
      */
-    private function applyArrayAppend(string $head, ?string $tail, mixed $value): void
+    private function applyArrayAppend(Contact $contact, string $head, ?string $tail, mixed $value): void
     {
         $group   = null === $tail ? null : $head;
         $name    = null === $tail ? $head : $tail;
         $maxSize = $this->resolveMaxSize($group, $name);
 
-        $attributes = is_array($this->contact->attributes) ? $this->contact->attributes : [];
+        $attributes = is_array($contact->attributes) ? $contact->attributes : [];
 
         if (null === $tail) {
             $current           = is_array($attributes[$head] ?? null) ? $attributes[$head] : [];
@@ -184,8 +190,8 @@ final readonly class ContactWriter implements ContactWriterInterface
             $attributes[$head] = $groupData;
         }
 
-        $this->contact->setAttribute('attributes', $attributes);
-        $this->contact->save();
+        $contact->setAttribute('attributes', $attributes);
+        $contact->save();
     }
 
     /**
@@ -233,11 +239,11 @@ final readonly class ContactWriter implements ContactWriterInterface
         return VariableType::Array === ($this->schemaRegistryResolver)()->get('contact', $group, $name);
     }
 
-    private function emitHistory(string $path, mixed $oldValue, mixed $newValue): void
+    private function emitHistory(Contact $contact, string $path, mixed $oldValue, mixed $newValue): void
     {
         $this->historyWriter->record(
             eventType: HistoryEventType::StateChange,
-            tenantId: (string) $this->contact->tenant_id,
+            tenantId: (string) $contact->tenant_id,
             sessionId: $this->sessionId,
             nodeId: $this->nodeId,
             path: $path,

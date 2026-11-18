@@ -25,7 +25,7 @@ use Illuminate\Database\ConnectionInterface;
  *
  *  • Resolves {@code flow_id} to the latest active flow_definition.
  *  • Inserts a child flow_session linked to the parent, inheriting tenant /
- *    contact / assistant identity.
+ *    contact / assistant identity, run kind and trigger.
  *  • Pauses the parent (status=paused_subflow), extending its expires_at
  *    when shorter than the child's so the parent does not die before the
  *    child has a chance to resume it.
@@ -112,6 +112,8 @@ final readonly class SubflowStarterService
                 'tenant_id'             => $parent->tenant_id,
                 'assistant_id'          => $parent->assistant_id,
                 'contact_id'            => $parent->contact_id,
+                'run_kind'              => $parent->run_kind,
+                'trigger_id'            => $parent->trigger_id,
                 'flow_definition_id'    => $definition->getKey(),
                 'flow_version'          => $definition->version,
                 'current_node_id'       => $entryNode,

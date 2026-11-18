@@ -6,6 +6,7 @@ namespace Tests\Unit\Domains\Flow\State;
 
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\State\Exceptions\ContactlessSessionException;
 use App\Domains\Flow\State\Readers\ScopedStateReader;
 use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
@@ -248,6 +249,42 @@ final class ScopedStateReaderTest extends TestCase
             $accessor->calls,
         );
         $this->assertNull($reader->read('module.crm.department'));
+    }
+
+    public function test_a_contactless_session_reads_session_namespaces(): void
+    {
+        $reader = new ScopedStateReader(
+            sessionState: ['flow' => ['attempts' => 2], 'system' => ['language' => 'uk']],
+            contact: null,
+            accessors: $this->emptyRegistry(),
+            namespaces: new StateNamespaceRegistry(),
+        );
+
+        $this->assertSame(2, $reader->read('flow.attempts'));
+        $this->assertSame('uk', $reader->read('system.language'));
+        $this->assertNull($reader->read('call.response'));
+    }
+
+    public function test_a_contactless_session_refuses_a_contact_path(): void
+    {
+        $reader = new ScopedStateReader([], null, $this->emptyRegistry(), new StateNamespaceRegistry());
+
+        $this->expectException(ContactlessSessionException::class);
+        $this->expectExceptionMessage('contact.name');
+
+        $reader->read('contact.name');
+    }
+
+    public function test_a_contactless_session_refuses_a_module_path_before_asking_the_accessor(): void
+    {
+        $registry = $this->createMock(DataAccessorRegistryInterface::class);
+        $registry->expects($this->never())->method('resolve');
+
+        $reader = new ScopedStateReader([], null, $registry, new StateNamespaceRegistry());
+
+        $this->expectException(ContactlessSessionException::class);
+
+        $reader->read('module.hr.department');
     }
 
     private function contact(): Contact

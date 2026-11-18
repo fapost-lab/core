@@ -169,7 +169,7 @@ final class ChannelCapabilityCheckerTest extends FeatureTestCase
             'id'      => 'c',
             'type'    => 'input',
             'version' => 1,
-            'config'  => ['expected_type' => 'contact', 'variable' => ['name' => 'phone']],
+            'config'  => ['expected_type' => 'contact', 'variable' => ['name' => 'phone', 'storage' => 'session']],
         ]];
 
         $service = $this->app->make(ValidateFlowService::class);

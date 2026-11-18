@@ -17,10 +17,10 @@ use Throwable;
 /**
  * Audits the graph structure of stored flows, per tenant.
  *
- * Publishing does not run {@see FlowGraphStructureValidator} yet, so a flow can be
- * active today and still fail at start (no single entry node, unreachable nodes,
- * duplicate handles). This command reports those flows without changing anything,
- * to size the problem before publish starts rejecting them. Findings never change the
+ * Publishing runs {@see FlowGraphStructureValidator} through ValidateFlowService, so a flow
+ * that is active but published before that check existed can still fail at start (no single
+ * entry node, unreachable nodes, duplicate handles) and is refused on its next publish. This
+ * command reports those flows, and the drafts that would be refused, without changing anything. Findings never change the
  * exit code: it is a report, not a gate. It exits non-zero only when the audit itself
  * could not run: an unknown `--tenant` slug, or a tenant whose schema could not be read.
  *

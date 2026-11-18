@@ -283,7 +283,7 @@ final class BuilderApiTest extends FeatureTestCase
             ->assertJsonPath('warnings.0.path', 'nodes.in_1');
     }
 
-    public function test_validate_returns_valid_for_empty_flow_without_trigger(): void
+    public function test_validate_returns_valid_for_a_single_node_flow_without_trigger(): void
     {
         $draft = $this->draft();
         $user  = $this->staffUser();
@@ -292,13 +292,35 @@ final class BuilderApiTest extends FeatureTestCase
         $this->actingAs($user)
             ->postJson("/builder/flows/{$draft->flow_id}/validate", [
                 'definition' => [
-                    'nodes' => [],
+                    'nodes' => [['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']]],
                     'edges' => [],
                 ],
             ])
             ->assertOk()
             ->assertJsonPath('valid', true)
             ->assertJsonPath('errors', []);
+    }
+
+    public function test_validate_reports_a_structurally_broken_graph(): void
+    {
+        $draft = $this->draft();
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $response = $this->actingAs($user)
+            ->postJson("/builder/flows/{$draft->flow_id}/validate", [
+                'definition' => [
+                    'nodes' => [
+                        ['id' => 'a', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+                        ['id' => 'b', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+                    ],
+                    'edges' => [],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('valid', false);
+
+        $this->assertContains('entry_node_count', array_column($response->json('errors'), 'code'));
     }
 
     public function test_validate_returns_error_when_event_trigger_selects_unknown_event(): void
@@ -387,8 +409,10 @@ final class BuilderApiTest extends FeatureTestCase
 
     public function test_a_publish_is_one_entry_with_the_version_and_without_the_graph(): void
     {
-        $draft = $this->draft(['name' => 'Welcome']);
-        $user  = $this->staffUser();
+        $draft = $this->draft(['name' => 'Welcome', 'nodes' => [
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ]]);
+        $user = $this->staffUser();
         /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
 
         $this->actingAs($user);
