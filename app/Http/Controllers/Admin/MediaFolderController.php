@@ -72,6 +72,8 @@ final class MediaFolderController extends Controller
         Gate::authorize('delete', $record);
 
         $open = $this->openFolder($request->openFolder());
+        // Before the contents move: afterwards the open folder no longer sits under the deleted one.
+        $openWasInside = null !== $open && $this->folders->isInSubtree($open, $record);
 
         try {
             $target = $this->folders->resolve($request->moveTo(), 'move_to');
@@ -82,7 +84,7 @@ final class MediaFolderController extends Controller
 
         Inertia::flash('success', __('media.notifications.folder_deleted'));
 
-        if (null === $open || ! $this->folders->isInSubtree($open, $record)) {
+        if (! $openWasInside) {
             return redirect()->back(fallback: $this->index());
         }
 

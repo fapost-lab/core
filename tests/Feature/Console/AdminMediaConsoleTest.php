@@ -329,7 +329,7 @@ final class AdminMediaConsoleTest extends FeatureTestCase
             ->assertSessionHasErrors(['move_to' => __('media.errors.folder.own_subtree')]);
         $this->assertNotNull($old->fresh());
 
-        $this->actingAs($admin)->delete($this->url("/folders/{$old->id}"), ['move_to' => $target->id, 'open_folder' => $sub->id])
+        $this->actingAs($admin)->delete($this->url("/folders/{$old->id}"), ['move_to' => $target->id, 'open_folder' => $deep->id])
             ->assertRedirect($this->url('?' . http_build_query(['filter' => ['folder' => $target->id]])))
             ->assertInertiaFlash('success', __('media.notifications.folder_deleted'));
 

@@ -168,7 +168,6 @@ final readonly class MediaService implements MediaServiceInterface
     public function renameFolder(MediaFolder $folder, string $newName): MediaFolder
     {
         DB::transaction(function () use ($folder, $newName): void {
-            $oldPath = $folder->path_cache;
             $newPath = $this->buildFolderPath($folder->parent_id, $newName);
 
             $folder->forceFill([
@@ -176,7 +175,7 @@ final readonly class MediaService implements MediaServiceInterface
                 'path_cache' => $newPath,
             ])->save();
 
-            $this->rewriteDescendantPaths($oldPath, $newPath);
+            $this->rewriteDescendantPaths($folder);
         });
 
         return $folder->fresh() ?? $folder;
@@ -185,7 +184,6 @@ final readonly class MediaService implements MediaServiceInterface
     public function moveFolder(MediaFolder $folder, ?MediaFolder $newParent): MediaFolder
     {
         DB::transaction(function () use ($folder, $newParent): void {
-            $oldPath = $folder->path_cache;
             $newPath = $this->buildFolderPath($newParent?->id, $folder->name);
 
             $folder->forceFill([
@@ -193,7 +191,7 @@ final readonly class MediaService implements MediaServiceInterface
                 'path_cache' => $newPath,
             ])->save();
 
-            $this->rewriteDescendantPaths($oldPath, $newPath);
+            $this->rewriteDescendantPaths($folder);
         });
 
         return $folder->fresh() ?? $folder;
@@ -236,17 +234,38 @@ final readonly class MediaService implements MediaServiceInterface
         return mb_rtrim($parent->path_cache, '/') . '/' . $name;
     }
 
-    private function rewriteDescendantPaths(string $oldPath, string $newPath): void
+    /**
+     * Rebuilds `path_cache` for everything below `$folder`, level by level through `parent_id`. The folder's own
+     * `path_cache` is already new. Never matches on the path text: same-named siblings and `_`/`%` in names would
+     * hit folders outside the subtree.
+     */
+    private function rewriteDescendantPaths(MediaFolder $folder): void
     {
-        $tenant = $this->tenantContext->get();
+        $tenantId = $this->tenantContext->get()->getId();
+        /** @var array<string, string> $level folder id => its fresh path_cache */
+        $level = [$folder->id => $folder->path_cache];
+        $seen  = [$folder->id => true];
 
-        MediaFolder::query()
-            ->where('tenant_id', $tenant->getId())
-            ->where('path_cache', 'like', $oldPath . '/%')
-            ->each(function (MediaFolder $descendant) use ($oldPath, $newPath): void {
-                $descendant->forceFill([
-                    'path_cache' => $newPath . mb_substr($descendant->path_cache, mb_strlen($oldPath)),
-                ])->save();
-            });
+        while ([] !== $level) {
+            $next = [];
+
+            MediaFolder::query()
+                ->where('tenant_id', $tenantId)
+                ->whereIn('parent_id', array_keys($level))
+                ->get()
+                ->each(function (MediaFolder $child) use ($level, &$next, &$seen): void {
+                    if (isset($seen[$child->id])) {
+                        return;
+                    }
+
+                    $seen[$child->id] = true;
+                    $path             = mb_rtrim($level[$child->parent_id], '/') . '/' . $child->name;
+
+                    $child->forceFill(['path_cache' => $path])->save();
+                    $next[$child->id] = $path;
+                });
+
+            $level = $next;
+        }
     }
 }

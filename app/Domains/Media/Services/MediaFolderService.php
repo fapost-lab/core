@@ -94,7 +94,7 @@ final readonly class MediaFolderService
             throw new MediaFolderRuleException($attribute, MediaFolderRuleException::OWN_SUBTREE);
         }
 
-        $this->assertRoomUnder($parent, $attribute);
+        $this->assertRoomUnder($parent, $attribute, $this->height($folder));
 
         return $this->media->moveFolder($folder, $parent);
     }
@@ -144,7 +144,8 @@ final readonly class MediaFolderService
     }
 
     /**
-     * Every folder of the tenant in path order, which lists a parent right before its subtree.
+     * Every folder of the tenant depth-first through `parent_id`, siblings by name: a parent comes right before its
+     * subtree, even when two siblings share a name.
      *
      * @return list<array{id: string, name: string, path: string, parentId: string|null, depth: int, files: int, folders: int}>
      */
@@ -153,18 +154,43 @@ final readonly class MediaFolderService
         $folders = MediaFolder::query()
             ->where('tenant_id', $this->tenantContext->get()->getId())
             ->withCount(['files', 'children'])
-            ->orderBy('path_cache')
+            ->orderBy('name')
+            ->orderBy('id')
             ->get();
 
-        return $folders->map(fn (MediaFolder $folder): array => [
-            'id'       => $folder->id,
-            'name'     => $folder->name,
-            'path'     => $folder->path_cache,
-            'parentId' => $folder->parent_id,
-            'depth'    => $this->depth($folder) - 1,
-            'files'    => (int) $folder->getAttribute('files_count'),
-            'folders'  => (int) $folder->getAttribute('children_count'),
-        ])->values()->all();
+        $byParent = [];
+        $known    = $folders->keyBy('id');
+
+        foreach ($folders as $folder) {
+            // A folder whose parent is missing from the tenant is listed at the top rather than lost.
+            $key              = null !== $folder->parent_id && $known->has($folder->parent_id) ? $folder->parent_id : '';
+            $byParent[$key][] = $folder;
+        }
+
+        $rows = [];
+        $seen = [];
+        $walk = function (string $parentKey, int $depth) use (&$walk, &$rows, &$seen, $byParent): void {
+            foreach ($byParent[$parentKey] ?? [] as $folder) {
+                if (isset($seen[$folder->id])) {
+                    continue;
+                }
+
+                $seen[$folder->id] = true;
+                $rows[]            = [
+                    'id'       => $folder->id,
+                    'name'     => $folder->name,
+                    'path'     => $folder->path_cache,
+                    'parentId' => $folder->parent_id,
+                    'depth'    => $depth,
+                    'files'    => (int) $folder->getAttribute('files_count'),
+                    'folders'  => (int) $folder->getAttribute('children_count'),
+                ];
+                $walk($folder->id, $depth + 1);
+            }
+        };
+        $walk('', 0);
+
+        return $rows;
     }
 
     /**
@@ -192,8 +218,13 @@ final readonly class MediaFolderService
      */
     public function isInSubtree(MediaFolder $candidate, MediaFolder $folder): bool
     {
-        return $candidate->id === $folder->id
-            || str_starts_with($candidate->path_cache, mb_rtrim($folder->path_cache, '/') . '/');
+        foreach ($this->ancestorIds($candidate) as $id) {
+            if ($id === $folder->id) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -207,24 +238,75 @@ final readonly class MediaFolderService
     }
 
     /**
-     * A new child of `$parent` would sit one level below it: refused when that is deeper than the limit.
+     * A subtree `$height` levels tall (a single folder is 1) put under `$parent` is refused when its deepest folder
+     * would sit below the limit.
      *
      * @throws MediaFolderRuleException
      */
-    private function assertRoomUnder(?MediaFolder $parent, string $attribute): void
+    private function assertRoomUnder(?MediaFolder $parent, string $attribute, int $height = 1): void
     {
-        if (null !== $parent && $this->depth($parent) + 1 > $this->maxDepth) {
+        if (null !== $parent && $this->depth($parent) + $height > $this->maxDepth) {
             throw new MediaFolderRuleException($attribute, MediaFolderRuleException::TOO_DEEP, $this->maxDepth);
         }
     }
 
     /**
-     * A root folder is at depth 1.
+     * A root folder is at depth 1; counted through `parent_id`: that is the tree, and `path_cache` is only a derived breadcrumb.
      */
     private function depth(MediaFolder $folder): int
     {
-        $path = mb_trim($folder->path_cache, '/');
+        return count($this->ancestorIds($folder));
+    }
 
-        return '' === $path ? 1 : mb_substr_count($path, '/') + 1;
+    /**
+     * The folder itself, then its parent and so on up to the root.
+     *
+     * @return list<string>
+     */
+    private function ancestorIds(MediaFolder $folder): array
+    {
+        $ids    = [$folder->id];
+        $cursor = $folder->parent_id;
+
+        while (null !== $cursor && ! in_array($cursor, $ids, true)) {
+            $ids[]  = $cursor;
+            $cursor = MediaFolder::query()
+                ->where('tenant_id', $folder->tenant_id)
+                ->whereKey($cursor)
+                ->value('parent_id');
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Levels of the subtree rooted at `$folder`, itself included (a folder with no subfolders is 1), found through
+     * `parent_id`.
+     */
+    private function height(MediaFolder $folder): int
+    {
+        $height = 0;
+        $level  = [$folder->id];
+        $seen   = [$folder->id => true];
+
+        while ([] !== $level) {
+            ++$height;
+            $next = [];
+
+            MediaFolder::query()
+                ->where('tenant_id', $folder->tenant_id)
+                ->whereIn('parent_id', $level)
+                ->pluck('id')
+                ->each(function (string $id) use (&$next, &$seen): void {
+                    if (! isset($seen[$id])) {
+                        $seen[$id] = true;
+                        $next[]    = $id;
+                    }
+                });
+
+            $level = $next;
+        }
+
+        return $height;
     }
 }

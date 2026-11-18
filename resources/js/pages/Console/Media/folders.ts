@@ -9,9 +9,22 @@ export function folderIdOf(value: unknown): string | null {
   return typeof value === 'string' && value !== '' && value !== ROOT ? value : null
 }
 
-/** Whether `candidate` is `folder` itself or lies inside it. */
-export function isInSubtree(candidate: FolderNode, folder: FolderNode): boolean {
-  return candidate.id === folder.id || candidate.path.startsWith(`${folder.path}/`)
+/** Whether `candidate` is `folder` itself or lies inside it, found through `parentId`, not the path text. */
+export function isInSubtree(candidate: FolderNode, folder: FolderNode, tree: readonly FolderNode[]): boolean {
+  const parentOf = new Map(tree.map((node) => [node.id, node.parentId]))
+  const seen = new Set<string>()
+  let cursor: string | null = candidate.id
+
+  while (cursor !== null && !seen.has(cursor)) {
+    if (cursor === folder.id) {
+      return true
+    }
+
+    seen.add(cursor)
+    cursor = parentOf.get(cursor) ?? null
+  }
+
+  return false
 }
 
 /**
@@ -19,7 +32,7 @@ export function isInSubtree(candidate: FolderNode, folder: FolderNode): boolean 
  * those too).
  */
 export function moveTargets(tree: readonly FolderNode[], folder: FolderNode): FolderNode[] {
-  return tree.filter((candidate) => !isInSubtree(candidate, folder))
+  return tree.filter((candidate) => !isInSubtree(candidate, folder, tree))
 }
 
 /** A folder's name in a select: its whole path, so two folders with the same name are told apart. */
