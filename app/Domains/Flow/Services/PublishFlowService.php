@@ -448,9 +448,9 @@ final readonly class PublishFlowService
     /**
      * Extract the array element type from a variable's schema properties.
      *
-     * `max_size` is intentionally ignored: it is not carried in node config
-     * (it lives only in the registry, spec §7.3), so it cannot be compared for
-     * cross-flow conflicts. Only the element type (`item_type`) is authoritative.
+     * `max_size` is intentionally ignored: the registry keeps one value per variable
+     * (spec §7.3), so it is not compared for cross-flow conflicts. Only the element
+     * type (`item_type`) is authoritative.
      *
      * @param  array<string, mixed>  $properties
      */
@@ -473,8 +473,24 @@ final readonly class PublishFlowService
 
         $now = Carbon::now();
 
+        // "Keep last" is set per node but the registry keeps one row per variable: a node that leaves it empty must
+        // not reset what another node of this flow sets, so the last declared max_size is applied to every row.
+        $maxSizes = [];
+
+        foreach ($declarations as ['variable' => $variable]) {
+            if (isset($variable->properties['max_size'])) {
+                $maxSizes[$this->variableKey($variable)] = $variable->properties['max_size'];
+            }
+        }
+
         foreach ($declarations as ['variable' => $variable, 'node_id' => $nodeId]) {
             /** @var Variable $variable */
+            $properties = $variable->properties;
+
+            if (isset($maxSizes[$this->variableKey($variable)])) {
+                $properties['max_size'] = $maxSizes[$this->variableKey($variable)];
+            }
+
             VariableSchemaEntry::query()->upsert(
                 values: [
                     'id'                  => (string)Str::ulid()->toRfc4122(),
@@ -483,7 +499,7 @@ final readonly class PublishFlowService
                     'group'               => $variable->group,
                     'name'                => $variable->name,
                     'type'                => $variable->type?->value ?? 'text',
-                    'properties'          => json_encode($variable->properties ?: new stdClass()),
+                    'properties'          => json_encode($properties ?: new stdClass()),
                     'declared_in_flow_id' => $flowId,
                     'declared_by_node_id' => $nodeId,
                     'updated_at'          => $now,
@@ -492,6 +508,11 @@ final readonly class PublishFlowService
                 update: ['type', 'properties', 'declared_in_flow_id', 'declared_by_node_id', 'updated_at'],
             );
         }
+    }
+
+    private function variableKey(Variable $variable): string
+    {
+        return $variable->storage->value . '|' . ($variable->group ?? '') . '|' . $variable->name;
     }
 
     /**

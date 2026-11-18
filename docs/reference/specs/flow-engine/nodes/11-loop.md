@@ -41,8 +41,13 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
   `ConditionOperandPicker`, advanced `iterator_name`). Arrays are produced by the **"Store as list"**
   toggle on a variable (`VariableStorageEditor`), which compiles to `type: 'array'` plus
   `properties.item_type`; the element type comes from the input's `expected_type`.
-- **Condition `.length`:** `OperandResolver::resolveWithLength` makes `contact.photos.length` yield the element
-  count in conditions; a real `length` key wins over the pseudo-accessor.
+- **`.length` in templates and conditions:** one rule (`PathLength`) shared by `TemplateEngine` and
+  `OperandResolver::resolveWithLength`: `contact.photos.length` is the element count of a list, `flow.name.length` the
+  number of characters of a text, and `0` for a missing value or any other scalar; a real `length` key wins over the
+  pseudo-accessor, and a bare namespace (`contact.length`) is not an accessor.
+- **`max_size` editor:** `VariableStorageEditor` shows "Keep last" under the list toggle for a list saved to the
+  contact; it compiles to `properties.max_size` and publish writes it to the registry (7.3). `list_max_size_invalid`
+  (`ListSizeChecker`) rejects a value that is not a whole number from 1 to 1000, or one set on a session list.
 - **Tests:** `tests/Feature/Domains/Flow/LoopEngineTest.php`, `LoopNodeHandlerTest.php`, and the loop cases in
   `tests/Unit/Domains/Flow/ValidateFlowServiceTest.php`, `LoopConfigCheckerTest`, `LoopPublishChecksTest`.
 
@@ -52,8 +57,6 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
   value fails the session in the handler.
 - A decision on the iteration budget (14.1): the general `flow.execution.max_iterations` (default 100) applies, plus the
   literal-count rule 8.8. Batch loops with no wait node hit the limit at roughly 30 iterations.
-- `{{....length}}` in `TemplateEngine` message templates (14.3); only conditions support it.
-- A UI to edit `max_size` (the default 100 comes from the registry), see 7.3.
 
 ---
 
@@ -344,12 +347,14 @@ Replacing a whole array is a separate operation that does not exist yet.
 {{contact.photos.2}}   -> the third element
 ```
 
-The size (`{{contact.photos.length}}`) is **not** supported in templates. In branch and loop **conditions**
-`OperandResolver::resolveWithLength` supports `.length`. Negative indices and slicing are not built.
+The size is `{{contact.photos.length}}`, in templates and in branch and loop **conditions** alike (the same
+`PathLength` rule: list count, text characters, `0` for a missing value or a scalar). Negative indices and slicing
+are not built.
 
 ### 5.7 In the builder
 
-`VariableStorageEditor.vue` shows a "Store as list (append each value)" toggle; the card shows a read-only Type
+`VariableStorageEditor.vue` shows a "Store as list (append each value)" toggle and, for a list saved to the contact,
+a "Keep last" field for `max_size` (5.3, 7.3); the card shows a read-only Type
 label and a `[]` suffix (for example `photos[]`), and new inputs inside a loop body get the list toggle turned on.
 
 ---
@@ -432,11 +437,13 @@ use it as an array of "file". Match the existing element type or use a different
 
 ### 7.3 `max_size` source of truth
 
-The registry, not the node config. A node snapshot does not store `max_size`; the writer looks it up at runtime
-through the lazy resolver and falls back to 100 when the property is absent.
+The registry. The variable block in a node snapshot carries `properties.max_size` only so publish can write it to
+the registry (the upsert replaces the stored properties, so the last published flow wins); the writer looks it up at
+runtime through the lazy resolver, falls back to 100 when the property is absent and clamps it to 1..1000.
 
-There is no UI to edit registry properties (changing them is a data migration, or drop and recreate the
-variable while no data exists). A "Variables" section in the admin panel is future work.
+The builder edits it as "Keep last" on a list variable saved to the contact (empty means 100). A session list is not
+capped, so the field is hidden there and publish rejects it (`list_max_size_invalid`). A "Variables" section in the
+admin panel is future work.
 
 ---
 
@@ -549,8 +556,8 @@ Two branches, each with its own loop and the same `iterator_name`, are fine: onl
 - **Concurrency:** long loops are covered by the lock heartbeat (`LockHeartbeat`, refreshed before each node); an
   incoming message during an input inside a loop goes through standard routing.
 - **Expressions:** `count_source` and `condition` are structured forms, not expressions; `flow.iterator` and
-  `flow.{iterator_name}_total` are reachable through `TemplateEngine`. The `.length` resolver exists for conditions
-  only (14.3).
+  `flow.{iterator_name}_total` are reachable through `TemplateEngine`. `.length` works in templates and conditions
+  (5.6).
 - **Subflow:** a subflow in a loop body creates a new child session per iteration (wait mode; `resumeAfterSubflow`
   returns to the post-subflow position inside the body). 100 iterations x a subflow is 100 child sessions:
   acceptable but heavy, use with care.
@@ -640,7 +647,7 @@ Reusing `flow.iterator` is safe because of the cleanup on exit.
    separate, larger loop-iteration limit, which makes counted loops with runtime values workable. Option (b): keep
    the shared budget plus rule 8.8. Option (a) is preferred. **Undecided.**
 2. **Iterator name on `loop_end`.** Settled: denormalised by `PublishFlowService` at publish (4.3).
-3. **`{{....length}}` in templates.** Conditions support it; message templates do not yet.
+3. **`{{....length}}` in templates.** Settled: supported in templates and conditions (5.6).
 4. **ForEach mode:** iterate over an existing collection. On request.
 5. **Break / Continue:** a formal mechanism. On request.
 6. **Bulk array operations:** replace, remove, sort, filter. As needed.

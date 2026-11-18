@@ -151,6 +151,7 @@ use App\Domains\Flow\Validation\ChannelCapabilityChecker;
 use App\Domains\Flow\Validation\ContactContextChecker;
 use App\Domains\Flow\Validation\FlowGraphStructureValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
+use App\Domains\Flow\Validation\ListSizeChecker;
 use App\Domains\Flow\Validation\LoopConfigChecker;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
@@ -380,6 +381,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(FlowGraphStructureValidator::class);
         $this->app->bind(ContactContextChecker::class);
         $this->app->bind(LoopConfigChecker::class);
+        $this->app->bind(ListSizeChecker::class);
         $this->app->scoped(SubflowStarterService::class, fn ($app): SubflowStarterService => new SubflowStarterService(
             definitions: $app->make(FlowDefinitionRepositoryInterface::class),
             sessions: $app->make(FlowSessionRepositoryInterface::class),

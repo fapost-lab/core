@@ -81,6 +81,7 @@ Annotation nodes (`comment`) are exempt from node-level checks. Per node:
 | `subflow_target_is_template` | `subflow.flow_id` does not name a flow template (path `nodes.<id>.config.flow_id`): a template never starts on its own, it is placed with a template node |
 | `loop_invalid_iterator_name`, `loop_reserved_iterator_name`, `loop_count_exceeds_budget` | iterator name is an identifier and not one of `id, language, meta, tenant_id, external_id`; a literal count above 100 is rejected |
 | `loop_iterator_variable_conflict`, `loop_count_not_numeric` | `LoopConfigChecker` (path `nodes.<loop>.config.iterator_name` / `.config.count_source`): no node writes a session variable named like a loop's `iterator_name` or `{iterator_name}_total`; a counted loop's literal `count_source` is a number (a numeric string counts) |
+| `list_max_size_invalid` | `ListSizeChecker` (path `nodes.<node>`): a list variable's `properties.max_size` is a whole number from 1 to 1000 and is set only on a list saved to the contact |
 | `loop_end_missing_loop_node_id`, `loop_end_invalid_loop_node_id` | `loop_end.loop_node_id` references an existing `loop` node |
 
 Graph-level checks (need `edges`):

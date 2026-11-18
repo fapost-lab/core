@@ -26,6 +26,7 @@ use App\Domains\Flow\Validation\ButtonLimitChecker;
 use App\Domains\Flow\Validation\ChannelCapabilityChecker;
 use App\Domains\Flow\Validation\ContactContextChecker;
 use App\Domains\Flow\Validation\FlowGraphStructureValidator;
+use App\Domains\Flow\Validation\ListSizeChecker;
 use App\Domains\Flow\Validation\LoopConfigChecker;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
@@ -55,6 +56,7 @@ final readonly class ValidateFlowService
         private ?FlowGraphStructureValidator $graphValidator = null,
         private ?ContactContextChecker $contactContext = null,
         private ?LoopConfigChecker $loopConfig = null,
+        private ?ListSizeChecker $listSize = null,
     ) {
     }
 
@@ -129,6 +131,11 @@ final readonly class ValidateFlowService
             $loopFindings = $this->loopConfig->check($this->withoutAnnotations($nodeMap), $edges);
             array_push($errors, ...$loopFindings['errors']);
             array_push($warnings, ...$loopFindings['warnings']);
+        }
+
+        // A list variable's max_size must be a whole number in range. Skipped when the checker was not injected.
+        if (null !== $this->listSize) {
+            array_push($errors, ...$this->listSize->check($this->withoutAnnotations($nodeMap)));
         }
 
         if (null !== $assistantId) {
