@@ -13,6 +13,11 @@
 >   bare session variable names, not paths — `input_mapping` maps a child variable to an expression over the parent,
 >   `output_mapping` a parent variable to a child variable — and outputs reach only the parent's `flow.*`, on `success`
 >   only. The node spec `docs/reference/specs/flow-engine/nodes/08-subflow.md` describes the shipped behaviour.
+> - Version pinning exists (2026-11, node still `subflow@1`): the optional `flow_version` pins the node to one published
+>   version of the child, active or superseded; without it the child's latest active version runs, as in V1. Validate
+>   and publish refuse a pin to a version the target flow never published; a pin that no longer resolves at runtime
+>   fails the node with `error_type = subflow_pinned_version_missing`. Definitions are never deleted, so a published
+>   version stays pinnable.
 
 **Status:** Accepted
 **Date:** Апрель 2026

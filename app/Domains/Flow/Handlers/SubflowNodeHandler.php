@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
+use App\Domains\Flow\Exceptions\SubflowPinnedVersionMissingException;
 use App\Domains\Flow\Exceptions\SubflowTargetInactiveException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Subflow\SubflowMapping;
 use App\Domains\Flow\Subflow\SubflowMappingValidator;
+use App\Domains\Flow\Subflow\SubflowPin;
 use App\Domains\Flow\Subflow\SubflowStarterService;
 use Exception;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -20,6 +22,7 @@ use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use Fapost\Support\Builder\Schema\Fields\DurationField;
 use Fapost\Support\Builder\Schema\Fields\FlowPickerField;
 use Fapost\Support\Builder\Schema\Fields\KeyValueField;
+use Fapost\Support\Builder\Schema\Fields\NumberField;
 use Fapost\Support\Builder\Schema\Schema;
 use Fapost\Support\Builder\Schema\Section;
 
@@ -28,6 +31,9 @@ use Fapost\Support\Builder\Schema\Section;
  * child session for the resolved {@code flow_id}; once the child reaches an
  * end node, {@see \App\Domains\Flow\Subflow\DefaultSubflowResumer} routes
  * the parent through the matching `success` / `cancelled` / `failed` handle.
+ *
+ * The optional `flow_version` pins the node to one published version of the child flow, so republishing the child
+ * does not change what this node runs; without it the child's latest active version runs.
  *
  * The optional `input_mapping` seeds the child's session variables from
  * expressions over the parent's state, evaluated here before the child starts;
@@ -85,7 +91,15 @@ final class SubflowNodeHandler extends AbstractVersionedHandler implements NodeC
                             ->help(
                                 'Runs as a child session; the parent pauses until it ends. '
                                 . 'Resumes here via success / cancelled / failed once the child '
-                                . 'reaches an end node (failed also covers timeout and inactive target).',
+                                . 'reaches an end node (failed also covers timeout; an inactive target fails the parent).',
+                            ),
+                        NumberField::make(SubflowPin::FIELD)
+                            ->label('Pinned version')
+                            ->min(1)
+                            ->help(
+                                'Leave empty to run the active version of the flow. Enter a published version '
+                                . 'number to keep running that version when the flow is republished; if it does '
+                                . 'not exist, the node fails like an inactive flow.',
                             ),
                     ]),
             )
@@ -178,14 +192,25 @@ final class SubflowNodeHandler extends AbstractVersionedHandler implements NodeC
             );
         }
 
+        $pinnedVersion = SubflowPin::read($config);
+
+        if (false === $pinnedVersion) {
+            throw new InvalidNodeConfigException('subflow: flow_version must be a positive whole number');
+        }
+
         $input = $this->evaluateInput($config, $state, $context);
 
         try {
-            $child = $this->starter->start($parent, $flowId, $duration, $context->nodeId, $input);
+            $child = $this->starter->start($parent, $flowId, $duration, $context->nodeId, $input, $pinnedVersion);
         } catch (SubflowTargetInactiveException $exception) {
             return new NodeExecutionResult(
                 status: NodeExecutionStatus::Failed,
                 metadata: ['error' => $exception->getMessage(), 'error_type' => 'subflow_target_inactive'],
+            );
+        } catch (SubflowPinnedVersionMissingException $exception) {
+            return new NodeExecutionResult(
+                status: NodeExecutionStatus::Failed,
+                metadata: ['error' => $exception->getMessage(), 'error_type' => 'subflow_pinned_version_missing'],
             );
         }
 
@@ -195,6 +220,7 @@ final class SubflowNodeHandler extends AbstractVersionedHandler implements NodeC
                 'flow_id'  => $flowId,
                 'child_id' => (string)$child->getKey(),
                 'timeout'  => $timeout,
+                ...(null !== $pinnedVersion ? ['flow_version' => $pinnedVersion] : []),
             ],
         );
     }

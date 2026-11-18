@@ -18,10 +18,12 @@ use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\LoopNodeHandler;
+use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\Subflow\CallGraphValidator;
+use App\Domains\Flow\Subflow\SubflowPin;
 use App\Domains\Flow\Validation\ButtonLimitChecker;
 use App\Domains\Flow\Validation\ChannelCapabilityChecker;
 use App\Domains\Flow\Validation\ContactContextChecker;
@@ -102,6 +104,7 @@ final readonly class ValidateFlowService
 
         $this->validateEndNodeOutgoingEdges($nodeMap, $edges, $errors);
         $this->validateSubflowTargetsAreNotTemplates($nodeMap, $errors);
+        $this->validateSubflowPinnedVersionsExist($nodeMap, $errors);
         $this->validateSubflowCallGraph($flowId, $nodeMap, $errors);
         $this->validateNoNestedLoops($nodeMap, $edges, $errors);
         $this->validateLoopReachesLoopEnd($nodeMap, $edges, $errors);
@@ -709,6 +712,14 @@ final readonly class ValidateFlowService
             );
         }
 
+        if (false === SubflowPin::read($config)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.flow_version",
+                code: 'subflow_invalid_flow_version',
+                message: 'flow_version must be a positive whole number (a published version of the target flow) or empty.',
+            );
+        }
+
         $timeout = $config['timeout'] ?? null;
         if (null !== $timeout) {
             if (! is_string($timeout) || '' === mb_trim($timeout)) {
@@ -776,6 +787,62 @@ final readonly class ValidateFlowService
                     path: "nodes.{$nodeId}.config.flow_id",
                     code: 'subflow_target_is_template',
                     message: "Subflow target '{$target}' is a template: templates are placed with a template node, not called as a subflow.",
+                );
+            }
+        }
+    }
+
+    /**
+     * A node pinned to a version the target flow never published fails when it runs. Versions are looked up in one
+     * query, as runnable (flow, not template) definitions of the target flow id, so a version number of another
+     * flow never satisfies the pin. A target with no draft or a malformed pin is left to the other checks. Skipped,
+     * like the call-graph check, when that validator was not injected (legacy unit tests without a database).
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateSubflowPinnedVersionsExist(array $nodeMap, array &$errors): void
+    {
+        if (null === $this->callGraphValidator) {
+            return;
+        }
+
+        $pins = [];
+
+        foreach ($nodeMap as $nodeId => $node) {
+            if (\App\Domains\Flow\Handlers\SubflowNodeHandler::TYPE !== ($node['type'] ?? null)) {
+                continue;
+            }
+
+            $config  = is_array($node['config'] ?? null) ? $node['config'] : [];
+            $target  = $config['flow_id'] ?? null;
+            $version = SubflowPin::read($config);
+
+            if (is_int($version) && is_string($target) && '' !== mb_trim($target) && ! str_contains($target, '{{')) {
+                $pins[(string) $nodeId] = [mb_trim($target), $version];
+            }
+        }
+
+        if ([] === $pins) {
+            return;
+        }
+
+        $published = [];
+
+        FlowDefinition::query()
+            ->whereIn('flow_id', array_values(array_unique(array_column($pins, 0))))
+            ->runnable()
+            ->get(['flow_id', 'version'])
+            ->each(static function (FlowDefinition $definition) use (&$published): void {
+                $published[$definition->flow_id][$definition->version] = true;
+            });
+
+        foreach ($pins as $nodeId => [$target, $version]) {
+            if (! isset($published[$target][$version])) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "nodes.{$nodeId}.config.flow_version",
+                    code: 'subflow_pinned_version_missing',
+                    message: "Subflow target '{$target}' has no published version {$version}.",
                 );
             }
         }

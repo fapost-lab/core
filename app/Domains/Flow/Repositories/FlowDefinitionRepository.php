@@ -28,6 +28,15 @@ final class FlowDefinitionRepository implements FlowDefinitionRepositoryInterfac
             ->first();
     }
 
+    public function findRunnableByFlowIdAndVersion(string $flowId, int $version): ?FlowDefinition
+    {
+        return FlowDefinition::query()
+            ->where('flow_id', $flowId)
+            ->where('version', $version)
+            ->runnable()
+            ->first();
+    }
+
     public function findById(string $id): FlowDefinition
     {
         return FlowDefinition::query()->findOrFail($id);

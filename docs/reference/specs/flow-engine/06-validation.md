@@ -78,6 +78,7 @@ Annotation nodes (`comment`) are exempt from node-level checks. Per node:
 | `rag_missing_knowledge_base_id`, `rag_template_in_knowledge_base_id`, `rag_missing_provider`, `rag_missing_query` | `rag_query` has a literal knowledge base id, a provider and a query template. The knowledge base is **not** looked up |
 | `input_missing_save_target` | `input` has a `variable.name` (or legacy `save_to`) |
 | `subflow_missing_flow_id`, `subflow_template_in_flow_id`, `subflow_invalid_timeout` | `subflow.flow_id` is a literal; `timeout` is an ISO 8601 duration |
+| `subflow_invalid_flow_version`, `subflow_pinned_version_missing` | `subflow.flow_version`, when set, is a positive whole number naming a version the target flow published (path `nodes.<id>.config.flow_version` for the second) |
 | `subflow_target_is_template` | `subflow.flow_id` does not name a flow template (path `nodes.<id>.config.flow_id`): a template never starts on its own, it is placed with a template node |
 | `loop_invalid_iterator_name`, `loop_reserved_iterator_name`, `loop_count_exceeds_budget` | iterator name is an identifier and not one of `id, language, meta, tenant_id, external_id`; a literal count above 100 is rejected |
 | `loop_iterator_variable_conflict`, `loop_count_not_numeric` | `LoopConfigChecker` (path `nodes.<loop>.config.iterator_name` / `.config.count_source`): no node writes a session variable named like a loop's `iterator_name` or `{iterator_name}_total`; a counted loop's literal `count_source` is a number (a numeric string counts) |
