@@ -147,6 +147,14 @@ Repeats the blocks between them.
 runs each time round. The **Structure** panel in the builder is the practical way
 to see what is inside a loop, since the main column can get long.
 
+The loop keeps its count in a temporary variable, `iterator` by default (set the
+name under advanced options), and the total in `iterator_total`. Validate and
+publish refuse a flow where another block saves a temporary variable with one of
+those names, and a fixed repeat count that is not a number. A **while** loop whose
+condition no block inside the loop changes gets a warning: it may run until the
+platform's iteration limit stops it. The warning does not block publishing, since
+the value can change from outside the flow.
+
 ### Subflow
 
 Runs another flow, and **pauses this one until it finishes**.

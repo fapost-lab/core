@@ -111,6 +111,7 @@ use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Repositories\FlowTriggerRepository;
 use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
+use App\Domains\Flow\Retention\AutomationRunRetention;
 use App\Domains\Flow\Routing\DropPolicy;
 use App\Domains\Flow\Routing\DropPolicyInterface;
 use App\Domains\Flow\Routing\MessageRouter;
@@ -150,6 +151,7 @@ use App\Domains\Flow\Validation\ChannelCapabilityChecker;
 use App\Domains\Flow\Validation\ContactContextChecker;
 use App\Domains\Flow\Validation\FlowGraphStructureValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
+use App\Domains\Flow\Validation\LoopConfigChecker;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
@@ -273,6 +275,32 @@ final class FlowServiceProvider extends ServiceProvider
             max: FlowEngineInterface::MAX_SEGMENT_SECONDS,
         ));
 
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: AutomationRunRetention::SUCCEEDED_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.automation_runs.succeeded_retention_days',
+            fallback: AutomationRunRetention::DEFAULT_SUCCEEDED_DAYS,
+            label: 'Succeeded automation runs retention',
+            description: 'How many days a finished automation run that succeeded is kept, with its history and logs, for every tenant. The daily flow:prune-automation-runs deletes older ones; deleting is irreversible. 0 keeps them forever. Conversation sessions are never pruned.',
+            group: 'Flow',
+            unit: 'days',
+            min: 0,
+            max: AutomationRunRetention::MAX_DAYS,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: AutomationRunRetention::FAILED_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.automation_runs.failed_retention_days',
+            fallback: AutomationRunRetention::DEFAULT_FAILED_DAYS,
+            label: 'Failed automation runs retention',
+            description: 'How many days any other finished automation run (failed, expired, cancelled, terminated) is kept, with its history and logs, for every tenant. The daily flow:prune-automation-runs deletes older ones; deleting is irreversible. 0 keeps them forever.',
+            group: 'Flow',
+            unit: 'days',
+            min: 0,
+            max: AutomationRunRetention::MAX_DAYS,
+        ));
+
         // Seed Core's system translation keys. Features and Solutions register
         // their own keys through the same catalog from their providers.
         // Idempotent so the test bootstrap can boot the provider repeatedly.
@@ -381,6 +409,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(ButtonLimitChecker::class);
         $this->app->bind(FlowGraphStructureValidator::class);
         $this->app->bind(ContactContextChecker::class);
+        $this->app->bind(LoopConfigChecker::class);
         $this->app->scoped(SubflowStarterService::class, fn ($app): SubflowStarterService => new SubflowStarterService(
             definitions: $app->make(FlowDefinitionRepositoryInterface::class),
             sessions: $app->make(FlowSessionRepositoryInterface::class),

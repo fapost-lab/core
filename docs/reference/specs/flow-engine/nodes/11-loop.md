@@ -28,7 +28,9 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
 - **Validation** (all are errors in `ValidateFlowService`, returned by validate and enforced at publish):
   `loop_end_missing_loop_node_id` / `loop_end_invalid_loop_node_id`, `loop_invalid_iterator_name`,
   `loop_reserved_iterator_name`, `loop_nested_not_allowed`, `loop_missing_loop_end` (reachability BFS from the
-  `loop` handle), `loop_count_exceeds_budget` (literal count above 100).
+  `loop` handle), `loop_count_exceeds_budget` (literal count above 100), and from `LoopConfigChecker`
+  `loop_iterator_variable_conflict` (8.3) and `loop_count_not_numeric` (8.7). The one warning is
+  `loop_while_condition_unchanged` (8.5).
 - **Registry conflicts:** an array variable whose `item_type` differs between flows is rejected at publish
   (`variable_properties_conflict`, `PublishFlowService::assertNoVariableTypeConflicts`); `max_size` is not
   compared (it is registry-only, see 7.3).
@@ -42,19 +44,16 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
 - **Condition `.length`:** `OperandResolver::resolveWithLength` makes `contact.photos.length` yield the element
   count in conditions; a real `length` key wins over the pseudo-accessor.
 - **Tests:** `tests/Feature/Domains/Flow/LoopEngineTest.php`, `LoopNodeHandlerTest.php`, and the loop cases in
-  `tests/Unit/Domains/Flow/ValidateFlowServiceTest.php`.
+  `tests/Unit/Domains/Flow/ValidateFlowServiceTest.php`, `LoopConfigCheckerTest`, `LoopPublishChecksTest`.
 
 **Not built:**
 
-- Rejecting session variables named like an active `iterator_name` or `{iterator_name}_total` (8.3, second part).
-- A warning when a while condition is not changed in the body (8.5).
-- A static type check of a numeric `count_source` (8.7); a non-numeric runtime value fails the session in the handler.
+- A static type check of a *variable* `count_source` (8.7): only a literal count is checked; a non-numeric runtime
+  value fails the session in the handler.
 - A decision on the iteration budget (14.1): the general `flow.execution.max_iterations` (default 100) applies, plus the
   literal-count rule 8.8. Batch loops with no wait node hit the limit at roughly 30 iterations.
 - `{{....length}}` in `TemplateEngine` message templates (14.3); only conditions support it.
 - A UI to edit `max_size` (the default 100 comes from the registry), see 7.3.
-- Validation severities "warning vs error": `ValidateFlowService` has no warning level; every rule
-  above is an error.
 
 ---
 
@@ -444,8 +443,8 @@ variable while no data exists). A "Variables" section in the admin panel is futu
 ## 8. Validation rules
 
 Additions to [../06-validation.md](../06-validation.md). Save draft runs **no** validation; the explicit validate
-call returns the errors, and publish enforces them atomically. There is no warning level: every rule below is an
-error unless it is listed under "Not built".
+call returns the errors, and publish enforces them atomically. Every rule below is an error except 8.5, which is a
+warning (`FlowValidationResultDto::$warnings`) that never blocks publishing.
 
 ### 8.1 LoopEnd is required (`loop_missing_loop_end`)
 
@@ -461,26 +460,36 @@ points at this loop. A `loop_end` of another loop is a boundary and is not trave
 Must match `^[A-Za-z_][A-Za-z0-9_]*$` and not be one of the reserved names `id`, `language`, `meta`, `tenant_id`,
 `external_id`.
 
-Not built: rejecting session variables that have the name of an active `iterator_name` or `{iterator_name}_total`.
+### 8.3b Iterator versus session variable (`loop_iterator_variable_conflict`)
+
+The iterator and its total live in `flow.{iterator_name}` and `flow.{iterator_name}_total`, the same namespace as session
+variables. A node that saves a session variable with either name (an `input`, `assign`, `send_message`, `call` or
+`subflow` output) would overwrite the counter, so the flow is refused; the error is at
+`nodes.<loop>.config.iterator_name` and names the writing node. Two sequential loops sharing an `iterator_name` are not a
+conflict (9.2). The `_total` name is checked for counted loops only. Contact variables are not affected: they live under `contact.*`.
 
 ### 8.4 No nested loops (`loop_nested_not_allowed`)
 
 A BFS from the `loop` handle; another `loop` node in the reachable set means a nested loop.
 
-### 8.5 A while condition must change (not built)
+### 8.5 A while condition must change (`loop_while_condition_unchanged`, warning)
 
-Intended: extract the paths from `condition.left` and check that at least one body node writes to them, else warn
-about a possible infinite loop. It would be a warning only, since the condition may change from outside (for
-example an event trigger of another flow writing to the contact).
+The path read by `condition.left` (a session or contact variable, or a `flow.*` / `contact.*` source) is compared with
+the paths written by the nodes of the loop body (see 06-validation.md for the write shapes); when none matches, the loop
+gets a warning at `nodes.<loop>.config.condition`. It is a warning only, since the condition may change from outside (for
+example an event trigger of another flow writing to the contact). Skipped for a condition on the loop's own iterator
+(`loop_end` advances it), for paths the check cannot follow (`module.*`), and when the body has a Solution node.
 
 ### 8.6 Variable registry conflicts
 
 Publish compares every variable of the flow with the registry; conflicts are refused (7.2).
 
-### 8.7 Counted source must be a number (not built)
+### 8.7 Counted source must be a number (`loop_count_not_numeric`)
 
-A best-effort static check was planned (literal type, a known registry type for `contact.*`, skip `flow.*`). A
-non-numeric runtime value fails the session in the handler.
+A counted loop with a literal `count_source` whose value is not numeric (text such as `"many"`, a missing value) is
+rejected at `nodes.<loop>.config.count_source`; a numeric string passes. A variable `count_source` is not checked
+statically (a known registry type for `contact.*` was considered and left out); a non-numeric runtime value fails the
+session in the handler.
 
 ### 8.8 Literal count budget (`loop_count_exceeds_budget`)
 
@@ -571,7 +580,6 @@ Two branches, each with its own loop and the same `iterator_name`, are fine: onl
 - array operations beyond append: replace, remove, sort, filter
 - negative indices and slicing in expressions
 - per-flow override of variable properties (the registry is the single source of truth)
-- strict while-condition validation (8.5)
 - cleanup of orphan registry records
 - node usage statistics: see [../node-usage-statistics.md](../node-usage-statistics.md)
 
@@ -652,7 +660,8 @@ Acceptance, per the code:
 - [x] Missing LoopEnd, nested loops, an invalid `loop_node_id` and a reserved `iterator_name` are rejected (errors).
 - [x] Sequential loops with the same `iterator_name` do not conflict (cleanup writes `null`).
 - [x] A variable type or element-type conflict is rejected at publish with a clear message.
-- [ ] While condition that never changes in the body gives a warning (8.5): not built.
+- [x] While condition that never changes in the body gives a warning (8.5); iterator/session-variable clash and a
+  non-numeric literal count are errors (8.3b, 8.7): `LoopConfigCheckerTest`, `LoopPublishChecksTest`.
 - [ ] Manual runs (counted 5 photos end to end, while exit, a 60-iteration loop under the lock heartbeat) and the
   performance check (100 iterations x 5 nodes): not recorded.
 - [ ] A batch loop at the iteration-budget boundary: behaviour pending decision 14.1.

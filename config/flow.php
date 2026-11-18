@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Domains\Flow\Retention\AutomationRunRetention;
+
 return [
     // Only the default of the platform setting `flow.execution.max_iterations`: a stored value wins
     // (`platform:settings:set`, or Platform settings in a single-tenant admin).
@@ -24,6 +26,21 @@ return [
     'automation' => [
         'segment_steps'   => (int) env('FLOW_AUTOMATION_SEGMENT_STEPS', 50),
         'segment_seconds' => (int) env('FLOW_AUTOMATION_SEGMENT_SECONDS', 20),
+    ],
+
+    // Only the defaults of the platform settings `flow.automation_runs.succeeded_retention_days` and
+    // `flow.automation_runs.failed_retention_days`: how many days a finished automation run is kept before the daily
+    // `flow:prune-automation-runs` deletes it with its history and logs. 0 keeps that class forever; a value that is
+    // not a whole number from 0 to 3650 is ignored. Conversation sessions are never pruned by it.
+    'automation_runs' => [
+        'succeeded_retention_days' => AutomationRunRetention::parseDays(
+            env('FLOW_AUTOMATION_SUCCEEDED_RETENTION_DAYS'),
+            AutomationRunRetention::DEFAULT_SUCCEEDED_DAYS,
+        ),
+        'failed_retention_days' => AutomationRunRetention::parseDays(
+            env('FLOW_AUTOMATION_FAILED_RETENTION_DAYS'),
+            AutomationRunRetention::DEFAULT_FAILED_DAYS,
+        ),
     ],
 
     /*

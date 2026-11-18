@@ -47,7 +47,7 @@ What to watch:
 
 ## The scheduler
 
-Five scheduled tasks matter, and all fail silently if the scheduler is not
+Six scheduled tasks matter, and all fail silently if the scheduler is not
 running:
 
 | Task | When | If it does not run |
@@ -56,6 +56,7 @@ running:
 | `logs:create-partition` | Monthly, on the 1st | Next month's flow-log partition is missing |
 | `logs:prune-flow` | Daily, 03:00 | Old log partitions accumulate |
 | `conversations:prune` | Daily, 03:15 | Nothing is pruned; the transcript keeps growing (a no-op while retention is `0`) |
+| `flow:prune-automation-runs` | Daily, 04:30 | Finished automation runs and their history keep growing |
 | `horizon:snapshot` | Every five minutes | Horizon's metrics and the health page's jobs-per-minute figures stop moving |
 
 The monthly one is the trap: it fails at a month boundary, weeks after the
