@@ -9,7 +9,7 @@ Goal: an install can run for a year without manual cleanup. Done when: scheduled
 conversation messages, session history and old flow versions, and next month's message partition
 exists before the first write of the month.
 
-- [ ] `conversation-retention` — Conversation retention: `retention_days` read and enforced by a scheduled prune
+- [x] `conversation-retention` — Conversation retention: `retention_days` read and enforced by a scheduled prune
 - [ ] Message partitions pre-created ahead of writes
 - [ ] `flow_session_history` retention
 - [ ] Keep the last N published flow versions

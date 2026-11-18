@@ -9,12 +9,12 @@ tenant-scoped, retention-managed audit log that authorized staff can review.
 Goal: every in-scope write lands in a tenant-scoped audit log. Done when: performing any in-scope
 action produces a matching log row stored in the acting tenant's schema.
 
-- [ ] Record create/update/delete on `Assistant`, `Channel`, and `Flow` (including version publish)
+- [x] Record create/update/delete on `Assistant`, `Channel`, and `Flow` (including version publish)
       in a tenant-scoped audit log
-- [ ] Record create/update/delete on `Contact`/segments, `Broadcast`, `User`/`Role`, and tenant
+- [x] Record create/update/delete on `Contact`/segments, `Broadcast`, `User`/`Role`, and tenant
       settings changes in the same log (after: Assistant/Channel/Flow logging — reuses the same
       recording mechanism, only extends the covered entities)
-- [ ] Record staff sign-in/sign-out events in the log
+- [x] Record staff sign-in/sign-out events in the log
 - [ ] fog: whether platform-administrator actions on a tenant are captured here — depends on the
       open question of who the journal is meant to hold accountable
 
@@ -23,18 +23,17 @@ action produces a matching log row stored in the acting tenant's schema.
 Goal: the log does not grow without limit. Done when: a scheduled command prunes entries past the
 configured retention period.
 
-- [ ] Add configurable retention with a scheduled cleanup command
-- [ ] fog: whether old/new value diffs are stored, and how channel secrets are kept out of them —
-      not decided, blocks whether diff storage ships at all
+- [x] Add configurable retention with a scheduled cleanup command
+- [x] Old/new value diffs stored as attribute changes, with secrets never named in them (decided in
+      code by #340: `AuditChanges`)
 
 ## Phase 3 — Make it visible
 
 Goal: staff with permission can read the journal. Done when: an authorized user can open a view of
 the log — a dedicated screen or a tab, built on the kit — and see the recorded actions for their tenant.
 
-- [ ] fog: dedicated console screen vs. a "History" tab on each record, built on the kit — shape not decided (after: ui-foundation phases 2 and 3 — the view is built on the kit)
-- [ ] fog: who can see the journal (owner-only vs. permission-gated role) — blocks how the view is
-      authorized
+- [x] A dedicated console screen for the journal, built on the kit and gated by a permission
+      (decided in code by #340: `Console/ActivityLog`, `ActivityEntryPolicy`)
 
 ## Waves
 

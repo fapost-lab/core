@@ -18,7 +18,7 @@ recipients with their outcome, and the panel shows flow starts and completions p
 Goal: an operator sees a new message as it arrives. Done when: a contact's message appears in an
 open conversation without a reload.
 
-- [ ] Live inbox updates (after: ui-foundation phase 2 — builds on its live-updates composable, Echo when a broadcaster is configured and polling otherwise)
+- [x] Live inbox updates (after: ui-foundation phase 2 — builds on its live-updates composable, Echo when a broadcaster is configured and polling otherwise)
 - [ ] Read receipts (after: spec `data-lifecycle` delivery status ingestion — receipts are that data)
 
 ## Waves
