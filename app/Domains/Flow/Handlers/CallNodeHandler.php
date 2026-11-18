@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Handlers;
 use App\Domains\Flow\Call\CallAttempt;
 use App\Domains\Flow\Call\CallExecutionLedgerInterface;
 use App\Domains\Flow\Call\CallOutcome;
+use App\Domains\Flow\Call\CallSuccessStatuses;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
@@ -25,15 +26,19 @@ use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Contracts\ContactWriterInterface;
 use Fapost\Foundation\Flow\Contracts\DeclaresContextRequirementInterface;
+use Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface;
+use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
 use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
 use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use Fapost\Support\Builder\Schema\Fields\ObjectArrayField;
 use Fapost\Support\Builder\Schema\Fields\ObjectField;
 use Fapost\Support\Builder\Schema\Fields\SelectField;
 use Fapost\Support\Builder\Schema\Fields\TextField;
+use Fapost\Support\Builder\Schema\Fields\ToggleField;
 use Fapost\Support\Builder\Schema\Schema;
 use Fapost\Support\Builder\Schema\Section;
 use JsonException;
+use stdClass;
 
 /**
  * Outgoing integration node. Resolves a pluggable transport (http / handler)
@@ -48,6 +53,11 @@ use JsonException;
  *  - `result_mapping` extracts individual response paths (`body.data.id`,
  *    `status`, `headers.X`) straight into variables inline.
  *
+ * Two optional fields tighten the outcome (both default to the earlier behaviour):
+ *  - `success_statuses` replaces the transport's own verdict by a list of statuses ({@see CallSuccessStatuses}).
+ *  - `strict_mapping` sends a successful call to `error` (`error_code = mapping_missing`) when a mapped path is absent
+ *    from the response, instead of writing null.
+ *
  * Legacy nodes (no `transport`/`target`) keep their original behavior through
  * {@see executeLegacy()} — POST `url` with `include_state`, save body to
  * `save_response_to` / `save_to_variable`.
@@ -56,7 +66,7 @@ use JsonException;
  * `null` on a contactless run, and a config that reads the contact or saves to a contact variable is refused at
  * publish there.
  */
-final class CallNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
+final class CallNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface, NodeConfigValidatorInterface
 {
     final public const string TYPE = 'call';
 
@@ -72,6 +82,9 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
     private const string STATUS_CODE_META     = 'status_code';
     private const string ATTEMPT_META         = 'attempt_number';
     private const string DEDUPLICATED_META    = 'deduplicated';
+    private const string MISSING_PATHS_META   = 'missing_paths';
+
+    private const string ERROR_MAPPING_MISSING = 'mapping_missing';
 
     private const string ERROR_SOLUTION_INACTIVE = 'solution_inactive';
 
@@ -151,9 +164,41 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
                             ->itemFields([
                                 TextField::make('from')->label('Response path'),
                             ]),
+                        ToggleField::make('strict_mapping')
+                            ->label('Fail when a mapped path is missing')
+                            ->default(false),
                     ]),
             )
             ->toArray();
+    }
+
+    /**
+     * Publish-time checks of the two optional fields; both are literals, never templates.
+     *
+     * @param  array<string, mixed>  $node
+     *
+     * @return list<NodeConfigIssue>
+     */
+    public function validate(array $node): array
+    {
+        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+        $issues = [];
+
+        $problem = CallSuccessStatuses::problem($config['success_statuses'] ?? null);
+
+        if (null !== $problem) {
+            $issues[] = NodeConfigIssue::error('call_invalid_success_statuses', $problem, 'success_statuses');
+        }
+
+        if (isset($config['strict_mapping']) && ! is_bool($config['strict_mapping'])) {
+            $issues[] = NodeConfigIssue::error(
+                'call_invalid_strict_mapping',
+                'strict_mapping must be true or false.',
+                'strict_mapping',
+            );
+        }
+
+        return $issues;
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
@@ -201,42 +246,54 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
         }
 
         $request = new CallRequest(target: $target, parameters: $parameters, options: $options);
-        $outcome = $this->dispatch($transportId, $request, $callContext, $earlier);
+        $outcome = $this->dispatch($transportId, $request, $callContext, $earlier, CallSuccessStatuses::fromConfig($config['success_statuses'] ?? null));
         $result  = $outcome->result;
 
         $stateChanges = [];
-        $this->applyResponse($config, $result, $context, $stateChanges);
+        $missing      = $this->applyResponse($config, $result, $context, $stateChanges);
+        $mappingFails = [] !== $missing;
+        $errorCode    = $mappingFails ? self::ERROR_MAPPING_MISSING : $result->errorCode;
 
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Executed,
-            sourceHandle: $result->success ? self::HANDLE_SUCCESS : self::HANDLE_ERROR,
+            sourceHandle: $result->success && ! $mappingFails ? self::HANDLE_SUCCESS : self::HANDLE_ERROR,
             stateChanges: $stateChanges,
             metadata: array_filter([
                 self::STATUS_CODE_META     => $result->metadata['status_code'] ?? null,
-                self::ERROR_CODE_META      => $result->errorCode,
+                self::ERROR_CODE_META      => $errorCode,
+                self::MISSING_PATHS_META   => $mappingFails ? $missing : null,
                 self::IDEMPOTENCY_KEY_META => $callContext->idempotencyKey,
                 self::ATTEMPT_META         => $outcome->attempt,
                 self::DEDUPLICATED_META    => $outcome->replayed ? true : null,
             ], static fn (mixed $v): bool => null !== $v),
             // The flow log keeps only this field; without it the author would not see why the call was refused.
-            errorMessage: in_array($result->errorCode, [self::ERROR_SOLUTION_INACTIVE, self::ERROR_SOLUTION_NOT_READY], true)
-                ? $result->errorCode . ': ' . (is_string($result->metadata['solution_id'] ?? null) ? $result->metadata['solution_id'] : 'unknown')
-                : null,
+            errorMessage: $mappingFails
+                ? self::ERROR_MAPPING_MISSING . ': ' . implode(', ', $missing)
+                : (in_array($result->errorCode, [self::ERROR_SOLUTION_INACTIVE, self::ERROR_SOLUTION_NOT_READY], true)
+                    ? $result->errorCode . ': ' . (is_string($result->metadata['solution_id'] ?? null) ? $result->metadata['solution_id'] : 'unknown')
+                    : null),
         );
     }
 
     /**
      * Write the whole-response variable and apply each result_mapping entry.
      *
+     * With `strict_mapping` and a successful call, a mapped path that is absent from the response (a path whose value
+     * is null is present) is returned and no mapping entry is written, so the node can take its `error` handle without
+     * leaving half of the mapping behind. An error response is mapped leniently: it already takes `error`, and its
+     * body rarely has the success shape.
+     *
      * @param  array<string, mixed>  $config
      * @param  array<string, mixed>  $stateChanges
+     *
+     * @return list<string>  the missing `from` paths; empty when none or not strict
      */
     private function applyResponse(
         array $config,
         CallResult $result,
         NodeExecutionContext $context,
         array &$stateChanges,
-    ): void {
+    ): array {
         $payload  = $result->payload;
         $metadata = $result->metadata;
 
@@ -257,7 +314,12 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
         ];
         $this->writeVariable($this->resolveVariable($config['save_to_variable'] ?? null), $whole, $context, $stateChanges);
 
+        $strict   = true === ($config['strict_mapping'] ?? null) && $result->success;
+        $absent   = new stdClass();
         $mappings = is_array($config['result_mapping'] ?? null) ? $config['result_mapping'] : [];
+        $writes   = [];
+        $missing  = [];
+
         foreach ($mappings as $mapping) {
             if (! is_array($mapping)) {
                 continue;
@@ -270,11 +332,32 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
                 continue;
             }
 
-            // Missing path resolves to null (written as-is) rather than failing
-            // the node — the author opted into the mapping, an absent field is
-            // expected to surface as an empty variable.
-            $this->writeVariable($to, data_get($bag, $from), $context, $stateChanges);
+            $value = data_get($bag, $from, $absent);
+
+            if ($absent === $value) {
+                if ($strict) {
+                    $missing[] = $from;
+
+                    continue;
+                }
+
+                // Lenient (the default): a missing path is written as null rather than failing the node. The
+                // author opted into the mapping, an absent field is expected to surface as an empty variable.
+                $value = null;
+            }
+
+            $writes[] = [$to, $value];
         }
+
+        if ([] !== $missing) {
+            return array_values(array_unique($missing));
+        }
+
+        foreach ($writes as [$to, $value]) {
+            $this->writeVariable($to, $value, $context, $stateChanges);
+        }
+
+        return [];
     }
 
     /**
@@ -382,8 +465,13 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
      * `$earlier` is the ledger's answer for this execution, looked up once by the caller so that the quota check
      * and the send decide on the same record.
      */
-    private function dispatch(string $transportId, CallRequest $request, CallContext $callContext, ?CallResult $earlier): CallOutcome
-    {
+    private function dispatch(
+        string $transportId,
+        CallRequest $request,
+        CallContext $callContext,
+        ?CallResult $earlier,
+        ?CallSuccessStatuses $statuses = null,
+    ): CallOutcome {
         if (null !== $earlier) {
             return new CallOutcome($earlier, null, true);
         }
@@ -396,6 +484,12 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
         );
 
         $result = $this->transports->get($transportId)->execute($request, $callContext);
+
+        // The node's verdict, not the transport's, decides what is recorded: a status the list rejects stays
+        // retryable, and one it accepts is a finished call that must not be sent again.
+        if ($statuses instanceof CallSuccessStatuses) {
+            $result = $statuses->judge($result);
+        }
 
         if ($result->success) {
             $this->ledger->complete($callContext->tenantId, $callContext->idempotencyKey, $result);

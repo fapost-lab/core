@@ -74,10 +74,18 @@ const form = reactive({
     // options
     timeout:      10 as number,
     successWhen:  '2xx',
+    successStatuses: '',
     // response
     saveTo:       null as Variable | null,
     mappings:     [] as MapRow[],
+    strictMapping: false,
 })
+
+// `success_statuses` is edited as comma-separated text ("200, 3xx, 400-404") and stored as a list; a bare number is
+// kept a number. A malformed entry is kept as typed so publish validation can name it.
+function parseStatuses(text: string): Array<number | string> {
+    return text.split(',').map(t => t.trim()).filter(t => t !== '').map(t => (/^\d{3}$/.test(t) ? Number(t) : t))
+}
 
 function rowsFromPrefix(params: Record<string, unknown>, prefix: string): KvRow[] {
     const out: KvRow[] = []
@@ -130,6 +138,8 @@ function hydrate() {
     form.bodyMode    = (cfg.body_mode === 'raw' || (form.bodyRaw.trim() !== '' && cfg.body_mode !== 'kv')) ? 'raw' : 'kv'
     form.timeout     = typeof opts.timeout === 'number' ? opts.timeout : Number(opts.timeout ?? 10) || 10
     form.successWhen = typeof opts.success_when === 'string' ? opts.success_when : '2xx'
+    form.successStatuses = Array.isArray(cfg.success_statuses) ? cfg.success_statuses.join(', ') : ''
+    form.strictMapping   = cfg.strict_mapping === true
 
     form.saveTo   = (cfg.save_to_variable && typeof cfg.save_to_variable === 'object')
         ? cfg.save_to_variable as Variable : null
@@ -182,6 +192,8 @@ function commit() {
         parameters,
         transport_options,
         body_mode:         form.transport === 'http' ? form.bodyMode : undefined,
+        success_statuses:  parseStatuses(form.successStatuses).length > 0 ? parseStatuses(form.successStatuses) : undefined,
+        strict_mapping:    form.strictMapping ? true : undefined,
         save_to_variable:  form.saveTo ?? undefined,
         result_mapping:    form.mappings
             .filter(m => m.from.trim() !== '' && m.to)
@@ -313,6 +325,7 @@ async function runTest() {
                 target:            cfg.target,
                 parameters:        cfg.parameters,
                 transport_options: cfg.transport_options,
+                success_statuses:  cfg.success_statuses,
             },
             sample,
         )
@@ -426,6 +439,11 @@ async function runTest() {
                         <option v-for="s in SUCCESS_WHEN" :key="s.value" :value="s.value">{{ s.label }}</option>
                     </select>
                     <p class="field-help">Determines which responses route to <em>success</em> vs <em>error</em>. Transport failures always go to <em>error</em>.</p>
+                </div>
+                <div class="config-field">
+                    <div class="field-label">Success statuses (optional)</div>
+                    <input class="field-input" placeholder="200, 3xx, 400-404" :value="form.successStatuses" @input="form.successStatuses = ($event.target as HTMLInputElement).value; commit()">
+                    <p class="field-help">Statuses that count as <em>success</em>: numbers, classes (<code>2xx</code>) or ranges (<code>200-299</code>). When set, it replaces “Success when”.</p>
                 </div>
             </AccordionSection>
         </template>
@@ -572,6 +590,10 @@ async function runTest() {
             </div>
             <button class="add-btn" @click="addMapping">+ Add mapping</button>
             <p class="field-help">Paths: <code>body.*</code>, <code>status</code>, <code>headers.*</code>, <code>metadata.*</code>. Missing path → empty.</p>
+            <label class="field-help" style="display:flex;gap:6px;align-items:center">
+                <input type="checkbox" :checked="form.strictMapping" @change="form.strictMapping = ($event.target as HTMLInputElement).checked; commit()">
+                Strict: a missing path on a successful call goes to <em>error</em> (<code>mapping_missing</code>) and writes no mapped variable.
+            </label>
         </AccordionSection>
 
         <AccordionSection title="Meta">

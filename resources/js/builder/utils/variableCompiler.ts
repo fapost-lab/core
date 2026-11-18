@@ -13,7 +13,7 @@
  * validator, so callers must explicitly drop the legacy key on save.
  */
 
-import type {Variable, VariableStorage, VariableType} from '@builder/dto/types'
+import {LIST_MAX_SIZE, LIST_MIN_SIZE, type Variable, type VariableStorage, type VariableType} from '@builder/dto/types'
 
 /** JSON shape persisted in `node.config.variable`. UI `type` is metadata. */
 export interface CompiledVariable {
@@ -21,8 +21,16 @@ export interface CompiledVariable {
     type:    VariableType
     storage: VariableStorage
     group:   string | null
-    /** Present only for list variables: { item_type } describing the element type. */
-    properties?: { item_type: VariableType }
+    /** Present only for list variables: the element type and, when set, how many elements a contact list keeps. */
+    properties?: { item_type: VariableType; max_size?: number }
+}
+
+/** A whole number within the backend's `max_size` bounds. */
+export function isValidListSize(value: unknown): value is number {
+    return typeof value === 'number'
+        && Number.isInteger(value)
+        && value >= LIST_MIN_SIZE
+        && value <= LIST_MAX_SIZE
 }
 
 /**
@@ -40,11 +48,16 @@ export function compileVariable(variable: Variable): CompiledVariable {
     }
 
     if (variable.isList) {
-        return {
-            ...base,
-            type:       'array',
-            properties: { item_type: variable.type === 'array' ? 'text' : variable.type },
+        const properties: NonNullable<CompiledVariable['properties']> = {
+            item_type: variable.type === 'array' ? 'text' : variable.type,
         }
+
+        // Only a contact list keeps a registry max_size; the backend rejects it on a session list.
+        if (variable.storage === 'contact' && isValidListSize(variable.maxSize)) {
+            properties.max_size = variable.maxSize
+        }
+
+        return { ...base, type: 'array', properties }
     }
 
     return base
@@ -69,7 +82,9 @@ export function decodeStoredVariable(
             ? (props.item_type as VariableType)
             : 'text'
 
-        return { name, type: itemType, storage, group: storage === 'contact' ? group : null, isList: true }
+        const maxSize = props && isValidListSize(props.max_size) ? props.max_size : null
+
+        return { name, type: itemType, storage, group: storage === 'contact' ? group : null, isList: true, maxSize }
     }
 
     return { name, type: rawType, storage, group: storage === 'contact' ? group : null, isList: false }

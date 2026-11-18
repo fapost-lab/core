@@ -37,14 +37,23 @@ final class OperandResolverLengthTest extends TestCase
         $this->assertSame(0, $value);
     }
 
-    public function test_length_accessor_ignored_when_parent_is_not_an_array(): void
+    public function test_length_accessor_counts_the_characters_of_a_text(): void
     {
         $resolver = $this->makeResolver();
-        $state    = ['contact' => ['name' => 'Ada']];
+        $state    = ['contact' => ['name' => 'Адам']];
 
         $value = $resolver->resolveLegacyPath('contact.name.length', $state, $this->context());
 
-        $this->assertNull($value);
+        $this->assertSame(4, $value);
+    }
+
+    public function test_length_accessor_is_zero_for_a_missing_value_and_a_non_text_scalar(): void
+    {
+        $resolver = $this->makeResolver();
+        $state    = ['flow' => ['count' => 7]];
+
+        $this->assertSame(0, $resolver->resolveLegacyPath('flow.missing.length', $state, $this->context()));
+        $this->assertSame(0, $resolver->resolveLegacyPath('flow.count.length', $state, $this->context()));
     }
 
     public function test_real_length_key_wins_over_pseudo_accessor(): void
@@ -68,6 +77,28 @@ final class OperandResolverLengthTest extends TestCase
 
         $this->expectException(InvalidNodeConfigException::class);
         $resolver->resolveLegacyPath('ghost.x', $state, $this->context());
+    }
+
+    public function test_the_parent_of_a_contact_length_path_is_read_through_the_state_reader(): void
+    {
+        $reader = new class () implements \Fapost\Foundation\Flow\Contracts\ScopedStateReaderInterface {
+            public function read(string $path): mixed
+            {
+                return 'contact.photos' === $path ? ['a', 'b'] : null;
+            }
+        };
+        $context = new NodeExecutionContext(
+            tenantId: 't',
+            contactId: 'c',
+            sessionId: 's',
+            nodeId: 'n',
+            idempotencyKey: 'k',
+            platform: 'test',
+            stateReader: $reader,
+        );
+
+        // The engine's state array holds no `contact.*`: without the reader this would be 0.
+        $this->assertSame(2, $this->makeResolver()->resolveLegacyPath('contact.photos.length', ['flow' => []], $context));
     }
 
     private function makeResolver(?StateNamespaceRegistry $namespaces = null): OperandResolver

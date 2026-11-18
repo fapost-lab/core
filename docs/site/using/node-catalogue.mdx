@@ -155,6 +155,12 @@ condition no block inside the loop changes gets a warning: it may run until the
 platform's iteration limit stops it. The warning does not block publishing, since
 the value can change from outside the flow.
 
+To collect values across passes, turn on **Store as list** on the variable a block
+saves. A list saved to the contact keeps its last 100 items by default; change
+that under **Keep last** (1 to 1000). A list saved as a temporary variable is not
+capped. Read the size of a list, or the length of a text, in any message or
+condition as `{{contact.photos.length}}`; it is `0` when there is nothing yet.
+
 ### Subflow
 
 Runs another flow, and **pauses this one until it finishes**.
@@ -176,6 +182,11 @@ optional lists move values between them:
 
 Names are variable names without the `flow.` prefix. Publishing refuses a name that
 is not a valid variable name.
+
+By default the subflow runs the flow's active version, so republishing the child
+changes what every parent runs. To keep a parent on a tested version, enter its
+number in **Pinned version**: that version keeps running after the child is
+republished. Publishing refuses a version the child never published.
 
 ### Template
 
@@ -246,6 +257,16 @@ Calls another system — an HTTP endpoint, or an internal action.
 It reports whether the call succeeded, so the flow can respond to a failure
 rather than pretending it did not happen. Failed calls are retried before the
 failure outcome is taken; how many times is a tenant setting.
+
+By default an HTTP response counts as a success when its status is 2xx. **Success
+statuses** (for example `200, 409, 3xx, 400-404`) replaces that rule: a listed status takes
+the success outcome and an unlisted one the failure outcome. The **Test call** applies the
+same rule.
+
+Field mapping writes `null` for a path the response does not contain. With **Strict**
+switched on, a successful call whose response lacks a mapped path takes the failure outcome
+instead, with `error_code = mapping_missing` (the flow log shows `mapping_missing: <paths>`),
+and none of the mapped variables is written.
 
 Each run of the block counts against the tenant's call executions for the
 period, and so does every **Test call** in the builder. When they are used up the

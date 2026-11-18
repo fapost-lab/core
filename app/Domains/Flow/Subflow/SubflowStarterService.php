@@ -10,6 +10,7 @@ use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
+use App\Domains\Flow\Exceptions\SubflowPinnedVersionMissingException;
 use App\Domains\Flow\Exceptions\SubflowTargetInactiveException;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\Models\FlowSession;
@@ -23,7 +24,7 @@ use Illuminate\Database\ConnectionInterface;
 /**
  * Builds out the subflow lifecycle when a {@code subflow} node executes.
  *
- *  • Resolves {@code flow_id} to the latest active flow_definition.
+ *  • Resolves {@code flow_id} to the latest active flow_definition, or to the pinned version when the node has one.
  *  • Inserts a child flow_session linked to the parent, inheriting tenant /
  *    contact / assistant identity, run kind and trigger.
  *  • Pauses the parent (status=paused_subflow), extending its expires_at
@@ -66,7 +67,10 @@ final readonly class SubflowStarterService
      * @param  array<string, mixed>  $input  The child's starting session variables (`flow.<name>`), from the node's
      *                                       `input_mapping`; empty for a node without one.
      *
+     * @param  int|null  $pinnedVersion  The child's version the node is pinned to; null runs its latest active one.
+     *
      * @throws SubflowTargetInactiveException  If the target flow has no active definition.
+     * @throws SubflowPinnedVersionMissingException  If the pinned version does not exist for the target flow.
      */
     public function start(
         FlowSession $parent,
@@ -74,13 +78,24 @@ final readonly class SubflowStarterService
         DateInterval $timeout,
         string $subflowNodeId,
         array $input = [],
+        ?int $pinnedVersion = null,
     ): FlowSession {
-        $definition = $this->definitions->findLatestActiveByFlowId($childFlowId);
+        if (null !== $pinnedVersion) {
+            $definition = $this->definitions->findRunnableByFlowIdAndVersion($childFlowId, $pinnedVersion);
 
-        if (null === $definition) {
-            throw new SubflowTargetInactiveException(
-                "Subflow target '{$childFlowId}' has no active flow_definition for tenant.",
-            );
+            if (null === $definition) {
+                throw new SubflowPinnedVersionMissingException(
+                    "Subflow target '{$childFlowId}' has no published version {$pinnedVersion}.",
+                );
+            }
+        } else {
+            $definition = $this->definitions->findLatestActiveByFlowId($childFlowId);
+
+            if (null === $definition) {
+                throw new SubflowTargetInactiveException(
+                    "Subflow target '{$childFlowId}' has no active flow_definition for tenant.",
+                );
+            }
         }
 
         $now             = now();
