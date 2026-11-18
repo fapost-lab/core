@@ -391,14 +391,14 @@ final class SubflowLifecycleTest extends FeatureTestCase
         $childFlowId = (string) Str::uuid();
         $this->createDefinition(
             flowId: $childFlowId,
-            nodes: [['id' => 'c-boom', 'type' => 'throwing_test', 'version' => 1, 'config' => []]],
+            nodes: [['id' => 'c-boom', 'type' => 'throwing_test', 'version' => 1, 'config' => ['message' => 'child-boom']]],
             edges: [],
         );
         $parentDefinition = $this->createDefinition(
             flowId: (string) Str::uuid(),
             nodes: [
                 ['id' => 'p-sub',  'type' => 'subflow',      'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H']],
-                ['id' => 'p-boom', 'type' => 'throwing_test', 'version' => 1, 'config' => []],
+                ['id' => 'p-boom', 'type' => 'throwing_test', 'version' => 1, 'config' => ['message' => 'parent-boom']],
             ],
             edges: [['id' => 'p-e1', 'from' => 'p-sub', 'to' => 'p-boom', 'handle' => 'failed']],
         );
@@ -407,7 +407,7 @@ final class SubflowLifecycleTest extends FeatureTestCase
             $this->app->make(FlowEngineInterface::class)->start($parentDefinition, $this->contact);
             $this->fail('The parent\'s own exception must surface.');
         } catch (RuntimeException $exception) {
-            $this->assertSame('boom', $exception->getMessage());
+            $this->assertSame('parent-boom', $exception->getMessage());
             $this->assertNotInstanceOf(FlowConcurrencyException::class, $exception);
         }
 
@@ -418,6 +418,45 @@ final class SubflowLifecycleTest extends FeatureTestCase
 
         $this->assertSame(FlowSessionStatus::Failed, $parent->status);
         $this->assertSame(1, FlowSession::query()->where('parent_session_id', $parent->getKey())->count());
+    }
+
+    public function test_a_middle_session_that_runs_off_its_graph_hands_the_outer_parent_the_success_exit(): void
+    {
+        $leafFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $leafFlowId,
+            nodes: [['id' => 'c-fail', 'type' => 'failed_result_test', 'version' => 1, 'config' => []]],
+            edges: [],
+        );
+        // The middle flow has no `failed` edge on its subflow node, so it runs off its graph.
+        $middleFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $middleFlowId,
+            nodes: [['id' => 'b-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $leafFlowId, 'timeout' => 'PT1H']]],
+            edges: [],
+        );
+        $outerDefinition = $this->createDefinition(
+            flowId: (string) Str::uuid(),
+            nodes: [
+                ['id' => 'a-sub', 'type' => 'subflow',     'version' => 1, 'config' => ['flow_id' => $middleFlowId, 'timeout' => 'PT1H']],
+                ['id' => 'a-ok',  'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'outer-resumed']],
+                ['id' => 'a-end', 'type' => 'end',         'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'a-e1', 'from' => 'a-sub', 'to' => 'a-ok',  'handle' => 'success'],
+                ['id' => 'a-e2', 'from' => 'a-ok',  'to' => 'a-end', 'handle' => 'default'],
+            ],
+        );
+
+        $this->app->make(FlowEngineInterface::class)->start($outerDefinition, $this->contact);
+
+        $outer = FlowSession::query()
+            ->where('contact_id', $this->contact->getKey())
+            ->whereNull('parent_session_id')
+            ->sole();
+
+        $this->assertSame(FlowSessionStatus::Ended, $outer->status);
+        $this->assertSame('outer-resumed', $outer->state['flow']['marker'] ?? null);
     }
 
     /**
@@ -604,6 +643,8 @@ final class ThrowingTestHandler implements NodeHandlerInterface
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        throw new RuntimeException('boom');
+        $message = $nodeConfig['config']['message'] ?? 'boom';
+
+        throw new RuntimeException(is_string($message) ? $message : 'boom');
     }
 }

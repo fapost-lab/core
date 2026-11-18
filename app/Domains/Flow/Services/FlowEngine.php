@@ -230,6 +230,10 @@ final readonly class FlowEngine implements FlowEngineInterface
 
         if (null !== $nextNodeId) {
             $this->executeLoop($definition, $parent, null, $contact);
+        } else {
+            // No edge for that handle: the parent just ran off its graph. When it is itself a child, its own
+            // parent must not keep waiting for it (a plain finish, as for any session that runs off its graph).
+            $this->subflowResumer->resumeIfChild($parent, EndStatus::Success->value);
         }
 
         $parent->refresh();

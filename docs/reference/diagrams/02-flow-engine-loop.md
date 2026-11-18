@@ -71,7 +71,7 @@ flowchart TD
 
     LOG[Write flow log, non-fatal] --> RESUME_PARENT
 
-    RESUME_PARENT[end node, or no end node (completed: success,<br/>failed: failed): SubflowResumerInterface<br/>.resumeIfChild] --> STOP
+    RESUME_PARENT["end node, or no end node (completed: success,<br/>failed: failed): SubflowResumerInterface<br/>.resumeIfChild"] --> STOP
 
     STOP{status Waiting, Delayed,<br/>Failed or Finished,<br/>or no next node?}
     STOP -- yes --> STOPPED([stop, session is parked or finished])
