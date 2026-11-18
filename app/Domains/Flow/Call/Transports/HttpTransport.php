@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Call\Transports;
 
 use App\Domains\Flow\Call\CallAttempt;
+use App\Domains\Flow\Call\CallSuccessStatuses;
 use App\Domains\Flow\Call\Egress\EgressDeniedException;
 use App\Domains\Flow\Call\Egress\GuardedHttpClient;
 use Fapost\Foundation\Flow\Call\CallContext;
@@ -135,9 +136,7 @@ final readonly class HttpTransport implements CallTransportInterface
         $isSuccess  = $this->matchesSuccessPolicy($statusCode, $successWhen);
 
         if (! $isSuccess) {
-            $code = $statusCode >= 500 ? 'http_5xx' : ($statusCode >= 400 ? 'http_4xx' : 'http_other');
-
-            return CallResult::error($code, $payload, $metadata);
+            return CallResult::error(CallSuccessStatuses::errorCodeFor($statusCode), $payload, $metadata);
         }
 
         return CallResult::ok($payload, $metadata);

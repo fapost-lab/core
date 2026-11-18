@@ -74,7 +74,7 @@ Registered in `FlowServiceProvider` through `CallTransportRegistry`.
   `success_when`, `body_raw` (a pre-built JSON string that wins over `body.*`).
 - The `Idempotency-Key` header is set from `CallContext::$idempotencyKey`, and `X-FaPost-Attempt-Number` from `options.attempt_number`, unless the caller supplied one.
 - Response parsing: JSON when the `Content-Type` is JSON, otherwise raw text.
-- The success boundary is `options.success_when`: `2xx` (default), `any_response`, `2xx_or_4xx`.
+- The success boundary is `options.success_when`: `2xx` (default), `any_response`, `2xx_or_4xx`. The node's own `success_statuses` (see `nodes/06-call.md`) overrides it, for any transport.
   Transport-level failures (DNS, timeout, TLS) are always errors with code `transport_failure`.
 - Error codes: `invalid_target`, `invalid_method`, `egress_denied`, `transport_failure`, `http_4xx`,
   `http_5xx`, `http_other`.

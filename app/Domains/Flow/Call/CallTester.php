@@ -141,6 +141,13 @@ final readonly class CallTester
             ];
         }
 
+        // The same verdict the node gives, so the builder shows what the flow will do.
+        $statuses = CallSuccessStatuses::fromConfig($config['success_statuses'] ?? null);
+
+        if ($statuses instanceof CallSuccessStatuses) {
+            $result = $statuses->judge($result);
+        }
+
         return [
             'success'     => $result->success,
             'status_code' => is_int($result->metadata['status_code'] ?? null) ? $result->metadata['status_code'] : null,
