@@ -11,6 +11,7 @@ use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Fapost\Foundation\Media\Enums\MediaKind;
+use GuzzleHttp\Psr7\NoSeekStream;
 use GuzzleHttp\Psr7\Utils;
 use Illuminate\Http\UploadedFile;
 use Tests\Feature\FeatureTestCase;
@@ -93,5 +94,24 @@ final class MediaUploaderTest extends FeatureTestCase
         );
 
         $this->assertSame(8, $media->blob->size);
+    }
+
+    /**
+     * A channel downloader may hand over the body of a streamed HTTP response, which cannot be rewound; the contract
+     * of DownloadResult does not ask for a seekable stream.
+     */
+    public function test_stores_a_stream_that_cannot_be_rewound(): void
+    {
+        $stream = new NoSeekStream(Utils::streamFor('streamed body'));
+
+        $media = $this->app->make(MediaUploaderInterface::class)->storeFromStream(
+            stream: $stream,
+            mimeType: 'text/plain',
+            originalFilename: 'streamed.txt',
+            folder: null,
+            source: MediaSource::Conversation,
+        );
+
+        $this->assertSame(13, $media->blob->size);
     }
 }

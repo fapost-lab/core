@@ -31,7 +31,6 @@ its results without sharing session variables, against a pinned version of the c
 
 - [ ] Subflow `input_mapping` / `output_mapping`
 - [ ] Subflow pinned to a target version
-- [ ] `emit_event` `assistant_filter` on event triggers
 - [ ] Design-time leaf-vs-group variable path check
 
 - [ ] `subflow-orphan-parents` — A subflow parent never stays `paused_subflow` without a live child — any end of the child returns control to the parent, and the sweeper does not count a live child as dead
@@ -44,13 +43,12 @@ engine, and a Solution can register a bot command.
 - [ ] Per-tenant expression engine: setting, boot validation, snapshot at save (ADR-08)
 - [ ] Commands and command action types registered by a Solution (ADR-09) (after: spec `solution-activation-lifecycle` — registration needs the Core registrar)
 - [ ] `auth_request` by phone, SMS and email
-- [ ] fog: `notify` staff identity on a messenger and targeting by tag — no rollout has described the need yet
 
 ## Waves
 
 1. Publish-time loop checks: iterator-vs-session variable conflict, unchanging while condition, static numeric count; Outbound idempotency for `call`: `attempt_number` and Redis dedup with a TTL above queue retention; Subflow `input_mapping` / `output_mapping`
 2. Loop-aware iteration budget instead of the shared `max_iterations = 100`; `call` retry with backoff; Subflow pinned to a target version
-3. `{{x.length}}` in templates and a `max_size` editor in the builder; `call` `strict_mapping` and generic `success_statuses`; `emit_event` `assistant_filter` on event triggers; Design-time leaf-vs-group variable path check
+3. `{{x.length}}` in templates and a `max_size` editor in the builder; `call` `strict_mapping` and generic `success_statuses`; Design-time leaf-vs-group variable path check
 4. Per-tenant expression engine: setting, boot validation, snapshot at save (ADR-08); `auth_request` by phone, SMS and email
 5. Commands and command action types registered by a Solution (ADR-09)
 

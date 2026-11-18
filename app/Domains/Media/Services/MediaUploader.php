@@ -270,7 +270,10 @@ final class MediaUploader implements MediaUploaderInterface
             throw MediaUploadFailedException::storageFailed('Cannot allocate temp resource for stream copy.');
         }
 
-        $stream->rewind();
+        // A channel downloader may hand over a streamed HTTP body, which cannot be rewound and is read from its start.
+        if ($stream->isSeekable()) {
+            $stream->rewind();
+        }
 
         while (! $stream->eof()) {
             $chunk = $stream->read(1024 * 256);
