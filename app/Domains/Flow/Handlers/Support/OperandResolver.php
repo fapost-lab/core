@@ -8,6 +8,7 @@ use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Exceptions\UnknownDataAccessorNamespacePrefixException;
+use App\Domains\Flow\Expression\PathLength;
 use App\Domains\Flow\State\Variables\Variable;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
@@ -99,7 +100,7 @@ final class OperandResolver
         $namespace = explode('.', $path, 2)[0];
 
         if (str_contains($path, '.') && ('contact' === $namespace || $this->namespaces->has($namespace))) {
-            return $this->resolveWithLength($state, $path);
+            return $this->resolveWithLength($state, $path, $context);
         }
 
         throw new InvalidNodeConfigException("operand: unsupported namespace in path '{$path}'");
@@ -111,23 +112,33 @@ final class OperandResolver
      * count so conditions can compare array size (e.g. "photos.length >= 5").
      *
      * A real state key literally named `length` still wins when it exists; the
-     * pseudo-accessor only kicks in when `data_get` finds nothing and the parent
-     * value is a countable array.
+     * pseudo-accessor only kicks in when `data_get` finds nothing. The result is
+     * the same as in templates (see {@see PathLength}): list count, text
+     * characters, 0 for a missing value or any other scalar.
      *
      * @param  array<string, mixed>  $state
      */
-    private function resolveWithLength(array $state, string $path): mixed
+    private function resolveWithLength(array $state, string $path, NodeExecutionContext $context): mixed
     {
         $value = data_get($state, $path);
 
-        if (null !== $value || ! str_ends_with($path, '.length')) {
+        if (null !== $value) {
             return $value;
         }
 
-        $parent      = mb_substr($path, 0, -mb_strlen('.length'));
-        $parentValue = data_get($state, $parent);
+        $parent = PathLength::parentPath($path);
 
-        return is_array($parentValue) ? count($parentValue) : $value;
+        if (null === $parent) {
+            return null;
+        }
+
+        // The engine's state holds no `contact.*`: the reader is the one path to it (a context built without the
+        // engine, as in legacy unit tests, falls back to the state array).
+        $parentValue = null !== $context->stateReader
+            ? $context->stateReader->read($parent)
+            : data_get($state, $parent);
+
+        return PathLength::of($parentValue);
     }
 
     /**

@@ -55,6 +55,10 @@ placeholders**:
 
 A plain string without placeholders is a literal. A pure placeholder yields the value at that path.
 
+A path ending in `.length` is the size of the value before it: the element count of a list or the number of
+characters of a text, and `0` for a missing value or any other scalar (`{{contact.photos.length}}`). A real state
+key named `length` wins. Conditions read `.length` the same way.
+
 Evaluation is a pluggable strategy behind `ExpressionEngineInterface`. The engine is chosen per flow
 definition: the engine id is stored in `flow_definitions.expression_engine` (default `template`,
 `TemplateEngine::ID`) and the runtime falls back to `template` when the stored id is empty or not

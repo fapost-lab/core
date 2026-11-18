@@ -43,7 +43,9 @@ import StorageRadio from './StorageRadio.vue'
 import GroupSelect from './GroupSelect.vue'
 import NameSelect from './NameSelect.vue'
 import { useFlowVariables } from '@builder/composables/useFlowVariables'
+import { LIST_DEFAULT_SIZE, LIST_MAX_SIZE, LIST_MIN_SIZE } from '@builder/dto/types'
 import type { Variable, VariableStorage, VariableType } from '@builder/dto/types'
+import { isValidListSize } from '@builder/utils/variableCompiler'
 
 const props = withDefaults(defineProps<{
     modelValue:   Variable | null
@@ -102,6 +104,8 @@ function normalize(input: Variable | null): Variable {
         storage: base.storage === 'session' ? 'session' : 'contact',
         group:   typeof base.group === 'string' && base.group !== '' ? base.group : null,
         isList:  base.isList === true,
+        // Kept even when out of range so the error stays visible; the compiler drops an invalid value.
+        maxSize: typeof base.maxSize === 'number' && Number.isFinite(base.maxSize) ? base.maxSize : null,
     }
 }
 
@@ -200,6 +204,7 @@ function emitUpdate() {
         storage: state.value.storage,
         group:   state.value.storage === 'contact' ? state.value.group : null,
         isList:  state.value.isList === true,
+        maxSize: state.value.maxSize ?? null,
     }
     emit('update:modelValue', snapshot)
 }
@@ -234,6 +239,26 @@ function onTypeChange(event: Event) {
 
 function onListChange(event: Event) {
     state.value.isList = (event.target as HTMLInputElement).checked
+    emitUpdate()
+}
+
+// Shown for a contact list only: the registry applies max_size to contact lists, a session list is not capped.
+const maxSizeVisible = computed<boolean>(
+    () => state.value.isList === true && state.value.storage === 'contact',
+)
+
+const maxSizeError = computed<string | null>(() => {
+    const value = state.value.maxSize
+    if (value === null || value === undefined || isValidListSize(value)) {
+        return null
+    }
+    return `Whole number from ${LIST_MIN_SIZE} to ${LIST_MAX_SIZE}`
+})
+
+function onMaxSizeInput(event: Event) {
+    const raw = (event.target as HTMLInputElement).value.trim()
+    // Empty means "platform default"; an invalid number is kept so the error shows and the compiler drops it.
+    state.value.maxSize = raw === '' ? null : Number(raw)
     emitUpdate()
 }
 
@@ -318,6 +343,26 @@ function onGroupCreate(name: string) {
                         >
                         <span>Store as list (append each value)</span>
                     </label>
+                </div>
+            </div>
+
+            <div v-if="maxSizeVisible" class="vse-row">
+                <label class="vse-label">Keep last:</label>
+                <div class="vse-control">
+                    <input
+                        class="vse-input"
+                        :class="{ 'vse-input--error': maxSizeError }"
+                        type="number"
+                        inputmode="numeric"
+                        step="1"
+                        :min="LIST_MIN_SIZE"
+                        :max="LIST_MAX_SIZE"
+                        :value="state.maxSize ?? ''"
+                        :placeholder="String(LIST_DEFAULT_SIZE)"
+                        @input="onMaxSizeInput"
+                    >
+                    <div v-if="maxSizeError" class="vse-error">{{ maxSizeError }}</div>
+                    <div v-else class="vse-hint">Items kept in the list; the oldest drops out. Empty = {{ LIST_DEFAULT_SIZE }}.</div>
                 </div>
             </div>
 

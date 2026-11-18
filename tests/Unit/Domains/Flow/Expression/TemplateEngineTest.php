@@ -45,6 +45,43 @@ final class TemplateEngineTest extends TestCase
         );
     }
 
+    public function test_length_renders_the_count_of_a_list_and_the_characters_of_a_text(): void
+    {
+        $engine  = new TemplateEngine();
+        $context = $this->context([
+            'contact.photos' => ['a', 'b', 'c'],
+            'flow.name'      => 'Иван',
+        ]);
+
+        $this->assertSame('3 photos, 4 letters', $engine->evaluate('{{contact.photos.length}} photos, {{flow.name.length}} letters', $context));
+    }
+
+    public function test_length_of_missing_empty_and_scalar_values_is_zero(): void
+    {
+        $engine  = new TemplateEngine();
+        $context = $this->context(['flow.empty' => [], 'flow.count' => 42, 'flow.flag' => true]);
+
+        $this->assertSame(
+            '0 0 0 0',
+            $engine->evaluate('{{flow.empty.length}} {{flow.missing.length}} {{flow.count.length}} {{flow.flag.length}}', $context),
+        );
+    }
+
+    public function test_a_real_length_key_wins_over_the_accessor(): void
+    {
+        $engine  = new TemplateEngine();
+        $context = $this->context(['flow.photos.length' => 'explicit', 'flow.photos' => ['a']]);
+
+        $this->assertSame('explicit', $engine->evaluate('{{flow.photos.length}}', $context));
+    }
+
+    public function test_a_bare_namespace_length_is_not_an_accessor(): void
+    {
+        $engine = new TemplateEngine();
+
+        $this->assertSame('', $engine->evaluate('{{contact.length}}', $this->context(['contact' => ['a', 'b']])));
+    }
+
     public function test_evaluate_returns_input_unchanged_when_no_placeholders(): void
     {
         $engine = new TemplateEngine();

@@ -40,6 +40,14 @@ final readonly class Variable
         'meta',
     ];
 
+    /** How many elements a contact list keeps when its `max_size` property is absent. */
+    public const int LIST_DEFAULT_SIZE = 100;
+
+    /** Bounds of a list variable's `max_size` property. */
+    public const int LIST_MIN_SIZE = 1;
+
+    public const int LIST_MAX_SIZE = 1000;
+
     /** Variable / group identifier pattern (alphanumeric + underscore, must not start with digit). */
     private const string IDENTIFIER_REGEX = '/^[A-Za-z_][A-Za-z0-9_]*$/';
 

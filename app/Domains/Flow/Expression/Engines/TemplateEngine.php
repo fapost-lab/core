@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Expression\Engines;
 
+use App\Domains\Flow\Expression\PathLength;
 use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
 use Fapost\Foundation\Flow\Contracts\ExpressionSyntaxException;
 use Fapost\Foundation\Flow\DTO\ExpressionContext;
@@ -17,6 +18,9 @@ use Fapost\Foundation\Flow\DTO\ExpressionContext;
  * needs (greeting messages, prompts, simple parameter assembly) without paying
  * the cost of a full expression DSL. More expressive engines (Symfony EL, Twig,
  * custom plugin DSLs) are added by registering additional implementations.
+ *
+ * A path ending in {@code .length} renders the element count of a list or the character count of a text
+ * ({@code {{contact.photos.length}}}); see {@see PathLength}.
  *
  * Behaviour for unknown paths: substitutes empty string (graceful). Engines
  * that prefer fail-loud semantics should be implemented separately.
@@ -50,7 +54,7 @@ final class TemplateEngine implements ExpressionEngineInterface
             function (array $match) use ($context): string {
                 $path = (string) ($match[1] ?? '');
 
-                return $this->stringify($context->read($path));
+                return $this->stringify($this->read($path, $context));
             },
             $source
         );
@@ -89,6 +93,19 @@ final class TemplateEngine implements ExpressionEngineInterface
         $paths = array_values(array_unique($matches[1]));
 
         return $paths;
+    }
+
+    private function read(string $path, ExpressionContext $context): mixed
+    {
+        $value = $context->read($path);
+
+        if (null !== $value) {
+            return $value;
+        }
+
+        $parent = PathLength::parentPath($path);
+
+        return null === $parent ? null : PathLength::of($context->read($parent));
     }
 
     private function stringify(mixed $value): string

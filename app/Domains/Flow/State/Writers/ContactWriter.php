@@ -10,6 +10,7 @@ use App\Domains\Flow\History\HistoryWriterInterface;
 use App\Domains\Flow\State\Exceptions\ContactlessSessionException;
 use App\Domains\Flow\State\Exceptions\ReservedContactPathException;
 use App\Domains\Flow\State\Exceptions\StructuralPathConflictException;
+use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableType;
 use Closure;
 use Fapost\Foundation\Flow\Contracts\ContactWriterInterface;
@@ -212,18 +213,18 @@ final readonly class ContactWriter implements ContactWriterInterface
         return $array;
     }
 
-    /** Resolve max_size from the schema registry; default 100 when unknown. */
+    /** Resolve max_size from the schema registry; default 100 when unknown, clamped to the publish bounds. */
     private function resolveMaxSize(?string $group, string $name): int
     {
         if (null === $this->schemaRegistryResolver) {
-            return 100;
+            return Variable::LIST_DEFAULT_SIZE;
         }
 
         $properties = ($this->schemaRegistryResolver)()->getProperties('contact', $group, $name);
 
         return isset($properties['max_size']) && is_int($properties['max_size'])
-            ? $properties['max_size']
-            : 100;
+            ? max(Variable::LIST_MIN_SIZE, min(Variable::LIST_MAX_SIZE, $properties['max_size']))
+            : Variable::LIST_DEFAULT_SIZE;
     }
 
     /**

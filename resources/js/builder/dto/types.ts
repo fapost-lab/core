@@ -156,7 +156,17 @@ export interface Variable {
      * Compiles to backend `type: 'array'` + `properties.item_type = type`.
      */
     isList?: boolean
+    /**
+     * List variables saved to the contact only: how many elements the list keeps before the oldest drops out.
+     * Absent means the platform default. Compiles to `properties.max_size`.
+     */
+    maxSize?: number | null
 }
+
+/** Bounds of a list's `max_size`, mirrored from the backend (`Variable::LIST_*_SIZE`). */
+export const LIST_DEFAULT_SIZE = 100
+export const LIST_MIN_SIZE = 1
+export const LIST_MAX_SIZE = 1000
 
 export type ActiveTab = 'builder' | 'content'
 

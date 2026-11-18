@@ -18,6 +18,7 @@ interface Variable {
     storage: 'contact' | 'session'  // default: 'contact'
     group:   string | null          // null = root; always null for 'session'
     isList?: boolean                // when true, `type` is the array's item type
+    maxSize?: number | null         // contact lists only: items kept ("Keep last"), 1..1000, null = 100
 }
 
 defineProps<{
@@ -47,6 +48,7 @@ expressed with the `isList` checkbox). Nodes that need a narrower list pass `typ
 - **Group** is visible only when `storage === 'contact'`; switching to `session` clears it (`group: null`
   in the emitted value). The dropdown offers existing groups and an inline "Create new group" field
   (no modal).
+- "Keep last" (`maxSize`) shows only for a list saved to the contact; a value outside 1..1000 or not a whole number shows an inline error and is dropped by the compiler.
 - Validation is inline and does not block emitting; the parent decides what to do with an invalid value.
 
 | Field | Rule | Message |
