@@ -16,7 +16,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-18
 ---
 # Flow glossary
 
@@ -28,9 +28,11 @@ per flow. Informal synonyms: published flow, version.
 
 ## Flow session
 
-One execution of a flow definition for a contact. It snapshots `flow_definition_id`, and holds
+One execution of a flow definition, usually for a contact. It snapshots `flow_definition_id`, and holds
 `current_node_id` (the only navigation pointer), the `state` jsonb, a status, and an
-optimistic-lock `version`. Informal synonyms: run, conversation (avoid — that is a Conversation
+optimistic-lock `version`. `run_kind` says what started it — `conversation` or `automation` — and
+`trigger_id` which trigger; an automation may have no contact and no assistant (a contactless run,
+`adr-20261118-contactless-runs-in-flow-sessions`). Informal synonyms: run, conversation (avoid — that is a Conversation
 term).
 
 ## Node
@@ -65,7 +67,8 @@ it: `system.sent_messages`, `system.set_tag.<node>`, `system.staff_notified.*`, 
 ## Session lock
 
 A Redis lock `session_lock:<tenant>:<contact>:<assistant>` with a heartbeat, taken through
-`FlowExecutionGuard` so one contact's session runs on one worker at a time.
+`FlowExecutionGuard` so one contact's session runs on one worker at a time. `LockScope` refuses an
+empty contact (`ContactlessSessionException`): a contactless run has no session lock yet.
 
 ## Routing decision
 

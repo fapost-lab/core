@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Models;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
@@ -16,8 +17,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property string              $id
  * @property string              $tenant_id
- * @property string              $assistant_id
- * @property string              $contact_id
+ * @property string|null         $assistant_id  null for a run without an assistant, or once its assistant was deleted
+ * @property string|null         $contact_id    null for a contactless run (always an automation)
+ * @property FlowRunKind         $run_kind
+ * @property string|null         $trigger_id    the trigger that fired the run; no foreign key
  * @property string              $flow_definition_id  FK to {@see FlowDefinition::$id} — immutable
  *           definition snapshot for this session (specific version row), not only logical
  *           {@see FlowDefinition::$flow_id}
@@ -32,8 +35,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession query()
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read Assistant      $assistant
- * @property-read Contact        $contact
+ * @property-read Assistant|null $assistant
+ * @property-read Contact|null   $contact
  * @property-read FlowDefinition $flowDefinition
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereAssistantId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereContactId($value)
@@ -66,11 +69,22 @@ final class FlowSession extends BaseModel
         'current_node_id',
         'state',
         'status',
+        'run_kind',
+        'trigger_id',
         'end_status',
         'parent_session_id',
         'parent_resume_node_id',
         'version',
         'expires_at',
+    ];
+
+    /**
+     * A row inserted without a run kind is a conversation, as the column default says.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'run_kind' => 'conversation',
     ];
 
     /**
@@ -152,6 +166,7 @@ final class FlowSession extends BaseModel
         return [
             'state'      => 'array',
             'status'     => FlowSessionStatus::class,
+            'run_kind'   => FlowRunKind::class,
             'version'    => 'integer',
             'expires_at' => 'datetime',
         ];
