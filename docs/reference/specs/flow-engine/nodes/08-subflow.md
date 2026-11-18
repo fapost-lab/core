@@ -27,7 +27,8 @@ Calls another flow and pauses the parent until the child finishes.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `flow_id` | string | yes | Logical flow id (**not** a flow definition id), a literal. Resolved to the **latest active** definition at runtime |
+| `flow_id` | string | yes | Logical flow id (**not** a flow definition id), a literal. Resolved to the **latest active** definition at runtime, or to `flow_version` when that is set |
+| `flow_version` | integer | no | Pins the node to one published version of the child (`flow_definitions.version`), active or superseded. Absent or empty runs the latest active definition |
 | `timeout` | string | yes | ISO 8601 duration (default `PT24H`). When it passes, the child is force-failed |
 | `input_mapping` | object | no | Child session variable name → expression over the parent's state. Sets the child's `flow.<name>` when it starts |
 | `output_mapping` | object | no | Parent session variable name → child session variable name. Copies the child's `flow.<name>` into the parent's on `success` |
@@ -36,7 +37,12 @@ Both mappings are optional and were reserved by ADR-11 for V1.1; adding them did
 version (an optional field with a no-op default). Without them the parent passes nothing and receives
 nothing back. Names on both sides are session variable names without the `flow.` prefix, checked like any
 session variable (`Variable`: an identifier, not a reserved name). Contact data (`contact.*`) is shared by
-parent and child anyway, so a mapping never targets it. Pinning a specific version is not supported.
+parent and child anyway, so a mapping never targets it.
+
+`flow_version` is a third optional field, added to `subflow@1` the same way. A pinned node keeps running the
+chosen version of the child when the child is republished (ADR-11 listed pinning as a possible V1.x
+addition). `SubflowPin` (`app/Domains/Flow/Subflow/`) reads it: a positive whole number, or empty for no pin.
+The builder offers it as a number field ("Pinned version"), empty meaning the active version.
 
 `SubflowMapping` (`app/Domains/Flow/Subflow/`) reads both fields.
 
@@ -83,12 +89,14 @@ rethrowing; what the parent's own resumed run throws propagates as the parent's 
    object, an invalid name or a non-string value throws `InvalidNodeConfigException` before any child is
    created.
 5. `SubflowStarterService::start()` (see below), with the evaluated values. If the target flow has no
-   active definition, the node returns `Failed` with `error_type = subflow_target_inactive`.
-6. Return `Waiting` with metadata `{flow_id, child_id, timeout}`.
+   active definition, the node returns `Failed` with `error_type = subflow_target_inactive`; if it is pinned
+   to a version that does not exist, `Failed` with `error_type = subflow_pinned_version_missing`.
+6. Return `Waiting` with metadata `{flow_id, child_id, timeout}` (plus `flow_version` when pinned).
 
 `SubflowStarterService::start()` (`app/Domains/Flow/Subflow/`):
 
-1. Resolve `flow_id` to the latest active `flow_definition`.
+1. Resolve `flow_id` to the latest active `flow_definition`, or, when the node has a `flow_version`, to that
+   version of the flow (`findRunnableByFlowIdAndVersion`: a flow, never a template, active or not).
 2. In one transaction: pause the parent first (`status = paused_subflow`) and, when the parent's
    `expires_at` is empty or earlier than the child's, set it to the child's `expires_at + 1h`; then
    create the child session with:
@@ -187,6 +195,9 @@ definitions stay in `flow_definitions`. Validation concerns only sessions that s
 
 - `subflow_missing_flow_id`, `subflow_template_in_flow_id`: `flow_id` must be a non-empty literal.
 - `subflow_invalid_timeout`: `timeout` must be an ISO 8601 duration.
+- `subflow_invalid_flow_version`: `flow_version` is set but is not a positive whole number.
+- `subflow_pinned_version_missing`: the target flow has no published version `flow_version` (looked up among
+  its flow definitions, so another flow's version number never satisfies the pin).
 - `subflow_invalid_input_mapping`, `subflow_invalid_output_mapping`: the field is not an object of name to
   value.
 - `subflow_invalid_input_name`, `subflow_invalid_output_name`: a key is not a valid session variable name
@@ -200,7 +211,7 @@ variable is not checked, since its latest active definition is resolved only whe
 - The call-graph and cross-assistant codes above.
 
 A missing target flow is not a publish error: an unknown callee has no edges, and a callee with no active
-definition surfaces at runtime as `subflow_target_inactive` (the `failed` handle).
+definition surfaces at runtime as `subflow_target_inactive`, which fails the node result (the parent session fails; the `failed` handle is for a child that ended failed).
 
 Save-draft does not validate; validate and publish do (see [../06-validation.md](../06-validation.md)).
 

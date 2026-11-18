@@ -89,7 +89,8 @@ broken.
   definitions cannot be deleted while sessions reference them (`restrictOnDelete`).
 - **A flow template never starts a session.** Every start path (default flow, trigger, global
   command, event job, subflow) loads its definition through
-  `FlowDefinitionRepositoryInterface::findLatestActiveByFlowId()`, which returns only `runnable()`
+  `FlowDefinitionRepositoryInterface::findLatestActiveByFlowId()` (a subflow node pinned to a version, through
+  `findRunnableByFlowIdAndVersion()`), which return only `runnable()`
   (`kind = flow`) definitions; a template has no trigger (refused on draft save) and is not offered
   by any flow picker. A template runs only as a copy inside the flows that place it, expanded at
   publish (`adr-20261111-flow-templates-expanded-at-publish`). Enforced:

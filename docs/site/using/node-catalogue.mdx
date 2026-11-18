@@ -177,6 +177,11 @@ optional lists move values between them:
 Names are variable names without the `flow.` prefix. Publishing refuses a name that
 is not a valid variable name.
 
+By default the subflow runs the flow's active version, so republishing the child
+changes what every parent runs. To keep a parent on a tested version, enter its
+number in **Pinned version**: that version keeps running after the child is
+republished. Publishing refuses a version the child never published.
+
 ### Template
 
 Places a [flow template](/using/flow-templates) in the flow as a single block.

@@ -15,8 +15,10 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Services\ValidateFlowService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use DateInterval;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
@@ -459,6 +461,148 @@ final class SubflowLifecycleTest extends FeatureTestCase
         $this->assertSame('outer-resumed', $outer->state['flow']['marker'] ?? null);
     }
 
+    public function test_a_pinned_subflow_runs_its_version_after_the_child_is_republished(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [['id' => 'c-mark', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'v1']]],
+            edges: [],
+            isActive: false,
+        );
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [['id' => 'c-mark', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'v2']]],
+            edges: [],
+            version: 2,
+        );
+
+        $pinned   = $this->runParentCalling($childFlowId, ['flow_version' => 1]);
+        $unpinned = $this->runParentCalling($childFlowId, []);
+
+        $this->assertSame(FlowSessionStatus::Ended, $pinned->status);
+        $this->assertSame(1, FlowSession::query()->where('parent_session_id', $pinned->getKey())->value('flow_version'));
+        $this->assertSame(2, FlowSession::query()->where('parent_session_id', $unpinned->getKey())->value('flow_version'));
+    }
+
+    public function test_a_subflow_pinned_to_a_missing_version_fails_the_parent_like_an_inactive_target(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(flowId: $childFlowId, nodes: [], edges: []);
+
+        $parent = $this->runParentCalling($childFlowId, ['flow_version' => 7]);
+
+        $this->assertSame(0, FlowSession::query()->where('parent_session_id', $parent->getKey())->count());
+        $this->assertSame(FlowSessionStatus::Failed, $parent->status);
+    }
+
+    public function test_the_starter_names_a_missing_pinned_version_apart_from_an_inactive_target(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [['id' => 'c-mark', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'v1']]],
+            edges: [],
+        );
+        $parent = $this->runParentCalling($childFlowId, []);
+
+        $starter = $this->app->make(\App\Domains\Flow\Subflow\SubflowStarterService::class);
+
+        $this->expectException(\App\Domains\Flow\Exceptions\SubflowPinnedVersionMissingException::class);
+        $starter->start($parent, $childFlowId, new DateInterval('PT1H'), 'p-sub', [], 9);
+    }
+
+    public function test_a_pin_never_resolves_to_a_template(): void
+    {
+        $templateFlowId = (string) Str::uuid();
+        FlowDefinition::query()->create([
+            'tenant_id' => $this->tenantId,
+            'flow_id'   => $templateFlowId,
+            'version'   => 1,
+            'kind'      => \App\Domains\Flow\Enums\FlowKind::Template->value,
+            'name'      => 'Template',
+            'nodes'     => [],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $parent = $this->runParentCalling($templateFlowId, ['flow_version' => 1]);
+
+        $this->assertSame(FlowSessionStatus::Failed, $parent->status);
+        $this->assertSame(0, FlowSession::query()->where('parent_session_id', $parent->getKey())->count());
+    }
+
+    public function test_a_pin_never_resolves_to_another_flows_version(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(flowId: $childFlowId, nodes: [], edges: []);
+        $this->createDefinition(flowId: (string) Str::uuid(), nodes: [], edges: [], version: 2);
+
+        $parent = $this->runParentCalling($childFlowId, ['flow_version' => 2]);
+
+        $this->assertSame(FlowSessionStatus::Failed, $parent->status);
+    }
+
+    public function test_validation_refuses_a_pin_to_a_version_the_target_never_published_and_malformed_pins(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(flowId: $childFlowId, nodes: [], edges: []);
+        $this->createDefinition(flowId: (string) Str::uuid(), nodes: [], edges: [], version: 2);
+
+        $codes = fn (mixed $pin): array => array_map(
+            static fn ($error): string => $error->code,
+            $this->app->make(ValidateFlowService::class)->execute(
+                nodes: [[
+                    'id'      => 'p-sub',
+                    'type'    => 'subflow',
+                    'version' => 1,
+                    'config'  => ['flow_id' => $childFlowId, 'timeout' => 'PT1H', 'flow_version' => $pin],
+                ]],
+                edges: [],
+                flowId: (string) Str::uuid(),
+            )->errors,
+        );
+
+        $this->assertNotContains('subflow_pinned_version_missing', $codes(1));
+        $this->assertNotContains('subflow_pinned_version_missing', $codes(null));
+        $this->assertNotContains('subflow_pinned_version_missing', $codes(''));
+        $this->assertContains('subflow_pinned_version_missing', $codes(2));
+        $this->assertContains('subflow_invalid_flow_version', $codes(0));
+        $this->assertContains('subflow_invalid_flow_version', $codes('latest'));
+    }
+
+    /**
+     * Starts a parent whose subflow node calls the given child with extra config; the parent marks each exit.
+     *
+     * @param  array<string, mixed>  $extraConfig
+     */
+    private function runParentCalling(string $childFlowId, array $extraConfig): FlowSession
+    {
+        $parentDefinition = $this->createDefinition(
+            flowId: (string) Str::uuid(),
+            nodes: [
+                ['id' => 'p-sub', 'type' => 'subflow',     'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H', ...$extraConfig]],
+                ['id' => 'p-ok',  'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'branch-success']],
+                ['id' => 'p-bad', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'branch-failed']],
+                ['id' => 'p-end', 'type' => 'end',         'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'p-e1', 'from' => 'p-sub', 'to' => 'p-ok',  'handle' => 'success'],
+                ['id' => 'p-e2', 'from' => 'p-sub', 'to' => 'p-bad', 'handle' => 'failed'],
+                ['id' => 'p-e3', 'from' => 'p-ok',  'to' => 'p-end', 'handle' => 'default'],
+                ['id' => 'p-e4', 'from' => 'p-bad', 'to' => 'p-end', 'handle' => 'default'],
+            ],
+        );
+
+        $this->app->make(FlowEngineInterface::class)->start($parentDefinition, $this->contact);
+
+        return FlowSession::query()
+            ->where('flow_definition_id', $parentDefinition->getKey())
+            ->whereNull('parent_session_id')
+            ->latest('created_at')
+            ->firstOrFail();
+    }
+
     /**
      * Starts a parent whose subflow node calls a child made of the given nodes; the parent has a marker on
      * each of its success / failed exits.
@@ -505,15 +649,17 @@ final class SubflowLifecycleTest extends FeatureTestCase
         array $nodes,
         array $edges,
         bool $loggingEnabled = false,
+        int $version = 1,
+        bool $isActive = true,
     ): FlowDefinition {
         return FlowDefinition::query()->create([
             'tenant_id'       => $this->tenantId,
             'flow_id'         => $flowId,
-            'version'         => 1,
+            'version'         => $version,
             'name'            => "Test {$flowId}",
             'nodes'           => $nodes,
             'edges'           => $edges,
-            'is_active'       => true,
+            'is_active'       => $isActive,
             'logging_enabled' => $loggingEnabled,
         ]);
     }

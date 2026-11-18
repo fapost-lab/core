@@ -19,5 +19,11 @@ interface FlowDefinitionRepositoryInterface
      */
     public function findLatestPublishedByFlowId(string $flowId): ?FlowDefinition;
 
+    /**
+     * One published version of a flow, active or superseded: what a subflow node pinned to a version runs. Never a
+     * template's, for the same reason as {@see findLatestActiveByFlowId()}.
+     */
+    public function findRunnableByFlowIdAndVersion(string $flowId, int $version): ?FlowDefinition;
+
     public function findById(string $id): FlowDefinition;
 }
