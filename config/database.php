@@ -99,6 +99,7 @@ return [
             'prefix_indexes' => true,
             'search_path'    => 'public',
             'sslmode'        => env('DB_SSLMODE', 'prefer'),
+            'timezone'       => 'UTC',
         ],
 
         'tenant' => [
@@ -112,6 +113,7 @@ return [
             'prefix'      => '',
             'search_path' => 'public',
             'sslmode'     => 'prefer',
+            'timezone'    => 'UTC',
         ],
 
         'landlord' => [
@@ -125,6 +127,7 @@ return [
             'prefix'   => '',
             'schema'   => 'public',
             'sslmode'  => 'prefer',
+            'timezone' => 'UTC',
         ],
 
         'sqlsrv' => [
