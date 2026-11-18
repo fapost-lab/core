@@ -7,8 +7,10 @@ namespace App\Domains\Flow\Handlers;
 use App\Domains\Flow\Call\CallAttempt;
 use App\Domains\Flow\Call\CallExecutionLedgerInterface;
 use App\Domains\Flow\Call\CallOutcome;
+use App\Domains\Flow\Call\CallRetryPolicy;
 use App\Domains\Flow\Call\CallSuccessStatuses;
 use App\Domains\Flow\Call\CallTransportRegistry;
+use App\Domains\Flow\Call\Transports\HttpTransport;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
@@ -37,6 +39,7 @@ use Fapost\Support\Builder\Schema\Fields\TextField;
 use Fapost\Support\Builder\Schema\Fields\ToggleField;
 use Fapost\Support\Builder\Schema\Schema;
 use Fapost\Support\Builder\Schema\Section;
+use Illuminate\Support\Sleep;
 use JsonException;
 use stdClass;
 
@@ -57,6 +60,8 @@ use stdClass;
  *  - `success_statuses` replaces the transport's own verdict by a list of statuses ({@see CallSuccessStatuses}).
  *  - `strict_mapping` sends a successful call to `error` (`error_code = mapping_missing`) when a mapped path is absent
  *    from the response, instead of writing null.
+ *
+ * The optional `retry` sends a failed call again, with backoff, inside the node's window ({@see CallRetryPolicy}).
  *
  * Legacy nodes (no `transport`/`target`) keep their original behavior through
  * {@see executeLegacy()} — POST `url` with `include_state`, save body to
@@ -83,6 +88,10 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
     private const string ATTEMPT_META         = 'attempt_number';
     private const string DEDUPLICATED_META    = 'deduplicated';
     private const string MISSING_PATHS_META   = 'missing_paths';
+    private const string SENDS_META           = 'attempts';
+    private const string RETRY_STOPPED_META   = 'retry_stopped';
+
+    private const string RETRY_STOPPED_WINDOW = 'window';
 
     private const string ERROR_MAPPING_MISSING = 'mapping_missing';
 
@@ -173,7 +182,7 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
     }
 
     /**
-     * Publish-time checks of the two optional fields; both are literals, never templates.
+     * Publish-time checks of the optional `success_statuses`, `strict_mapping` and `retry`; all are literals, never templates.
      *
      * @param  array<string, mixed>  $node
      *
@@ -185,6 +194,11 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
         $issues = [];
 
         $problem = CallSuccessStatuses::problem($config['success_statuses'] ?? null);
+        $retry   = CallRetryPolicy::problem($config['retry'] ?? null);
+
+        if (null !== $retry) {
+            $issues[] = NodeConfigIssue::error('call_invalid_retry', $retry, 'retry');
+        }
 
         if (null !== $problem) {
             $issues[] = NodeConfigIssue::error('call_invalid_success_statuses', $problem, 'success_statuses');
@@ -246,8 +260,15 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
         }
 
         $request = new CallRequest(target: $target, parameters: $parameters, options: $options);
-        $outcome = $this->dispatch($transportId, $request, $callContext, $earlier, CallSuccessStatuses::fromConfig($config['success_statuses'] ?? null));
-        $result  = $outcome->result;
+        $outcome = $this->dispatch(
+            $transportId,
+            $request,
+            $callContext,
+            $earlier,
+            CallSuccessStatuses::fromConfig($config['success_statuses'] ?? null),
+            CallRetryPolicy::fromConfig($config['retry'] ?? null),
+        );
+        $result = $outcome->result;
 
         $stateChanges = [];
         $missing      = $this->applyResponse($config, $result, $context, $stateChanges);
@@ -264,6 +285,8 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
                 self::MISSING_PATHS_META   => $mappingFails ? $missing : null,
                 self::IDEMPOTENCY_KEY_META => $callContext->idempotencyKey,
                 self::ATTEMPT_META         => $outcome->attempt,
+                self::SENDS_META           => $outcome->sends > 1 ? $outcome->sends : null,
+                self::RETRY_STOPPED_META   => $outcome->retryStopped ? self::RETRY_STOPPED_WINDOW : null,
                 self::DEDUPLICATED_META    => $outcome->replayed ? true : null,
             ], static fn (mixed $v): bool => null !== $v),
             // The flow log keeps only this field; without it the author would not see why the call was refused.
@@ -464,38 +487,68 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
      *
      * `$earlier` is the ledger's answer for this execution, looked up once by the caller so that the quota check
      * and the send decide on the same record.
+     *
+     * With a `$retry` policy a failure it calls retryable is sent again after a backoff, with the same key and the
+     * next attempt number, for as long as the policy allows and the send fits the node's window; the request timeout
+     * of a retry is cut to what is left of the window. The waits block this worker, which is why the window is short.
      */
     private function dispatch(
         string $transportId,
-        CallRequest $request,
+        CallRequest $prepared,
         CallContext $callContext,
         ?CallResult $earlier,
         ?CallSuccessStatuses $statuses = null,
+        ?CallRetryPolicy $retry = null,
     ): CallOutcome {
         if (null !== $earlier) {
             return new CallOutcome($earlier, null, true);
         }
 
-        $attempt = $this->ledger->startAttempt($callContext->tenantId, $callContext->idempotencyKey);
-        $request = new CallRequest(
-            target: $request->target,
-            parameters: $request->parameters,
-            options: [...$request->options, CallAttempt::OPTION => $attempt],
-        );
+        $startedAt = CarbonImmutable::now();
+        $timeout   = (int) ($prepared->options['timeout'] ?? HttpTransport::DEFAULT_TIMEOUT_SECONDS);
+        $options   = $prepared->options;
+        $sends     = 0;
 
-        $result = $this->transports->get($transportId)->execute($request, $callContext);
+        while (true) {
+            $attempt = $this->ledger->startAttempt($callContext->tenantId, $callContext->idempotencyKey);
+            // Named `$request` on purpose: OutboundGateCoverageTest finds the delivery by `->execute($request,`.
+            $request = new CallRequest(
+                target: $prepared->target,
+                parameters: $prepared->parameters,
+                options: [...$options, CallAttempt::OPTION => $attempt],
+            );
 
-        // The node's verdict, not the transport's, decides what is recorded: a status the list rejects stays
-        // retryable, and one it accepts is a finished call that must not be sent again.
-        if ($statuses instanceof CallSuccessStatuses) {
-            $result = $statuses->judge($result);
+            $result = $this->transports->get($transportId)->execute($request, $callContext);
+            ++$sends;
+
+            // The node's verdict, not the transport's, decides what is recorded: a status the list rejects stays
+            // retryable, and one it accepts is a finished call that must not be sent again.
+            if ($statuses instanceof CallSuccessStatuses) {
+                $result = $statuses->judge($result);
+            }
+
+            if ($result->success) {
+                $this->ledger->complete($callContext->tenantId, $callContext->idempotencyKey, $result);
+
+                return new CallOutcome($result, $attempt, false, $sends);
+            }
+
+            if (! $retry instanceof CallRetryPolicy || $sends >= $retry->maxAttempts || ! $retry->retries($result)) {
+                return new CallOutcome($result, $attempt, false, $sends);
+            }
+
+            $delayMs = $retry->delayMs($sends, $result);
+            $left    = CallRetryPolicy::secondsLeft($startedAt->diffInMilliseconds(CarbonImmutable::now()), $delayMs);
+
+            if (null === $left) {
+                return new CallOutcome($result, $attempt, false, $sends, retryStopped: true);
+            }
+
+            Sleep::for($delayMs)->milliseconds();
+
+            // A timeout of 0 (none) or below is not a limit the window can keep, so the retry gets what is left.
+            $options = [...$options, 'timeout' => $timeout > 0 ? min($timeout, $left) : $left];
         }
-
-        if ($result->success) {
-            $this->ledger->complete($callContext->tenantId, $callContext->idempotencyKey, $result);
-        }
-
-        return new CallOutcome($result, $attempt, false);
     }
 
     /**

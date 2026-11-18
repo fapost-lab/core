@@ -44,7 +44,8 @@ The built-in `call` node sends an `Idempotency-Key` header (the same value when 
 runs the step again, a new one on each pass of a loop) and an `X-FaPost-Attempt-Number`
 header. It also remembers a call that succeeded for about a week, and when the same step
 runs again it reuses that result instead of sending the request a second time. A call
-that failed is sent again with the same key and the next attempt number.
+that failed is sent again with the same key and the next attempt number, whether the
+queue runs the step again or the node's own `retry` sends it after a wait.
 
 ## What not to rely on
 

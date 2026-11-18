@@ -22,7 +22,7 @@ use Psr\Http\Message\RequestInterface;
 final readonly class EgressGuardMiddleware
 {
     /** Longest accepted name lookup; the HTTP timeout (10s by default) starts only after it. */
-    private const int LOOKUP_DEADLINE_SECONDS = 8;
+    public const int LOOKUP_DEADLINE_SECONDS = 8;
 
     public function __construct(
         private HostResolverInterface $resolver,

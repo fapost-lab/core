@@ -47,6 +47,11 @@ final readonly class HttpTransport implements CallTransportInterface
 {
     public const string ID = 'http';
 
+    /**
+     * The request timeout when the node sets none; the `call` retry window is sized from it.
+     */
+    public const int DEFAULT_TIMEOUT_SECONDS = 10;
+
     public function __construct(
         private GuardedHttpClient $http,
         private LoggerInterface $logger,
@@ -78,7 +83,7 @@ final readonly class HttpTransport implements CallTransportInterface
             $headers[CallAttempt::HEADER] ??= (string) $attempt;
         }
 
-        $timeout     = (int) ($request->options['timeout'] ?? 10);
+        $timeout     = (int) ($request->options['timeout'] ?? self::DEFAULT_TIMEOUT_SECONDS);
         $successWhen = (string) ($request->options['success_when'] ?? '2xx');
 
         // Raw body wins over bucketed body.* params: when present, the author
