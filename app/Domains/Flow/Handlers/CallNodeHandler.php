@@ -332,6 +332,7 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
                 : (in_array($result->errorCode, [self::ERROR_SOLUTION_INACTIVE, self::ERROR_SOLUTION_NOT_READY], true)
                     ? $result->errorCode . ': ' . (is_string($result->metadata['solution_id'] ?? null) ? $result->metadata['solution_id'] : 'unknown')
                     : null),
+            trace: $this->trace($transportId, $request, $outcome),
         );
     }
 
@@ -587,7 +588,41 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
                 self::ATTEMPT_META         => $outcome->attempt,
                 self::DEDUPLICATED_META    => $outcome->replayed ? true : null,
             ], static fn (mixed $v): bool => null !== $v),
+            trace: $this->trace(self::DEFAULT_TRANSPORT, $request, $outcome),
         );
+    }
+
+    /**
+     * What the node trace shows of the call: the rendered request and the response, body included. The engine masks
+     * and truncates it before writing it, and writes it nowhere else.
+     *
+     * @return array{input: array<string, mixed>, output: array<string, mixed>}
+     */
+    private function trace(string $transportId, CallRequest $request, CallOutcome $outcome): array
+    {
+        $options = $request->options;
+        unset($options[CallAttempt::OPTION]);
+
+        $result = $outcome->result;
+
+        return [
+            'input' => [
+                'transport'  => $transportId,
+                'target'     => $request->target,
+                'parameters' => $request->parameters,
+                'options'    => $options,
+            ],
+            'output' => array_filter([
+                'success'    => $result->success,
+                'status'     => $result->metadata['status_code'] ?? null,
+                'headers'    => $result->metadata['headers'] ?? null,
+                'body'       => $result->payload,
+                'error_code' => $result->errorCode,
+                'attempt'    => $outcome->attempt,
+                'sends'      => $outcome->sends,
+                'replayed'   => $outcome->replayed,
+            ], static fn (mixed $value): bool => null !== $value),
+        ];
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Domains\Flow\Call\RedisCallExecutionLedger;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\Retention\AutomationRunRetention;
+use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
 use App\Domains\Tenancy\Models\PlatformSetting;
@@ -102,6 +103,7 @@ final class PlatformSettingsTest extends FeatureTestCase
             RedisCallExecutionLedger::TTL_SETTING,
             self::ITERATIONS,
             FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING,
+            NodeTraceRecorder::PAYLOADS_SETTING,
             self::REDIRECT,
         ], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
         $this->assertSame(300, $definitions[8]->default);
@@ -111,7 +113,9 @@ final class PlatformSettingsTest extends FeatureTestCase
         $this->assertSame(192, $definitions[7]->default);
         $this->assertSame(168, $definitions[7]->min, 'The call dedup window may not drop below the failed-job retention.');
         $this->assertSame(1000, $definitions[9]->default);
-        $this->assertTrue($definitions[10]->hostModeOnly);
+        $this->assertFalse($definitions[10]->hostModeOnly);
+        $this->assertTrue($definitions[10]->default);
+        $this->assertTrue($definitions[11]->hostModeOnly);
         $this->assertSame(30, $definitions[5]->default);
         $this->assertSame(7, $definitions[6]->default);
         $this->assertSame(24, $definitions[2]->default);
@@ -237,7 +241,7 @@ final class PlatformSettingsTest extends FeatureTestCase
         $contract->update([self::REDIRECT => 3], 'operator:9');
 
         $this->assertSame(3, $this->settings()->integer(self::REDIRECT));
-        $this->assertCount(11, $contract->definitions());
+        $this->assertCount(12, $contract->definitions());
         $this->assertSame('operator:9', PlatformSettingEvent::query()->sole()->changed_by);
     }
 

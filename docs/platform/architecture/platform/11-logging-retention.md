@@ -22,6 +22,30 @@ Both tables live in the tenant schema.
   `flow.automation_runs.failed_retention_days` (30), both platform settings. A subflow chain goes only as a whole.
   Conversation sessions and their history are not pruned by anything yet (spec `data-lifecycle`).
 
+### Node trace in `flow_session_history`
+
+Every node of every session — conversation, automation, subflow child — writes trace rows to `flow_session_history`
+(`NodeTraceRecorder`), whatever the flow's `logging_enabled`: `node_entered` before the handler runs,
+`node_completed` with status, exit, next node, duration, loop iterations and error message, or `node_failed` with the
+error class and message when the session failed at the node (`step_limit` for a step limit). The rows are written
+outside the step's transaction, each insert in its own savepoint; a failure is the warning `flow.trace.write_failed`
+and never breaks the step.
+
+- **Payloads.** Only an automation run's `node_completed` rows carry the node's `input` (the incoming message, the
+  delay-resume flag, what the handler put in `NodeExecutionResult::$trace`) and `output` (state changes, result
+  metadata, the handler's trace output; for `call`, the request and the response body). The platform setting
+  `flow.trace.payloads` (default on) turns them off. A conversation's rows never carry them, because nothing deletes
+  a conversation's history yet.
+- **Masking and size.** Before writing, values under sensitive keys (`authorization`, `cookie`, `password`, `token`,
+  `api_key`, `bearer` and the like, also as a suffix after `.`, `-`, `_`), passwords and sensitive query parameters
+  in URLs are masked (`TracePayloadMasker`, which also removes literal secrets once a caller passes them — none does
+  yet); then an envelope over 1 MiB has its largest `input`/`output` values replaced by `"[truncated, N bytes]"` (`TracePayloadLimiter`). Masking is a deny-list: a
+  secret under an innocent key name in a response body stays visible.
+- **Retention.** An automation run's trace goes with the run (`flow:prune-automation-runs`); every trace goes with
+  its contact (foreign key cascade). Conversation traces are otherwise kept.
+- **Visibility.** No screen reads the trace yet: the session page (`FlowSessionInspector`) filters the three event
+  types out until a page gated by its own permission shows them.
+
 ### analytics_events has no aggregation and no pruning
 
 Nothing aggregates `analytics_events`, and nothing prunes it. The "keep aggregated events forever" idea is only true in

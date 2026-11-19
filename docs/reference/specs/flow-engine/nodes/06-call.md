@@ -201,7 +201,10 @@ number and the record (`CallExecutionLedgerInterface`, Redis implementation `Red
   minimum 168 = Horizon's failed-job retention, maximum 720). A retry from the `failed_jobs` table past the window
   re-sends with the same `Idempotency-Key`.
 - **Limits:** a result over 256 KiB is not recorded; a Redis failure is logged and the call is sent anyway. The
-  builder's test call never uses the ledger. Request headers and parameters are never stored.
+  builder's test call never uses the ledger. The ledger never stores request headers and parameters.
+- **Trace:** in an automation run the node trace (`node_completed` in `flow_session_history`) keeps the rendered
+  request (transport, target, parameters, options) and the response (status, headers, body, attempt, sends, replay),
+  masked and cut to 1 MiB (`adr-20261119-node-trace-in-session-history`). A conversation's trace keeps neither.
 
 ## Retry
 

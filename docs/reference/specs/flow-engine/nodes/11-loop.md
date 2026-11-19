@@ -566,7 +566,8 @@ Two branches, each with its own loop and the same `iterator_name`, are fine: onl
 ## 11. Integration with the platform
 
 - **State writes:** the loop relies on the atomic `stateChanges` batch plus navigation in one transaction under the
-  optimistic lock (a retry-safe increment). History logging respects `logging_enabled`.
+  optimistic lock (a retry-safe increment). History logging respects `logging_enabled`; the node trace, written for
+  every node, carries each node's loop iterations (`iterations`).
 - **Concurrency:** long loops are covered by the lock heartbeat (`LockHeartbeat`, refreshed before each node); an
   incoming message during an input inside a loop goes through standard routing.
 - **Expressions:** `count_source` and `condition` are structured forms, not expressions; `flow.iterator` and
