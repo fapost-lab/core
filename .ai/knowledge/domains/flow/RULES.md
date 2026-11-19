@@ -120,8 +120,9 @@ broken.
   inside a loop body knows it from the iterator in state. A conversation call, which has no segments, also fails a loop
   body still running after `FlowEngineInterface::MAX_SEGMENT_SECONDS` (30 s) of the outermost call — subflow children
   it ran synchronously included — so a long loop of slow nodes never outlives the 60 s job timeout and leaves the
-  session stuck `active`. In an automation the per-iteration allowance restarts with each segment, so a runaway inside
-  or after a loop body that never reaches its `loop_end` is stopped by the ceiling, not by `max_iterations`. Settings are read through the scoped
+  session stuck `active`. An automation also persists the steps of the iteration in progress (`loop_iteration_step_count`,
+  reset by a `loop_end` and by the loop's exit), so a runaway inside or after a loop body that never reaches its
+  `loop_end` stops at `max_iterations` steps of that iteration however many segments it spans. Settings are read through the scoped
   `PlatformSettingsReaderInterface`; a lost session lock aborts with `SessionLockLostException`. Why: a loop over a long
   list is legitimate and must not trip the shared budget, while a runaway flow must still free its worker
   (`adr-20261118-segmented-automation-runs`, amendment 2026-11-19). Enforced: `LoopEngineTest`, `AutomationRunTest`,

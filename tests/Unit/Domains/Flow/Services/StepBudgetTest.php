@@ -46,7 +46,7 @@ final class StepBudgetTest extends TestCase
 
     public function test_an_automation_run_counts_a_loop_s_iterations_from_its_first_one(): void
     {
-        $budget = StepBudget::forAutomationRun(100, 5, 0, 0, [], []);
+        $budget = StepBudget::forAutomationRun(100, 5, 0, 0, 0, [], []);
 
         $this->assertNull($budget->record(self::LOOP, $this->intoBody(), ['flow' => ['i' => 5]]));
         $this->assertNotNull($budget->record(self::LOOP, $this->intoBody(), ['flow' => ['i' => 6]]));
@@ -54,7 +54,7 @@ final class StepBudgetTest extends TestCase
 
     public function test_the_iterator_a_first_pass_writes_counts_as_the_first_iteration(): void
     {
-        $budget = StepBudget::forAutomationRun(100, 1, 0, 0, [], []);
+        $budget = StepBudget::forAutomationRun(100, 1, 0, 0, 0, [], []);
         $first  = new NodeExecutionResult(status: NodeExecutionStatus::Executed, sourceHandle: 'loop', stateChanges: ['flow.i' => 1]);
 
         $this->assertNull($budget->record(self::LOOP, $first, []));
@@ -68,7 +68,7 @@ final class StepBudgetTest extends TestCase
 
     public function test_an_automation_run_starts_from_its_persisted_counts(): void
     {
-        $budget = StepBudget::forAutomationRun(10, 5, 9, 0, [], []);
+        $budget = StepBudget::forAutomationRun(10, 5, 9, 0, 0, [], []);
 
         $this->assertNull($budget->charge('n1'));
         $this->assertFalse($budget->lastStepInLoop());
@@ -78,16 +78,60 @@ final class StepBudgetTest extends TestCase
     public function test_a_segment_that_starts_in_a_loop_body_counts_its_steps_as_loop_steps(): void
     {
         $nodes  = [self::LOOP, ['id' => 'body', 'type' => 'assign', 'version' => 1, 'config' => []]];
-        $budget = StepBudget::forAutomationRun(10, 5, 10, 0, $nodes, ['flow' => ['i' => 3]]);
+        $budget = StepBudget::forAutomationRun(10, 5, 10, 0, 0, $nodes, ['flow' => ['i' => 3]]);
 
         // The shared budget is spent, but the body is not charged to it.
         $this->assertNull($budget->charge('body'));
         $this->assertTrue($budget->lastStepInLoop());
     }
 
+    public function test_a_segment_that_starts_in_a_loop_body_goes_on_counting_the_iteration_in_progress(): void
+    {
+        // The iteration had taken 9 steps in earlier segments without reaching its loop_end.
+        $nodes  = [self::LOOP, ['id' => 'body', 'type' => 'assign', 'version' => 1, 'config' => []]];
+        $budget = StepBudget::forAutomationRun(10, 5, 1, 9, 9, $nodes, ['flow' => ['i' => 1]]);
+
+        $this->assertNull($budget->charge('body'));
+        $this->assertSame(10, $budget->iterationSteps());
+        $this->assertStringContainsString(
+            "One iteration of loop node 'loop' exceeded 10 steps",
+            (string) $budget->charge('body')?->getMessage(),
+        );
+    }
+
+    public function test_the_persisted_iteration_steps_count_only_inside_a_loop_body(): void
+    {
+        $budget = StepBudget::forAutomationRun(10, 5, 1, 9, 9, [self::LOOP], []);
+
+        $this->assertSame(0, $budget->iterationSteps());
+    }
+
+    public function test_a_loop_end_and_the_loop_s_exit_start_the_iteration_count_afresh(): void
+    {
+        $budget = StepBudget::forAutomationRun(10, 5, 1, 4, 4, [self::LOOP], ['flow' => ['i' => 1]]);
+
+        $this->assertNull($budget->charge('le'));
+        $this->assertNull($budget->record(['id' => 'le', 'type' => 'loop_end', 'version' => 1, 'config' => []], new NodeExecutionResult(status: NodeExecutionStatus::Executed), []));
+        $this->assertSame(0, $budget->iterationSteps());
+
+        $this->assertNull($budget->charge('loop'));
+        $this->assertNull($budget->record(self::LOOP, new NodeExecutionResult(status: NodeExecutionStatus::Executed, sourceHandle: 'default'), []));
+        $this->assertSame(0, $budget->iterationSteps());
+    }
+
+    public function test_passing_into_another_loop_without_an_exit_keeps_counting_the_iteration(): void
+    {
+        $other  = ['id' => 'other', 'type' => 'loop', 'version' => 1, 'config' => ['iterator_name' => 'j']];
+        $budget = StepBudget::forAutomationRun(10, 5, 1, 6, 6, [self::LOOP, $other], ['flow' => ['i' => 1]]);
+
+        $this->assertNull($budget->charge('other'));
+        $this->assertNull($budget->record($other, $this->intoBody(), ['flow' => ['i' => 1, 'j' => 1]]));
+        $this->assertSame(7, $budget->iterationSteps());
+    }
+
     public function test_the_ceiling_counts_both_persisted_counts(): void
     {
-        $budget = StepBudget::forAutomationRun(10, 1, 2, 18, [], []);
+        $budget = StepBudget::forAutomationRun(10, 1, 2, 18, 0, [], []);
 
         $this->assertStringContainsString('ceiling of 20 steps', (string) $budget->charge('n1')?->getMessage());
     }
@@ -118,7 +162,7 @@ final class StepBudgetTest extends TestCase
 
         try {
             $conversation = StepBudget::forConversation(100, 1000, CarbonImmutable::now());
-            $automation   = StepBudget::forAutomationRun(100, 1000, 0, 0, [self::LOOP], ['flow' => ['i' => 2]]);
+            $automation   = StepBudget::forAutomationRun(100, 1000, 0, 0, 0, [self::LOOP], ['flow' => ['i' => 2]]);
 
             CarbonImmutable::setTestNow('2026-11-19 10:05:00');
 
