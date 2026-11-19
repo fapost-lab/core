@@ -129,11 +129,13 @@ final readonly class SubflowStarterService
             $entryNode = $this->graphResolver->resolveEntryNode($definition);
 
             return $this->sessions->create([
-                'tenant_id'             => $parent->tenant_id,
-                'assistant_id'          => $parent->assistant_id,
-                'contact_id'            => $parent->contact_id,
-                'run_kind'              => $parent->run_kind,
-                'trigger_id'            => $parent->trigger_id,
+                'tenant_id'    => $parent->tenant_id,
+                'assistant_id' => $parent->assistant_id,
+                'contact_id'   => $parent->contact_id,
+                'run_kind'     => $parent->run_kind,
+                'trigger_id'   => $parent->trigger_id,
+                // A child lives within its run: it carries the deadline of the run's root, not one of its own.
+                'deadline_at'           => $parent->deadline_at,
                 'flow_definition_id'    => $definition->getKey(),
                 'flow_version'          => $definition->version,
                 'current_node_id'       => $entryNode,

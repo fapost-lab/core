@@ -649,6 +649,36 @@ final class AutomationRunTest extends FeatureTestCase
         $this->assertSame(['p1' => 1, 'p2' => 1], AutomationProbeTestHandler::$runs);
     }
 
+    public function test_a_run_gets_its_deadline_at_its_start_and_its_subflow_child_carries_the_same(): void
+    {
+        Carbon::setTestNow('2026-11-19 12:00:00');
+        $childFlowId = $this->probeChain(3);
+
+        $this->start($this->subflowParent($childFlowId), 'slot-1');
+
+        $parent = FlowSession::query()->whereNull('parent_session_id')->sole();
+        $child  = FlowSession::query()->whereNotNull('parent_session_id')->sole();
+        $this->assertSame('2026-11-20 12:00:00', $parent->deadline_at?->toDateTimeString(), 'The start plus 24 hours.');
+        $this->assertSame('2026-11-20 12:00:00', $child->deadline_at?->toDateTimeString(), 'A child lives within its run.');
+
+        config(['flow.automation.max_run_hours' => 1]);
+        Carbon::setTestNow('2026-11-19 12:30:00');
+        $this->drain();
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
+        $this->assertSame('2026-11-20 12:00:00', $parent->deadline_at?->toDateTimeString(), 'A setting change never moves a running deadline.');
+    }
+
+    public function test_the_deadline_setting_is_held_within_its_bounds(): void
+    {
+        Carbon::setTestNow('2026-11-19 12:00:00');
+        config(['flow.automation.max_run_hours' => 0]);
+
+        $this->start($this->probeChain(1), 'slot-1');
+
+        $this->assertSame('2026-11-19 13:00:00', FlowSession::query()->sole()->deadline_at?->toDateTimeString());
+    }
+
     public function test_a_conversation_is_not_segmented(): void
     {
         $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
@@ -660,6 +690,7 @@ final class AutomationRunTest extends FeatureTestCase
 
         $this->assertSame(FlowSessionStatus::Ended, $session->status);
         $this->assertSame(0, $session->refresh()->step_count);
+        $this->assertNull($session->deadline_at, 'A conversation has no deadline.');
         Queue::assertNotPushed(ContinueAutomationRunJob::class);
     }
 

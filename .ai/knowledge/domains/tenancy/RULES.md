@@ -33,7 +33,7 @@ paths:
   - tests/Feature/Staff/CoreOperatorAccessTest.php
   - tests/Feature/Staff/HorizonOperatorAccessTest.php
   - tests/Architecture/OperatorAccessBoundaryTest.php
-reviewed_at: 2026-11-12
+reviewed_at: 2026-11-19
 ---
 # Tenancy rules
 
@@ -278,7 +278,7 @@ broken.
   media, mini-app and console routes answer 423 (`RefuseWritesWhenTenantStopped`; the platform support user passes; a
   route with no side effects opts out with `withoutMiddleware`; the only destructive exceptions are requesting and
   cancelling the workspace's deletion, so a stopped tenant's admins can leave), runtime jobs are dropped or postponed by
-  `RespectsTenantAccessMode`, and `flow:sweep-subflow-timeouts` skips the tenant. The tenant stays `Active` so
+  `RespectsTenantAccessMode`, and `flow:sweep-subflow-timeouts` and `flow:sweep-overdue-automation-runs` skip the tenant. The tenant stays `Active` so
   console commands see it. A postponed job is re-queued as a delayed copy, never `release()`d (a release spends
   an attempt). Fail open: an operator that throws is reported and counts as active (`TenantAccessStates`). A
   gateway "Class@method" handler must run the job's middleware itself. The builder opens view-only rather than closed

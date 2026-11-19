@@ -55,6 +55,7 @@ value stored in the database wins over them, and resetting the stored value brin
 | `FLOW_CALL_DEDUP_TTL_HOURS` | `192` | `flow.call.dedup_ttl_hours`: how many hours the `call` node remembers a successful call, so a retried step is not sent again |
 | `FLOW_AUTOMATION_SEGMENT_STEPS` | `50` | `flow.automation.segment_steps`: how many nodes an automation run passes through in one queue job |
 | `FLOW_AUTOMATION_SEGMENT_SECONDS` | `20` | `flow.automation.segment_seconds`: how many seconds an automation run executes in one queue job, at most 30 |
+| `FLOW_AUTOMATION_MAX_RUN_HOURS` | `24` | `flow.automation.max_run_hours`: how many hours an automation run may live before `flow:sweep-overdue-automation-runs` fails it; held within 1 to 720 |
 | `FLOW_AUTOMATION_SUCCEEDED_RETENTION_DAYS` | `7` | `flow.automation_runs.succeeded_retention_days`: how many days a succeeded automation run is kept before `flow:prune-automation-runs` deletes it; `0` keeps them forever. A value that is not a whole number from 0 to 3650 is ignored |
 | `FLOW_AUTOMATION_FAILED_RETENTION_DAYS` | `30` | `flow.automation_runs.failed_retention_days`: the same for every other finished automation run |
 | `TENANCY_RENAME_REDIRECT_DAYS` | `30` | `tenancy.rename.redirect_days`, described above |

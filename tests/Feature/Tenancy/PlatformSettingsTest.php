@@ -7,6 +7,7 @@ namespace Tests\Feature\Tenancy;
 use App\Domains\Conversation\Retention\PartitionRetention;
 use App\Domains\Flow\Call\RedisCallExecutionLedger;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\Retention\AutomationRunRetention;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
@@ -93,6 +94,7 @@ final class PlatformSettingsTest extends FeatureTestCase
         $this->assertSame([
             'audit.retention_days',
             PartitionRetention::SETTING,
+            AutomationRunDeadline::SETTING,
             FlowEngineInterface::SEGMENT_SECONDS_SETTING,
             FlowEngineInterface::SEGMENT_STEPS_SETTING,
             AutomationRunRetention::FAILED_SETTING,
@@ -102,16 +104,19 @@ final class PlatformSettingsTest extends FeatureTestCase
             FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING,
             self::REDIRECT,
         ], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
-        $this->assertSame(300, $definitions[7]->default);
-        $this->assertSame(10, $definitions[7]->min);
-        $this->assertSame(10000, $definitions[7]->max);
-        $this->assertFalse($definitions[7]->hostModeOnly);
-        $this->assertSame(192, $definitions[6]->default);
-        $this->assertSame(168, $definitions[6]->min, 'The call dedup window may not drop below the failed-job retention.');
-        $this->assertSame(1000, $definitions[8]->default);
-        $this->assertTrue($definitions[9]->hostModeOnly);
-        $this->assertSame(30, $definitions[4]->default);
-        $this->assertSame(7, $definitions[5]->default);
+        $this->assertSame(300, $definitions[8]->default);
+        $this->assertSame(10, $definitions[8]->min);
+        $this->assertSame(10000, $definitions[8]->max);
+        $this->assertFalse($definitions[8]->hostModeOnly);
+        $this->assertSame(192, $definitions[7]->default);
+        $this->assertSame(168, $definitions[7]->min, 'The call dedup window may not drop below the failed-job retention.');
+        $this->assertSame(1000, $definitions[9]->default);
+        $this->assertTrue($definitions[10]->hostModeOnly);
+        $this->assertSame(30, $definitions[5]->default);
+        $this->assertSame(7, $definitions[6]->default);
+        $this->assertSame(24, $definitions[2]->default);
+        $this->assertSame(1, $definitions[2]->min);
+        $this->assertSame(720, $definitions[2]->max, 'A run may live at most 30 days.');
     }
 
     public function test_a_refused_change_writes_nothing(): void
@@ -232,7 +237,7 @@ final class PlatformSettingsTest extends FeatureTestCase
         $contract->update([self::REDIRECT => 3], 'operator:9');
 
         $this->assertSame(3, $this->settings()->integer(self::REDIRECT));
-        $this->assertCount(10, $contract->definitions());
+        $this->assertCount(11, $contract->definitions());
         $this->assertSame('operator:9', PlatformSettingEvent::query()->sole()->changed_by);
     }
 

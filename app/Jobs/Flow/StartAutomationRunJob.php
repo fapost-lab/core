@@ -55,12 +55,14 @@ final class StartAutomationRunJob implements ShouldQueue, TenantAccessGatedJob
     }
 
     /**
-     * An hour of busy-lock releases, plus one postponement while the tenant is stopped: a copy the access-mode
-     * middleware postpones is dispatched again and gets its own deadline.
+     * {@see AutomationRunner::START_RETRY_SECONDS} (an hour) of busy-lock releases, plus one postponement while the
+     * tenant is stopped: a copy the access-mode middleware postpones is dispatched again and gets its own deadline.
      */
     public function retryUntil(): DateTimeInterface
     {
-        return Carbon::now()->addSeconds(RespectsTenantAccessMode::POSTPONE_SECONDS)->addHour();
+        return Carbon::now()
+            ->addSeconds(RespectsTenantAccessMode::POSTPONE_SECONDS)
+            ->addSeconds(AutomationRunner::START_RETRY_SECONDS);
     }
 
     public function accessModeTenantId(): string
