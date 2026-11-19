@@ -28,7 +28,7 @@ broken.
 ## Invariants
 
 - **The runtime does not use facades, the container or `Application`.** Covers the engine,
-  `Handlers`, `Orchestration`, `Registry`, `Routing`, `State`, `Subflow`. Why: handlers must be
+  `Handlers`, `Orchestration`, `Registry`, `Routing`, `State`, `Subflow`, `Trace`. Why: handlers must be
   constructible and testable without a booted framework, and a hidden container lookup inside a
   worker resolves whatever tenant state is current. Enforced: `tests/Architecture/FlowRuntimeIsolationTest.php`.
   Not covered: `Concurrency`, `Call`, `Expression`, the rest of `Services`.
@@ -149,6 +149,21 @@ broken.
   whose job was lost would keep its trigger and its flow for good, and a setting lowered later must not fail running
   runs at once (`adr-20261119-automation-run-deadline`). Enforced: `AutomationRunDeadlineSweeperTest`,
   `AutomationRunDeadlineSweeperRedisTest`, `SweepOverdueAutomationRunsCommandTest`, `AutomationRunTest`.
+
+- **The node trace is always written, masked and limited before it is written, never inside a step's transaction,
+  and read by no screen yet.** `FlowEngine` calls `NodeTraceRecorder` for every node of every session: `node_entered`,
+  then `node_completed` or `node_failed`, into `flow_session_history`, whatever `logging_enabled` (which still gates
+  `state_change` and `subflow_*`). Only an automation run's rows carry `input`/`output`, and only while
+  `flow.trace.payloads` is on: nothing deletes a conversation's history, so a conversation's trace keeps no payloads
+  (gate decision of `flow-node-trace`, D-3). Payloads pass `TracePayloadMasker` (sensitive key names, URL passwords and
+  query parameters, literal secrets) and then `TracePayloadLimiter` (1 MiB a row); masking is a deny-list, so a secret
+  under an innocent key in a response body stays visible — accepted risk, compensated by literal secrets once
+  credentials pass them. A trace write failure is the warning `flow.trace.write_failed`, in a savepoint of its own,
+  and never fails the step: the node's side effects have already happened. `FlowSessionInspector` filters
+  `NodeTraceRecorder::EVENT_TYPES` out until a page gated by its own permission reads the trace. A handler's
+  `NodeExecutionResult::$trace` goes to the trace only. Enforced: `NodeTraceRecordingTest`, `CallNodeTraceTest`,
+  `TracePayloadMaskerTest`, `TracePayloadLimiterTest`, `FlowSessionsConsoleTest`
+  (`adr-20261119-node-trace-in-session-history`).
 
 ## Rules
 

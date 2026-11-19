@@ -50,6 +50,12 @@ return [
         ),
     ],
 
+    // Only the default of the platform setting `flow.trace.payloads`: whether an automation run's node trace keeps each
+    // node's masked input and output. Conversation traces never keep them.
+    'trace' => [
+        'payloads' => (bool) env('FLOW_TRACE_PAYLOADS', true),
+    ],
+
     /*
      * Session execution lock — ADR Message Routing & Concurrency Control
      * § "Distributed Lock Strategy". One lock per (tenant, contact, assistant),

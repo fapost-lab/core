@@ -15,6 +15,7 @@ use App\Domains\Flow\Models\FlowSessionHistoryEntry;
 use App\Domains\Flow\Retention\AutomationRunPruner;
 use App\Domains\Flow\Retention\AutomationRunRetention;
 use Carbon\CarbonImmutable;
+use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
@@ -284,6 +285,30 @@ final class AutomationRunPrunerTest extends FeatureTestCase
         $this->assertSame(0, FlowLog::query()->where('session_id', $gone->getKey())->count());
         $this->assertSame(1, FlowSessionHistoryEntry::query()->where('session_id', $kept->getKey())->count());
         $this->assertSame(1, FlowLog::query()->where('session_id', $kept->getKey())->count());
+    }
+
+    public function test_the_node_trace_of_a_pruned_run_goes_with_it_and_a_kept_runs_stays(): void
+    {
+        $gone = $this->flowRun(FlowRunKind::Automation, FlowSessionStatus::Failed, $this->now->subDays(40));
+        $kept = $this->flowRun(FlowRunKind::Automation, FlowSessionStatus::Failed, $this->now->subDays(10));
+
+        foreach ([$gone, $kept] as $session) {
+            foreach ([HistoryEventType::NodeEntered, HistoryEventType::NodeCompleted, HistoryEventType::NodeFailed] as $event) {
+                FlowSessionHistoryEntry::query()->create([
+                    'tenant_id'  => $session->tenant_id,
+                    'session_id' => $session->getKey(),
+                    'node_id'    => 'end',
+                    'event_type' => $event,
+                    'metadata'   => ['type' => 'end', 'input' => ['a' => 1]],
+                    'created_at' => $this->now,
+                ]);
+            }
+        }
+
+        $this->assertSame(1, $this->pruner()->prune($this->tenantId, ...$this->cutoffs()));
+
+        $this->assertSame(0, FlowSessionHistoryEntry::query()->where('session_id', $gone->getKey())->count());
+        $this->assertSame(3, FlowSessionHistoryEntry::query()->where('session_id', $kept->getKey())->count());
     }
 
     public function test_a_dry_run_counts_exactly_what_the_run_then_deletes(): void

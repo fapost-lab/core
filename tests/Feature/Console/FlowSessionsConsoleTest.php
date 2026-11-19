@@ -12,6 +12,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
+use App\Domains\Flow\Services\FlowSessionInspector;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
@@ -218,6 +219,49 @@ final class FlowSessionsConsoleTest extends FeatureTestCase
                 ->where('history.1.path', 'flow.name')
                 ->where('history.1.payload', 'new: Anna')
                 ->etc());
+    }
+
+    public function test_node_trace_rows_are_not_shown_in_the_history(): void
+    {
+        $session = $this->sessionWith(FlowSessionStatus::Completed);
+        $this->history($session, 'audit', Carbon::now()->subMinutes(5), ['new_value' => 'Anna', 'path' => 'flow.name']);
+
+        foreach ([HistoryEventType::NodeEntered, HistoryEventType::NodeCompleted, HistoryEventType::NodeFailed] as $event) {
+            $this->history($session, 'traced', Carbon::now()->subMinute(), [
+                'event_type' => $event,
+                'metadata'   => ['type' => 'call', 'input' => ['secret' => 'visible only to the trace']],
+            ]);
+        }
+
+        $this->actingAs($this->admin())
+            ->get($this->viewUrl($session))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('history', 1)
+                ->where('history.0.nodeId', 'audit')
+                ->etc());
+    }
+
+    public function test_a_session_with_only_node_trace_rows_has_no_history_to_show(): void
+    {
+        $session = $this->sessionWith(FlowSessionStatus::Completed);
+        $this->history($session, 'traced', Carbon::now()->subMinute(), [
+            'event_type' => HistoryEventType::NodeCompleted,
+            'metadata'   => ['type' => 'call'],
+        ]);
+
+        $this->assertFalse($this->app->make(FlowSessionInspector::class)->hasHistory($session));
+
+        $this->actingAs($this->admin())
+            ->get($this->viewUrl($session))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('history', null)->etc());
+    }
+
+    public function test_a_session_with_an_audit_row_has_history(): void
+    {
+        $session = $this->sessionWith(FlowSessionStatus::Completed);
+        $this->history($session, 'audit', Carbon::now()->subMinute());
+
+        $this->assertTrue($this->app->make(FlowSessionInspector::class)->hasHistory($session));
     }
 
     public function test_another_assistants_session_or_a_malformed_id_is_not_found(): void

@@ -9,6 +9,11 @@
 > - The Core `StateReader` / `StateWriter` layer was deleted (see `.ai/knowledge/adr/0002-retire-core-state-primitives.md`);
 >   `ScopedStateReader` reads directly.
 > - History retention is not implemented: `flow_session_history` accumulates with no pruning (the V1.x item stays open).
+>
+> **Superseded in part (2026-11).** Node entry, exit and failure events are not gated by `logging_enabled`: the engine
+> writes a masked, size-limited node trace (`node_entered`, `node_completed`, `node_failed`) to `flow_session_history`
+> for every session (`.ai/knowledge/adr/20261119-node-trace-in-session-history.md`). The flag still gates
+> `state_change` and `subflow_*`.
 
 **Status:** Accepted
 **Date:** Апрель 2026

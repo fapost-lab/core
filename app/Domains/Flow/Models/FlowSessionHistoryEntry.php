@@ -10,14 +10,16 @@ use Fapost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Single row in flow_session_history — opt-in audit trail of state mutations
- * and lifecycle events. Engine and ContactWriter write here when the running
- * flow_definition has logging_enabled = true; otherwise NoOpHistoryWriter
- * absorbs the call.
+ * Single row in flow_session_history.
  *
- * Distinct from flow_logs (operational, 30-day retention, partitioned). This
- * is business audit; retention is currently manual/forever (V1.x will add
- * per-tenant policy).
+ * Two kinds of rows share the table. The opt-in audit trail — `state_change` and `subflow_*` — is written only when
+ * the running flow_definition has logging_enabled = true (otherwise NoOpHistoryWriter absorbs the call). The node
+ * trace — `node_entered`, `node_completed`, `node_failed`, see {@see \App\Domains\Flow\Trace\NodeTraceRecorder} — is
+ * written for every node of every session, whatever the flag, and no screen reads it yet.
+ *
+ * Distinct from flow_logs (operational, 30-day retention, partitioned). Rows go with their session: an automation
+ * run's with the run (AutomationRunPruner), a contact's sessions' with the contact (foreign key cascade); a
+ * conversation's rows are otherwise kept, which is why its trace rows carry no input or output.
  *
  * @property string                                  $id
  * @property string                                  $tenant_id

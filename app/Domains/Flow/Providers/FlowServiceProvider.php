@@ -145,6 +145,7 @@ use App\Domains\Flow\Subflow\SubflowResumerInterface;
 use App\Domains\Flow\Subflow\SubflowStarterService;
 use App\Domains\Flow\Subflow\SubflowTimeoutSweeper;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
+use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Flow\Translations\CoreSystemTranslations;
 use App\Domains\Flow\Translations\InMemorySystemTranslationCatalog;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
@@ -332,6 +333,16 @@ final class FlowServiceProvider extends ServiceProvider
             unit: 'days',
             min: 0,
             max: AutomationRunRetention::MAX_DAYS,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: NodeTraceRecorder::PAYLOADS_SETTING,
+            type: PlatformSettingType::Boolean,
+            configKey: 'flow.trace.payloads',
+            fallback: true,
+            label: 'Node input and output in automation run traces',
+            description: 'Whether the trace of an automation run keeps what each node received and produced (a call node: the request and the response body), masked and cut to 1 MB a row. Off, trace rows keep only the status, exit, duration and error. Conversation traces never keep them. A change applies to nodes that run afterwards.',
+            group: 'Flow',
         ));
 
         // Seed Core's system translation keys. Features and Solutions register
@@ -571,6 +582,8 @@ final class FlowServiceProvider extends ServiceProvider
         );
 
         $this->app->scoped(FlowEngineInterface::class, FlowEngine::class);
+        // Reads the scoped platform settings; built per scope like the engine that calls it.
+        $this->app->scoped(NodeTraceRecorder::class);
         $this->app->scoped(FlowGraphResolver::class);
         $this->app->scoped(FlowSessionPersister::class);
         $this->app->scoped(FlowLogWriter::class);

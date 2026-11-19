@@ -134,6 +134,30 @@ public function execute(array $nodeConfig, array $state, NodeExecutionContext $c
   part of the handler contract, and may change — rely on `$resumedAfterDelay`.
 </Warning>
 
+### Data for the run trace
+
+Every node writes a trace row when it completes. In an automation run that row holds the node's input (the incoming
+message) and output (state changes and result metadata). A handler can add what only it knows (the request it sent,
+the response it received) through the `trace` argument of `NodeExecutionResult`:
+
+```php
+return new NodeExecutionResult(
+    status: NodeExecutionStatus::Executed,
+    sourceHandle: 'success',
+    stateChanges: ['flow.order' => $order],
+    trace: [
+        'input'  => ['endpoint' => $endpoint, 'query' => $query],
+        'output' => ['status' => $status, 'body' => $body],
+    ],
+);
+```
+
+The trace is written nowhere else: not to the flow log, not to the session state. Core masks values under sensitive
+key names (`authorization`, `password`, `token`, `api_key`, `secret` and the like), passwords and sensitive query
+parameters in URLs, and cuts a row to 1 MB. Masking goes by key name, not by content, so never put a raw secret under
+an innocent name. A conversation's trace keeps no input or output. `trace` needs `fapost/foundation` `^0.44` and is
+experimental.
+
 ## The handler must be graph-unaware
 
 <Warning>
