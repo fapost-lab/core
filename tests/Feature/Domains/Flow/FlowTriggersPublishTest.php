@@ -128,7 +128,7 @@ final class FlowTriggersPublishTest extends FeatureTestCase
         $this->assertCount(1, $rows);
         $this->assertSame(['stay'], $rows[0]->config['keywords']);
         $this->assertEquals($before, $rows[0]->updated_at);
-        $this->assertSame([
+        $this->assertSame($this->sortedKeys([
             [
                 'id'        => mb_strtolower((string) $row->getKey()),
                 'type'      => 'message',
@@ -136,7 +136,7 @@ final class FlowTriggersPublishTest extends FeatureTestCase
                 'priority'  => 100,
                 'config'    => ['keywords' => ['stay'], 'phrases' => []],
             ],
-        ], $definition->triggers);
+        ]), $this->sortedKeys($definition->triggers), 'the definition records the live row, whatever key order its jsonb config came back in');
         $this->assertNull($draft->refresh()->triggers, 'publishing does not write the list into the draft');
     }
 
@@ -510,6 +510,28 @@ final class FlowTriggersPublishTest extends FeatureTestCase
         }
 
         $this->fail("Publishing {$flowId} should be refused with {$code}.");
+    }
+
+    /**
+     * Sorts every associative array by key, recursively, so a list read back from a
+     * Postgres jsonb column (which reorders object keys) compares strictly with a literal.
+     *
+     * @param  array<array-key, mixed>  $value
+     * @return array<array-key, mixed>
+     */
+    private function sortedKeys(array $value): array
+    {
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $value[$key] = $this->sortedKeys($item);
+            }
+        }
+
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
     }
 
     private function staffUser(): User

@@ -292,14 +292,14 @@ final class ContactContextValidationTest extends FeatureTestCase
         $read = $this->contactErrors($node([
             'text'      => ['en' => 'Hi {{contact.name}}'],
             'addressee' => ['kind' => 'contact', 'contact' => '{{flow.customer_id}}'],
-        ]), self::SCHEDULE);
+        ]), [self::SCHEDULE]);
         $this->assertCount(1, $read);
         $this->assertStringContainsString("it reads 'contact.name'", $read[0]->message);
 
         $empty = $this->contactErrors($node([
             'text'      => ['en' => 'Hi'],
             'addressee' => ['kind' => 'contact', 'contact' => ''],
-        ]), self::SCHEDULE);
+        ]), [self::SCHEDULE]);
         $this->assertCount(1, $empty);
         $this->assertStringContainsString("the node type 'send_message' reaches the contact of the run", $empty[0]->message);
     }
@@ -315,7 +315,7 @@ final class ContactContextValidationTest extends FeatureTestCase
         ]]];
 
         foreach ([self::SCHEDULE, self::MESSAGE] as $trigger) {
-            $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $nodes, trigger: $trigger);
+            $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $nodes, triggers: [$trigger]);
             $codes  = array_map(static fn ($error): string => "{$error->code}@{$error->path}", $result->errors);
 
             $this->assertContains('addressee_cannot_wait@nodes.ask.config.content_type', $codes);
