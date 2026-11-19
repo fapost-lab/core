@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use ReflectionProperty;
 use Tests\Feature\FeatureTestCase;
@@ -72,6 +73,25 @@ final class AutomationRunTest extends FeatureTestCase
         Carbon::setTestNow();
 
         parent::tearDown();
+    }
+
+    /**
+     * Segment sizes that stop a run in the child, in the parent its child resumed, and on either side of the subflow
+     * node, with a child of one or two steps.
+     *
+     * @return array<string, array{int, int}>  segment steps, child probe nodes
+     */
+    public static function subflowInLoopSegments(): array
+    {
+        return [
+            'one step a segment'                    => [1, 1],
+            'stops in the resumed parent'           => [2, 1],
+            'stops in the child'                    => [2, 2],
+            'stops around the subflow node'         => [3, 1],
+            'stops around the subflow node, longer' => [3, 2],
+            'five steps a segment'                  => [5, 1],
+            'one segment'                           => [50, 1],
+        ];
     }
 
     public function test_a_run_crosses_several_segments_and_ends_as_one_session(): void
@@ -249,13 +269,14 @@ final class AutomationRunTest extends FeatureTestCase
         $this->assertSame(0, $session->loop_step_count);
     }
 
-    public function test_a_runaway_inside_a_loop_body_stops_at_the_ceiling_over_every_segment(): void
+    public function test_a_runaway_inside_a_loop_body_stops_at_one_iteration_s_steps_over_every_segment(): void
     {
         // The body leads straight back to the loop node, so the iterator never moves and every step after the entry
-        // is a loop step. The ceiling is max_iterations x (max_loop_iterations + 1) = 20 steps over the whole run.
+        // is a step of the same iteration. Segments of 3 steps would restart an in-memory count; the persisted one
+        // stops the run at max_iterations steps of the iteration, long before the ceiling of 10 x (5 + 1) = 60.
         config([
             'flow.execution.max_iterations'      => 10,
-            'flow.execution.max_loop_iterations' => 1,
+            'flow.execution.max_loop_iterations' => 5,
             'flow.automation.segment_steps'      => 3,
         ]);
         $flowId = $this->flow([
@@ -276,15 +297,62 @@ final class AutomationRunTest extends FeatureTestCase
 
         try {
             $this->drain();
-            $this->fail('A loop body that never reaches its loop_end must hit the ceiling across segments.');
+            $this->fail('A loop body that never reaches its loop_end must hit the iteration\'s step limit across segments.');
         } catch (FlowExecutionLimitExceededException $exception) {
-            $this->assertStringContainsString('ceiling of 20 steps', $exception->getMessage());
+            $this->assertStringContainsString("One iteration of loop node 'loop' exceeded 10 steps", $exception->getMessage());
         }
 
         $session = FlowSession::query()->sole();
         $this->assertSame(FlowSessionStatus::Failed, $session->status);
         $this->assertSame(2, $session->step_count);
-        $this->assertSame(18, $session->loop_step_count);
+        $this->assertSame(10, $session->loop_step_count);
+        $this->assertSame(10, $session->loop_iteration_step_count);
+        $this->assertSame(['c0' => 1, 'c1' => 5], AutomationProbeTestHandler::$runs);
+    }
+
+    public function test_a_runaway_that_left_its_loop_body_by_another_edge_stops_at_one_iteration_s_steps(): void
+    {
+        // The body leaves the loop by a plain edge instead of its loop_end, so the iterator stays set and the cycle
+        // after it still counts as the iteration in progress — in every segment, not only the first.
+        config([
+            'flow.execution.max_iterations'      => 10,
+            'flow.execution.max_loop_iterations' => 5,
+            'flow.automation.segment_steps'      => 3,
+        ]);
+        $flowId = $this->flow([
+            ['id' => 'c0', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                'mode'          => 'counted',
+                'iterator_name' => 'i',
+                'count_source'  => ['type' => 'literal', 'value' => 3],
+            ]],
+            ['id' => 'c1', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'c2', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'c3', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [
+            ['id' => 'e0', 'from' => 'c0', 'to' => 'loop', 'handle' => 'default'],
+            ['id' => 'e1', 'from' => 'loop', 'to' => 'c1', 'handle' => 'loop'],
+            ['id' => 'e2', 'from' => 'c1', 'to' => 'c2', 'handle' => 'default'],
+            ['id' => 'e3', 'from' => 'c2', 'to' => 'c3', 'handle' => 'default'],
+            ['id' => 'e4', 'from' => 'c3', 'to' => 'c2', 'handle' => 'default'],
+            ['id' => 'e5', 'from' => 'loop', 'to' => 'end', 'handle' => 'default'],
+        ]);
+
+        $this->start($flowId, 'slot-1');
+
+        try {
+            $this->drain();
+            $this->fail('A cycle after a loop body left by another edge must hit the iteration\'s step limit across segments.');
+        } catch (FlowExecutionLimitExceededException $exception) {
+            $this->assertStringContainsString("One iteration of loop node 'loop' exceeded 10 steps", $exception->getMessage());
+        }
+
+        $session = FlowSession::query()->sole();
+        $this->assertSame(FlowSessionStatus::Failed, $session->status);
+        $this->assertSame(2, $session->step_count);
+        $this->assertSame(10, $session->loop_step_count);
+        $this->assertSame(['c0' => 1, 'c1' => 1, 'c2' => 5, 'c3' => 4], AutomationProbeTestHandler::$runs);
     }
 
     public function test_a_loop_longer_than_the_step_budget_runs_to_its_end_across_segments(): void
@@ -315,6 +383,8 @@ final class AutomationRunTest extends FeatureTestCase
         // Only entering the loop and the end node ran outside its body; every segment that starts in the body knows it.
         $this->assertSame(2, $session->step_count);
         $this->assertSame(120, $session->loop_step_count);
+        // The loop's exit ended the last iteration's count.
+        $this->assertSame(0, $session->loop_iteration_step_count);
     }
 
     public function test_a_loop_s_iteration_limit_counts_over_every_segment_of_a_run(): void
@@ -422,6 +492,64 @@ final class AutomationRunTest extends FeatureTestCase
         $this->assertSame(FlowSessionStatus::Ended, $child->refresh()->status);
         $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
         $this->assertSame(['k1' => 1, 'k2' => 1, 'k3' => 1, 'p1' => 1], AutomationProbeTestHandler::$runs);
+    }
+
+    #[DataProvider('subflowInLoopSegments')]
+    public function test_a_subflow_inside_a_loop_body_runs_each_iteration_once_with_its_true_count(int $segmentSteps, int $childProbes): void
+    {
+        // An iteration is the loop node, p1, the subflow node and the loop_end: four steps, the whole budget of one
+        // iteration. A parent resumed by its child's end runs the next iterations in a nested call; the frame that ran
+        // the subflow node must not write its stale iteration count over theirs, or a later iteration — in this
+        // segment or the next — starts from a count it never ran and fails as a runaway.
+        config([
+            'flow.execution.max_iterations'      => 4,
+            'flow.execution.max_loop_iterations' => 10,
+            'flow.automation.segment_steps'      => $segmentSteps,
+        ]);
+        $parentFlowId = $this->subflowInLoopParent($this->childOfProbes($childProbes), 6);
+
+        $this->start($parentFlowId, 'slot-1');
+        $this->drain();
+
+        $parent = FlowSession::query()->whereNull('parent_session_id')->sole();
+        $this->assertSame(FlowSessionStatus::Ended, $parent->status);
+        $this->assertSame(6, FlowSession::query()->whereNotNull('parent_session_id')->where('status', FlowSessionStatus::Ended)->count());
+
+        $expectedRuns = ['p1' => 6];
+
+        for ($probe = 1; $probe <= $childProbes; ++$probe) {
+            $expectedRuns["k{$probe}"] = 6;
+        }
+
+        $this->assertEqualsCanonicalizing($expectedRuns, AutomationProbeTestHandler::$runs);
+        // Entering the loop and the end node ran outside its body; 6 x (p1, subflow, loop_end, loop) inside it.
+        $this->assertSame(2, $parent->step_count);
+        $this->assertSame(24, $parent->loop_step_count);
+        $this->assertSame(0, $parent->loop_iteration_step_count);
+    }
+
+    public function test_a_subflow_step_whose_child_ran_out_still_counts_in_its_iteration(): void
+    {
+        // The segment runs out inside the child: no nested run took the parent further, so the subflow step's own
+        // frame is the one that records it in the iteration count the next segment goes on from.
+        config(['flow.automation.segment_steps' => 3]);
+        $parentFlowId = $this->subflowInLoopParent($this->childOfProbes(3), 2);
+
+        $this->start($parentFlowId, 'slot-1');
+
+        $parent = FlowSession::query()->whereNull('parent_session_id')->sole();
+        $this->assertSame(FlowSessionStatus::PausedSubflow, $parent->status);
+        $this->assertSame('p-sub', $parent->current_node_id);
+        // p1 and the subflow node of the first iteration; entering the loop counts outside it.
+        $this->assertSame(2, $parent->loop_iteration_step_count);
+        $this->assertSame(1, $parent->step_count);
+        $this->assertSame(2, $parent->loop_step_count);
+
+        $this->drain();
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
+        $this->assertSame(['p1' => 2, 'k1' => 2, 'k2' => 2, 'k3' => 2], AutomationProbeTestHandler::$runs);
+        $this->assertSame(0, $parent->loop_iteration_step_count);
     }
 
     public function test_a_start_killed_inside_its_subflow_child_is_retried_into_the_child(): void
@@ -649,6 +777,36 @@ final class AutomationRunTest extends FeatureTestCase
         $this->assertSame(['p1' => 1, 'p2' => 1], AutomationProbeTestHandler::$runs);
     }
 
+    public function test_a_run_gets_its_deadline_at_its_start_and_its_subflow_child_carries_the_same(): void
+    {
+        Carbon::setTestNow('2026-11-19 12:00:00');
+        $childFlowId = $this->probeChain(3);
+
+        $this->start($this->subflowParent($childFlowId), 'slot-1');
+
+        $parent = FlowSession::query()->whereNull('parent_session_id')->sole();
+        $child  = FlowSession::query()->whereNotNull('parent_session_id')->sole();
+        $this->assertSame('2026-11-20 12:00:00', $parent->deadline_at?->toDateTimeString(), 'The start plus 24 hours.');
+        $this->assertSame('2026-11-20 12:00:00', $child->deadline_at?->toDateTimeString(), 'A child lives within its run.');
+
+        config(['flow.automation.max_run_hours' => 1]);
+        Carbon::setTestNow('2026-11-19 12:30:00');
+        $this->drain();
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
+        $this->assertSame('2026-11-20 12:00:00', $parent->deadline_at?->toDateTimeString(), 'A setting change never moves a running deadline.');
+    }
+
+    public function test_the_deadline_setting_is_held_within_its_bounds(): void
+    {
+        Carbon::setTestNow('2026-11-19 12:00:00');
+        config(['flow.automation.max_run_hours' => 0]);
+
+        $this->start($this->probeChain(1), 'slot-1');
+
+        $this->assertSame('2026-11-19 13:00:00', FlowSession::query()->sole()->deadline_at?->toDateTimeString());
+    }
+
     public function test_a_conversation_is_not_segmented(): void
     {
         $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
@@ -660,6 +818,7 @@ final class AutomationRunTest extends FeatureTestCase
 
         $this->assertSame(FlowSessionStatus::Ended, $session->status);
         $this->assertSame(0, $session->refresh()->step_count);
+        $this->assertNull($session->deadline_at, 'A conversation has no deadline.');
         Queue::assertNotPushed(ContinueAutomationRunJob::class);
     }
 
@@ -811,6 +970,46 @@ final class AutomationRunTest extends FeatureTestCase
         ], [
             ['id' => 'pe1', 'from' => 'p-sub', 'to' => 'p1', 'handle' => 'success'],
             ['id' => 'pe2', 'from' => 'p1', 'to' => 'p-end', 'handle' => 'default'],
+        ]);
+    }
+
+    /**
+     * A child flow of {@code $probes} probe nodes `k1`, `k2`, … in a row, then an end node.
+     */
+    private function childOfProbes(int $probes): string
+    {
+        $nodes = [];
+
+        for ($i = 1; $i <= $probes; ++$i) {
+            $nodes[] = ['id' => "k{$i}", 'type' => 'automation_probe_test', 'version' => 1, 'config' => []];
+        }
+
+        $nodes[] = ['id' => 'k-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']];
+
+        return $this->flow($nodes);
+    }
+
+    /**
+     * A parent whose counted loop of {@code $iterations} runs a probe `p1` and then {@code $childFlowId} as a subflow in
+     * its body, then ends.
+     */
+    private function subflowInLoopParent(string $childFlowId, int $iterations): string
+    {
+        return $this->flow([
+            ['id' => 'loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                'mode'          => 'counted',
+                'iterator_name' => 'i',
+                'count_source'  => ['type' => 'literal', 'value' => $iterations],
+            ]],
+            ['id' => 'p1', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H']],
+            ['id' => 'le', 'type' => 'loop_end', 'version' => 1, 'config' => ['loop_node_id' => 'loop', 'iterator_name' => 'i']],
+            ['id' => 'p-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [
+            ['id' => 'pe1', 'from' => 'loop', 'to' => 'p1', 'handle' => 'loop'],
+            ['id' => 'pe2', 'from' => 'p1', 'to' => 'p-sub', 'handle' => 'default'],
+            ['id' => 'pe3', 'from' => 'p-sub', 'to' => 'le', 'handle' => 'success'],
+            ['id' => 'pe4', 'from' => 'loop', 'to' => 'p-end', 'handle' => 'default'],
         ]);
     }
 

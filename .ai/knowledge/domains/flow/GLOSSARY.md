@@ -82,6 +82,14 @@ The part of an automation run one queue job executes: at most `flow.automation.s
 `flow.automation.segment_seconds` seconds, after which the run continues in a new job carrying the `segment_id`
 of the run's root session (`adr-20261118-segmented-automation-runs`). Informal synonym: segment.
 
+## Run deadline
+
+The moment an automation run must be over, `deadline_at` on its sessions: its start plus
+`flow.automation.max_run_hours`, frozen at the start and copied to its subflow children. A run still live past it is
+failed whole by `flow:sweep-overdue-automation-runs`, with a **failure reason** (`failure_reason`:
+`deadline_exceeded`, or `start_lost` for a run that never left `pending`); a session the engine failed itself has
+none (`adr-20261119-automation-run-deadline`). Not the subflow timeout (`expires_at`).
+
 ## Routing decision
 
 The outcome of `SessionStateRouter` for an inbound message: `StartViaTrigger`, `ResumeWaiting`,

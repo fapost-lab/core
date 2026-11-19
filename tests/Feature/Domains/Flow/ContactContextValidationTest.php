@@ -218,6 +218,66 @@ final class ContactContextValidationTest extends FeatureTestCase
         $this->assertSame(1, $definition->version);
     }
 
+    public function test_a_scheduled_flow_that_messages_an_addressee_is_published(): void
+    {
+        $nodes = [
+            ['id' => 'tell', 'type' => 'send_message', 'version' => 1, 'config' => [
+                'content_type' => 'text',
+                'text'         => ['en' => 'Your order {{flow.order_id}} has shipped'],
+                'addressee'    => ['kind' => 'contact', 'contact' => '{{flow.customer_id}}'],
+            ]],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [['id' => 'e1', 'from' => 'tell', 'to' => 'end', 'handle' => 'default']];
+
+        $scheduled = $this->draft($nodes, $edges);
+        $this->storeTrigger($scheduled, self::SCHEDULE);
+
+        $definition = $this->app->make(PublishFlowService::class)->execute($scheduled->flow_id);
+
+        $this->assertSame(1, $definition->version);
+    }
+
+    public function test_an_addressee_does_not_excuse_a_contact_read_or_an_empty_expression(): void
+    {
+        $node = static fn (array $config): array => ['n1' => ['id' => 'n1', 'type' => 'send_message', 'version' => 1, 'config' => [
+            'content_type' => 'text',
+            ...$config,
+        ]]];
+
+        $read = $this->contactErrors($node([
+            'text'      => ['en' => 'Hi {{contact.name}}'],
+            'addressee' => ['kind' => 'contact', 'contact' => '{{flow.customer_id}}'],
+        ]), self::SCHEDULE);
+        $this->assertCount(1, $read);
+        $this->assertStringContainsString("it reads 'contact.name'", $read[0]->message);
+
+        $empty = $this->contactErrors($node([
+            'text'      => ['en' => 'Hi'],
+            'addressee' => ['kind' => 'contact', 'contact' => ''],
+        ]), self::SCHEDULE);
+        $this->assertCount(1, $empty);
+        $this->assertStringContainsString("the node type 'send_message' reaches the contact of the run", $empty[0]->message);
+    }
+
+    public function test_a_message_to_an_addressee_cannot_wait_for_an_answer_in_any_flow(): void
+    {
+        $nodes = ['ask' => ['id' => 'ask', 'type' => 'send_message', 'version' => 1, 'config' => [
+            'content_type'  => 'text_with_keyboard',
+            'keyboard_mode' => 'inline',
+            'text'          => ['en' => 'Approve?'],
+            'buttons'       => [['id' => (string) Str::uuid(), 'label' => ['en' => 'Yes'], 'value' => 'yes']],
+            'addressee'     => ['kind' => 'contact', 'contact' => '{{flow.manager_id}}'],
+        ]]];
+
+        foreach ([self::SCHEDULE, self::MESSAGE] as $trigger) {
+            $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $nodes, trigger: $trigger);
+            $codes  = array_map(static fn ($error): string => "{$error->code}@{$error->path}", $result->errors);
+
+            $this->assertContains('addressee_cannot_wait@nodes.ask.config.content_type', $codes);
+        }
+    }
+
     public function test_a_template_publish_that_puts_a_contact_node_into_a_scheduled_host_is_refused(): void
     {
         $template = FlowDraft::factory()->template()->create([

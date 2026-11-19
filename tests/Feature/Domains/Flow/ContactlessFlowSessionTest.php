@@ -6,6 +6,9 @@ namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
+use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
@@ -20,6 +23,8 @@ use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Tests\Feature\FeatureTestCase;
@@ -190,6 +195,48 @@ final class ContactlessFlowSessionTest extends FeatureTestCase
         $assistant->delete();
 
         $this->assertNull($session->refresh()->assistant_id);
+    }
+
+    public function test_a_contactless_run_messages_the_addressee_on_its_assistant_s_channel(): void
+    {
+        $assistant = Assistant::factory()->create(['tenant_id' => $this->tenantId, 'default_language' => 'en']);
+        $customer  = Contact::factory()->forTenant($this->tenantId)->create(['external_id' => 'chat-777']);
+        $channel   = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->getKey(),
+            'tenant_id'    => $this->tenantId,
+            'type'         => ChannelTypeEnum::Telegram,
+            'token'        => 'bot-token',
+            'is_active'    => true,
+        ]));
+        ChannelContact::query()->create([
+            'contact_id'          => $customer->getKey(),
+            'channel_id'          => $channel->getKey(),
+            'last_interaction_at' => now(),
+        ]);
+
+        Http::fake(['*' => Http::response(['ok' => true, 'result' => ['message_id' => 501]])]);
+
+        $definition = $this->definition([
+            ['id' => 'tell', 'type' => 'send_message', 'version' => 1, 'config' => [
+                'content_type' => 'text',
+                'text'         => 'Order {{flow.order_id}} has shipped',
+                'addressee'    => ['kind' => 'contact', 'contact' => '{{flow.customer_id}}'],
+            ]],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [['id' => 'e1', 'from' => 'tell', 'to' => 'end', 'handle' => 'default']]);
+
+        $session = $this->engine()->start(
+            $definition,
+            null,
+            ['flow' => ['customer_id' => (string) $customer->getKey(), 'order_id' => '42']],
+            FlowRunOrigin::automation((string) Str::uuid(), (string) $assistant->getKey()),
+        );
+
+        $this->assertSame(FlowSessionStatus::Ended, $session->status);
+        $this->assertNull($session->contact_id);
+        $this->assertSame('501', (string) $session->state['system']['sent_messages']['tell']);
+        Http::assertSent(static fn (Request $request): bool => 'chat-777' === (string) ($request['chat_id'] ?? null)
+            && 'Order 42 has shipped' === ($request['text'] ?? null));
     }
 
     private function engine(): FlowEngineInterface

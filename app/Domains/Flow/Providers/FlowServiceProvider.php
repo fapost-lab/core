@@ -96,6 +96,8 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Orchestration\AutomationRunDeadline;
+use App\Domains\Flow\Orchestration\AutomationRunDeadlineSweeper;
 use App\Domains\Flow\Orchestration\DelayedSessionResumer;
 use App\Domains\Flow\Orchestration\FlowOrchestrator;
 use App\Domains\Flow\Policies\FlowDraftPolicy;
@@ -294,6 +296,19 @@ final class FlowServiceProvider extends ServiceProvider
         ));
 
         $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: AutomationRunDeadline::SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.automation.max_run_hours',
+            fallback: AutomationRunDeadline::DEFAULT_HOURS,
+            label: 'Maximum automation run duration',
+            description: 'How long an automation run may live, from its start. A run still running or waiting past it — its job was lost, or it sleeps in a delay or waits longer than this — is failed with all its subflows, which cannot be undone. A change applies to runs that start afterwards.',
+            group: 'Flow',
+            unit: 'hours',
+            min: AutomationRunDeadline::MIN_HOURS,
+            max: AutomationRunDeadline::MAX_HOURS,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
             key: AutomationRunRetention::SUCCEEDED_SETTING,
             type: PlatformSettingType::Integer,
             configKey: 'flow.automation_runs.succeeded_retention_days',
@@ -442,6 +457,8 @@ final class FlowServiceProvider extends ServiceProvider
             historyWriterFactory: $app->make(HistoryWriterFactory::class),
         ));
         $this->app->scoped(SubflowTimeoutSweeper::class);
+        $this->app->scoped(AutomationRunDeadline::class);
+        $this->app->scoped(AutomationRunDeadlineSweeper::class);
 
         $this->app->scoped(GlobalCommandExecutor::class);
         $this->app->scoped(

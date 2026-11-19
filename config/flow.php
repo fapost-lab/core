@@ -25,9 +25,14 @@ return [
     // an automation run stops at its saved position after this many steps or seconds, whichever comes first, and
     // continues in a new job on `flow.automations`. The seconds stay under the job timeout (60 s) minus the slowest
     // node, which is why the setting caps them at 30.
+    //
+    // Only the default of the platform setting `flow.automation.max_run_hours`: how long an automation run may live.
+    // The deadline is frozen when a run starts; every minute `flow:sweep-overdue-automation-runs` fails a run still
+    // live past it, which cannot be undone. Held within 1 to 720.
     'automation' => [
         'segment_steps'   => (int) env('FLOW_AUTOMATION_SEGMENT_STEPS', 50),
         'segment_seconds' => (int) env('FLOW_AUTOMATION_SEGMENT_SECONDS', 20),
+        'max_run_hours'   => (int) env('FLOW_AUTOMATION_MAX_RUN_HOURS', 24),
     ],
 
     // Only the defaults of the platform settings `flow.automation_runs.succeeded_retention_days` and

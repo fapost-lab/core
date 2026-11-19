@@ -120,8 +120,14 @@ broken.
   inside a loop body knows it from the iterator in state. A conversation call, which has no segments, also fails a loop
   body still running after `FlowEngineInterface::MAX_SEGMENT_SECONDS` (30 s) of the outermost call — subflow children
   it ran synchronously included — so a long loop of slow nodes never outlives the 60 s job timeout and leaves the
-  session stuck `active`. In an automation the per-iteration allowance restarts with each segment, so a runaway inside
-  or after a loop body that never reaches its `loop_end` is stopped by the ceiling, not by `max_iterations`. Settings are read through the scoped
+  session stuck `active`. An automation also persists the steps of the iteration in progress (`loop_iteration_step_count`,
+  reset by a `loop_end` and by the loop's exit), so a runaway inside or after a loop body that never reaches its
+  `loop_end` stops at `max_iterations` steps of that iteration however many segments it spans; a subflow step whose parent a nested
+  call already took further (its child ended in the same call) leaves that call's `loop_iteration_step_count` in place
+  and counts itself only in `step_count`/`loop_step_count`. Known gap: that nested call starts from the count before the
+  subflow step, so each such step is missing from the iteration count until the next `loop_end`; a runaway body with a
+  subflow in it is held by a looser bound than `max_iterations` (about twice it, or only the ceiling and the run
+  deadline for a cycle of subflow nodes alone). Settings are read through the scoped
   `PlatformSettingsReaderInterface`; a lost session lock aborts with `SessionLockLostException`. Why: a loop over a long
   list is legitimate and must not trip the shared budget, while a runaway flow must still free its worker
   (`adr-20261118-segmented-automation-runs`, amendment 2026-11-19). Enforced: `LoopEngineTest`, `AutomationRunTest`,
@@ -137,6 +143,17 @@ broken.
   second runner or a re-reserved job repeats `call` side effects in somebody else's system, silently
   (`adr-20261118-segmented-automation-runs`). Enforced: `AutomationRunTest`, `AutomationRunLockRedisTest`,
   `ExecutionSegmentTest`, `HorizonAutomationsSupervisorTest`.
+- **An automation run has a deadline frozen at its start; past it the whole run fails and runs no node.**
+  `FlowEngine::start()` writes `deadline_at` = start + `flow.automation.max_run_hours` (24) for `run_kind = automation`
+  only, and a subflow child copies its parent's; a row without one counts from `created_at`. Every minute
+  `flow:sweep-overdue-automation-runs` (`AutomationRunDeadlineSweeper`, per tenant passed explicitly, stopped tenants
+  skipped) fails every live session of a run past its deadline, or still `pending` 3 h after it was created, bottom-up in
+  one transaction under the root's `LockScope::ofSession()`: `status = failed`, `failure_reason` `deadline_exceeded` or
+  `start_lost`, the root's `segment_id` cleared, `updated_at` written; no node runs and no parent takes its `failed`
+  handle. Conversations are never touched. A producer of `pending` rows must write their `deadline_at`. Why: a run
+  whose job was lost would keep its trigger and its flow for good, and a setting lowered later must not fail running
+  runs at once (`adr-20261119-automation-run-deadline`). Enforced: `AutomationRunDeadlineSweeperTest`,
+  `AutomationRunDeadlineSweeperRedisTest`, `SweepOverdueAutomationRunsCommandTest`, `AutomationRunTest`.
 
 ## Rules
 
@@ -171,9 +188,9 @@ broken.
   themselves instead of spending an attempt). A caller that may hold a contactless session takes its scope from `LockScope::ofSession()`, never
   builds it from the session's columns (callers that only ever hold a contact's session — buttons, operator requests,
   event starts — still pass the triple). `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
-  `StartFlowFromEventJob`, `SubflowTimeoutSweeper` and `AutomationRunner` follow it (`tests/Feature/Redis`); the sweeper
-  skips a parent whose lock is busy and retries on its next run, and skips with a warning a parent it cannot lock at
-  all, so one parent never ends its pass.
+  `StartFlowFromEventJob`, `SubflowTimeoutSweeper`, `AutomationRunDeadlineSweeper` and `AutomationRunner` follow it
+  (`tests/Feature/Redis`); the sweepers skip a parent or run whose lock is busy and retry on their next run, and skip
+  with a warning one they cannot lock at all, so one never ends the pass.
 - **A contactless session never reaches a contact through an empty id.** Without a contact,
   `ScopedStateReader` refuses `contact.*` and `module.*`, `ContactWriter` refuses every write and
   `LockScope` refuses a scope with neither a contact nor a trigger, all with `ContactlessSessionException`; `FlowEngine::start()` takes a
@@ -203,10 +220,15 @@ broken.
   `nodes.<id>`. Declare `any` only for a handler checked never to use `NodeExecutionContext::$contactId`,
   `$platform` (both `null` there) or the contact writer without a contact, and hands them on only where the
   receiver takes `null` — `call` is `any` because `CallContext::$contactId` is nullable; `subflow` stays `contact`
-  until its target is followed. Known gap: a trigger
+  until its target is followed. A Core handler that needs a contact by type may name its recipient in a node's
+  config instead (`App\Domains\Flow\Contracts\NamesOwnRecipientInterface`, Core-only): `send_message` with an
+  `addressee` is then not refused for its type, though the rest of its config still is for contact reads; such a node
+  never waits for an answer (`addressee_cannot_wait`) and never falls back to the run's contact when the addressee
+  gives no id (`error`, `addressee_unresolved`). Known gap: a trigger
   changed on draft save goes live before any publish runs this check.
   Why: a contactless run reaches a contact through an empty id or dies on a typed error nobody watches
-  (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`.
+  (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`,
+  `ContactlessFlowSessionTest` (the addressee), `BuiltInNodeHandlersTest`.
 - **A definition's expression engine is the flow's choice, written explicitly at publish and checked with.** The draft
   holds it (`flow_drafts.expression_engine`); `PublishFlowService` passes the engine on to `ValidateFlowService` and
   `TemplateExpander` and writes it onto the definition — the draft's on a publish, the active definition's on a
