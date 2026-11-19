@@ -219,6 +219,20 @@ final class BuilderApiTest extends FeatureTestCase
             ->assertJsonPath('errors.0.code', 'duplicate_exact_trigger_keyword');
     }
 
+    public function test_validate_checks_the_flow_with_the_engine_its_draft_chose(): void
+    {
+        $draft = $this->draft(['expression_engine' => 'not_installed']);
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $this->actingAs($user)
+            ->postJson("/builder/flows/{$draft->flow_id}/validate", ['definition' => ['nodes' => []]])
+            ->assertOk()
+            ->assertJsonPath('valid', false)
+            ->assertJsonPath('errors.0.code', 'expression_engine_unknown')
+            ->assertJsonPath('errors.0.path', 'expression_engine');
+    }
+
     public function test_validate_returns_trigger_errors_when_trigger_payload_is_invalid(): void
     {
         $draft = $this->draft();

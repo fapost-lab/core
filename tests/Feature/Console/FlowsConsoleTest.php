@@ -9,6 +9,7 @@ use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
+use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
@@ -18,6 +19,8 @@ use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use Database\Seeders\TenantAclSeeder;
+use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
+use Fapost\Foundation\Flow\DTO\ExpressionContext;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -407,13 +410,15 @@ final class FlowsConsoleTest extends FeatureTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('Console/Flows/Edit')
                 ->where('flow', [
-                    'id'             => (string) $flow->getKey(),
-                    'name'           => 'Help',
-                    'flowGroupId'    => (string) $group->getKey(),
-                    'description'    => 'Text',
-                    'isPublic'       => false,
-                    'loggingEnabled' => true,
+                    'id'               => (string) $flow->getKey(),
+                    'name'             => 'Help',
+                    'flowGroupId'      => (string) $group->getKey(),
+                    'description'      => 'Text',
+                    'isPublic'         => false,
+                    'loggingEnabled'   => true,
+                    'expressionEngine' => 'template',
                 ])
+                ->where('expressionEngines', ['template'])
                 ->where('groups', [['id' => (string) $group->getKey(), 'name' => 'Support']])
                 ->where('urls.submit', "/assistant/{$this->assistant->getKey()}/flows/{$flow->getKey()}")
                 ->etc());
@@ -449,6 +454,50 @@ final class FlowsConsoleTest extends FeatureTestCase
         $this->assertEquals([['from' => 'a', 'to' => 'b']], $flow->edges);
         $this->assertSame(7, $flow->draft_version);
         $this->assertFalse($flow->is_active);
+    }
+
+    public function test_the_expression_engine_changes_only_when_sent_and_only_to_an_installed_one(): void
+    {
+        $this->app->make(ExpressionEngineRegistry::class)->register(new class () implements ExpressionEngineInterface {
+            public function id(): string
+            {
+                return 'second_test';
+            }
+
+            public function version(): int
+            {
+                return 1;
+            }
+
+            public function evaluate(string $source, ExpressionContext $context): mixed
+            {
+                return $source;
+            }
+
+            public function validate(string $source): void
+            {
+            }
+
+            public function extractReferences(string $source): array
+            {
+                return [];
+            }
+        });
+
+        $flow    = $this->flow('Help');
+        $payload = ['name' => 'Help', 'flow_group_id' => null, 'is_public' => true, 'logging_enabled' => false];
+        $this->actingAs($this->admin());
+
+        $this->put($this->listUrl("/{$flow->getKey()}"), [...$payload, 'expression_engine' => 'not_installed'])
+            ->assertSessionHasErrors('expression_engine');
+        $this->assertSame('template', $flow->fresh()->expression_engine);
+
+        $this->put($this->listUrl("/{$flow->getKey()}"), [...$payload, 'expression_engine' => 'second_test'])->assertRedirect($this->listUrl());
+        $this->assertSame('second_test', $flow->fresh()->expression_engine);
+
+        // The form sends no engine while it shows no choice: the flow keeps the one it has.
+        $this->put($this->listUrl("/{$flow->getKey()}"), $payload)->assertRedirect($this->listUrl());
+        $this->assertSame('second_test', $flow->fresh()->expression_engine);
     }
 
     public function test_every_flow_write_is_in_the_audit_log_and_the_graph_never_is(): void

@@ -34,6 +34,7 @@ final class CreateFlowActionTest extends TestCase
             $table->boolean('is_public')->default(true);
             $table->boolean('is_active')->default(true);
             $table->boolean('logging_enabled')->default(false);
+            $table->string('expression_engine', 32)->default('template');
             $table->json('nodes')->nullable();
             $table->json('edges')->nullable();
             $table->timestamps();

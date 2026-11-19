@@ -18,6 +18,8 @@ export interface FlowsTranslations {
     is_public_hint: string
     logging_enabled: string
     logging_enabled_hint: string
+    expression_engine: string
+    expression_engine_hint: string
   }
   new_group: string
   new_group_title: string

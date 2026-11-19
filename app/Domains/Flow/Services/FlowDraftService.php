@@ -179,7 +179,7 @@ final readonly class FlowDraftService
      * Creates a flow seeded with an `end` node (or a template seeded with one output), for the current assistant.
      * Templates count under the same flow limit.
      *
-     * @param  array{name: string, flow_group_id?: string|null, description?: string|null, is_public?: bool, logging_enabled?: bool}  $data
+     * @param  array{name: string, flow_group_id?: string|null, description?: string|null, is_public?: bool, logging_enabled?: bool, expression_engine?: string}  $data
      *
      * @throws RecordLimitReachedException when the tenant is at its flow limit
      */
@@ -207,18 +207,27 @@ final readonly class FlowDraftService
     /**
      * Changes what the list and the form show; the graph and the draft version stay as they are.
      *
-     * @param  array{name: string, flow_group_id?: string|null, description?: string|null, is_public: bool, logging_enabled: bool}  $data
+     * Without `expression_engine` the flow keeps its engine; a new one applies from the next publish, and the versions
+     * published before keep theirs.
+     *
+     * @param  array{name: string, flow_group_id?: string|null, description?: string|null, is_public: bool, logging_enabled: bool, expression_engine?: string}  $data
      */
     public function update(FlowDraft $flow, array $data): FlowDraft
     {
         DB::transaction(function () use ($flow, $data): void {
-            $flow->update([
+            $attributes = [
                 'name'            => $data['name'],
                 'flow_group_id'   => $data['flow_group_id'] ?? null,
                 'description'     => $data['description'] ?? null,
                 'is_public'       => $data['is_public'],
                 'logging_enabled' => $data['logging_enabled'],
-            ]);
+            ];
+
+            if (array_key_exists('expression_engine', $data)) {
+                $attributes['expression_engine'] = $data['expression_engine'];
+            }
+
+            $flow->update($attributes);
 
             $this->recordUpdated($flow);
         });
@@ -335,7 +344,7 @@ final readonly class FlowDraftService
     {
         $changes = AuditChanges::ofSavedModel(
             $flow,
-            ['name', 'flow_group_id', 'is_public', 'is_active', 'logging_enabled'],
+            ['name', 'flow_group_id', 'is_public', 'is_active', 'logging_enabled', 'expression_engine'],
             ['description'],
         );
 

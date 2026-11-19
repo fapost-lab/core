@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Console;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Services\FlowDraftService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -38,8 +39,11 @@ final class FlowRequest extends FormRequest
     /**
      * @return array<string, list<mixed>>
      */
-    public function rules(TenantContextInterface $tenants, CurrentAssistantInterface $assistant): array
-    {
+    public function rules(
+        TenantContextInterface $tenants,
+        CurrentAssistantInterface $assistant,
+        ExpressionEngineRegistry $expressionEngines,
+    ): array {
         return [
             'name' => ['required', 'string', 'max:255'],
             // Only a group of this assistant: the column has no foreign key to hold it to that.
@@ -54,23 +58,31 @@ final class FlowRequest extends FormRequest
             'description'     => ['nullable', 'string', 'max:65535'],
             'is_public'       => ['required', 'boolean'],
             'logging_enabled' => ['required', 'boolean'],
+            // Sent only while the form shows the choice (more than one engine): absent, the flow keeps its engine.
+            'expression_engine' => ['sometimes', 'string', Rule::in($expressionEngines->ids())],
         ];
     }
 
     /**
-     * @return array{name: string, flow_group_id: string|null, description: string|null, is_public: bool, logging_enabled: bool}
+     * @return array{name: string, flow_group_id: string|null, description: string|null, is_public: bool, logging_enabled: bool, expression_engine?: string}
      */
     public function fields(): array
     {
-        /** @var array{name: string, flow_group_id?: string|null, description?: string|null} $data */
+        /** @var array{name: string, flow_group_id?: string|null, description?: string|null, expression_engine?: string} $data */
         $data = $this->validated();
 
-        return [
+        $fields = [
             'name'            => $data['name'],
             'flow_group_id'   => $data['flow_group_id'] ?? null,
             'description'     => $data['description'] ?? null,
             'is_public'       => $this->boolean('is_public'),
             'logging_enabled' => $this->boolean('logging_enabled'),
         ];
+
+        if (isset($data['expression_engine'])) {
+            $fields['expression_engine'] = $data['expression_engine'];
+        }
+
+        return $fields;
     }
 }

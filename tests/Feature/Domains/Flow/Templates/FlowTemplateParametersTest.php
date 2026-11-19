@@ -8,6 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Flow\Exceptions\FlowValidationException;
+use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Services\LoadBuilderFlowService;
@@ -205,6 +206,7 @@ final class FlowTemplateParametersTest extends FeatureTestCase
             edges: [],
             assistantId: (string) $this->assistant->getKey(),
             isTemplate: false,
+            engineId: TemplateEngine::ID,
         );
 
         $this->assertSame(['template_unknown_parameter'], array_map(static fn ($error): string => $error->code, $errors));

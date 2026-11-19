@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Console;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Flow\Exceptions\FlowHasLiveSessionsException;
+use App\Domains\Flow\Expression\Engines\TemplateEngine;
+use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Services\FlowDraftService;
@@ -38,6 +40,7 @@ final class FlowController extends Controller
         private readonly FlowDraftService $flows,
         private readonly FlowGroupService $groups,
         private readonly CurrentAssistantInterface $assistant,
+        private readonly ExpressionEngineRegistry $expressionEngines,
     ) {
     }
 
@@ -110,9 +113,11 @@ final class FlowController extends Controller
         abort_if($this->flows->limit()->reached, HttpResponse::HTTP_FORBIDDEN);
 
         return Inertia::render('Console/Flows/Create', [
-            'groups' => $this->groups->options(),
-            'can'    => ['createGroup' => Gate::allows('create', FlowGroup::class)],
-            'urls'   => [
+            'groups'            => $this->groups->options(),
+            'expressionEngines' => $this->expressionEngines->ids(),
+            'defaultEngine'     => TemplateEngine::ID,
+            'can'               => ['createGroup' => Gate::allows('create', FlowGroup::class)],
+            'urls'              => [
                 'index'      => $this->url('index'),
                 'submit'     => $this->url('store'),
                 'storeGroup' => $this->groupUrl('store-inline'),
@@ -150,16 +155,18 @@ final class FlowController extends Controller
 
         return Inertia::render('Console/Flows/Edit', [
             'flow' => [
-                'id'             => (string) $flow->getKey(),
-                'name'           => $flow->name,
-                'flowGroupId'    => $groupId,
-                'description'    => $flow->description,
-                'isPublic'       => $flow->is_public,
-                'loggingEnabled' => $flow->logging_enabled,
+                'id'               => (string) $flow->getKey(),
+                'name'             => $flow->name,
+                'flowGroupId'      => $groupId,
+                'description'      => $flow->description,
+                'isPublic'         => $flow->is_public,
+                'loggingEnabled'   => $flow->logging_enabled,
+                'expressionEngine' => $flow->expression_engine,
             ],
-            'groups' => $groups,
-            'can'    => ['createGroup' => Gate::allows('create', FlowGroup::class)],
-            'urls'   => [
+            'groups'            => $groups,
+            'expressionEngines' => $this->expressionEngines->ids(),
+            'can'               => ['createGroup' => Gate::allows('create', FlowGroup::class)],
+            'urls'              => [
                 'index'      => $this->url('index'),
                 'submit'     => $this->url('update', ['record' => $flow->getKey()]),
                 'storeGroup' => $this->groupUrl('store-inline'),

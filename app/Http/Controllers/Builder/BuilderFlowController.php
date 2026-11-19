@@ -122,9 +122,16 @@ final class BuilderFlowController extends Controller
             flowId: $flow,
             edges: $definitionEdges,
             assistantId: $draft->assistant_id,
+            engineId: $draft->expression_engine,
         );
 
-        $templateErrors = $templates->draftErrors($definitionNodes, $definitionEdges, $draft->assistant_id, $draft->isTemplate());
+        $templateErrors = $templates->draftErrors(
+            $definitionNodes,
+            $definitionEdges,
+            $draft->assistant_id,
+            $draft->isTemplate(),
+            $draft->expression_engine,
+        );
 
         if ([] !== $templateErrors) {
             $result = new FlowValidationResultDto(
