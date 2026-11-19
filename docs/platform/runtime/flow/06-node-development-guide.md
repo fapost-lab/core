@@ -357,7 +357,7 @@ Recommendation:
    Implement `DeclaresContextRequirementInterface` with `any` (or `none`) only when the handler never uses
    `$context->contactId`, `$context->platform` or the contact writer without a contact and never hands them on;
    otherwise leave it out: the node then needs a contact and is refused in flows started by a schedule, webhook or
-   API trigger (`adr-20261118-node-contact-context-checked-at-publish`).
+   API trigger, or an event trigger on a Core event (`adr-20261118-node-contact-context-checked-at-publish`).
 4. Register the handler in `FlowServiceProvider::registerCoreNodeHandlers()` (not in `boot()`).
 5. Add or update the UI config (Vue) in the builder.
 6. If the node needs rules beyond required fields, add them to `ValidateFlowService`.

@@ -76,6 +76,19 @@ a session with neither (`ContactlessSessionException`).
 What fired a trigger — a schedule slot, an event id, a webhook delivery id — kept on the session as `fire_key`,
 unique with `trigger_id`, so a trigger starts one run per fire.
 
+## Core event
+
+An event Core itself raises for event triggers — `core.contact.created`, `core.contact.tag_added`,
+`core.contact.tag_removed`, `core.broadcast.completed`, `core.operator_request.timed_out` (`CoreEventCatalog`). It
+starts a contactless run on every active trigger that names it, once per event id. The `core.` prefix is reserved: a
+flow's `emit_event` cannot use it. Not a flow event (one an `emit_event` node raises).
+
+## Event chain depth
+
+How deep in a chain "event → run → event" a session was started: `flow_sessions.event_chain_depth`, 0 when no event
+started it. An event raised inside a session is one deeper; past 5 it starts nothing
+(`adr-20261119-core-events-start-contactless-runs`). Informal synonym: chain depth.
+
 ## Execution segment
 
 The part of an automation run one queue job executes: at most `flow.automation.segment_steps` steps or

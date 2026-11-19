@@ -114,4 +114,14 @@ final class FlowTriggerRepository implements FlowTriggerRepositoryInterface
             ->orderBy('id')
             ->get();
     }
+
+    public function hasActiveEventTrigger(string $tenantId, string $eventName): bool
+    {
+        return FlowTrigger::query()
+            ->where('tenant_id', $tenantId)
+            ->where('type', 'event')
+            ->where('is_active', true)
+            ->where('config->event_name', $eventName)
+            ->exists();
+    }
 }

@@ -60,9 +60,9 @@ shipping any front-end code — see [Builder UI extensions](/extending/builder-u
 | `$state` | Namespaced session state, **read-only** for the handler |
 | `$context` | `NodeExecutionContext` — tenant, contact, and session metadata, plus the writers a handler is allowed to use |
 
-A flow started by a schedule, a webhook or an API call runs without a contact. A node needs a contact unless its
-handler says otherwise, so such a flow cannot be published while it holds your node; nodes in flows started by a
-message or an event are unaffected. A handler that can run without a contact implements
+A flow started by a schedule, a webhook, an API call or a [Core event](/reference/events#core-events) runs without a
+contact. A node needs a contact unless its handler says otherwise, so such a flow cannot be published while it holds
+your node; nodes in flows started by a message or by another flow's event are unaffected. A handler that can run without a contact implements
 `Fapost\Foundation\Flow\Contracts\DeclaresContextRequirementInterface`:
 
 ```php

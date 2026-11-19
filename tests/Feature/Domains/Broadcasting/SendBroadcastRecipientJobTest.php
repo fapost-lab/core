@@ -7,6 +7,7 @@ namespace Tests\Feature\Domains\Broadcasting;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\RecipientStatus;
+use App\Domains\Broadcasting\Events\BroadcastCompleted;
 use App\Domains\Broadcasting\Jobs\SendBroadcastRecipientJob;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Models\BroadcastRecipient;
@@ -17,6 +18,7 @@ use App\Domains\Contact\Models\Contact;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessageSenderInterface;
 use Fapost\Foundation\Messaging\OutboundMessage;
+use Illuminate\Support\Facades\Event;
 use Tests\Feature\FeatureTestCase;
 
 final class SendBroadcastRecipientJobTest extends FeatureTestCase
@@ -37,6 +39,51 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
         $this->assertSame('pmid-1', $recipient->provider_message_id);
         $this->assertSame(1, $broadcast->sent_count);
         $this->assertSame(BroadcastStatus::Completed, $broadcast->status, 'Last recipient must complete the broadcast.');
+    }
+
+    public function test_the_last_recipient_announces_the_completed_broadcast_once_with_final_counts(): void
+    {
+        Event::fake([BroadcastCompleted::class]);
+        $this->fakeSender(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        [$broadcast, $recipient] = $this->scenario();
+
+        $this->send($recipient);
+        $this->send($recipient); // retry: the recipient is already settled
+
+        Event::assertDispatchedTimes(BroadcastCompleted::class, 1);
+        Event::assertDispatched(BroadcastCompleted::class, fn (BroadcastCompleted $event): bool => self::TENANT_ID === $event->tenantId
+            && (string) $broadcast->getKey() === $event->broadcastId
+            && 'Promo' === $event->name
+            && 1 === $event->recipientsTotal
+            && 1 === $event->sent
+            && 0 === $event->failed);
+    }
+
+    public function test_a_recipient_that_is_not_the_last_announces_nothing(): void
+    {
+        Event::fake([BroadcastCompleted::class]);
+        $this->fakeSender(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        [$broadcast, $recipient] = $this->scenario();
+        $broadcast->update(['total_recipients' => 2]);
+
+        $this->send($recipient);
+
+        $this->assertSame(BroadcastStatus::Running, $broadcast->fresh()->status);
+        Event::assertNotDispatched(BroadcastCompleted::class);
+    }
+
+    public function test_a_cancelled_broadcast_announces_no_completion(): void
+    {
+        Event::fake([BroadcastCompleted::class]);
+
+        [$broadcast, $recipient] = $this->scenario();
+        $broadcast->update(['status' => BroadcastStatus::Cancelled->value]);
+
+        $this->send($recipient);
+
+        Event::assertNotDispatched(BroadcastCompleted::class);
     }
 
     public function test_is_idempotent_when_recipient_already_processed(): void

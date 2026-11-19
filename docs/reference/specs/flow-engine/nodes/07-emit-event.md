@@ -35,10 +35,13 @@ An empty `event_type` throws `InvalidNodeConfigException`.
 
 ## Behavior
 
-1. Render `payload` (every string leaf) through `TemplateRenderer`.
-2. Publish through `FlowTriggerEventPublisherInterface::publish(tenantId, eventName, payload, source)`
+1. An `event_type` in Core's reserved namespace (`core.`, `CoreEventCatalog`) is not published: the node logs
+   `flow.event.reserved_name_dropped` and takes `success`. Validation refuses such a name (`reserved_event_name`);
+   this covers definitions published before the reservation.
+2. Render `payload` (every string leaf) through `TemplateRenderer`.
+3. Publish through `FlowTriggerEventPublisherInterface::publish(tenantId, eventName, payload, source)`
    with `source = {tenant_id, session_id, node_id, contact_id}`.
-3. Return `Executed` with the `success` handle and metadata `event_type`. The engine does **not** wait
+4. Return `Executed` with the `success` handle and metadata `event_type`. The engine does **not** wait
    for the event to be handled.
 
 ### Publisher chain
@@ -46,13 +49,20 @@ An empty `event_type` throws `InvalidNodeConfigException`.
 ```
 FlowTriggerEventPublisherInterface
   -> QueuedFlowTriggerEventPublisher        (app/Domains/Flow/Events/)
-       dispatches DispatchFlowTriggerEventJob on queue `scheduled.triggers`
+       mints the event id, takes the chain depth (the running session's + 1, from EventChainContext),
+       drops an event deeper than MAX_CHAIN_DEPTH (5) with `flow.event.chain_depth_exceeded`, and
+       dispatches DispatchFlowTriggerEventJob on queue `scheduled.triggers` after commit
   -> DispatchFlowTriggerEventJob            (app/Jobs/Flow/)
        switches to the tenant, registers the event name in the tenant registry (best effort),
        resolves subscribed event triggers (ResolveEventTriggersService) and fans out one job per trigger
   -> StartFlowFromEventJob                  (app/Jobs/Flow/), queue `scheduled.triggers`
-       starts the subscribed flow through FlowEngine::start under the contact's session lock
+       starts the subscribed flow through FlowEngine::start under the contact's session lock,
+       recording the event's chain depth on the session
 ```
+
+The same publisher carries Core's own events (`CoreEventCatalog`, raised by `Listeners/PublishCoreEvents`):
+those are queued only when an active trigger listens, get `event_id` and `occurred_at` in their payload, and fan
+out to `StartAutomationRunJob` — a contactless run per trigger with the event id as its fire key.
 
 Details of the fan-out:
 

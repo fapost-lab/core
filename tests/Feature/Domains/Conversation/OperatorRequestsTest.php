@@ -268,7 +268,9 @@ final class OperatorRequestsTest extends FeatureTestCase
 
         $this->assertSame(ConversationOwner::Bot, Conversation::query()->sole()->owner_type);
         $this->assertSame(OperatorRequestState::Timeout, $this->requests()->find($id)?->state);
-        Event::assertDispatched(OperatorRequestStateChanged::class, fn (OperatorRequestStateChanged $event): bool => OperatorRequestState::Timeout === $event->state);
+        Event::assertDispatched(OperatorRequestStateChanged::class, fn (OperatorRequestStateChanged $event): bool => OperatorRequestState::Timeout === $event->state
+            && null !== $event->assistantId
+            && null !== $event->contactId);
         $this->assertFalse($this->requests()->expire($id));
         $this->assertFalse($this->requests()->cancel($id));
     }

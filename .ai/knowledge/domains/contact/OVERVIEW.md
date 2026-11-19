@@ -15,7 +15,7 @@ paths:
   - "app/Http/Requests/Console/*Contact*"
   - "resources/js/pages/Console/Contacts/**"
   - "resources/js/pages/Console/ContactSegments/**"
-reviewed_at: 2026-10-16
+reviewed_at: 2026-11-19
 ---
 # Contact
 
@@ -34,6 +34,10 @@ condition is removed (`ContactSegmentRequest` validates against `ContactPlatform
 
 - Bindings are plain `bind` (`ContactServiceInterface`, `ContactTagRepositoryInterface`) in
   `Providers/ContactServiceProvider.php`.
+- Domain events: `ContactService::findOrCreate()` raises `Events/ContactCreated` for a contact it really created, and
+  `ContactTagRepository` raises `ContactTagAdded` / `ContactTagRemoved` for every tag that really changed (tenant id
+  read from the contact row); a no-op raises nothing. Contact does not depend on Flow: Flow listens and publishes them
+  as Core events (`adr-20261119-core-events-start-contactless-runs`).
 - Consumers:
   - Flow imports Contact the most, mostly the concrete `Contact` model (including in Flow's own
     contracts); `ContactWriter` saves it.

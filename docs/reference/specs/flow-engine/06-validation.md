@@ -74,6 +74,7 @@ Annotation nodes (`comment`) are exempt from node-level checks. Per node:
 | `invalid_module_reference`, `unknown_module_accessor` | `module.*` references resolve to a registered data accessor |
 | `legacy_media_field`, `media_file_not_found` | `send_message` media uses `media_file_id` pointing at an existing media file |
 | `emit_event_missing_type`, `emit_event_template_in_type`, `emit_event_invalid_type` | `event_type` is a literal made of alphanumerics, underscores and dots |
+| `reserved_event_name` | `event_type` does not start with `core.`: that namespace is Core's (`CoreEventCatalog`) |
 | `end_invalid_status` | `end.status` is a valid `EndStatus` |
 | `rag_missing_knowledge_base_id`, `rag_template_in_knowledge_base_id`, `rag_missing_provider`, `rag_missing_query` | `rag_query` has a literal knowledge base id, a provider and a query template. The knowledge base is **not** looked up |
 | `input_missing_save_target` | `input` has a `variable.name` (or legacy `save_to`) |
@@ -114,7 +115,7 @@ does not know is refused with `expression_engine_unknown` (path `expression_engi
 (`adr-20261119-expression-engine-chosen-per-flow`).
 
 Contact context (`ContactContextChecker`, code `node_needs_contact`, path `nodes.<id>`): when any trigger of the flow,
-active or not, gives no contact — `schedule`, `webhook`, `api` (`FlowTriggerType::givesContact()`) — no node may need
+active or not, gives no contact — `schedule`, `webhook`, `api`, or `event` on a Core event (`TriggerContactContext::givesContact()`) — no node may need
 one. The triggers are the list being validated or published; without a list, the flow's live triggers. No trigger at
 all means a contact. A node needs a contact when its handler declares `NodeContextRequirement::Contact` or declares
 nothing (Foundation's `DeclaresContextRequirementInterface`, which a Solution's handler may implement too), or when its config reads `contact.*` or

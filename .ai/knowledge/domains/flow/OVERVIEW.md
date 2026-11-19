@@ -31,7 +31,7 @@ reviewed_at: 2026-11-19
 ## Responsibility
 
 Flow executes published flow definitions for a contact, or as a contactless automation run
-(no contact, optionally no assistant; started through `Orchestration/AutomationRunner` by `StartAutomationRunJob`, which no trigger dispatches yet). It routes an inbound message or event
+(no contact, optionally no assistant; started through `Orchestration/AutomationRunner` by `StartAutomationRunJob`, which a Core event dispatches — `DispatchFlowTriggerEventJob`, from the events of `Events/CoreEventCatalog` that `Listeners/PublishCoreEvents` publishes). It routes an inbound message or event
 to a flow session, runs node handlers until the flow waits, ends or fails, and persists session
 state. It also owns triggers, subflows, the session lock, run history and logs, the template
 expression engine, and content translation (`Translations/`, `ContentTranslatorInterface`),

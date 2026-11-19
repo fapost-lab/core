@@ -35,4 +35,10 @@ interface FlowTriggerRepositoryInterface
      * @return iterable<FlowTrigger>
      */
     public function getActiveEventTriggers(string $tenantId, string $eventName): iterable;
+
+    /**
+     * Whether any flow of the tenant has an active event trigger on this event — a cheap check before an event is
+     * queued, so a Core event nobody listens to costs no job.
+     */
+    public function hasActiveEventTrigger(string $tenantId, string $eventName): bool;
 }

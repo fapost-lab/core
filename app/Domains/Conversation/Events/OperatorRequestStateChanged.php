@@ -19,12 +19,16 @@ final readonly class OperatorRequestStateChanged implements ShouldDispatchAfterC
 {
     /**
      * @param  string|null  $actorUserId  the operator who accepted or finished, for those two states
+     * @param  string|null  $assistantId  the assistant the request was raised on
+     * @param  string|null  $contactId    the contact who asked for an operator
      */
     public function __construct(
         public string $tenantId,
         public string $requestId,
         public OperatorRequestState $state,
         public ?string $actorUserId = null,
+        public ?string $assistantId = null,
+        public ?string $contactId = null,
     ) {
     }
 }

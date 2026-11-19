@@ -7,6 +7,7 @@ namespace Tests\Feature\Domains\Broadcasting;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\RecipientStatus;
+use App\Domains\Broadcasting\Events\BroadcastCompleted;
 use App\Domains\Broadcasting\Jobs\RunBroadcastJob;
 use App\Domains\Broadcasting\Jobs\SendBroadcastRecipientJob;
 use App\Domains\Broadcasting\Models\Broadcast;
@@ -20,6 +21,7 @@ use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Models\ContactTag;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 
@@ -60,6 +62,38 @@ final class RunBroadcastJobTest extends FeatureTestCase
         $this->assertSame(0, $broadcast->total_recipients);
         $this->assertNotNull($broadcast->completed_at);
         Bus::assertNotDispatched(SendBroadcastRecipientJob::class);
+    }
+
+    public function test_empty_audience_announces_the_completed_broadcast_once(): void
+    {
+        Bus::fake();
+        Event::fake([BroadcastCompleted::class]);
+
+        $channel   = $this->channel();
+        $broadcast = $this->runningBroadcast((string) $channel->assistant_id, target: 'tags', tags: ['nobody']);
+
+        $this->runJob($broadcast);
+
+        Event::assertDispatchedTimes(BroadcastCompleted::class, 1);
+        Event::assertDispatched(BroadcastCompleted::class, fn (BroadcastCompleted $event): bool => self::TENANT_ID === $event->tenantId
+            && (string) $broadcast->getKey() === $event->broadcastId
+            && 'Promo' === $event->name
+            && 0 === $event->recipientsTotal
+            && 0 === $event->sent
+            && 0 === $event->failed);
+    }
+
+    public function test_a_non_empty_run_does_not_announce_completion_yet(): void
+    {
+        Bus::fake();
+        Event::fake([BroadcastCompleted::class]);
+
+        $channel = $this->channel();
+        $this->bind($this->contact(), $channel);
+
+        $this->runJob($this->runningBroadcast((string) $channel->assistant_id));
+
+        Event::assertNotDispatched(BroadcastCompleted::class);
     }
 
     public function test_segment_target_only_reaches_matching_contacts(): void

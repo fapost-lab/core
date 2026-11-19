@@ -13,9 +13,10 @@ enum FlowTriggerType: string
     case Event    = 'event';
 
     /**
-     * Whether a run this trigger starts has a contact. A message comes from one; an event trigger starts for the
-     * contact the event carries. A schedule, a webhook and an API call start a run without one, so a flow with such
-     * a trigger may hold no node that needs a contact (`ContactContextChecker`).
+     * Whether a run a trigger of this type starts has a contact. A message comes from one; an event trigger starts for
+     * the contact a flow's event carries — but not for a Core event, which only the trigger's config tells, so ask
+     * `TriggerContactContext::givesContact()` for a trigger. A schedule, a webhook and an API call start a run without
+     * one, so a flow with such a trigger may hold no node that needs a contact (`ContactContextChecker`).
      */
     public function givesContact(): bool
     {

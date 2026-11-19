@@ -1136,7 +1136,7 @@ final class BuiltInNodeHandlersTest extends TestCase
                         && 'contact-1' === $source['contact_id'])
             );
 
-        $handler = new EmitEventNodeHandler($publisher, new TemplateRenderer());
+        $handler = new EmitEventNodeHandler($publisher, new TemplateRenderer(), new NullLogger());
         $context = $this->context(nodeId: 'emit-1');
 
         $result = $handler->execute([
@@ -1158,12 +1158,33 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('sales.order.created', $result->metadata['event_type']);
     }
 
+    public function test_emit_event_drops_a_name_in_cores_reserved_namespace_and_goes_on(): void
+    {
+        $publisher = Mockery::mock(FlowTriggerEventPublisherInterface::class);
+        $publisher->shouldNotReceive('publish');
+        $logger = Mockery::mock(LoggerInterface::class);
+        $logger->shouldReceive('warning')
+            ->once()
+            ->with('flow.event.reserved_name_dropped', Mockery::on(static fn (array $context): bool => 'core.contact.created' === $context['event_name']));
+
+        $handler = new EmitEventNodeHandler($publisher, new TemplateRenderer(), $logger);
+
+        $result = $handler->execute(
+            ['id' => 'emit-x', 'config' => ['event_type' => 'core.contact.created', 'payload' => ['contact_id' => 'fake']]],
+            [],
+            $this->context(nodeId: 'emit-x'),
+        );
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('success', $result->sourceHandle);
+    }
+
     public function test_emit_event_throws_when_event_type_is_missing(): void
     {
         $publisher = Mockery::mock(FlowTriggerEventPublisherInterface::class);
         $publisher->shouldNotReceive('publish');
 
-        $handler = new EmitEventNodeHandler($publisher, new TemplateRenderer());
+        $handler = new EmitEventNodeHandler($publisher, new TemplateRenderer(), new NullLogger());
 
         $this->expectException(InvalidNodeConfigException::class);
 

@@ -41,6 +41,15 @@ const filteredEvents = computed<string[]>(() => {
     return props.availableEvents.filter((name) => name.toLowerCase().includes(query))
 })
 
+/** Core's own events (`core.*`): they start the flow without a contact. */
+const CORE_EVENT_PREFIX = 'core.'
+
+const coreEvents = computed<string[]>(() => filteredEvents.value.filter((name) => name.startsWith(CORE_EVENT_PREFIX)))
+
+const flowEvents = computed<string[]>(() => filteredEvents.value.filter((name) => !name.startsWith(CORE_EVENT_PREFIX)))
+
+const isCoreEvent = computed<boolean>(() => currentEventName.value.startsWith(CORE_EVENT_PREFIX))
+
 function setEventName(name: string): void {
     update({ config: { event_name: name } })
 }
@@ -298,14 +307,28 @@ function defaultConfig(type: string): Record<string, unknown> {
                         @blur="eventDropdownOpen = false"
                     >
                     <div v-if="eventDropdownOpen && filteredEvents.length" class="event-dropdown">
-                        <button
-                            v-for="eventName in filteredEvents"
-                            :key="eventName"
-                            type="button"
-                            class="event-option"
-                            :class="{ active: eventName === currentEventName }"
-                            @mousedown.prevent="selectEvent(eventName)"
-                        >{{ eventName }}</button>
+                        <template v-if="coreEvents.length">
+                            <div class="event-group" data-test="event-group-core">Core</div>
+                            <button
+                                v-for="eventName in coreEvents"
+                                :key="eventName"
+                                type="button"
+                                class="event-option"
+                                :class="{ active: eventName === currentEventName }"
+                                @mousedown.prevent="selectEvent(eventName)"
+                            >{{ eventName }}</button>
+                        </template>
+                        <template v-if="flowEvents.length">
+                            <div v-if="coreEvents.length" class="event-group" data-test="event-group-flow">Flow events</div>
+                            <button
+                                v-for="eventName in flowEvents"
+                                :key="eventName"
+                                type="button"
+                                class="event-option"
+                                :class="{ active: eventName === currentEventName }"
+                                @mousedown.prevent="selectEvent(eventName)"
+                            >{{ eventName }}</button>
+                        </template>
                     </div>
                     <div
                         v-else-if="eventDropdownOpen && currentEventName.trim()"
@@ -314,8 +337,12 @@ function defaultConfig(type: string): Record<string, unknown> {
                         No matching event — it will be saved as a new event name.
                     </div>
                 </div>
-                <div class="field-hint">
-                    Lists events from all assistants in this tenant. Pick one or type a new name.
+                <div v-if="isCoreEvent" class="field-hint" data-test="core-event-hint">
+                    A Core event starts the flow without a contact: the event's data is in flow.event.*, and nodes that
+                    need a contact cannot be published.
+                </div>
+                <div v-else class="field-hint">
+                    Lists Core events and events from all assistants in this tenant. Pick one or type a new name.
                 </div>
             </div>
         </AccordionSection>
@@ -343,6 +370,14 @@ function defaultConfig(type: string): Record<string, unknown> {
     border-radius: var(--radius);
     box-shadow: var(--shadow-md);
     padding: 4px;
+}
+.event-group {
+    padding: 6px 8px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-3);
 }
 .event-option {
     display: block;

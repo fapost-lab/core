@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace App\Domains\Contact\Repositories;
 
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
+use App\Domains\Contact\Events\ContactTagAdded;
+use App\Domains\Contact\Events\ContactTagRemoved;
+use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactTag;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
@@ -14,9 +18,15 @@ use Illuminate\Database\UniqueConstraintViolationException;
  * Reads/writes the {@code contact_tags} table. Idempotency is guaranteed by the
  * unique (contact_id, tag) constraint plus violation fallbacks, keeping the
  * {@see \App\Domains\Flow\Handlers\SetTagNodeHandler} safe to retry.
+ *
+ * Announces every tag that really changed with {@see ContactTagAdded} / {@see ContactTagRemoved}; a no-op raises nothing.
  */
 final class ContactTagRepository implements ContactTagRepositoryInterface
 {
+    public function __construct(private readonly Dispatcher $events)
+    {
+    }
+
     /**
      * The insert runs in its own (nested) transaction: on PostgreSQL a failed
      * statement aborts the whole surrounding transaction, so catching the
@@ -37,19 +47,29 @@ final class ContactTagRepository implements ContactTagRepositoryInterface
                 ]);
             });
 
-            return true;
         } catch (UniqueConstraintViolationException) {
             // Tag already present — retry-safe no-op.
             return false;
         }
+
+        // After the nested transaction closed, so the event never leaves a listener inside the insert's savepoint.
+        $this->announceAdded($contactId, $tag, $taggedBy);
+
+        return true;
     }
 
     public function remove(string $contactId, string $tag): bool
     {
-        return ContactTag::query()
+        $removed = ContactTag::query()
             ->where('contact_id', $contactId)
             ->where('tag', $tag)
             ->delete() > 0;
+
+        if ($removed) {
+            $this->announceRemoved($contactId, [$tag]);
+        }
+
+        return $removed;
     }
 
     public function toggle(string $contactId, string $tag, ?string $taggedBy): bool
@@ -109,11 +129,57 @@ final class ContactTagRepository implements ContactTagRepositoryInterface
 
         $toRemove = array_diff($existing, $desired);
 
-        if ([] !== $toRemove) {
-            ContactTag::query()
+        $removed = [];
+
+        // One delete per tag, so only a tag this call really removed is announced — not one a concurrent call took.
+        foreach ($toRemove as $tag) {
+            $deleted = ContactTag::query()
                 ->where('contact_id', $contactId)
-                ->whereIn('tag', $toRemove)
+                ->where('tag', $tag)
                 ->delete();
+
+            if ($deleted > 0) {
+                $removed[] = $tag;
+            }
         }
+
+        if ([] !== $removed) {
+            $this->announceRemoved($contactId, $removed);
+        }
+    }
+
+    /**
+     * The tags table carries no tenant id, so it is read from the contact; a contact that is gone raises nothing.
+     */
+    private function announceAdded(string $contactId, string $tag, ?string $taggedBy): void
+    {
+        $tenantId = $this->tenantOf($contactId);
+
+        if (null !== $tenantId) {
+            $this->events->dispatch(new ContactTagAdded($tenantId, $contactId, $tag, $taggedBy));
+        }
+    }
+
+    /**
+     * @param  list<string>  $tags
+     */
+    private function announceRemoved(string $contactId, array $tags): void
+    {
+        $tenantId = $this->tenantOf($contactId);
+
+        if (null === $tenantId) {
+            return;
+        }
+
+        foreach ($tags as $tag) {
+            $this->events->dispatch(new ContactTagRemoved($tenantId, $contactId, $tag));
+        }
+    }
+
+    private function tenantOf(string $contactId): ?string
+    {
+        $tenantId = Contact::query()->whereKey($contactId)->value('tenant_id');
+
+        return null === $tenantId ? null : (string) $tenantId;
     }
 }

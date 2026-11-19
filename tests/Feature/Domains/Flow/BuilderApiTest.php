@@ -7,6 +7,7 @@ namespace Tests\Feature\Domains\Flow;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Flow\Events\CoreEventCatalog;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Models\TenantEvent;
@@ -61,7 +62,7 @@ final class BuilderApiTest extends FeatureTestCase
                         ->has('triggers', 1)
                         ->where('triggers.0.id', mb_strtolower((string) $row->getKey()))
                         ->where('triggers.0.type', 'event')
-                        ->where('availableEvents.0', 'employee_registered')
+                        ->where('availableEvents', [...CoreEventCatalog::names(), 'employee_registered'])
                         ->etc());
             });
     }
@@ -81,7 +82,7 @@ final class BuilderApiTest extends FeatureTestCase
                 $page->component('FlowBuilder/FlowEditor')
                     ->has('flow', fn (AssertableInertia $flow): AssertableInertia => $flow
                         ->where('flowId', $draft->flow_id)
-                        ->where('availableEvents', [])
+                        ->where('availableEvents', CoreEventCatalog::names())
                         ->etc());
             });
     }
@@ -426,6 +427,42 @@ final class BuilderApiTest extends FeatureTestCase
             ->assertOk()
             ->assertJsonPath('valid', false)
             ->assertJsonPath('errors.0.code', 'unknown_event_trigger_selection');
+    }
+
+    public function test_a_core_event_is_selectable_without_a_registry_row_and_its_flow_runs_without_a_contact(): void
+    {
+        $draft = $this->draft();
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $response = $this->actingAs($user)
+            ->postJson("/builder/flows/{$draft->flow_id}/validate", [
+                'definition' => [[
+                    'id'      => 'input_1',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
+                ]],
+                'triggers' => [[
+                    'id'        => (string) Str::uuid(),
+                    'type'      => 'event',
+                    'is_active' => true,
+                    'priority'  => 100,
+                    'config'    => ['event_name' => CoreEventCatalog::CONTACT_CREATED],
+                ]],
+            ])
+            ->assertOk();
+
+        $codes = array_column($response->json('errors'), 'code');
+        $this->assertNotContains('unknown_event_trigger_selection', $codes);
+        $this->assertContains('node_needs_contact', $codes, 'An input waits for the contact a Core event does not give.');
     }
 
     public function test_validate_returns_duplicate_keyword_error_for_exact_message_trigger_conflict(): void

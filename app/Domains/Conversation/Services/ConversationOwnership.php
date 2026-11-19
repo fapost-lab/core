@@ -155,7 +155,7 @@ final readonly class ConversationOwnership implements ConversationOwnershipInter
         });
 
         if ($settled instanceof OperatorRequest) {
-            $this->events->dispatch(new OperatorRequestStateChanged($settled->tenantId, $settled->id, $settled->state, $actorUserId));
+            $this->events->dispatch(new OperatorRequestStateChanged($settled->tenantId, $settled->id, $settled->state, $actorUserId, $settled->assistantId, $settled->contactId));
         }
 
         return $changed;

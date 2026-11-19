@@ -476,6 +476,25 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertContains('emit_event_invalid_type', $codes);
     }
 
+    public function test_emit_event_refuses_a_name_in_cores_reserved_namespace(): void
+    {
+        $service = $this->makeServiceWithEmitEvent();
+
+        foreach (['core.contact.created', 'core.anything_else', 'Core.Contact.Created'] as $eventType) {
+            $result = $service->execute([
+                'ev_1' => [
+                    'id'      => 'ev_1',
+                    'type'    => 'emit_event',
+                    'version' => 1,
+                    'config'  => ['event_type' => $eventType],
+                ],
+            ]);
+
+            $codes = array_map(static fn ($e) => $e->code, $result->errors);
+            $this->assertContains('reserved_event_name', $codes, $eventType);
+        }
+    }
+
     public function test_emit_event_accepts_dotted_alphanumeric_type(): void
     {
         $service = $this->makeServiceWithEmitEvent();
