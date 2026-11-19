@@ -16,7 +16,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
-reviewed_at: 2026-11-18
+reviewed_at: 2026-11-19
 ---
 # Flow glossary
 
@@ -122,7 +122,8 @@ An inline button that re-enters a finished session's branch when pressed.
 
 ## Expression engine
 
-The evaluator used for templates in node config; its id is snapshotted per definition. Only the
+The evaluator used for templates in node config. The author chooses it per flow (`flow_drafts.expression_engine`)
+and publishing snapshots its id onto the definition (`adr-20261119-expression-engine-chosen-per-flow`). Only the
 `template` engine exists.
 
 ## Content translator

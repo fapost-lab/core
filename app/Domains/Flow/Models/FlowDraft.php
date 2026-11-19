@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property bool                    $is_public
  * @property bool                    $is_active
  * @property bool                    $logging_enabled
+ * @property string                  $expression_engine  Engine id the author chose; snapshotted onto each published definition
  * @property array<array-key, mixed> $nodes
  * @property array<array-key, mixed> $edges
  * @property \Illuminate\Support\Carbon|null $created_at
@@ -86,6 +87,7 @@ final class FlowDraft extends BaseModel
         'is_public',
         'is_active',
         'logging_enabled',
+        'expression_engine',
         'nodes',
         'edges',
     ];

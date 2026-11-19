@@ -14,11 +14,13 @@ import type { FlowGroupOption, FlowsPageProps } from './types'
 
 /** The fields of a flow, shared by the create and the edit screen. The server validates; its errors show under the fields. */
 const props = defineProps<{
-  initial: { name: string; flowGroupId: string | null; description: string | null; isPublic: boolean; loggingEnabled: boolean }
+  initial: { name: string; flowGroupId: string | null; description: string | null; isPublic: boolean; loggingEnabled: boolean; expressionEngine: string }
   method: 'post' | 'put'
   submitUrl: string
   cancelUrl: string
   groups: FlowGroupOption[]
+  /** The installed expression engines; with only one there is nothing to choose, and the field is neither shown nor sent. */
+  expressionEngines: string[]
   canCreateGroup: boolean
   storeGroupUrl: string
   submitLabel?: string
@@ -37,6 +39,20 @@ const form = useForm({
   description: props.initial.description ?? '',
   is_public: props.initial.isPublic,
   logging_enabled: props.initial.loggingEnabled,
+  expression_engine: props.initial.expressionEngine,
+})
+
+const chooseEngine = computed(() => props.expressionEngines.length > 1)
+
+// Absent, the flow keeps its engine: a hidden field must not be validated against the installed engines.
+form.transform((data) => {
+  if (chooseEngine.value) {
+    return data
+  }
+
+  const { expression_engine: _omitted, ...rest } = data
+
+  return rest
 })
 
 const groupValue = computed({
@@ -92,6 +108,17 @@ function submit(): void {
 
         <FormField id="logging_enabled" :label="t.fields.logging_enabled" :hint="t.fields.logging_enabled_hint" :error="form.errors.logging_enabled" v-slot="{ invalid, describedBy }">
           <Switch id="logging_enabled" v-model="form.logging_enabled" :aria-invalid="invalid" :aria-describedby="describedBy" />
+        </FormField>
+
+        <FormField v-if="chooseEngine" id="expression_engine" :label="t.fields.expression_engine" :hint="t.fields.expression_engine_hint" :error="form.errors.expression_engine" v-slot="{ invalid, describedBy }">
+          <Select v-model="form.expression_engine">
+            <SelectTrigger id="expression_engine" class="w-full" :aria-invalid="invalid" :aria-describedby="describedBy">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="engine in expressionEngines" :key="engine" :value="engine">{{ engine }}</SelectItem>
+            </SelectContent>
+          </Select>
         </FormField>
       </FormSection>
 

@@ -192,6 +192,14 @@ broken.
   changed on draft save goes live before any publish runs this check.
   Why: a contactless run reaches a contact through an empty id or dies on a typed error nobody watches
   (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`.
+- **A definition's expression engine is the flow's choice, written explicitly at publish and checked with.** The draft
+  holds it (`flow_drafts.expression_engine`); `PublishFlowService` passes the engine on to `ValidateFlowService` and
+  `TemplateExpander` and writes it onto the definition — the draft's on a publish, the active definition's on a
+  republish by a template (never the host draft's), the template draft's on a template's own publish. A checker never
+  looks the engine up by flow id. An unregistered id is refused (`expression_engine_unknown`), and a template is placed
+  only in a flow of its engine (`template_engine_mismatch`). Why: a republish must not publish a host's unpublished
+  choice, and one definition runs one engine (`adr-20261119-expression-engine-chosen-per-flow`). Enforced:
+  `FlowExpressionEngineTest`, `BuilderApiTest::test_validate_checks_the_flow_with_the_engine_its_draft_chose`; a template's own snapshot is review only (no test publishes a template with another engine).
 - **New built-in state namespaces go into the foundation `StateNamespace` enum.** Core keeps no enum of
   its own (ADR-0002). The runtime list is `StateNamespacesInterface` (`StateNamespaceRegistry`: built-ins plus
   Solution namespaces, frozen at boot); readers (`ScopedStateReader`, `OperandResolver`) and the branch

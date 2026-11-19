@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Actions;
 
 use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowKind;
+use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\TemplateOutputNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
@@ -49,18 +50,19 @@ final readonly class CreateFlowAction
         $kind = $kind instanceof FlowKind ? $kind : FlowKind::from((string) $kind);
 
         $draft = FlowDraft::create([
-            'tenant_id'       => $this->tenantContext->get()->id,
-            'flow_id'         => (string)Str::uuid(),
-            'kind'            => $kind,
-            'assistant_id'    => $data['assistant_id'],
-            'flow_group_id'   => $data['flow_group_id'] ?? null,
-            'name'            => $data['name'],
-            'description'     => $data['description'] ?? null,
-            'is_public'       => $data['is_public'] ?? true,
-            'logging_enabled' => $data['logging_enabled'] ?? false,
-            'is_active'       => true,
-            'nodes'           => $data['nodes'] ?? [$this->seedNode($kind)],
-            'edges'           => $data['edges'] ?? [],
+            'tenant_id'         => $this->tenantContext->get()->id,
+            'flow_id'           => (string)Str::uuid(),
+            'kind'              => $kind,
+            'assistant_id'      => $data['assistant_id'],
+            'flow_group_id'     => $data['flow_group_id'] ?? null,
+            'name'              => $data['name'],
+            'description'       => $data['description'] ?? null,
+            'is_public'         => $data['is_public'] ?? true,
+            'logging_enabled'   => $data['logging_enabled'] ?? false,
+            'expression_engine' => $data['expression_engine'] ?? TemplateEngine::ID,
+            'is_active'         => true,
+            'nodes'             => $data['nodes'] ?? [$this->seedNode($kind)],
+            'edges'             => $data['edges'] ?? [],
         ]);
 
         $this->limitWatch->afterSaved(FlowDraft::LIMIT_KEY, $countBefore);

@@ -59,11 +59,15 @@ A path ending in `.length` is the size of the value before it: the element count
 characters of a text, and `0` for a missing value or any other scalar (`{{contact.photos.length}}`). A real state
 key named `length` wins. Conditions read `.length` the same way.
 
-Evaluation is a pluggable strategy behind `ExpressionEngineInterface`. The engine is chosen per flow
-definition: the engine id is stored in `flow_definitions.expression_engine` (default `template`,
-`TemplateEngine::ID`) and the runtime falls back to `template` when the stored id is empty or not
-registered. There is no per-tenant setting for it. Only the built-in `template` engine (`{{path}}`
-substitution) ships; more engines can be registered through `ExpressionEngineRegistry`.
+Evaluation is a pluggable strategy behind `ExpressionEngineInterface`. The author chooses the engine per
+flow: the draft holds it (`flow_drafts.expression_engine`, default `template`, `TemplateEngine::ID`; a choice on the
+console flow form, shown only while more than one engine is registered), and publishing snapshots it onto
+`flow_definitions.expression_engine` — a republish by a template keeps the snapshot of the host's active definition.
+Validate and publish check the flow with that engine and refuse an engine that is not registered
+(`expression_engine_unknown`) or a template published with another engine (`template_engine_mismatch`). The runtime
+falls back to `template` when the stored id is empty or not registered. There is no per-tenant setting for it
+(`adr-20261119-expression-engine-chosen-per-flow`). Only the built-in `template` engine (`{{path}}` substitution)
+ships; more engines can be registered through `ExpressionEngineRegistry`.
 
 **Namespaces readable in an expression:**
 
