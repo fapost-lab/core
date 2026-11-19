@@ -10,6 +10,7 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\Retention\AutomationRunRetention;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
+use App\Domains\Flow\Webhook\FlowWebhookReceiver;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
 use App\Domains\Tenancy\Models\PlatformSetting;
@@ -104,23 +105,25 @@ final class PlatformSettingsTest extends FeatureTestCase
             self::ITERATIONS,
             FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING,
             NodeTraceRecorder::PAYLOADS_SETTING,
+            FlowWebhookReceiver::PER_TOKEN_SETTING,
             self::REDIRECT,
         ], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
-        $this->assertSame(300, $definitions[8]->default);
-        $this->assertSame(10, $definitions[8]->min);
-        $this->assertSame(10000, $definitions[8]->max);
-        $this->assertFalse($definitions[8]->hostModeOnly);
-        $this->assertSame(192, $definitions[7]->default);
-        $this->assertSame(168, $definitions[7]->min, 'The call dedup window may not drop below the failed-job retention.');
-        $this->assertSame(1000, $definitions[9]->default);
-        $this->assertFalse($definitions[10]->hostModeOnly);
-        $this->assertTrue($definitions[10]->default);
-        $this->assertTrue($definitions[11]->hostModeOnly);
-        $this->assertSame(30, $definitions[5]->default);
-        $this->assertSame(7, $definitions[6]->default);
-        $this->assertSame(24, $definitions[2]->default);
-        $this->assertSame(1, $definitions[2]->min);
-        $this->assertSame(720, $definitions[2]->max, 'A run may live at most 30 days.');
+        $byKey = array_combine($keys, $definitions);
+        $this->assertSame(300, $byKey[self::ITERATIONS]->default);
+        $this->assertSame(10, $byKey[self::ITERATIONS]->min);
+        $this->assertSame(10000, $byKey[self::ITERATIONS]->max);
+        $this->assertFalse($byKey[self::ITERATIONS]->hostModeOnly);
+        $this->assertSame(192, $byKey[RedisCallExecutionLedger::TTL_SETTING]->default);
+        $this->assertSame(168, $byKey[RedisCallExecutionLedger::TTL_SETTING]->min, 'The call dedup window may not drop below the failed-job retention.');
+        $this->assertSame(1000, $byKey[FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING]->default);
+        $this->assertFalse($byKey[NodeTraceRecorder::PAYLOADS_SETTING]->hostModeOnly);
+        $this->assertTrue($byKey[NodeTraceRecorder::PAYLOADS_SETTING]->default);
+        $this->assertTrue($byKey[self::REDIRECT]->hostModeOnly);
+        $this->assertSame(30, $byKey[AutomationRunRetention::FAILED_SETTING]->default);
+        $this->assertSame(7, $byKey[AutomationRunRetention::SUCCEEDED_SETTING]->default);
+        $this->assertSame(24, $byKey[AutomationRunDeadline::SETTING]->default);
+        $this->assertSame(1, $byKey[AutomationRunDeadline::SETTING]->min);
+        $this->assertSame(720, $byKey[AutomationRunDeadline::SETTING]->max, 'A run may live at most 30 days.');
     }
 
     public function test_a_refused_change_writes_nothing(): void
@@ -241,7 +244,10 @@ final class PlatformSettingsTest extends FeatureTestCase
         $contract->update([self::REDIRECT => 3], 'operator:9');
 
         $this->assertSame(3, $this->settings()->integer(self::REDIRECT));
-        $this->assertCount(12, $contract->definitions());
+        $this->assertSame(
+            array_map(static fn (PlatformSettingDefinition $d): string => $d->key, $this->settings()->definitions()),
+            array_map(static fn (PlatformSettingDefinition $d): string => $d->key, $contract->definitions()),
+        );
         $this->assertSame('operator:9', PlatformSettingEvent::query()->sole()->changed_by);
     }
 
