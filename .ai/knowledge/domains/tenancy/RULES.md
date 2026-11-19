@@ -330,7 +330,7 @@ broken.
 - **A tenant API token never chooses its tenant.** A request with a bearer token is resolved by host
   (or by `single` mode's configuration) like the console, and the token is looked up only inside that
   tenant's schema; there is no landlord token table and no tenant taken from a token
-  (`adr-20261119-tenant-api-tokens`). Review only.
+  (`adr-20261119-tenant-api-tokens`, proposed). Review only.
 - **In workers, change tenant only through `TenantSwitcher::runForTenant()`**; never set
   `search_path` or the context directly. Review only.
 - **Core is not the control plane.** No SaaS logic, billing or onboarding belongs in Core, and

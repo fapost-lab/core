@@ -1,19 +1,22 @@
 ---
 id: adr-20261119-tenant-api-tokens
 type: adr
-status: accepted
+status: proposed
 date: 2026-11-19
 domains:
   - staff
   - tenancy
   - audit
 paths:
-  - "app/Domains/Staff/**/ApiToken*"
   - "app/Domains/Staff/**/*ApiToken*"
   - "database/migrations/tenant/*api_tokens*"
   - "app/Http/Middleware/*ApiToken*"
   - app/Domains/Staff/Policies/PlatformSupportProtection.php
   - app/Infrastructure/Audit/AuditActorResolver.php
+  - app/Providers/StaffServiceProvider.php
+  - app/Domains/Staff/Enums/Permission.php
+  - config/auth.php
+  - bootstrap/app.php
 summary: "Tenant API tokens: tenant-owned, hashed in the tenant schema, found by host, Permission abilities via Gate, 90/365-day expiry"
 ---
 # A tenant API token is a tenant's own hashed credential in its schema, found on the tenant's host and authorized by `Permission` through the Gate
@@ -81,12 +84,19 @@ Passport installed and adds dependencies only by agreement. Forces:
      spec text is updated by its owner). A hard refusal a policy holds for everyone (for example a
      `create` that no one may perform) is repeated by the surface itself.
    - **No escalation, on issue and on rotation.** The actor grants only permissions they hold
-     themselves, and rotation re-checks the same against the rotator: a successor is issued only if
-     the rotator holds every ability of the predecessor. A non-admin issuer may grant only
-     permissions whose reach is not narrowed for them by a record-level policy (assigned assistants
-     and the like), since the token would reach the whole tenant; which permissions those are is a
-     method on `Permission` next to `isSensitive()`. An administrator may grant any permission a
-     token may hold. Revoking needs only `ManageApiTokens`.
+     themselves. A non-admin issuer may grant only permissions whose reach is not narrowed for them
+     by a record-level policy (assigned assistants and the like), since the token would reach the
+     whole tenant; which permissions those are is a method on `Permission` next to `isSensitive()`.
+     An administrator may grant any permission a token may hold.
+   - **Rotation never widens a token.** A successor inherits at most the permissions of the token
+     it replaces: its abilities are a subset of the predecessor's, never a superset, so rotation
+     may narrow a token and nothing else. The successor's abilities also pass the issue rules
+     above against the rotator — each one held by the rotator, and for a non-admin rotator none
+     narrowed by a record-level policy. A rotator who cannot grant every ability of the
+     predecessor may rotate only to the subset they can grant, or leave the rotation to someone
+     who can. Widening a token's rights is never a rotation: it is a new token, issued by someone
+     who holds those permissions.
+   - Revoking needs only `ManageApiTokens` in the console; the operator's incident revoke is (8).
    - Sensitive permissions (`Permission::isSensitive()`) are chosen separately and marked so in the
      screen.
    - A new permission `StartFlowRuns` (start a run of a published flow through the API trigger)
@@ -114,21 +124,36 @@ Passport installed and adds dependencies only by agreement. Forces:
    ahead of the admin bypass, that refuses the support user `ManageApiTokens` **and every ability
    on the `ApiToken` resource** (issue, rotate, revoke, view). The token screen authorizes by the
    `ManageApiTokens` value only; should an `ApiTokenPolicy` appear later, its abilities are refused
-   to the support user by the same check. Revoking is refused to the support user too in v1: the
-   tenant's admins revoke; an operator's incident revoke would be a Foundation contract and a
-   decision of its own. It narrows
-   `adr-20261007-support-access-through-platform-support-user`, which is amended accordingly. The operator (SaaS) does
-   not issue a tenant's tokens; no Foundation contract exists for it and this ADR adds none.
+   to the support user by the same check, revoking included: in the console the support user
+   does nothing with tokens. It narrows
+   `adr-20261007-support-access-through-platform-support-user`, which is amended accordingly.
+   **The installation operator may revoke a tenant's token, and only revoke it** (incident
+   response: a token leaked and the tenant's admins cannot be reached in time). The operator never
+   issues, rotates or reads a tenant's token — not the list, the names, the abilities, the issuers
+   or `last_four`. The revoke is an operator action outside the tenant console: it is given the
+   leaked token itself, which carries its row's id (3); the row is found inside the tenant's schema
+   by that id and revoked only if the secret matches its hash, so the operator learns nothing they
+   did not already hold and cannot revoke by guessing ids. In Core it is an operator command over a
+   tenant; in the SaaS shell the same action is a panel action through a Foundation contract, built
+   by the first task that needs it. As with support access, Core records the operator it is given:
+   the revocation is audited in the tenant's log with `actor_kind = support` and the operator's
+   name (no `support_entry_id`, since there is no visit), and `revoked_by` stays empty because no
+   staff user acted. The operator issues nothing: no contract for issuing or reading tokens exists,
+   and this ADR adds none.
    Revoking sets `revoked_at`/`revoked_by`, keeps the row for history and takes effect on the next
    request (no authentication cache: one primary-key lookup per request).
 9. **Lifetime and rotation.** An expiry is mandatory: 90 days by default, at most 365, as a platform
    setting with that ceiling; there are no tokens without one (owner, 2026-11-19). Rotation issues
-   a successor with the same name and abilities and sets the predecessor's `expires_at` to now plus
-   a grace window (24 hours by default, 0 allowed); a secret is never changed in place. Fourteen
+   a successor with the same name and, by default, the same abilities — narrowed when the rotator
+   chooses or must, never widened (7) — and shortens the predecessor's life to a grace window
+   (24 hours by default, 0 allowed): its `expires_at` becomes the earlier of its current value and
+   now plus the grace, so rotation never extends a token. An expired or revoked token cannot be
+   rotated (a new token is issued instead). A secret is never changed in place. Fourteen
    days before expiry the tenant's admins are notified through the existing staff notifications.
 10. **Rate limits.** A named limiter `api-token` keyed by tenant id and token id (60 requests a
     minute by default, a platform setting); MCP may have a limiter of its own on the same key.
-    Failed authentications have a separate per-IP limit against guessing. Plan quotas are not here:
+    Failed authentications have a separate per-IP limit against guessing, applied by the
+    authenticator (13) itself, since a failed request never reaches the throttle after `auth`. Plan quotas are not here:
     the API trigger goes through the run admission and rate breaker of `flow-automations`, and the
     operator decides the plan. `last_used_at` is written at most once a minute per token.
 11. **Access mode.** The `api-token` stack asks the tenant's access mode as the console does, and a
@@ -138,7 +163,8 @@ Passport installed and adds dependencies only by agreement. Forces:
     and `tools/list` still answer on a stopped tenant, a write tool is refused with the same
     status), by the MCP surface, not by the method.
 12. **Audit.** Issue, rotation and revocation are `AuditAction`s in the tenant's log, with the token's
-    name and `last_four` and never its secret or hash; the actor is the staff user. Actions taken
+    name and `last_four` and never its secret or hash; the actor is the staff user, or for an
+    operator's revoke the operator Core is given (8). Actions taken
     through a token are recorded with a new `actor_kind = api_token` and the label
     `API · <token name>`: `AuditActorResolver` learns to read the `api-token` guard. The per-call log
     of a surface stays with the surface (`mcp_audit_log` for MCP, the run and its `trigger_id` for
@@ -170,6 +196,17 @@ Passport installed and adds dependencies only by agreement. Forces:
   unchanged, assistant assignments included. Rejected: pseudo-staff in `users` must be kept out of
   the limit, pickers, notifications and password sign-in and protected from edits — the support user
   shows what that costs. A separate principal is chosen.
+- **Token surfaces call policies, with policy abilities mapped to the token's `Permission`
+  values.** It would keep the MCP spec's "Policy classes" literally. Rejected for v1: every policy
+  ability (`view`, `reply`, …) would need a defined mapping for `ApiToken`, and a policy written for
+  a `User` would quietly start deciding for a principal it was not written for. Surfaces ask by
+  `Permission` value instead (7); record narrowing later brings the mapping with it.
+- **Rotation copies the predecessor's abilities unchecked.** Simple, and it is what "rotate" means
+  in most products. Rejected: anyone with `ManageApiTokens` would receive a plaintext token with
+  rights they do not hold (a reader of no transcripts rotating a token that reads every transcript).
+- **The support user revokes in the console.** Rejected: revoking from the console needs the token
+  list, i.e. reading the tenant's tokens, and it would split the support-user check into "every
+  ability but one". The operator's revoke takes the leaked token itself instead (8).
 - **Stateless JWT.** No immediate revocation without a denylist; keys and their rotation are needed.
 - **A scope vocabulary of its own (`flows:trigger`, `mcp:read`).** A second dictionary of rights that
   drifts from `Permission`; the MCP spec rejects it explicitly.
@@ -186,10 +223,22 @@ Passport installed and adds dependencies only by agreement. Forces:
   token to records later (by assistant, say) is a change to this ADR: a narrowing column and a defined
   mapping of policy abilities for `ApiToken`, not a policy that quietly starts accepting it.
 - New permissions `ManageApiTokens` (sensitive) and `StartFlowRuns`, with a data migration for
-  existing tenants; a new actor-keyed check in `Gate::before` refuses `ManageApiTokens` to the
-  support user (amendment to `adr-20261007-support-access-through-platform-support-user`).
-- The audit log gains an actor kind (amendment to `adr-20261111-audit-log-explicit-recording`).
-- A new `actor_kind` in the audit log, shown by `AuditActorResolver` and the log screen.
+  existing tenants; a new actor-keyed check in `Gate::before` refuses the support user
+  `ManageApiTokens` and every ability on the `ApiToken` resource — issue, rotate, revoke, view
+  (amendment to `adr-20261007-support-access-through-platform-support-user`).
+- The audit log gains the actor kind `api_token`, shown by `AuditActorResolver` and the log screen,
+  and records an operator's revoke as a `support` actor without a visit (amendment to
+  `adr-20261111-audit-log-explicit-recording`).
+- An operator's incident revoke (8) is one more operator action over a tenant: a Core command now,
+  a Foundation contract and a SaaS panel action when the shell needs it.
+- Decided after the gate, in review, and confirmed by the owner on 2026-11-19 ("Да, всё по
+  рекомендациям" — "Yes, everything per the recommendations"): token surfaces authorize by
+  `Permission` value and never call policies, narrowing the MCP spec's "Policy classes" (7); a
+  non-admin issuer grants no permission a record-level policy narrows for them (7); rotation
+  inherits at most the predecessor's permissions and passes the issue rules against the rotator
+  (7, 9); the support user is refused every token action, revoking included (8); the installation
+  operator may revoke a leaked token and never issue, rotate or read one (8). The rest was approved
+  at the gate.
 - Changing the storage or resolution later (2, 5) is the expensive direction: one URL needs the
   landlord index and a migration of issued tokens. The token format (3) cannot change after the first
   tokens are issued without reissuing them.
@@ -198,4 +247,5 @@ Passport installed and adds dependencies only by agreement. Forces:
   (`mcp-server`, phase 1) — and the second reuses them.
 
 Source: task `tenant-api-token-adr`, specs `flow-automations` and `mcp-server`; design approved by the
-owner on 2026-11-19 ("Да, всё одобряю").
+owner at the gate on 2026-11-19 ("Да, всё одобряю" — "Yes, I approve everything"); the review's
+decisions confirmed by the owner on 2026-11-19 ("Да, всё по рекомендациям").

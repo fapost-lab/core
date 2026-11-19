@@ -126,9 +126,10 @@ sign-in and sign-out are not repeated in the audit log. Decided with the owner a
 
 ## Amendment 2026-11-19: no tenant API tokens
 
-The support user is an admin in every tenant with one exception: it cannot issue tenant API tokens
-(`ManageApiTokens`), nor rotate, revoke or view them, because a token would outlive the operator's 60-minute
-visit. The refusal is a check keyed
+Proposed by `adr-20261119-tenant-api-tokens` (it takes effect when that ADR is accepted). The support user is an
+admin in every tenant with one exception: it cannot issue tenant API tokens (`ManageApiTokens`), nor rotate,
+revoke or view them, because a token would outlive the operator's 60-minute visit. The refusal is a check keyed
 on the actor, in `Gate::before` ahead of the admin bypass — unlike `PlatformSupportProtection`, which guards the
-support user as a target. Decided with the owner at the `tenant-api-token-adr` gate
-(`adr-20261119-tenant-api-tokens`).
+support user as a target. An operator who must revoke a leaked token does it through an operator action that is
+given the token itself, never through the support user in the console. Decided in the review of
+`tenant-api-token-adr` and confirmed by the owner on 2026-11-19.
