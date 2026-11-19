@@ -21,7 +21,7 @@ run instead of starting a second one, and a run past its deadline is moved to `f
 Goal: a flow runs on a cron. Done when: reference automation 1 (a daily summary) is built in the builder
 and passes e2e, a tick is never run twice, and a trigger that overlaps itself is skipped visibly.
 
-- [ ] Several triggers per flow, live on publish — stable trigger ids in the definition, sync by id, `UNIQUE(flow_id)` dropped, activation moved from draft save to publish for every trigger type
+- [x] Several triggers per flow, live on publish — stable trigger ids in the definition, sync by id, `UNIQUE(flow_id)` dropped, activation moved from draft save to publish for every trigger type
 - [ ] Schedule trigger — landlord registry of next fires, compare-and-set slot claim with the `pending` run in one transaction, skip-if-running on a `(tenant, trigger)` lock, no catch-up, jitter, DST semantics, one-minute floor (after: `flow-segmented-execution` — a scheduled run is a contactless run; after: Several triggers per flow, live on publish — `next_run_at` must survive a republish)
 - [ ] Run rate breaker and quota seam — a Foundation "may this run start" contract and run counter for the SaaS shell, a Core breaker that pauses a trigger, a refusal counter and last reason on the trigger (after: Schedule trigger — the first trigger that fires on its own)
 
@@ -31,7 +31,7 @@ Goal: an automation calls an external API without a secret in its config, and wh
 read automations is set per permission. Done when: a `call` node authenticates with a stored credential
 whose value no UI shows, and a content manager builds an automation on a credential the admin created.
 
-- [ ] Credentials store — a Foundation contract shared by `call`, Solutions and connectors; Bearer, Basic, API key, OAuth2 client credentials; encrypted cast, write-only in the UI, referenced by id
+- [x] Credentials store — a Foundation contract shared by `call`, Solutions and connectors; Bearer, Basic, API key, OAuth2 client credentials; encrypted cast, write-only in the UI, referenced by id
 - [ ] Automation and credential permissions — `ManageAutomations`, `ManageCredentials`, `UseCredentials`, `ViewRunPayloads`; the content manager gets all but `ManageCredentials`; a data migration for existing tenants (after: Credentials store — two of the permissions guard it)
 - [ ] Credential and trigger changes in the activity log (after: spec `audit-log` — the staff activity log does not exist yet)
 
@@ -62,7 +62,7 @@ Goal: any run — a conversation or an automation — is read as one graph. Done
 buttons open further flows and subflows is shown on one screen with the taken path lit, each node's full
 data a click away, and a loop of 1000 iterations stays readable.
 
-- [ ] Node trace with full data — `NodeEntered`, `NodeFailed` and "node completed" in `flow_session_history`, outcome, duration, error, iteration, full input and output, secrets masked, 1 MB per node, erased with the contact
+- [x] Node trace with full data — `NodeEntered`, `NodeFailed` and "node completed" in `flow_session_history`, outcome, duration, error, iteration, full input and output, secrets masked, 1 MB per node, erased with the contact
 - [ ] Run graph page — the executed definition drawn with the builder's cards on `@vue-flow/core` and `elkjs`, branches and subflows as nested frames, loops as "×N" with an iteration switcher and small loops expanded, `ViewRunPayloads` for node data, live over Reverb or polling (after: Node trace with full data — the page draws what the trace recorded)
 
 ## Phase 7 — Webhook and API
@@ -70,7 +70,7 @@ data a click away, and a loop of 1000 iterations stays readable.
 Goal: other systems start flows. Done when: a third-party webhook starts a run and gets either 202 or
 the flow's answer within 30 s, and an API call with a tenant token starts a run.
 
-- [ ] Tenant API-token ADR — one token model for this spec and `mcp-server`
+- [x] Tenant API-token ADR — one token model for this spec and `mcp-server`
 - [ ] Webhook trigger — served by Laravel, signature or secret, `(trigger, delivery id)` dedup, response mode 202 or "respond to webhook" with a 30 s limit (after: `flow-engine-v1x` outbound idempotency for `call` — a redelivered webhook would repeat calls; after: `flow-segmented-execution` — the delivery is the fire key)
 - [ ] API trigger — start a flow with a tenant token and a payload (after: Tenant API-token ADR — the token model; after: Webhook trigger — the same inbound path)
 
