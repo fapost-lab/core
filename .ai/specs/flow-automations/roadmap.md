@@ -11,10 +11,10 @@ contactless run that crosses several execution segments, a killed and retried se
 run instead of starting a second one, and a run past its deadline is moved to `failed`.
 
 - [x] `flow-contactless-sessions` — Sessions without a contact or assistant: `contact_id` and `assistant_id` nullable (history outlives an assistant), a run kind and `trigger_id` on the session, the state reader and writer fail with a typed error
-- [ ] `flow-contact-context` — Contact context checked at publish: handlers declare `contact | none | any` (default `contact`), publish refuses a contact node, a `contact.*` expression or a contact write in a flow whose triggers give no contact; `contactId` nullable in a Foundation minor release (after: `flow-contactless-sessions` — the check guards a run that must first exist)
-- [ ] `flow-segmented-execution` — Idempotent, segmented execution: a fire key under a unique index, segments re-dispatched as jobs, a queue and supervisor of their own (after: `flow-contactless-sessions` — the fire key lives on the session)
-- [ ] `flow-run-deadline-sweeper` — Run deadline sweeper: overdue runs move to `failed` with a reason and free their trigger (after: `flow-segmented-execution` — the deadline is per run, the sweeper also picks up lost `pending` runs)
-- [ ] `flow-run-retention` — Run retention: successful runs 7 days, failed 30, runtime settings, aligned with spec `data-lifecycle` (after: `flow-contactless-sessions` — the run kind decides the retention)
+- [x] `flow-contact-context` — Contact context checked at publish: handlers declare `contact | none | any` (default `contact`), publish refuses a contact node, a `contact.*` expression or a contact write in a flow whose triggers give no contact; `contactId` nullable in a Foundation minor release (after: `flow-contactless-sessions` — the check guards a run that must first exist)
+- [x] `flow-segmented-execution` — Idempotent, segmented execution: a fire key under a unique index, segments re-dispatched as jobs, a queue and supervisor of their own (after: `flow-contactless-sessions` — the fire key lives on the session)
+- [x] `flow-run-deadline-sweeper` — Run deadline sweeper: overdue runs move to `failed` with a reason and free their trigger (after: `flow-segmented-execution` — the deadline is per run, the sweeper also picks up lost `pending` runs)
+- [x] `flow-run-retention` — Run retention: successful runs 7 days, failed 30, runtime settings, aligned with spec `data-lifecycle` (after: `flow-contactless-sessions` — the run kind decides the retention)
 
 ## Phase 2 — Schedule
 
@@ -50,7 +50,7 @@ re-raises its own event stops at depth 5.
 Goal: a contactless run talks to people and waits for them. Done when: reference automation 3 (an
 approval with a timeout) passes e2e, and a scheduled flow messages a segment through Broadcasting.
 
-- [ ] `send_message` addressee — a contact by expression in a flow with no contact; publish refuses `send_message` without an addressee there (after: `flow-contact-context` — the addressee is what satisfies the check)
+- [x] `send_message` addressee — a contact by expression in a flow with no contact; publish refuses `send_message` without an addressee there (after: `flow-contact-context` — the addressee is what satisfies the check)
 - [ ] Start a flow for a contact — contact by expression, the event-start collision rules, a `no_channel` outcome (after: `flow-contactless-sessions` — the starter is a contactless run)
 - [ ] Ask a person and wait — the run parks, a question with buttons to a contact of an assistant, a token per button routes the answer to the run, a timeout branch, "already decided" on a late tap (after: `flow-segmented-execution` — parking and resume of a contactless run)
 - [ ] Tag and segment addressees through Broadcasting — `send_message` to a tag or segment creates a broadcast; `input` towards many starts a flow per contact (after: spec `broadcast-flows` — Broadcasting cannot start a flow yet; after: `send_message` addressee — the same addressee field)

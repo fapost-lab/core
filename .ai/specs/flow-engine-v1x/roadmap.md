@@ -9,9 +9,9 @@ Goal: a loop mistake is caught at publish, not by the iteration budget at runtim
 with a never-changing while condition, a non-numeric static count or an iterator shadowing a session
 variable gets a publish warning or error naming the node.
 
-- [ ] Publish-time loop checks: iterator-vs-session variable conflict, unchanging while condition, static numeric count
-- [ ] Loop-aware iteration budget instead of the shared `max_iterations = 100`
-- [ ] `{{x.length}}` in templates and a `max_size` editor in the builder
+- [x] Publish-time loop checks: iterator-vs-session variable conflict, unchanging while condition, static numeric count
+- [x] Loop-aware iteration budget instead of the shared `max_iterations = 100`
+- [x] `{{x.length}}` in templates and a `max_size` editor in the builder
 
 - [x] `block-invalid-flow-graphs` — Publishing refuses a structurally broken graph — duplicate ids, dangling edges, duplicate `(from, handle)`, not exactly one entry, orphans, variable-contract breaks: the errors `flow:audit-graph` only reports today
 
@@ -21,17 +21,17 @@ Goal: a `call` to a flaky endpoint can be retried without duplicating its effect
 retried after a timeout reaches the remote system with the same idempotency key and attempt number.
 
 - [x] `call-outbound-idempotency` — Outbound idempotency for `call`: `attempt_number` and Redis dedup with a TTL above queue retention
-- [ ] `call` retry with backoff (after: outbound idempotency — a retry without it duplicates side effects)
-- [ ] `call` `strict_mapping` and generic `success_statuses`
+- [x] `call` retry with backoff (after: outbound idempotency — a retry without it duplicates side effects)
+- [x] `call` `strict_mapping` and generic `success_statuses`
 
 ## Phase 3 — Composable flows
 
 Goal: a subflow behaves like a function. Done when: a parent passes values into a subflow and reads
 its results without sharing session variables, against a pinned version of the child.
 
-- [ ] `subflow-io-mapping` — Subflow `input_mapping` / `output_mapping`
-- [ ] Subflow pinned to a target version
-- [ ] Design-time leaf-vs-group variable path check
+- [x] `subflow-io-mapping` — Subflow `input_mapping` / `output_mapping`
+- [x] Subflow pinned to a target version
+- [x] Design-time leaf-vs-group variable path check
 
 - [x] `subflow-orphan-parents` — A subflow parent never stays `paused_subflow` without a live child — any end of the child returns control to the parent, and the sweeper does not count a live child as dead
 
@@ -40,7 +40,7 @@ its results without sharing session variables, against a pinned version of the c
 Goal: the extension points the ADRs promised are real. Done when: a tenant can choose its expression
 engine, and a Solution can register a bot command.
 
-- [ ] Per-tenant expression engine: setting, boot validation, snapshot at save (ADR-08)
+- [x] Expression engine chosen per flow: a flow-level setting, snapshot at publish (ADR-08 revised by ADR 20261119-expression-engine-chosen-per-flow)
 - [ ] Commands and command action types registered by a Solution (ADR-09) (after: spec `solution-activation-lifecycle` — registration needs the Core registrar)
 - [ ] `auth_request` by phone, SMS and email
 
