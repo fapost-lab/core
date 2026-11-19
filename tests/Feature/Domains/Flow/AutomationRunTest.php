@@ -246,6 +246,108 @@ final class AutomationRunTest extends FeatureTestCase
         $session = FlowSession::query()->sole();
         $this->assertSame(FlowSessionStatus::Failed, $session->status);
         $this->assertSame(10, $session->step_count);
+        $this->assertSame(0, $session->loop_step_count);
+    }
+
+    public function test_a_runaway_inside_a_loop_body_stops_at_the_ceiling_over_every_segment(): void
+    {
+        // The body leads straight back to the loop node, so the iterator never moves and every step after the entry
+        // is a loop step. The ceiling is max_iterations x (max_loop_iterations + 1) = 20 steps over the whole run.
+        config([
+            'flow.execution.max_iterations'      => 10,
+            'flow.execution.max_loop_iterations' => 1,
+            'flow.automation.segment_steps'      => 3,
+        ]);
+        $flowId = $this->flow([
+            ['id' => 'c0', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                'mode'          => 'counted',
+                'iterator_name' => 'i',
+                'count_source'  => ['type' => 'literal', 'value' => 1],
+            ]],
+            ['id' => 'c1', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+        ], [
+            ['id' => 'e0', 'from' => 'c0', 'to' => 'loop', 'handle' => 'default'],
+            ['id' => 'e1', 'from' => 'loop', 'to' => 'c1', 'handle' => 'loop'],
+            ['id' => 'e2', 'from' => 'c1', 'to' => 'loop', 'handle' => 'default'],
+        ]);
+
+        $this->start($flowId, 'slot-1');
+
+        try {
+            $this->drain();
+            $this->fail('A loop body that never reaches its loop_end must hit the ceiling across segments.');
+        } catch (FlowExecutionLimitExceededException $exception) {
+            $this->assertStringContainsString('ceiling of 20 steps', $exception->getMessage());
+        }
+
+        $session = FlowSession::query()->sole();
+        $this->assertSame(FlowSessionStatus::Failed, $session->status);
+        $this->assertSame(2, $session->step_count);
+        $this->assertSame(18, $session->loop_step_count);
+    }
+
+    public function test_a_loop_longer_than_the_step_budget_runs_to_its_end_across_segments(): void
+    {
+        // 40 iterations of loop + probe + loop_end are 120 steps, past max_iterations, in segments of 50.
+        config(['flow.execution.max_iterations' => 100, 'flow.automation.segment_steps' => 50]);
+        $flowId = $this->flow([
+            ['id' => 'loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                'mode'          => 'counted',
+                'iterator_name' => 'i',
+                'count_source'  => ['type' => 'literal', 'value' => 40],
+            ]],
+            ['id' => 'c1', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'le', 'type' => 'loop_end', 'version' => 1, 'config' => ['loop_node_id' => 'loop', 'iterator_name' => 'i']],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [
+            ['id' => 'e1', 'from' => 'loop', 'to' => 'c1', 'handle' => 'loop'],
+            ['id' => 'e2', 'from' => 'c1', 'to' => 'le', 'handle' => 'default'],
+            ['id' => 'e3', 'from' => 'loop', 'to' => 'end', 'handle' => 'default'],
+        ]);
+
+        $this->start($flowId, 'slot-1');
+        $this->drain();
+
+        $session = FlowSession::query()->sole();
+        $this->assertSame(FlowSessionStatus::Ended, $session->status);
+        $this->assertSame(['c1' => 40], AutomationProbeTestHandler::$runs);
+        // Only entering the loop and the end node ran outside its body; every segment that starts in the body knows it.
+        $this->assertSame(2, $session->step_count);
+        $this->assertSame(120, $session->loop_step_count);
+    }
+
+    public function test_a_loop_s_iteration_limit_counts_over_every_segment_of_a_run(): void
+    {
+        // Each segment of 3 steps runs about one iteration: only the persisted iterator sees the sixth.
+        config(['flow.execution.max_loop_iterations' => 5, 'flow.automation.segment_steps' => 3]);
+        $flowId = $this->flow([
+            ['id' => 'loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                'mode'          => 'counted',
+                'iterator_name' => 'i',
+                'count_source'  => ['type' => 'literal', 'value' => 6],
+            ]],
+            ['id' => 'c1', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'le', 'type' => 'loop_end', 'version' => 1, 'config' => ['loop_node_id' => 'loop', 'iterator_name' => 'i']],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [
+            ['id' => 'e1', 'from' => 'loop', 'to' => 'c1', 'handle' => 'loop'],
+            ['id' => 'e2', 'from' => 'c1', 'to' => 'le', 'handle' => 'default'],
+            ['id' => 'e3', 'from' => 'loop', 'to' => 'end', 'handle' => 'default'],
+        ]);
+
+        $this->start($flowId, 'slot-1');
+
+        try {
+            $this->drain();
+            $this->fail('The sixth iteration must fail the run.');
+        } catch (FlowExecutionLimitExceededException $exception) {
+            $this->assertStringContainsString("Loop node 'loop' exceeded 5 iterations", $exception->getMessage());
+        }
+
+        $this->assertGreaterThan(4, count($this->pushedContinuations()));
+        $this->assertSame(['c1' => 5], AutomationProbeTestHandler::$runs);
+        $this->assertSame(FlowSessionStatus::Failed, FlowSession::query()->sole()->status);
     }
 
     public function test_the_time_budget_stops_a_segment_before_its_step_budget(): void

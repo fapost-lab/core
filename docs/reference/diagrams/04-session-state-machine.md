@@ -36,7 +36,7 @@ stateDiagram-v2
 
     active --> ended : end node executed<br/>(end_status = success / cancelled / failed)
 
-    active --> failed : handler returned failed(),<br/>handler threw, iteration budget exceeded
+    active --> failed : handler returned failed(),<br/>handler threw, step budget exceeded
 
     waiting_input --> failed : handler threw while handling the reply
 

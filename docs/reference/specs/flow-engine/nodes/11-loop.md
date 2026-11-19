@@ -28,7 +28,7 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
 - **Validation** (all are errors in `ValidateFlowService`, returned by validate and enforced at publish):
   `loop_end_missing_loop_node_id` / `loop_end_invalid_loop_node_id`, `loop_invalid_iterator_name`,
   `loop_reserved_iterator_name`, `loop_nested_not_allowed`, `loop_missing_loop_end` (reachability BFS from the
-  `loop` handle), `loop_count_exceeds_budget` (literal count above 100), and from `LoopConfigChecker`
+  `loop` handle), `loop_count_exceeds_budget` (literal count above `flow.execution.max_loop_iterations`), and from `LoopConfigChecker`
   `loop_iterator_variable_conflict` (8.3) and `loop_count_not_numeric` (8.7). The one warning is
   `loop_while_condition_unchanged` (8.5).
 - **Registry conflicts:** an array variable whose `item_type` differs between flows is rejected at publish
@@ -48,6 +48,18 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
 - **`max_size` editor:** `VariableStorageEditor` shows "Keep last" under the list toggle for a list saved to the
   contact; it compiles to `properties.max_size` and publish writes it to the registry (7.3). `list_max_size_invalid`
   (`ListSizeChecker`) rejects a value that is not a whole number from 1 to 1000, or one set on a session list.
+- **Loop-aware step budget (14.1, option a):** `StepBudget`, one per engine call. Steps inside a loop body — the body,
+  its `loop_end` and the loop node's re-evaluations — do not count against `flow.execution.max_iterations`; entering a
+  loop costs it one step. A loop may run `flow.execution.max_loop_iterations` iterations (platform setting, default
+  1000, at most 3000), checked against its persisted iterator when it takes the `loop` exit — over the whole run for an
+  automation (across segments, delay wake-ups and job retries), per engine call for a conversation (counted from the
+  iterator the call found, so a loop that waits for the contact is not stopped after so many messages); one iteration may take at most `max_iterations` steps until its `loop_end`; and a
+  run never takes more than `min(10000, max_iterations × (max_loop_iterations + 1))` steps in all. An automation run counts
+  over all its segments: steps outside loop bodies in `flow_sessions.step_count` (capped by `max_iterations`), steps
+  inside them in `loop_step_count` (the sum capped by the ceiling); a segment that starts inside a body knows it from the
+  iterator in state. In a conversation, which has no segments, a loop body also stops once the engine call has run 30
+  seconds (`FlowEngineInterface::MAX_SEGMENT_SECONDS`), before the job timeout. Each limit fails the session with `FlowExecutionLimitExceededException`
+  naming the node. See 8.8 and 14.1.
 - **Tests:** `tests/Feature/Domains/Flow/LoopEngineTest.php`, `LoopNodeHandlerTest.php`, and the loop cases in
   `tests/Unit/Domains/Flow/ValidateFlowServiceTest.php`, `LoopConfigCheckerTest`, `LoopPublishChecksTest`.
 
@@ -55,8 +67,6 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
 
 - A static type check of a *variable* `count_source` (8.7): only a literal count is checked; a non-numeric runtime
   value fails the session in the handler.
-- A decision on the iteration budget (14.1): the general `flow.execution.max_iterations` (default 100) applies, plus the
-  literal-count rule 8.8. Batch loops with no wait node hit the limit at roughly 30 iterations.
 
 ---
 
@@ -500,11 +510,10 @@ session in the handler.
 
 ### 8.8 Literal count budget (`loop_count_exceeds_budget`)
 
-A counted loop with a literal `count_source` above 100 is rejected. This is related to the engine limit
-`flow.execution.max_iterations = 100` (`config/flow.php`): each loop iteration costs `body + 2` engine iterations
-inside one `executeLoop()` pass. Loops with a wait node (`input`) are safe because each iteration runs in a
-separate resume. **Batch loops without a wait node** hit the limit at roughly 30 iterations; there is no
-validation for a runtime-valued count.
+A counted loop with a literal `count_source` above the platform setting `flow.execution.max_loop_iterations` (default
+1000, `config/flow.php`) is rejected: every run would fail at that limit. The engine checks the limit itself for a
+runtime-valued count (14.1); a loop's iterations no longer count against `flow.execution.max_iterations`, so batch
+loops without a wait node run to the end.
 
 ---
 
@@ -545,7 +554,7 @@ Two branches, each with its own loop and the same `iterator_name`, are fine: onl
 | 3 | The while condition throws (for example a DataAccessor module failure) | session failed, as in 2 |
 | 4 | `loop_node_id` points at a missing loop at runtime (manual DB intervention; publish validation excludes it) | session failed |
 | 5 | A huge array fills up | the array stays at `max_size`, old elements drop out. Acceptable by design ("keep the last N items") |
-| 6 | A batch loop exceeds the iteration budget | `FlowExecutionLimitExceededException`, session failed. See 8.8 / 14.1 |
+| 6 | A loop starts more than `flow.execution.max_loop_iterations` iterations, an iteration takes more than `flow.execution.max_iterations` steps without reaching its `loop_end`, or the run passes its step ceiling | `FlowExecutionLimitExceededException` naming the node, session failed. See 8.8 / 14.1 |
 
 ---
 
@@ -643,9 +652,8 @@ Reusing `flow.iterator` is safe because of the cleanup on exit.
 
 ## 14. Open questions
 
-1. **Iteration budget (8.8).** Option (a): do not count `loop` / `loop_end` against `max_iterations` and add a
-   separate, larger loop-iteration limit, which makes counted loops with runtime values workable. Option (b): keep
-   the shared budget plus rule 8.8. Option (a) is preferred. **Undecided.**
+1. **Iteration budget (8.8).** Settled, option (a): loop bodies do not count against `max_iterations`; a separate
+   limit `flow.execution.max_loop_iterations` caps each loop, and a ceiling caps the run (Implementation status).
 2. **Iterator name on `loop_end`.** Settled: denormalised by `PublishFlowService` at publish (4.3).
 3. **`{{....length}}` in templates.** Settled: supported in templates and conditions (5.6).
 4. **ForEach mode:** iterate over an existing collection. On request.
@@ -671,7 +679,9 @@ Acceptance, per the code:
   non-numeric literal count are errors (8.3b, 8.7): `LoopConfigCheckerTest`, `LoopPublishChecksTest`.
 - [ ] Manual runs (counted 5 photos end to end, while exit, a 60-iteration loop under the lock heartbeat) and the
   performance check (100 iterations x 5 nodes): not recorded.
-- [ ] A batch loop at the iteration-budget boundary: behaviour pending decision 14.1.
+- [x] A batch loop past the shared step budget runs to its end; a loop past its iteration limit, an iteration that
+  never reaches its `loop_end` and an automation loop across segments are covered (`LoopEngineTest`,
+  `AutomationRunTest`).
 
 ---
 

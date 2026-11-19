@@ -42,7 +42,9 @@ final class LoopNodeHandler extends AbstractVersionedHandler implements Declares
     /** Suffix appended to the iterator name for its per-loop total (counted mode). */
     public const string TOTAL_SUFFIX = '_total';
 
-    private const string LOOP_HANDLE    = 'loop';
+    /** The handle into the loop body; the engine's step budget follows it ({@see \App\Domains\Flow\Services\StepBudget}). */
+    public const string LOOP_HANDLE = 'loop';
+
     private const string DEFAULT_HANDLE = 'default';
 
     private readonly OperandResolver $operands;

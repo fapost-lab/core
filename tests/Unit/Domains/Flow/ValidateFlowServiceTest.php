@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
@@ -643,14 +644,14 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertNotContains('loop_missing_loop_end', $codes);
     }
 
-    public function test_a_literal_loop_count_is_checked_against_the_platform_step_budget(): void
+    public function test_a_literal_loop_count_is_checked_against_the_loop_iteration_limit(): void
     {
         $nodes = [
             'loop_1' => [
                 'id'      => 'loop_1',
                 'type'    => 'loop',
                 'version' => 1,
-                'config'  => ['mode' => 'counted', 'count_source' => ['type' => 'literal', 'value' => 150]],
+                'config'  => ['mode' => 'counted', 'count_source' => ['type' => 'literal', 'value' => 1500]],
             ],
             'end_1' => [
                 'id'      => 'end_1',
@@ -664,7 +665,7 @@ final class ValidateFlowServiceTest extends TestCase
         $codes = static fn ($result): array => array_map(static fn ($e) => $e->code, $result->errors);
 
         $this->assertContains('loop_count_exceeds_budget', $codes($this->makeServiceWithLoop()->execute(nodes: $nodes, edges: $edges)));
-        $this->assertNotContains('loop_count_exceeds_budget', $codes($this->makeServiceWithLoop(stepBudget: 200)->execute(nodes: $nodes, edges: $edges)));
+        $this->assertNotContains('loop_count_exceeds_budget', $codes($this->makeServiceWithLoop(loopIterations: 2000)->execute(nodes: $nodes, edges: $edges)));
     }
 
     public function test_loop_end_paired_with_another_loop_does_not_satisfy_reachability(): void
@@ -744,7 +745,7 @@ final class ValidateFlowServiceTest extends TestCase
         );
     }
 
-    private function makeServiceWithLoop(?int $stepBudget = null): ValidateFlowService
+    private function makeServiceWithLoop(?int $loopIterations = null): ValidateFlowService
     {
         $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
         $registry->register(LoopStubHandler::class);
@@ -757,7 +758,7 @@ final class ValidateFlowServiceTest extends TestCase
             triggerValidator: new NullTriggerConfigValidator(),
             tenantEvents: new NullTenantEventRepository(),
             tenantContext: new NullTenantContext(),
-            platformSettings: null === $stepBudget ? null : new FixedStepBudget($stepBudget),
+            platformSettings: null === $loopIterations ? null : new FixedStepBudget($loopIterations),
         );
     }
 
@@ -1133,6 +1134,10 @@ final readonly class FixedStepBudget implements PlatformSettingsReaderInterface
 
     public function integer(string $key): int
     {
+        if (FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING !== $key) {
+            throw new LogicException($key);
+        }
+
         return $this->steps;
     }
 

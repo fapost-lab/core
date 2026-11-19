@@ -9,9 +9,12 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Exceptions\FlowExecutionLimitExceededException;
 use App\Domains\Flow\Models\FlowDefinition;
+use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
@@ -313,5 +316,112 @@ final class LoopEngineTest extends FeatureTestCase
 
         $this->assertCount(3, $keys);
         $this->assertCount(3, array_unique($keys));
+    }
+
+    public function test_a_batch_loop_longer_than_the_step_budget_runs_to_its_end(): void
+    {
+        // 200 iterations of loop + body + loop_end are 600 steps; only entering the loop costs the shared budget.
+        Config::set('flow.execution.max_iterations', 100);
+        Config::set('flow.execution.max_loop_iterations', 1000);
+
+        $session = $this->runLoop(count: 200);
+
+        $this->assertSame(FlowSessionStatus::Ended, $session->status);
+        $this->assertNull($session->state['flow']['i'] ?? null);
+    }
+
+    public function test_a_loop_may_run_exactly_its_iteration_limit(): void
+    {
+        Config::set('flow.execution.max_loop_iterations', 5);
+
+        $this->assertSame(FlowSessionStatus::Ended, $this->runLoop(count: 5)->status);
+    }
+
+    public function test_a_loop_past_its_iteration_limit_fails_naming_the_loop_node(): void
+    {
+        Config::set('flow.execution.max_loop_iterations', 5);
+
+        try {
+            $this->runLoop(count: 6);
+            $this->fail('Expected FlowExecutionLimitExceededException');
+        } catch (FlowExecutionLimitExceededException $exception) {
+            $this->assertStringContainsString("Loop node 'loop' exceeded 5 iterations", $exception->getMessage());
+        }
+
+        $this->assertSame(FlowSessionStatus::Failed, FlowSession::query()->sole()->status);
+    }
+
+    public function test_a_loop_body_that_never_reaches_its_loop_end_fails_at_the_step_budget(): void
+    {
+        // The body leads straight back to the loop node: the iterator never moves, so only the per-iteration
+        // allowance (max_iterations) stops it.
+        Config::set('flow.execution.max_iterations', 10);
+
+        try {
+            $this->runLoop(count: 3, bodyBackToLoop: true);
+            $this->fail('Expected FlowExecutionLimitExceededException');
+        } catch (FlowExecutionLimitExceededException $exception) {
+            $this->assertStringContainsString("One iteration of loop node 'loop' exceeded 10 steps", $exception->getMessage());
+        }
+    }
+
+    public function test_steps_outside_a_loop_still_count_against_the_shared_budget(): void
+    {
+        // Every pass through the loop node from outside the loop is a shared step: a cycle around the loop fails.
+        Config::set('flow.execution.max_iterations', 10);
+
+        try {
+            $this->runLoop(count: 1, exitBackToLoop: true);
+            $this->fail('Expected FlowExecutionLimitExceededException');
+        } catch (FlowExecutionLimitExceededException $exception) {
+            $this->assertStringContainsString('exceeded 10 steps outside loops', $exception->getMessage());
+        }
+    }
+
+    /**
+     * Runs start -> loop(count) -> body (assign) -> loop_end, exiting through `after` to an end node. The start node
+     * keeps the loop from being the entry even when an edge leads back to it.
+     *
+     * @param  bool  $bodyBackToLoop  the body links back to the loop node instead of to its loop_end
+     * @param  bool  $exitBackToLoop  the loop's exit leads through a node back to the loop node instead of to the end
+     */
+    private function runLoop(int $count, bool $bodyBackToLoop = false, bool $exitBackToLoop = false): FlowSession
+    {
+        $tenantId  = (string) Str::uuid();
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create();
+
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id'       => $tenantId,
+            'flow_id'         => (string) Str::uuid(),
+            'version'         => 1,
+            'name'            => 'Budget Loop',
+            'is_active'       => true,
+            'logging_enabled' => false,
+            // A node nothing links to would be a second entry, so a variant drops the node it bypasses.
+            'nodes' => array_values(array_filter([
+                ['id' => 'start', 'type' => 'assign', 'version' => 1, 'config' => ['operations' => []]],
+                ['id' => 'loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                    'mode'          => 'counted',
+                    'iterator_name' => 'i',
+                    'count_source'  => ['type' => 'literal', 'value' => $count],
+                ]],
+                ['id' => 'body', 'type' => 'assign', 'version' => 1, 'config' => ['operations' => []]],
+                ['id' => 'le', 'type' => 'loop_end', 'version' => 1, 'config' => ['loop_node_id' => 'loop', 'iterator_name' => 'i']],
+                ['id' => 'after', 'type' => 'assign', 'version' => 1, 'config' => ['operations' => []]],
+                ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ], static fn (array $node): bool => !($bodyBackToLoop && 'le' === $node['id']) && !($exitBackToLoop && 'end' === $node['id']))),
+            'edges' => [
+                ['id' => 'e0', 'from' => 'start', 'to' => 'loop', 'handle' => 'default'],
+                ['id' => 'e1', 'from' => 'loop', 'to' => 'body', 'handle' => 'loop'],
+                ['id' => 'e2', 'from' => 'body', 'to' => $bodyBackToLoop ? 'loop' : 'le', 'handle' => 'default'],
+                ['id' => 'e3', 'from' => 'loop', 'to' => 'after', 'handle' => 'default'],
+                ['id' => 'e4', 'from' => 'after', 'to' => $exitBackToLoop ? 'loop' : 'end', 'handle' => 'default'],
+            ],
+        ]);
+
+        return $this->app->make(FlowEngineInterface::class)->start($definition, $contact);
     }
 }

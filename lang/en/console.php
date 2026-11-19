@@ -1926,7 +1926,8 @@ return [
             'solutions'     => 'Solutions',
         ],
         'fields' => [
-            'flow_execution_max_iterations'                 => ['label' => 'Maximum flow iterations', 'description' => 'How many steps one flow run may take before it is stopped, which protects against endless loops.'],
+            'flow_execution_max_iterations'                 => ['label' => 'Maximum flow steps', 'description' => 'How many steps one flow run may take outside loops before it is stopped, and how many one pass through a loop may take. Protects against flows that go round in circles; steps inside a loop count against the loop limit.'],
+            'flow_execution_max_loop_iterations'            => ['label' => 'Iterations per loop', 'description' => 'How many times one loop may run its body before the session is stopped: in one go in a conversation, over the whole run in an automation. A run never takes more than 10,000 steps in all.'],
             'flow_call_dedup_ttl_hours'                     => ['label' => 'Call de-duplication window', 'description' => 'How many hours the call node remembers a successful call, so a retried step is not sent again. Keep it above the Horizon failed-job retention (7 days, 168 hours); a retry after the window sends the call again with the same key.'],
             'flow_automation_segment_steps'                 => ['label' => 'Steps per automation segment', 'description' => 'How many nodes an automation run passes through in one queue job before it continues in a new job.'],
             'flow_automation_segment_seconds'               => ['label' => 'Seconds per automation segment', 'description' => 'How long an automation run executes in one queue job before it continues in a new job. At most 30 seconds.'],

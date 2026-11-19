@@ -12,8 +12,10 @@ paths:
   - app/Jobs/Flow/ContinueAutomationRunJob.php
   - app/Domains/Flow/Concurrency/LockScope.php
   - "database/migrations/tenant/*segmented_execution*"
+  - app/Domains/Flow/Services/StepBudget.php
+  - "database/migrations/tenant/*loop_step_count*"
 summary: Why an automation run starts once per (trigger, fire key), runs in engine-level execution segments continued by a single valid segment_id, counts its steps per session, and is serialized on a (tenant, trigger) lock on its own queue flow.automations
-reviewed_at: 2026-11-18
+reviewed_at: 2026-11-19
 ---
 # An automation run starts once per fire key, runs in engine-level segments that a single valid continuation carries on, and is serialized on its trigger's lock
 
@@ -99,3 +101,19 @@ approved by the agent at the gate (unattended), 2026-11-18.
 - Nothing fires a trigger yet: `StartAutomationRunJob` is dispatched only by tests until the schedule, event and webhook
   triggers land.
 - `FlowExecutionGuardInterface` gained a method; a test double implements both.
+
+## Amendment 2026-11-19: loop-aware step budget
+
+"Steps per run" above holds for the steps outside loop bodies and gains a second count for the steps inside them (task
+`loop-aware-iteration-budget`). `step_count` counts an automation session's steps outside loop bodies over all its
+segments and is capped by `flow.execution.max_iterations`, as before, so a runaway with no loop node still stops at
+that many steps however many segments it spans. `loop_step_count` (tenant migration
+`2026_11_19_000001_add_loop_step_count_to_flow_sessions`) counts the steps inside loop bodies; the two together are capped
+by the run's ceiling `min(10000, max_iterations × (max_loop_iterations + 1))` (`StepBudget::ceiling()`), so a runaway
+inside a loop body cannot re-dispatch itself either. `flow.execution.max_loop_iterations` (at most 3000) caps each loop
+through its persisted iterator, over the whole run. A segment that starts inside a loop body knows it from the iterator
+in state (the first `loop` node whose iterator is set), so a long loop spread over many segments charges its body to
+the loop budget, not to `max_iterations`. Rejected: checking `step_count` (all steps) against the ceiling only — no
+migration, but a runaway with no loop would have run about 10,000 steps (some 200 segments, its side effects repeated
+that often) instead of 100. Conversations count everything per engine call; a conversation counts a loop's iterations
+from the iterator the call found, so a loop that waits for the contact keeps working.

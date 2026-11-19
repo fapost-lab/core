@@ -155,6 +155,14 @@ condition no block inside the loop changes gets a warning: it may run until the
 platform's iteration limit stops it. The warning does not block publishing, since
 the value can change from outside the flow.
 
+One loop repeats at most as many times as the installation's
+[loop limit](/self-hosting/platform-settings) allows, 1000 by default: a fixed repeat
+count above it is refused at publish, and a session that reaches it fails. A loop that
+waits for the contact counts again from each message; in a conversation, a loop that keeps
+working for more than 30 seconds without waiting fails too. The steps inside a loop do not use
+up the flow's general step limit, but one run never takes more than 10,000 steps, so a
+loop with many blocks inside stops sooner.
+
 To collect values across passes, turn on **Store as list** on the variable a block
 saves. A list saved to the contact keeps its last 100 items by default; change
 that under **Keep last** (1 to 1000). A list saved as a temporary variable is not

@@ -107,10 +107,22 @@ broken.
   (`adr-20261111-flow-templates-expanded-at-publish`). Enforced:
   `FlowTemplatePublishTest::test_a_flow_publish_locks_the_assistants_templates_before_its_own_draft`,
   `FlowTemplatePublishTest::test_a_template_publish_takes_no_shared_lock_on_templates`.
-- **Execution is bounded.** The engine stops after the platform setting `flow.execution.max_iterations`
-  (`FlowEngineInterface::MAX_ITERATIONS_SETTING`, read through the scoped `PlatformSettingsReaderInterface`) — per
-  engine call for a conversation, per session over all its segments (`step_count`) for an automation run; a lost
-  session lock aborts with `SessionLockLostException`.
+- **Execution is bounded, and loops have a budget of their own.** `StepBudget`, built per engine call, fails the
+  session with `FlowExecutionLimitExceededException` naming the node when: the steps outside loop bodies pass
+  `flow.execution.max_iterations` (entering a loop costs one); one loop iteration takes more than that many steps before
+  its `loop_end`; a `loop` node takes its `loop` exit with its persisted iterator past `flow.execution.max_loop_iterations`
+  (over the whole run for an automation, so it holds across segments and retries; per engine call for a conversation,
+  from the iterator the call found, so a loop that waits for the contact is not stopped after so many messages); or all steps pass the ceiling
+  `min(FlowEngineInterface::MAX_STEPS_PER_RUN, max_iterations × (max_loop_iterations + 1))`. A conversation counts per
+  engine call; an automation run counts over all its segments — steps outside loop bodies in `step_count` (capped by
+  `max_iterations`), steps inside them in `loop_step_count` (the sum capped by the ceiling) — and a segment that starts
+  inside a loop body knows it from the iterator in state. A conversation call, which has no segments, also fails a loop
+  body still running after `FlowEngineInterface::MAX_SEGMENT_SECONDS` (30 s) of the call, so a long loop of slow nodes
+  never outlives the 60 s job timeout and leaves the session stuck `active`. Settings are read through the scoped
+  `PlatformSettingsReaderInterface`; a lost session lock aborts with `SessionLockLostException`. Why: a loop over a long
+  list is legitimate and must not trip the shared budget, while a runaway flow must still free its worker
+  (`adr-20261118-segmented-automation-runs`, amendment 2026-11-19). Enforced: `LoopEngineTest`, `AutomationRunTest`,
+  `StepBudgetTest`, `FlowEngineTest`, `SubflowChildStopHandsBackTest`.
 - **An automation run never outlives its job and runs once per fire.** One engine call of a `run_kind = automation`
   session — nested subflow and parent-resume calls included, sharing the scoped `ExecutionSegment` — stops before the
   next node after `flow.automation.segment_steps` or `flow.automation.segment_seconds` (whichever first, at least one

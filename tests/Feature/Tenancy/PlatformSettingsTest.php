@@ -99,6 +99,7 @@ final class PlatformSettingsTest extends FeatureTestCase
             AutomationRunRetention::SUCCEEDED_SETTING,
             RedisCallExecutionLedger::TTL_SETTING,
             self::ITERATIONS,
+            FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING,
             self::REDIRECT,
         ], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
         $this->assertSame(300, $definitions[7]->default);
@@ -107,7 +108,8 @@ final class PlatformSettingsTest extends FeatureTestCase
         $this->assertFalse($definitions[7]->hostModeOnly);
         $this->assertSame(192, $definitions[6]->default);
         $this->assertSame(168, $definitions[6]->min, 'The call dedup window may not drop below the failed-job retention.');
-        $this->assertTrue($definitions[8]->hostModeOnly);
+        $this->assertSame(1000, $definitions[8]->default);
+        $this->assertTrue($definitions[9]->hostModeOnly);
         $this->assertSame(30, $definitions[4]->default);
         $this->assertSame(7, $definitions[5]->default);
     }
@@ -230,7 +232,7 @@ final class PlatformSettingsTest extends FeatureTestCase
         $contract->update([self::REDIRECT => 3], 'operator:9');
 
         $this->assertSame(3, $this->settings()->integer(self::REDIRECT));
-        $this->assertCount(9, $contract->definitions());
+        $this->assertCount(10, $contract->definitions());
         $this->assertSame('operator:9', PlatformSettingEvent::query()->sole()->changed_by);
     }
 
