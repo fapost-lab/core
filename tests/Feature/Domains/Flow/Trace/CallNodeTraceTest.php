@@ -23,12 +23,15 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * What the node trace of an automation run shows of a `call` node: the rendered request and the response, masked.
  */
 final class CallNodeTraceTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     private string $tenantId;
 
     protected function setUp(): void
@@ -56,7 +59,7 @@ final class CallNodeTraceTest extends FeatureTestCase
         $this->assertTrue($output['success']);
         $this->assertSame(201, $output['status']);
         $this->assertSame('abc-123', $output['headers']['X-Trace']);
-        $this->assertSame(['id' => 7, 'name' => 'Anna'], $output['body']);
+        $this->assertSameJson(['id' => 7, 'name' => 'Anna'], $output['body']);
         $this->assertSame(1, $output['attempt']);
         $this->assertFalse($output['replayed']);
         $this->assertSame(1, $output['sends']);
@@ -132,6 +135,29 @@ final class CallNodeTraceTest extends FeatureTestCase
         $this->assertStringNotContainsString('AIzaSECRETvalue', (string) json_encode($completed, JSON_UNESCAPED_SLASHES));
     }
 
+    public function test_a_secret_in_a_raw_json_body_is_masked_in_the_input(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+
+        $completed = $this->completed($this->runCall([
+            'target'            => 'POST https://api.example.com/oauth',
+            'transport_options' => ['body_raw' => '{"client_id":"app-1","client_secret":"{{flow.s}}"}'],
+        ], ['flow' => ['s' => 'TOPSECRETVALUE42']]));
+
+        $this->assertSame('{"client_id":"app-1","client_secret":"***"}', $completed['input']['node']['options']['body_raw']);
+        $this->assertStringNotContainsString('TOPSECRETVALUE42', (string) json_encode($completed, JSON_UNESCAPED_SLASHES));
+    }
+
+    public function test_a_secret_in_a_form_urlencoded_response_is_masked_in_the_output(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response('access_token=TOK123secret&expires_in=3600', 200, ['Content-Type' => 'application/x-www-form-urlencoded'])]);
+
+        $completed = $this->completed($this->runCall(['target' => 'POST https://api.example.com/token']));
+
+        $this->assertSame('access_token=***&expires_in=3600', $completed['output']['node']['body']);
+        $this->assertStringNotContainsString('TOK123secret', (string) json_encode($completed, JSON_UNESCAPED_SLASHES));
+    }
+
     public function test_a_secret_in_the_response_under_a_sensitive_key_is_masked_in_the_output(): void
     {
         Http::fake(['api.example.com/*' => Http::response(['token' => 'issued-token', 'user' => ['password' => 'pw', 'id' => 5]], 200)]);
@@ -153,7 +179,7 @@ final class CallNodeTraceTest extends FeatureTestCase
             'retry'             => ['max_attempts' => 2],
         ]));
 
-        $this->assertSame(['timeout' => 5], $completed['input']['node']['options']);
+        $this->assertSameJson(['timeout' => 5], $completed['input']['node']['options']);
         $this->assertArrayNotHasKey('attempt_number', $completed['input']['node']['options']);
     }
 

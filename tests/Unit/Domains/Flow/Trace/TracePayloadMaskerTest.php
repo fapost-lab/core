@@ -224,4 +224,49 @@ final class TracePayloadMaskerTest extends TestCase
     {
         $this->assertSame('plain text, token=abc', $this->masker->maskUrls('plain text, token=abc'));
     }
+
+    public function test_a_json_string_is_masked_as_the_structure_it_encodes(): void
+    {
+        $masked = $this->masker->mask(['body_raw' => '{"client_secret":"TOPSECRET","user":{"password":"pw","id":5},"url":"https://h.example/?token=t"}']);
+
+        $this->assertSame(
+            '{"client_secret":"***","user":{"password":"***","id":5},"url":"https://h.example/?token=***"}',
+            $masked['body_raw'],
+        );
+    }
+
+    public function test_a_json_string_with_nothing_to_hide_keeps_its_text(): void
+    {
+        $body = "{\n  \"name\": \"Anna\",\n  \"page\": 2\n}";
+
+        $this->assertSame($body, $this->masker->mask($body));
+    }
+
+    public function test_a_string_that_only_looks_like_json_is_left_alone(): void
+    {
+        $this->assertSame('{not json, token=abc}', $this->masker->mask('{not json, token=abc}'));
+    }
+
+    public function test_the_sensitive_pairs_of_a_form_body_are_masked(): void
+    {
+        $this->assertSame(
+            'access_token=***&expires_in=3600&token_type=bearer&refresh%5Ftoken=***',
+            $this->masker->mask('access_token=TOK123&expires_in=3600&token_type=bearer&refresh%5Ftoken=R1'),
+        );
+    }
+
+    public function test_a_form_body_without_a_secret_is_unchanged(): void
+    {
+        $this->assertSame('page=2&sort=asc&flag', $this->masker->mask('page=2&sort=asc&flag'));
+    }
+
+    public function test_a_url_inside_a_form_pair_is_masked(): void
+    {
+        $this->assertSame('next=https://h.example/cb?token=***', $this->masker->mask('next=https://h.example/cb?token=SECRET1'));
+        $this->assertSame('url=https://user:***@h.example/', $this->masker->mask('url=https://user:PASSWD@h.example/'));
+        $this->assertSame(
+            'status=ok&url=https://files.example/x?Signature=***&expires=1',
+            $this->masker->mask('status=ok&url=https://files.example/x?Signature=SIG3&expires=1'),
+        );
+    }
 }

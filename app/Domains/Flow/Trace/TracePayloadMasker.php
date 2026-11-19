@@ -18,6 +18,10 @@ use App\Domains\Flow\Support\SecretRedactor;
  * - in every string, each http(s) URL keeps its shape but loses the password of its `user:pass@` part and the values
  *   of its query parameters with a sensitive name (the keys above and {@see self::SENSITIVE_URL_PARAMETERS}) — also a
  *   URL quoted inside an error message;
+ * - a string that is a JSON object or array (a raw request body, a response body that was not decoded) is masked as the
+ *   structure it encodes and encoded again — only when something was masked, and then as PHP re-encodes it (an empty
+ *   object shows as `[]`, an integer beyond 64 bits as a float); a string that is a whole form-urlencoded body (`a=1&token=x`) has its
+ *   sensitive pairs masked as a URL query would;
  * - the literal secrets of the step are removed from every string ({@see SecretRedactor}).
  *
  * A deny-list: a secret under an innocent name, or in a response body without a sensitive key, stays visible unless it
@@ -55,6 +59,9 @@ final readonly class TracePayloadMasker
     public const array SENSITIVE_URL_PARAMETERS = ['key', 'sig', 'signature', 'code'];
 
     private const string URL_PATTERN = '#https?://[^\s"\'<>`]+#i';
+
+    /** A whole form-urlencoded body: `name=value` pairs joined by `&`, no whitespace. */
+    private const string FORM_PATTERN = '#^[^\s=&?\#/]+=[^\s&]*(?:&[^\s=&]+(?:=[^\s&]*)?)*$#';
 
     /**
      * @param  list<string>  $secrets  literal secrets of the step (credential values, secret variables)
@@ -130,7 +137,7 @@ final readonly class TracePayloadMasker
     private function maskStructure(mixed $value): mixed
     {
         if (is_string($value)) {
-            return $this->maskUrls($value);
+            return $this->maskString($value);
         }
 
         if (! is_array($value)) {
@@ -146,6 +153,59 @@ final readonly class TracePayloadMasker
         }
 
         return $masked;
+    }
+
+    private function maskString(string $value): string
+    {
+        $trimmed = mb_ltrim($value);
+
+        if ('' !== $trimmed && ('{' === $trimmed[0] || '[' === $trimmed[0])) {
+            $decoded = json_decode($value, true);
+
+            if (is_array($decoded)) {
+                $masked = $this->maskStructure($decoded);
+
+                // Nothing to hide: keep the text as it was written.
+                if ($masked === $decoded) {
+                    return $value;
+                }
+
+                $encoded = json_encode($masked, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+                if (false !== $encoded) {
+                    return $encoded;
+                }
+            }
+        }
+
+        if (1 === preg_match(self::FORM_PATTERN, $value)) {
+            // A pair's value may itself be a URL (`next=https://…?token=…`).
+            return $this->maskUrls($this->maskQuery($value));
+        }
+
+        return $this->maskUrls($value);
+    }
+
+    /**
+     * Masks the values of the sensitive pairs of a query string or form-urlencoded body.
+     */
+    private function maskQuery(string $query): string
+    {
+        $pairs = explode('&', $query);
+
+        foreach ($pairs as $index => $pair) {
+            $separator = mb_strpos($pair, '=');
+
+            if (false === $separator) {
+                continue;
+            }
+
+            if ($this->isSensitiveQueryParameter(urldecode(mb_substr($pair, 0, $separator)))) {
+                $pairs[$index] = mb_substr($pair, 0, $separator) . '=' . self::MASK;
+            }
+        }
+
+        return implode('&', $pairs);
     }
 
     private function maskUrl(string $url): string
@@ -165,20 +225,6 @@ final readonly class TracePayloadMasker
             : mb_substr($url, $queryStart + 1, $fragmentStart - $queryStart - 1);
         $rest = false === $fragmentStart ? '' : mb_substr($url, $fragmentStart);
 
-        $pairs = explode('&', $query);
-
-        foreach ($pairs as $index => $pair) {
-            $separator = mb_strpos($pair, '=');
-
-            if (false === $separator) {
-                continue;
-            }
-
-            if ($this->isSensitiveQueryParameter(urldecode(mb_substr($pair, 0, $separator)))) {
-                $pairs[$index] = mb_substr($pair, 0, $separator) . '=' . self::MASK;
-            }
-        }
-
-        return mb_substr($url, 0, $queryStart + 1) . implode('&', $pairs) . $rest;
+        return mb_substr($url, 0, $queryStart + 1) . $this->maskQuery($query) . $rest;
     }
 }

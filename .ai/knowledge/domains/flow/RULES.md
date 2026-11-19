@@ -160,8 +160,9 @@ broken.
   then `node_completed` or `node_failed`, into `flow_session_history`, whatever `logging_enabled` (which still gates
   `state_change` and `subflow_*`). Only an automation run's rows carry `input`/`output`, and only while
   `flow.trace.payloads` is on: nothing deletes a conversation's history, so a conversation's trace keeps no payloads
-  (gate decision of `flow-node-trace`, D-3). Payloads pass `TracePayloadMasker` (sensitive key names, URL passwords and
-  query parameters, literal secrets) and then `TracePayloadLimiter` (1 MiB a row); masking is a deny-list, so a secret
+  (gate decision of `flow-node-trace`, D-3). Payloads pass `TracePayloadMasker` (sensitive key names, also inside a
+  JSON document held in a string; URL passwords and query parameters, also `query.<name>` call parameters and
+  form-urlencoded bodies; literal secrets) and then `TracePayloadLimiter` (1 MiB a row); masking is a deny-list, so a secret
   under an innocent key in a response body stays visible — accepted risk, compensated by literal secrets once
   credentials pass them. A trace write failure is the warning `flow.trace.write_failed`, in a savepoint of its own,
   and never fails the step: the node's side effects have already happened. `FlowSessionInspector` filters

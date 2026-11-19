@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * The node trace: every node the engine runs writes `node_entered` / `node_completed` / `node_failed` rows into
@@ -34,6 +35,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class NodeTraceRecordingTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     private string $tenantId;
 
     protected function setUp(): void
@@ -66,7 +69,7 @@ final class NodeTraceRecordingTest extends FeatureTestCase
 
         $rows = $this->rows($session);
 
-        $this->assertSame(['type' => TraceProbeTestHandler::TYPE, 'version' => 1], $rows[0]->metadata);
+        $this->assertSameJson(['type' => TraceProbeTestHandler::TYPE, 'version' => 1], $rows[0]->metadata);
 
         $completed = $rows[1]->metadata;
         $this->assertSame(TraceProbeTestHandler::TYPE, $completed['type']);
@@ -177,7 +180,7 @@ final class NodeTraceRecordingTest extends FeatureTestCase
 
         $this->assertSame(HistoryEventType::NodeCompleted, $this->rows($session)->last()->event_type);
         $this->assertSame(NodeExecutionStatus::Failed->value, $completed['status']);
-        $this->assertSame(['message' => 'node said no'], $completed['error']);
+        $this->assertSameJson(['message' => 'node said no'], $completed['error']);
     }
 
     public function test_a_node_of_an_unknown_type_is_traced_as_failed_and_not_completed(): void
@@ -234,15 +237,15 @@ final class NodeTraceRecordingTest extends FeatureTestCase
             $this->assertArrayHasKey('inner', $entry->metadata['iterations']);
         }
 
-        $this->assertSame(['outer' => 1, 'inner' => 1], $bodyEntries[0]->metadata['iterations']);
-        $this->assertSame(['outer' => 1, 'inner' => 2], $bodyEntries[1]->metadata['iterations']);
-        $this->assertSame(['outer' => 2, 'inner' => 1], $bodyEntries[2]->metadata['iterations']);
-        $this->assertSame(['outer' => 2, 'inner' => 2], $bodyEntries[3]->metadata['iterations']);
+        $this->assertSameJson(['outer' => 1, 'inner' => 1], $bodyEntries[0]->metadata['iterations']);
+        $this->assertSameJson(['outer' => 1, 'inner' => 2], $bodyEntries[1]->metadata['iterations']);
+        $this->assertSameJson(['outer' => 2, 'inner' => 1], $bodyEntries[2]->metadata['iterations']);
+        $this->assertSameJson(['outer' => 2, 'inner' => 2], $bodyEntries[3]->metadata['iterations']);
 
         $bodyCompleted = $this->rows($session)
             ->first(static fn (FlowSessionHistoryEntry $row): bool => 'body' === $row->node_id && HistoryEventType::NodeCompleted === $row->event_type);
 
-        $this->assertSame(['outer' => 1, 'inner' => 1], $bodyCompleted->metadata['iterations']);
+        $this->assertSameJson(['outer' => 1, 'inner' => 1], $bodyCompleted->metadata['iterations']);
 
         $done = $this->rows($session)->last();
 
@@ -362,10 +365,10 @@ final class NodeTraceRecordingTest extends FeatureTestCase
 
         $completed = $this->rows($session)->firstWhere('event_type', HistoryEventType::NodeCompleted)->metadata;
 
-        $this->assertSame(['node' => ['q' => 'question']], $completed['input']);
+        $this->assertSameJson(['node' => ['q' => 'question']], $completed['input']);
         $this->assertSame('v', $completed['output']['state_changes']['flow.x']);
-        $this->assertSame(['m' => 1], $completed['output']['metadata']);
-        $this->assertSame(['a' => 'answer'], $completed['output']['node']);
+        $this->assertSameJson(['m' => 1], $completed['output']['metadata']);
+        $this->assertSameJson(['a' => 'answer'], $completed['output']['node']);
 
         $entered = $this->rows($session)->firstWhere('event_type', HistoryEventType::NodeEntered)->metadata;
 
@@ -414,7 +417,7 @@ final class NodeTraceRecordingTest extends FeatureTestCase
 
         $completed = $this->rows($session)->last()->metadata;
 
-        $this->assertSame(['message' => ['type' => 'text', 'text' => 'hello']], $completed['input']);
+        $this->assertSameJson(['message' => ['type' => 'text', 'text' => 'hello']], $completed['input']);
     }
 
     public function test_deleting_a_contact_deletes_the_trace_rows_of_its_sessions(): void

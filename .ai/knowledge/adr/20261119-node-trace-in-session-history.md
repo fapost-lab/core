@@ -36,8 +36,9 @@ data by nature: headers, tokens in URLs, response bodies, a contact's messages.
   `flow.trace.payloads` is on. A conversation's rows carry none: nothing deletes a conversation's history yet, and a
   conversation is a person's data (D-3). A handler adds its own data through `NodeExecutionResult::$trace`
   (Foundation 0.44, experimental), which goes to the trace and nowhere else; in v1 only `call` does (D-6).
-- Payloads are masked (`TracePayloadMasker`: sensitive key names, URL passwords and query parameters, literal
-  secrets) and then limited (`TracePayloadLimiter`: 1 MiB a row, largest values replaced by
+- Payloads are masked (`TracePayloadMasker`: sensitive key names, also inside a string holding a JSON document such
+  as a raw request body; URL passwords and query parameters, also `query.<name>` call parameters and the pairs of a
+  form-urlencoded body; literal secrets) and then limited (`TracePayloadLimiter`: 1 MiB a row, largest values replaced by
   `"[truncated, N bytes]"`) before they are written.
 - Rows are written outside the step's transaction, each insert in a savepoint of its own; a failure is the warning
   `flow.trace.write_failed` and never fails the step.
