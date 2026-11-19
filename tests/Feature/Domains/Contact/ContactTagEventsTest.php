@@ -9,6 +9,7 @@ use App\Domains\Contact\Events\ContactTagRemoved;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Repositories\ContactTagRepository;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
 final class ContactTagEventsTest extends FeatureTestCase
@@ -24,16 +25,17 @@ final class ContactTagEventsTest extends FeatureTestCase
 
     public function test_adding_a_new_tag_announces_it_once_and_an_existing_tag_announces_nothing(): void
     {
-        $contact = Contact::factory()->create();
+        $contact  = Contact::factory()->create();
+        $taggedBy = (string) Str::ulid();
 
-        $this->assertTrue($this->tags->add($contact->id, 'vip', 'session-1'));
-        $this->assertFalse($this->tags->add($contact->id, 'vip', 'session-1'));
+        $this->assertTrue($this->tags->add($contact->id, 'vip', $taggedBy));
+        $this->assertFalse($this->tags->add($contact->id, 'vip', $taggedBy));
 
         Event::assertDispatchedTimes(ContactTagAdded::class, 1);
         Event::assertDispatched(ContactTagAdded::class, fn (ContactTagAdded $event): bool => (string) $contact->tenant_id === $event->tenantId
             && $contact->id === $event->contactId
             && 'vip' === $event->tag
-            && 'session-1' === $event->taggedBy);
+            && $taggedBy === $event->taggedBy);
         Event::assertNotDispatched(ContactTagRemoved::class);
     }
 
@@ -70,11 +72,12 @@ final class ContactTagEventsTest extends FeatureTestCase
         $this->tags->add($contact->id, 'old', null);
         $this->tags->add($contact->id, 'keep', null);
         $this->fakeEvents();
+        $taggedBy = (string) Str::ulid();
 
-        $this->tags->syncForContact($contact->id, ['keep', 'new'], 'staff-1');
+        $this->tags->syncForContact($contact->id, ['keep', 'new'], $taggedBy);
 
         Event::assertDispatchedTimes(ContactTagAdded::class, 1);
-        Event::assertDispatched(ContactTagAdded::class, fn (ContactTagAdded $event): bool => 'new' === $event->tag && 'staff-1' === $event->taggedBy);
+        Event::assertDispatched(ContactTagAdded::class, fn (ContactTagAdded $event): bool => 'new' === $event->tag && $taggedBy === $event->taggedBy);
         Event::assertDispatchedTimes(ContactTagRemoved::class, 1);
         Event::assertDispatched(ContactTagRemoved::class, fn (ContactTagRemoved $event): bool => 'old' === $event->tag);
     }
