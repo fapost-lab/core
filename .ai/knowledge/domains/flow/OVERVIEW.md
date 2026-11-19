@@ -24,7 +24,7 @@ paths:
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
   - "app/Domains/Flow/Templates/**"
-reviewed_at: 2026-11-18
+reviewed_at: 2026-11-19
 ---
 # Flow
 
@@ -147,7 +147,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   `app/Infrastructure/Flow/DeferredResumeDispatcher`, which queues nothing on a `sync` queue: it
   cannot delay, and would re-enter the running engine. There a timeout never fires and a delay
   moves on only with the next inbound message.
-- Console: `flow:sweep-subflow-timeouts` (every minute), `logs:prune-flow`, `logs:create-partition`
+- Console: `flow:sweep-subflow-timeouts` and `flow:sweep-overdue-automation-runs` (every minute), `logs:prune-flow`, `logs:create-partition`
   (`routes/console.php`; the prune drops a partition under `lock_timeout` 5s through
   `Shared/Infrastructure/PostgresMonthlyPartitions`, and on a timeout the tenant is marked ✘ and the next run retries); `flow:node-usage` is run by hand and is not scheduled.
 - Bindings: `Providers/FlowServiceProvider.php`. Registries are singletons, frozen after boot

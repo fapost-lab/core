@@ -34,6 +34,7 @@ use App\Domains\Flow\Logging\FlowLogStatus;
 use App\Domains\Flow\Logging\FlowLogWriter;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use DateTimeImmutable;
@@ -84,6 +85,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private StateNamespacesInterface $stateNamespaces,
         private ExecutionSegment $segment,
         private SegmentHandOff $handOff,
+        private AutomationRunDeadline $runDeadline,
     ) {
     }
 
@@ -112,6 +114,9 @@ final readonly class FlowEngine implements FlowEngineInterface
 
         $baseState = $this->buildBaseState($definition, $contact, $assistantId, $initialState);
 
+        // An automation run's deadline is frozen at its start; a later change of the setting never moves it.
+        $deadlineAt = FlowRunKind::Automation === $origin->kind ? $this->runDeadline->for(now()) : null;
+
         $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
             'tenant_id'          => null !== $contact ? $contact->tenant_id : $definition->tenant_id,
             'assistant_id'       => $assistantId,
@@ -124,6 +129,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             'run_kind'           => $origin->kind,
             'trigger_id'         => $origin->triggerId,
             'fire_key'           => $origin->fireKey,
+            'deadline_at'        => $deadlineAt,
             'version'            => 1,
         ]));
 

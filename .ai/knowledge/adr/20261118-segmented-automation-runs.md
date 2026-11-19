@@ -91,7 +91,8 @@ approved by the agent at the gate (unattended), 2026-11-18.
 
 - A continuation lost between the `segment_id` commit and the queue push (a process killed in that instant), or a
   sweeper pass killed outright (not an exception) after it resumed a run, leaves the run `active` until the
-  run-deadline sweeper of `flow-run-deadline-sweeper` picks it up. So does a run whose job broke off after a subflow
+  run-deadline sweeper of `flow-run-deadline-sweeper` picks it up (`adr-20261119-automation-run-deadline`: the run
+  fails at its deadline, 24 h by default; it is not resumed earlier). So does a run whose job broke off after a subflow
   child's end committed but before its parent was resumed (the parent waits in `paused_subflow` over an ended child,
   which no retry follows); the subflow sweeper then expires the parent at its timeout.
 - A delay wake-up now waits out a busy lock — a conversation's too — for up to an hour past its due time instead of

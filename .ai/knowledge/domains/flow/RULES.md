@@ -137,6 +137,17 @@ broken.
   second runner or a re-reserved job repeats `call` side effects in somebody else's system, silently
   (`adr-20261118-segmented-automation-runs`). Enforced: `AutomationRunTest`, `AutomationRunLockRedisTest`,
   `ExecutionSegmentTest`, `HorizonAutomationsSupervisorTest`.
+- **An automation run has a deadline frozen at its start; past it the whole run fails and runs no node.**
+  `FlowEngine::start()` writes `deadline_at` = start + `flow.automation.max_run_hours` (24) for `run_kind = automation`
+  only, and a subflow child copies its parent's; a row without one counts from `created_at`. Every minute
+  `flow:sweep-overdue-automation-runs` (`AutomationRunDeadlineSweeper`, per tenant passed explicitly, stopped tenants
+  skipped) fails every live session of a run past its deadline, or still `pending` 3 h after it was created, bottom-up in
+  one transaction under the root's `LockScope::ofSession()`: `status = failed`, `failure_reason` `deadline_exceeded` or
+  `start_lost`, the root's `segment_id` cleared, `updated_at` written; no node runs and no parent takes its `failed`
+  handle. Conversations are never touched. A producer of `pending` rows must write their `deadline_at`. Why: a run
+  whose job was lost would keep its trigger and its flow for good, and a setting lowered later must not fail running
+  runs at once (`adr-20261119-automation-run-deadline`). Enforced: `AutomationRunDeadlineSweeperTest`,
+  `AutomationRunDeadlineSweeperRedisTest`, `SweepOverdueAutomationRunsCommandTest`, `AutomationRunTest`.
 
 ## Rules
 
@@ -171,9 +182,9 @@ broken.
   themselves instead of spending an attempt). A caller that may hold a contactless session takes its scope from `LockScope::ofSession()`, never
   builds it from the session's columns (callers that only ever hold a contact's session — buttons, operator requests,
   event starts — still pass the triple). `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
-  `StartFlowFromEventJob`, `SubflowTimeoutSweeper` and `AutomationRunner` follow it (`tests/Feature/Redis`); the sweeper
-  skips a parent whose lock is busy and retries on its next run, and skips with a warning a parent it cannot lock at
-  all, so one parent never ends its pass.
+  `StartFlowFromEventJob`, `SubflowTimeoutSweeper`, `AutomationRunDeadlineSweeper` and `AutomationRunner` follow it
+  (`tests/Feature/Redis`); the sweepers skip a parent or run whose lock is busy and retry on their next run, and skip
+  with a warning one they cannot lock at all, so one never ends the pass.
 - **A contactless session never reaches a contact through an empty id.** Without a contact,
   `ScopedStateReader` refuses `contact.*` and `module.*`, `ContactWriter` refuses every write and
   `LockScope` refuses a scope with neither a contact nor a trigger, all with `ContactlessSessionException`; `FlowEngine::start()` takes a

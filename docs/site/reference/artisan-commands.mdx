@@ -83,6 +83,7 @@ webhooks are not arriving — see [Webhook gateway](/self-hosting/gateway).
 | Command | Does |
 |---|---|
 | `flow:sweep-subflow-timeouts` | Force-fail subflow children whose parent has expired, and resume the parent through its failed handle |
+| `flow:sweep-overdue-automation-runs` | Fail every automation run still running or waiting past its deadline (the platform setting `flow.automation.max_run_hours`, default 24, counted from the run's start), and every run still `pending` 3 hours after it was fired, whose start was lost, in every active tenant that is not stopped. The whole run fails with its subflows, with the reason `deadline_exceeded` or `start_lost`; no node runs. A run busy in a worker is retried on the next pass. Conversations are never touched. Scheduled every minute |
 | `flow:node-usage` | Report which node types and versions are still in use, per tenant and across the platform |
 | `flow:audit-graph` | Report structural graph problems (no single entry node, unreachable nodes, duplicate handles, malformed variables) in active flow definitions and drafts, per tenant |
 

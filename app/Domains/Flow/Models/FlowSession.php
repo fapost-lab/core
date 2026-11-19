@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Models;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Enums\FlowRunFailureReason;
 use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int                 $step_count    steps of an automation session outside loop bodies, over all its segments (capped by flow.execution.max_iterations)
  * @property int                 $loop_step_count steps of an automation session inside loop bodies, over all its segments (with step_count, capped by StepBudget::ceiling())
  * @property string|null         $segment_id    the one continuation allowed to run an automation session next
+ * @property \Illuminate\Support\Carbon|null $deadline_at  when an automation run is failed if still live; frozen at its start
+ * @property FlowRunFailureReason|null $failure_reason  why the run was failed from outside the engine
  * @property string              $flow_definition_id  FK to {@see FlowDefinition::$id} — immutable
  *           definition snapshot for this session (specific version row), not only logical
  *           {@see FlowDefinition::$flow_id}
@@ -79,6 +82,8 @@ final class FlowSession extends BaseModel
         'step_count',
         'loop_step_count',
         'segment_id',
+        'deadline_at',
+        'failure_reason',
         'end_status',
         'parent_session_id',
         'parent_resume_node_id',
@@ -181,6 +186,8 @@ final class FlowSession extends BaseModel
             'step_count'      => 'integer',
             'loop_step_count' => 'integer',
             'expires_at'      => 'datetime',
+            'deadline_at'     => 'datetime',
+            'failure_reason'  => FlowRunFailureReason::class,
         ];
     }
 }

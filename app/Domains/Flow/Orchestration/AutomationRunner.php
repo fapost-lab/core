@@ -37,6 +37,13 @@ final readonly class AutomationRunner
     /** The queue of automation runs: their starts and their segments, apart from conversations and `sync.external`. */
     public const string QUEUE = 'flow.automations';
 
+    /**
+     * How long the job that starts a run keeps retrying on a busy trigger lock, beside the one postponement of a
+     * stopped tenant. A `pending` run older than that window and more has lost its start
+     * ({@see AutomationRunDeadline::PENDING_LOST_AFTER_SECONDS}).
+     */
+    public const int START_RETRY_SECONDS = 3600;
+
     public function __construct(
         private FlowSessionRepositoryInterface $sessions,
         private FlowDefinitionRepositoryInterface $definitions,
