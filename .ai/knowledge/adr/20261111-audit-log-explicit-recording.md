@@ -102,3 +102,11 @@ A change is detected on the canonical JSON of a value (`AuditChanges::canonical(
 keys does not matter, the order of a list does. Postgres `jsonb` reorders keys, so a stored value read back would
 otherwise look changed. Thread handling (takeover, finish, transfer, seize, the operator's request) is not
 recorded in v1, as the scope above says.
+
+## Amendment 2026-11-19: actions taken through a tenant API token
+
+A fourth actor kind, `api_token`, labelled `API · <token name>`: `AuditActorResolver` reads the `api-token`
+guard as well as `web`, and an action taken through a token is recorded with that actor (the token is not a
+`User`, so the causer is the token's row). Issuing, rotating and revoking a token are recorded as staff actions,
+with the token's name and `last_four`, never its secret or hash. Decided at the `tenant-api-token-adr` gate
+(`adr-20261119-tenant-api-tokens`); built by the first task that ships the token.

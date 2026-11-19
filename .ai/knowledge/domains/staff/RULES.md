@@ -137,6 +137,11 @@ broken.
   `PublishFlow`, `ManageRoles`, `ViewConversations`, `ReplyConversations`, `ViewOperatorScreens`,
   `ViewActivityLog`); the Roles UI badges
   those. A new permission with elevated risk is added to that `match`, not flagged elsewhere.
+- **A machine credential of a tenant is a tenant API token, one model for every surface.** The API
+  trigger, MCP and any later machine surface use the tenant's `api_tokens` (Staff), the `api-token`
+  guard and stack, and `Permission` values as abilities through `Gate` — never a token table or a
+  scope vocabulary of their own. Shape, storage, issuing, lifetime, limits and audit:
+  `adr-20261119-tenant-api-tokens`. Review only (nothing is built yet).
 - **`Permission::ManageFlow` is `@deprecated`** and kept for backward compatibility; use the granular
   flow permissions (`ManageFlowDefinitions`, `PublishFlow`, `ViewFlowSessions`, `ManageFlowGroups`,
   `ManageTranslations`) for new checks.
