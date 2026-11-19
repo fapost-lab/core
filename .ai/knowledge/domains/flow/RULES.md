@@ -41,7 +41,7 @@ broken.
   Why: without it a flow reads Redis, Postgres or the cloud credentials service from inside the
   network. New Flow code that needs HTTP uses `GuardedHttpClient::request()`, not `Http::` or
   Guzzle; hosts the operator chose (Telegram, captcha) are outside this rule. Enforced:
-  `tests/Architecture/EgressGuardTest.php` (Flow domain and builder controllers),
+  `tests/Architecture/EgressGuardTest.php` (Flow domain, `App\Domains\Credentials` and builder controllers),
   `EgressGuardMiddlewareTest`, `AddressClassifierTest`. Not covered: an extension action that makes
   its own request. Accepted risk: the name lookup (`dns_get_record`, then `gethostbynamel`) has no
   timeout of its own and runs before the HTTP timeout starts, so one `call` can take the system
@@ -50,6 +50,28 @@ broken.
   returns, so it never cuts a slow lookup short, and a name whose DNS never answers pays the
   resolver timeout twice (`dns_get_record`, then the `gethostbynamel` fallback); only a resolver
   timeout well under the 30s lock TTL keeps that worst case inside it. Accepted at the design gate.
+- **A `call` with a saved credential never exposes the secret and never sends it off its allowed hosts.**
+  (1) `credential_id` is read as written, never through a template, so a flow variable cannot pick another
+  credential; the secret travels in `CallRequest::$credential`, never in `parameters` or `options` (the node's
+  input). (2) Only the `http` transport applies a credential (`credential_unsupported` otherwise), and only to
+  a host in the credential's allowed hosts (`credential_host_denied`, no connection). (3) The credential's
+  headers and query replace the author's of the same name, the inline `auth.*` is ignored, and the author's
+  routing headers (`Host`, `X-Forwarded-Host`, `Forwarded`, `X-Original-Host`, `X-Host`) are dropped.
+  (4) Such a call never follows a redirect, and authorizing it (an OAuth2 token request) spends the call's own
+  `timeout`, so the node stays inside the window its job and lock are sized by. (5) The whole result, error messages and exception text included,
+  is masked with `SecretRedactor` before it reaches the ledger, state or logs. Why: whoever edits a flow must
+  not be able to read the key or send it to a server of their own (`adr-20261119-credentials-store`). Enforced:
+  `tests/Feature/Domains/Flow/Call/CallNodeCredentialTest.php` (`test_the_credential_id_is_not_a_template`,
+  `test_the_credential_reaches_the_transport_and_the_secret_is_in_neither_parameters_nor_options`,
+  `test_only_the_http_transport_takes_a_credential`), `HttpTransportCredentialTest.php`
+  (`test_a_host_outside_the_list_is_refused_without_a_connection`,
+  `test_the_authors_routing_headers_are_dropped_so_the_request_lands_on_the_allowed_host`,
+  `test_a_redirect_is_not_followed_and_the_credential_goes_nowhere_else`,
+  `test_a_token_request_that_spends_the_whole_timeout_sends_nothing_to_the_target`,
+  `test_the_secret_echoed_in_the_body_and_a_header_is_masked`,
+  `test_an_error_response_and_a_connection_exception_with_the_key_in_the_url_are_masked`),
+  `CallTesterCredentialTest.php`. Not covered: a secret the target echoes in a transformed form (URL-encoded,
+  re-encoded base64), and a value under 4 characters.
 - **Every class in `Handlers/` (except `Abstract` and `Support`) implements `NodeHandlerInterface`.**
   Enforced: `tests/Architecture/HandlerVersionContractTest.php`.
 - **Node handlers take collaborators as ordinary constructor dependencies.** The registry keeps

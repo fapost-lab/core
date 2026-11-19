@@ -78,6 +78,11 @@ return [
             'updated' => 'Role updated',
             'deleted' => 'Role deleted',
         ],
+        'credential' => [
+            'created' => 'Credential created',
+            'updated' => 'Credential updated',
+            'deleted' => 'Credential deleted',
+        ],
         'settings' => [
             'updated' => 'Workspace settings updated',
         ],

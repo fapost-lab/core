@@ -14,6 +14,7 @@ use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use Tests\Support\InMemoryCallExecutionLedger;
+use Tests\Support\InMemoryCredentialStore;
 use Tests\Support\UsageGates;
 use Tests\TestCase;
 
@@ -195,7 +196,7 @@ final class CallNodeSuccessStatusesAndStrictMappingTest extends TestCase
         $registry->register($transport);
 
         return [
-            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger()),
+            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore()),
             $transport,
         ];
     }

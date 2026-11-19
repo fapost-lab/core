@@ -43,6 +43,7 @@ Calls an external or internal service. Combines Integration (HTTP) and Action (i
 | `result_mapping` | list of `{from, to}` | no | Each entry copies one response path into a `Variable` (`to`) |
 | `success_statuses` | list | no | Statuses that count as success, for every transport that reports one. Absent: the transport's own rule (`success_when`). See "`success_statuses`" |
 | `strict_mapping` | boolean | no | `true`: a mapped path missing from a successful response sends the node to `error` instead of writing null. Default `false`. See "Strict mapping" |
+| `credential_id` | string | no | A saved credential of the tenant, applied by the `http` transport. A literal id, never a template. See "Saved credentials" |
 | `retry` | object | no | Sends a failed call again with backoff, inside the node's 18-second window. Absent: one send. See "Retry" |
 
 A node with neither `transport` nor `target` is a **legacy** node and runs through `executeLegacy()`:
@@ -55,6 +56,27 @@ it POSTs `url` through the `http` transport with `{session_id, contact_id, state
 |-----------|--------|
 | `http` | `<METHOD> <URL>`, for example `POST https://api.example.com/users` |
 | `handler` | an action id in `ActionHandlerRegistry`, for example `crm.sync_contact` |
+
+## Saved credentials
+
+`credential_id` names a credential saved on the console (Credentials). The node reads it as it is, without rendering: a
+flow variable cannot choose another credential of the tenant. A non-string or empty value means none.
+
+Resolution happens after the idempotency ledger lookup and before the call quota is spent. A replay of an earlier
+success needs no credential (nothing is sent), and a refused credential costs no quota. A refusal takes the `error`
+handle with `error_code` and `credential_id` in the metadata, and the flow log shows `<code>: <credential id>`:
+
+| `error_code` | Cause |
+|---|---|
+| `credential_unsupported` | the transport is not `http` |
+| `credential_not_found` | no credential with that id in the tenant |
+| `credential_unavailable` | the stored secret cannot be decrypted (the application key changed), or, from the transport, the type cannot authorize (for OAuth2, no token) |
+| `credential_host_denied` | from the transport: the target host is not among the credential's allowed hosts; no connection |
+
+The node passes the credential in `CallRequest::$credential`, on every attempt of a `retry` (it is read once per
+execution). What the transport does with it, including masking and the refusal to follow redirects, is in
+[04-call-transport-layer.md](../04-call-transport-layer.md), section 4.3. The author's inline `auth.bearer` /
+`auth.basic.*` keep working without a credential; with one they are ignored.
 
 ## Output handles
 
@@ -270,15 +292,20 @@ See [04-call-transport-layer.md](../04-call-transport-layer.md), section 4.3.
 ## Validation
 
 `ValidateFlowService` has no call-specific rules beyond the schema (no required fields are declared) and the handler's own
-`validate()`: the `success_statuses` list and the `strict_mapping` flag (see above).
+`validate()`: the `success_statuses` list, the `retry` policy, the `strict_mapping` flag (see above) and the `credential_id`:
+`call_invalid_credential` (not a string), `call_credential_unsupported` (the transport is not `http`),
+`call_credential_not_found` (no such credential in the tenant). They are errors, so they block publishing; the validator does not
+tell a draft check from a publish, so a draft validation reports them as errors too.
 An unknown transport, a malformed target or an invalid `success_when` surfaces at runtime as the
 `error` handle. There is a builder "test call" endpoint (`CallTestController`, `CallTester`) for
-trying a request before publishing.
+trying a request before publishing; it accepts `credential_id` and answers with the same codes, masking an exception message with
+the credential's secret fields.
 
 Tests: `tests/Unit/Domains/Flow/BuiltInNodeHandlersTest.php`,
 `tests/Unit/Domains/Flow/Call/HandlerTransportTest.php`,
 `tests/Feature/Domains/Flow/Call/HttpTransportTest.php`, `CallTesterTest.php`,
-`CallNodeSuccessStatusesAndStrictMappingTest.php`, `tests/Unit/Domains/Flow/Call/CallSuccessStatusesTest.php`.
+`CallNodeSuccessStatusesAndStrictMappingTest.php`, `CallNodeCredentialTest.php`, `HttpTransportCredentialTest.php`,
+`CallTesterCredentialTest.php`, `tests/Unit/Domains/Flow/Call/CallSuccessStatusesTest.php`.
 
 ---
 

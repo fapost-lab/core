@@ -4,16 +4,26 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Call\Transports;
 
+use App\Domains\Credentials\CredentialTypeRegistry;
+use App\Domains\Credentials\HostMatcher;
+use App\Domains\Credentials\OAuth2TokenCache;
+use App\Domains\Credentials\SecretRedactor;
+use App\Domains\Credentials\Types\OAuth2ClientCredentialsType;
 use App\Domains\Flow\Call\CallAttempt;
 use App\Domains\Flow\Call\CallSuccessStatuses;
 use App\Domains\Flow\Call\Egress\EgressDeniedException;
 use App\Domains\Flow\Call\Egress\GuardedHttpClient;
+use Fapost\Foundation\Credentials\DTO\CredentialSecret;
+use Fapost\Foundation\Credentials\DTO\HttpAuthorization;
+use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
 use Fapost\Foundation\Flow\Call\CallContext;
 use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Call\CallTransportInterface;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use InvalidArgumentException;
 use JsonException;
 use Psr\Log\LoggerInterface;
 
@@ -42,6 +52,21 @@ use Psr\Log\LoggerInterface;
  * Requests go through {@see GuardedHttpClient}: a target on a private, loopback,
  * link-local, reserved or cloud-metadata address, directly, through DNS or through
  * a redirect, ends in the `egress_denied` error code without a connection.
+ *
+ * A request that carries a saved credential ({@see CallRequest::$credential}) is sent as follows:
+ *  - the target host must match the credential's allowed hosts, else `credential_host_denied` and no connection
+ *    (nor a token request);
+ *  - the credential's type supplies the headers and query, which replace the author's of the same name (headers
+ *    compared case-insensitively); the author's `auth.bearer` / `auth.basic.*` are ignored;
+ *  - a redirect is not followed, the 3xx is the answer;
+ *  - every returned result, error ones and exception messages included, has the credential's secret strings
+ *    replaced by `***` ({@see SecretRedactor}), so what the ledger, the state and the logs get is already masked;
+ *  - a type that cannot authorize (the OAuth2 endpoint did not give a token, a setting is missing) is
+ *    `credential_unavailable`; a 401 from an OAuth2 target drops the cached token.
+ *
+ * The transport is a singleton and keeps no tenant state: the type registry is a singleton of classes, the
+ * credential travels in the request, and the scoped OAuth2 token cache is resolved from the container only when
+ * a 401 asks for it.
  */
 final readonly class HttpTransport implements CallTransportInterface
 {
@@ -52,9 +77,24 @@ final readonly class HttpTransport implements CallTransportInterface
      */
     public const int DEFAULT_TIMEOUT_SECONDS = 10;
 
+    /**
+     * The least time worth sending the target request with, once authorizing a credential has spent part of the timeout.
+     */
+    private const float MIN_TARGET_SECONDS = 1.0;
+
+    /**
+     * Headers that choose where a request lands behind the target address; an author may not set them on a request
+     * that carries a credential.
+     *
+     * @var list<string>
+     */
+    private const array ROUTING_HEADERS = ['Host', 'X-Forwarded-Host', 'Forwarded', 'X-Original-Host', 'X-Host'];
+
     public function __construct(
         private GuardedHttpClient $http,
         private LoggerInterface $logger,
+        private CredentialTypeRegistry $credentialTypes,
+        private Container $container,
     ) {
     }
 
@@ -71,10 +111,115 @@ final readonly class HttpTransport implements CallTransportInterface
             return CallResult::error('invalid_target', metadata: ['target' => $request->target]);
         }
 
+        $credential = $request->credential;
+
+        if (null === $credential) {
+            return $this->send($method, $url, $request, $context, null);
+        }
+
+        $startedAt     = hrtime(true);
+        $authorization = $this->authorize($credential, $url, $context);
+
+        if ($authorization instanceof CallResult) {
+            return $authorization;
+        }
+
+        // An OAuth2 token request spends the call's own time: the target gets what is left of the timeout, so a cold
+        // token cache cannot stretch the node past the window the flow runtime sizes its jobs and locks by.
+        $timeout = (int) ($request->options['timeout'] ?? self::DEFAULT_TIMEOUT_SECONDS);
+        $left    = $timeout - (hrtime(true) - $startedAt) / 1e9;
+
+        if ($timeout > 0 && $left < self::MIN_TARGET_SECONDS) {
+            $this->logger->warning('Call node credential took the whole timeout to authorize; the request was not sent.', [
+                'tenant_id'     => $context->tenantId,
+                'node_id'       => $context->nodeId,
+                'credential_id' => $credential->id,
+            ]);
+
+            return CallResult::error('credential_unavailable', metadata: ['reason' => 'timeout']);
+        }
+
+        $result = $this->send($method, $url, $request, $context, $authorization, $timeout > 0 ? $left : null);
+
+        if (401 === ($result->metadata['status_code'] ?? null) && OAuth2ClientCredentialsType::ID === $credential->type) {
+            $this->container->make(OAuth2TokenCache::class)->forget($credential->tenantId, $credential->id);
+        }
+
+        return $this->masked($result, $authorization);
+    }
+
+    /**
+     * Checks the target host against the credential's allowed hosts and asks its type for the authorization.
+     * A refusal comes back as the result to return; nothing is sent, and no token is requested for a denied host.
+     */
+    private function authorize(CredentialSecret $credential, string $url, CallContext $context): HttpAuthorization|CallResult
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        $host = is_string($host) ? $host : '';
+
+        if (! HostMatcher::matches($host, $credential->allowedHosts)) {
+            // The URL path and query are left out on purpose: they carry tokens.
+            $this->logger->warning('Call node request refused: the host is not allowed for the credential.', [
+                'tenant_id'     => $context->tenantId,
+                'node_id'       => $context->nodeId,
+                'host'          => $host,
+                'credential_id' => $credential->id,
+            ]);
+
+            return CallResult::error('credential_host_denied', metadata: ['host' => $host]);
+        }
+
+        try {
+            return $this->credentialTypes->get($credential->type)->authorize($credential);
+        } catch (InvalidArgumentException|CredentialUnavailableException $exception) {
+            $this->logger->warning('Call node credential cannot be applied.', [
+                'tenant_id'     => $context->tenantId,
+                'node_id'       => $context->nodeId,
+                'credential_id' => $credential->id,
+                'type'          => $credential->type,
+                'exception'     => $exception::class,
+            ]);
+
+            return CallResult::error('credential_unavailable');
+        }
+    }
+
+    /**
+     * Replaces the authorization's secret strings in the whole result: payload, metadata (headers, exception
+     * messages) and their keys. The error code is a fixed word and stays as it is.
+     */
+    private function masked(CallResult $result, HttpAuthorization $authorization): CallResult
+    {
+        $secrets = $authorization->secrets();
+
+        /** @var array<string, mixed> $metadata */
+        $metadata = SecretRedactor::redact($result->metadata, $secrets);
+
+        return new CallResult($result->success, SecretRedactor::redact($result->payload, $secrets), $result->errorCode, $metadata);
+    }
+
+    /**
+     * @param  float|null  $timeoutLeft  seconds left of the call's timeout after the credential was authorized; null
+     *                                   to use the timeout option as it is
+     */
+    private function send(string $method, string $url, CallRequest $request, CallContext $context, ?HttpAuthorization $authorization, ?float $timeoutLeft = null): CallResult
+    {
         [$body, $query, $headers, $bearer, $basic] = $this->bucketParameters($request->parameters);
 
-        $optionHeaders = is_array($request->options['headers'] ?? null) ? $request->options['headers'] : [];
-        $headers       = array_replace($optionHeaders, $headers);
+        $optionHeaders   = is_array($request->options['headers'] ?? null) ? $request->options['headers'] : [];
+        $headers         = array_replace($optionHeaders, $headers);
+        $credentialQuery = [];
+
+        if ($authorization instanceof HttpAuthorization) {
+            // The author's routing headers go too: a shared ingress that routes by Host would hand the credential to
+            // another site behind the allowed host.
+            $headers          = $this->withoutNamed($headers, [...array_keys($authorization->headers()), ...self::ROUTING_HEADERS]);
+            $headers          = [...$headers, ...$authorization->headers()];
+            $credentialQuery  = $authorization->query();
+            $query            = [...array_diff_key($query, $credentialQuery), ...$credentialQuery];
+            [$bearer, $basic] = [null, []];
+        }
+
         $headers['Idempotency-Key'] ??= $context->idempotencyKey;
 
         $attempt = $request->options[CallAttempt::OPTION] ?? null;
@@ -93,7 +238,12 @@ final readonly class HttpTransport implements CallTransportInterface
             ? $request->options['body_raw']
             : null;
 
-        $client = $this->configureClient($this->http->request()->withHeaders($headers)->timeout($timeout), $bearer, $basic);
+        $client = $this->configureClient($this->http->request()->withHeaders($headers)->timeout($timeoutLeft ?? $timeout), $bearer, $basic);
+
+        if ($authorization instanceof HttpAuthorization) {
+            // A credential is never carried to another place by a redirect.
+            $client = $client->withoutRedirecting();
+        }
 
         if (null !== $rawBody) {
             $client = $client->withBody($rawBody, 'application/json');
@@ -102,12 +252,17 @@ final readonly class HttpTransport implements CallTransportInterface
 
         try {
             $response = match ($method) {
-                'GET'    => $client->get($url, $query),
-                'DELETE' => $client->delete($url, [] === $body ? $query : $body),
-                'POST'   => $client->post($this->appendQuery($url, $query), $body),
-                'PUT'    => $client->put($this->appendQuery($url, $query), $body),
-                'PATCH'  => $client->patch($this->appendQuery($url, $query), $body),
-                default  => null,
+                'GET' => $client->get($url, $query),
+                // With a body the query is not sent, as before; the credential's query is the exception, it must reach the target.
+                // Without a body the author's query travels as the request data, as before; the credential's query
+                // always goes in the URL, where the target reads it.
+                'DELETE' => [] === $body
+                    ? $client->delete($this->appendQuery($url, $credentialQuery), array_diff_key($query, $credentialQuery))
+                    : $client->delete($this->appendQuery($url, $credentialQuery), $body),
+                'POST'  => $client->post($this->appendQuery($url, $query), $body),
+                'PUT'   => $client->put($this->appendQuery($url, $query), $body),
+                'PATCH' => $client->patch($this->appendQuery($url, $query), $body),
+                default => null,
             };
         } catch (EgressDeniedException $exception) {
             // The URL path and query are left out on purpose: they carry tokens.
@@ -145,6 +300,21 @@ final readonly class HttpTransport implements CallTransportInterface
         }
 
         return CallResult::ok($payload, $metadata);
+    }
+
+    /**
+     * The headers whose names differ from every given name, compared case-insensitively.
+     *
+     * @param  array<string, mixed>  $headers
+     * @param  list<string>  $names
+     *
+     * @return array<string, mixed>
+     */
+    private function withoutNamed(array $headers, array $names): array
+    {
+        $names = array_map(mb_strtolower(...), $names);
+
+        return array_filter($headers, static fn (int|string $name): bool => ! in_array(mb_strtolower((string) $name), $names, true), ARRAY_FILTER_USE_KEY);
     }
 
     /**

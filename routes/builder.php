@@ -6,6 +6,7 @@ use App\Http\Controllers\Builder\AssistantOptionsController;
 use App\Http\Controllers\Builder\BuilderFlowController;
 use App\Http\Controllers\Builder\CallTestController;
 use App\Http\Controllers\Builder\ContactTagsController;
+use App\Http\Controllers\Builder\CredentialOptionsController;
 use App\Http\Controllers\Builder\NodeTypesController;
 use App\Http\Controllers\Builder\StaffOptionsController;
 use App\Http\Middleware\EnsureTenantOnboarded;
@@ -23,6 +24,7 @@ Route::middleware(['auth', 'tenant', 'verified', EnsureTenantOnboarded::class, R
     Route::get('/node-types', [NodeTypesController::class, 'index']);
     Route::get('/tags', [ContactTagsController::class, 'index']);
     Route::get('/staff', [StaffOptionsController::class, 'index']);
+    Route::get('/credentials', [CredentialOptionsController::class, 'index']);
     Route::get('/assistants', [AssistantOptionsController::class, 'index']);
     Route::post('/call/test', CallTestController::class);
 });

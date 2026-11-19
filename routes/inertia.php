@@ -6,6 +6,7 @@ use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
+use App\Http\Controllers\Admin\CredentialController as AdminCredentialController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\HealthController as AdminHealthController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
@@ -163,6 +164,13 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::put('admin/platform-settings', [AdminPlatformSettingsController::class, 'update'])->name('console.admin.platform-settings.update');
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
+        // Credentials: saved secrets a flow's call node uses to authorize an HTTP request; a new screen, so its own URI.
+        Route::get('admin/credentials', [AdminCredentialController::class, 'index'])->name('console.admin.credentials.index');
+        Route::get('admin/credentials/create', [AdminCredentialController::class, 'create'])->name('console.admin.credentials.create');
+        Route::get('admin/credentials/{record}/edit', [AdminCredentialController::class, 'edit'])->name('console.admin.credentials.edit');
+        Route::post('admin/credentials', [AdminCredentialController::class, 'store'])->name('console.admin.credentials.store');
+        Route::put('admin/credentials/{record}', [AdminCredentialController::class, 'update'])->name('console.admin.credentials.update');
+        Route::delete('admin/credentials/{record}', [AdminCredentialController::class, 'destroy'])->name('console.admin.credentials.destroy');
         // Activity log: who changed what in the console and the builder, read only; a new screen, so its own URI.
         Route::get('admin/activity', [AdminActivityLogController::class, 'index'])->name('console.admin.activity.index');
 

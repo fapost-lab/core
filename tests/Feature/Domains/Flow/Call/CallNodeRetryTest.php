@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Sleep;
 use Tests\Support\FakeUsageMeter;
 use Tests\Support\InMemoryCallExecutionLedger;
+use Tests\Support\InMemoryCredentialStore;
 use Tests\Support\UsageGates;
 use Tests\TestCase;
 
@@ -362,7 +363,7 @@ final class CallNodeRetryTest extends TestCase
         $registry->register($transport);
 
         return [
-            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger()),
+            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore()),
             $transport,
         ];
     }

@@ -16,6 +16,7 @@ use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use Tests\Support\FakeUsageMeter;
 use Tests\Support\InMemoryCallExecutionLedger;
+use Tests\Support\InMemoryCredentialStore;
 use Tests\Support\UsageGates;
 use Tests\TestCase;
 
@@ -112,7 +113,7 @@ final class CallNodeIdempotencyTest extends TestCase
         $registry->register($transport);
         $ledger = new InMemoryCallExecutionLedger();
         $ledger->complete(UsageGates::TENANT_ID, 'session-1:call-1:3:call-1', CallResult::ok(['id' => 'user-1']));
-        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(FakeUsageMeter::denying()), $ledger);
+        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(FakeUsageMeter::denying()), $ledger, new InMemoryCredentialStore());
 
         $modern = $handler->execute($this->node(), [], $this->context('session-1:call-1:3'));
         $legacy = $handler->execute(['id' => 'call-1', 'config' => ['url' => 'https://x.test/hook']], [], $this->context('session-1:call-1:3'));
@@ -159,7 +160,7 @@ final class CallNodeIdempotencyTest extends TestCase
             {
             }
         };
-        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), $ledger);
+        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), $ledger, new InMemoryCredentialStore());
 
         $result = $handler->execute($this->node(), [], $this->context('session-1:call-1:3'));
         $handler->execute($this->node(), [], $this->context('session-1:call-1:3'));
@@ -182,7 +183,7 @@ final class CallNodeIdempotencyTest extends TestCase
         $ledger = new InMemoryCallExecutionLedger();
 
         return [
-            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), $ledger),
+            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), $ledger, new InMemoryCredentialStore()),
             $transport,
             $ledger,
         ];
