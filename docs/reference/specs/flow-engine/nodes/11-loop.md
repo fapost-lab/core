@@ -574,7 +574,9 @@ Two branches, each with its own loop and the same `iterator_name`, are fine: onl
   (5.6).
 - **Subflow:** a subflow in a loop body creates a new child session per iteration (wait mode; `resumeAfterSubflow`
   returns to the post-subflow position inside the body). 100 iterations x a subflow is 100 child sessions:
-  acceptable but heavy, use with care.
+  acceptable but heavy, use with care. In an automation the parent resumed by its child's end runs the next steps
+  of the body in a nested engine call, which writes the iteration count; the frame that ran the subflow node then counts
+  only its own step and leaves that count alone (`AutomationRunTest`).
 
 ---
 

@@ -571,16 +571,22 @@ final readonly class FlowEngine implements FlowEngineInterface
             // the stale result here would either lose that progress or
             // raise an OptimisticLockConflict. Skip persistence in that scenario.
             $skipPersist = false;
+            // Whether a nested run of this session counted steps of its own while this step ran: the parent resumed
+            // by its child's end inside the subflow node. That run went on from here and wrote the iteration count
+            // that holds now, so this frame's count is stale.
+            $nestedRunCounted = false;
             if (SubflowNodeHandler::TYPE === $type) {
                 $latest = FlowSession::query()->find($session->getKey());
                 if (null !== $latest && $latest->version !== $session->version) {
-                    $skipPersist = true;
+                    $skipPersist      = true;
+                    $nestedRunCounted = (int) $latest->step_count !== (int) $session->step_count
+                        || (int) $latest->loop_step_count !== (int) $session->loop_step_count;
                     $session->setRawAttributes($latest->getAttributes(), true);
                 }
             }
 
             $stepInLoop     = $budget->lastStepInLoop();
-            $iterationSteps = $budget->iterationSteps();
+            $iterationSteps = $nestedRunCounted ? null : $budget->iterationSteps();
 
             $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId, $automation, $stepInLoop, $iterationSteps): void {
                 if ($automation) {
@@ -757,13 +763,24 @@ final readonly class FlowEngine implements FlowEngineInterface
      * incremented, so the one step a killed segment repeats sets it again instead of counting twice. The columns are
      * not part of the optimistic lock: the step's own write bumps the version.
      *
+     * A null `$iterationSteps` leaves the iteration count as it is: a subflow step whose parent a nested run already
+     * took further wrote it there, and this frame's value predates that run. Such a run starts from the count before
+     * the subflow step, so until its next `loop_end` it counts that one step short — on the side that never fails a
+     * run early.
+     *
      * @param  'step_count'|'loop_step_count'  $column
      */
-    private function countRunStep(FlowSession $session, string $column, int $iterationSteps): void
+    private function countRunStep(FlowSession $session, string $column, ?int $iterationSteps): void
     {
-        $session->newQuery()->whereKey($session->getKey())->increment($column, 1, ['loop_iteration_step_count' => $iterationSteps]);
+        $extra = null !== $iterationSteps ? ['loop_iteration_step_count' => $iterationSteps] : [];
+
+        $session->newQuery()->whereKey($session->getKey())->increment($column, 1, $extra);
         $session->setAttribute($column, (int) $session->getAttribute($column) + 1);
-        $session->setAttribute('loop_iteration_step_count', $iterationSteps);
+
+        if (null !== $iterationSteps) {
+            $session->setAttribute('loop_iteration_step_count', $iterationSteps);
+        }
+
         $session->syncOriginalAttributes([$column, 'loop_iteration_step_count']);
     }
 
