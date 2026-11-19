@@ -27,16 +27,14 @@ export interface FlowDefinition {
 
 export type TriggerType = 'message' | 'schedule' | 'webhook' | 'api' | 'event'
 
-/** Discriminated union: either a delete marker or a full trigger config. */
-export type BuilderTriggerPayload =
-    | { _delete: true }
-    | {
-          _delete?: false
-          type: TriggerType
-          is_active: boolean
-          priority: number
-          config: Record<string, unknown>
-      }
+/** One trigger of a flow; the id is a ULID in RFC 4122 form, minted by the builder (utils/ulid.ts), that becomes its flow_triggers primary key on publish. */
+export interface BuilderTrigger {
+    id: string
+    type: TriggerType
+    is_active: boolean
+    priority: number
+    config: Record<string, unknown>
+}
 
 export type FlowKind = 'flow' | 'template'
 
@@ -80,7 +78,7 @@ export interface BuilderFlowPayload {
     draftVersion: number
     publishedVersion?: number | null
     definition?: unknown
-    trigger?: BuilderTriggerPayload | null
+    triggers?: BuilderTrigger[]
     availableEvents?: string[]
     availableLanguages?: string[]
     contentBaseLanguage?: string

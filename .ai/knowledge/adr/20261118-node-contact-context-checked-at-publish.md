@@ -43,6 +43,9 @@ published while anything in it needs one, and that every handler declares the co
 - A flow runs without a contact when its trigger's type gives none (`FlowTriggerType::givesContact()`: `schedule`,
   `webhook`, `api`). `/validate` uses the trigger in the request (`_delete` = none); publish uses the stored trigger,
   active or not, since switching a trigger on publishes nothing. No trigger means a contact.
+  *Amended by `adr-20261119-flow-triggers-in-definition-live-on-publish`:* a flow has a list of triggers, and is
+  contactless when any of them, active or not, gives none; `/validate` checks the list in the request (else the
+  draft's), publish the list it makes live.
 - In such a flow `ContactContextChecker`, run by `ValidateFlowService`, refuses each node that needs a contact with
   `node_needs_contact` at `nodes.<id>`, naming the reason and the trigger: its handler needs one, or its config reads
   `contact` or `module` (placeholders found by the template engine's `extractReferences`, `{{contact}}` included;
@@ -75,7 +78,7 @@ published while anything in it needs one, and that every handler declares the co
 - A flow saved with such a trigger and a contact node — which never ran, as these triggers start nothing yet — is
   refused at its next publish.
 - A trigger changed on draft save goes live before the flow is published again, so until triggers go live on
-  publish (spec `flow-automations`) the stored trigger and the active definition can disagree for a while.
+  publish (spec `flow-automations`) the stored trigger and the active definition can disagree for a while. *Closed by `adr-20261119-flow-triggers-in-definition-live-on-publish`: triggers go live only on publish.*
 - An automation can use `call` (the spec's first scenario: schedule, then `call`); every Solution action handler can
   now be reached without a contact and gets `CallContext::$contactId = null`.
 - The config check reads placeholders through the template engine only (`TemplateEngine::extractReferences`), while

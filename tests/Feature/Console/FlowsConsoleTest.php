@@ -95,6 +95,7 @@ final class FlowsConsoleTest extends FeatureTestCase
                     'groupName'        => 'Support',
                     'publishedVersion' => 3,
                     'trigger'          => ['type' => 'message', 'text' => 'help, support, reset password'],
+                    'moreTriggers'     => 0,
                     'editUrl'          => "/assistant/{$this->assistant->getKey()}/flows/{$flow->getKey()}/edit",
                     'deleteUrl'        => "/assistant/{$this->assistant->getKey()}/flows/{$flow->getKey()}",
                     'activityUrl'      => "/assistant/{$this->assistant->getKey()}/flows/{$flow->getKey()}/active",
@@ -118,6 +119,34 @@ final class FlowsConsoleTest extends FeatureTestCase
                 ->where('table.rows.0.groupName', null)
                 ->where('table.rows.0.publishedVersion', null)
                 ->where('table.rows.0.trigger', null)
+                ->etc());
+    }
+
+    public function test_a_flow_with_several_triggers_shows_the_first_one_and_counts_the_rest(): void
+    {
+        $flow = $this->flow('Multi');
+        $this->trigger($flow, FlowTriggerType::Message, ['keywords' => ['later']])->update(['priority' => 200]);
+        $this->trigger($flow, FlowTriggerType::Message, ['keywords' => ['first']])->update(['priority' => 10]);
+        $this->trigger($flow, FlowTriggerType::Event, ['event_name' => 'order_created']);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.trigger.type', 'message')
+                ->where('table.rows.0.trigger.text', 'first')
+                ->where('table.rows.0.moreTriggers', 2)
+                ->etc());
+    }
+
+    public function test_a_flow_with_one_trigger_has_no_more_triggers(): void
+    {
+        $flow = $this->flow('Single');
+        $this->trigger($flow, FlowTriggerType::Message, ['keywords' => ['only']]);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.moreTriggers', 0)
                 ->etc());
     }
 

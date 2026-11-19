@@ -119,7 +119,7 @@ final class FlowExpressionEngineTest extends FeatureTestCase
      */
     private function contactErrors(array $nodes, ?string $engineId): array
     {
-        $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $nodes, trigger: self::SCHEDULE, engineId: $engineId);
+        $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $nodes, triggers: [self::SCHEDULE], engineId: $engineId);
 
         return array_values(array_filter($result->errors, static fn ($error): bool => ContactContextChecker::CODE === $error->code));
     }

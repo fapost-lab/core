@@ -11,7 +11,7 @@ use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Fapost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @method static FlowDraftFactory factory($count = null, $state = [])
@@ -33,11 +33,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string                  $expression_engine  Engine id the author chose; snapshotted onto each published definition
  * @property array<array-key, mixed> $nodes
  * @property array<array-key, mixed> $edges
+ * @property list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>|null $triggers  The author's triggers; null until the draft carries them (the live rows count then)
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Assistant|null     $assistant
  * @property-read FlowGroup|null     $group
- * @property-read FlowTrigger|null   $trigger
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, FlowTrigger> $triggerRows  The flow's live triggers
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereAssistantId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereDescription($value)
@@ -115,9 +116,16 @@ final class FlowDraft extends BaseModel
         return $this->belongsTo(FlowGroup::class, 'flow_group_id');
     }
 
-    public function trigger(): HasOne
+    /**
+     * The flow's live triggers, the rows its last publish wrote, in routing order.
+     *
+     * @return HasMany<FlowTrigger, $this>
+     */
+    public function triggerRows(): HasMany
     {
-        return $this->hasOne(FlowTrigger::class, 'flow_id', 'flow_id');
+        return $this->hasMany(FlowTrigger::class, 'flow_id', 'flow_id')
+            ->orderBy('priority')
+            ->orderBy('id');
     }
 
     protected static function newFactory(): FlowDraftFactory
@@ -133,6 +141,7 @@ final class FlowDraft extends BaseModel
         return [
             'nodes'           => 'array',
             'edges'           => 'array',
+            'triggers'        => 'array',
             'kind'            => FlowKind::class,
             'draft_version'   => 'integer',
             'is_public'       => 'boolean',

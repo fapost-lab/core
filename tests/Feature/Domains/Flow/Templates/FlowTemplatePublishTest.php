@@ -18,6 +18,7 @@ use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Services\SaveDraftService;
@@ -243,6 +244,55 @@ final class FlowTemplatePublishTest extends FeatureTestCase
         $this->assertSame('v2', FlowSession::query()->where('contact_id', $newContact->getKey())->sole()->state['flow']['inside'] ?? null);
     }
 
+    public function test_a_template_republish_keeps_the_host_live_triggers_and_ignores_its_unpublished_trigger_edits(): void
+    {
+        $template = $this->publishedTemplate(withButtons: false);
+        $host     = $this->hostDraft($template->flow_id);
+
+        $kept      = (string) Str::uuid();
+        $published = [['id' => $kept, 'type' => 'message', 'is_active' => true, 'priority' => 100, 'config' => ['keywords' => ['live']]]];
+        $host->forceFill(['triggers' => $published])->save();
+        $this->publish($host->flow_id);
+
+        $row = FlowTrigger::query()->where('flow_id', $host->flow_id)->sole();
+        $this->assertSame($kept, mb_strtolower((string) $row->getKey()));
+        $row->update(['next_run_at' => '2026-12-01 10:00:00']);
+
+        // Unpublished trigger edits in the host's draft: another config, an extra trigger.
+        $host->forceFill(['triggers' => [
+            ['id' => $kept, 'type' => 'message', 'is_active' => true, 'priority' => 5, 'config' => ['keywords' => ['edited']]],
+            ['id' => (string) Str::uuid(), 'type' => 'api', 'is_active' => true, 'priority' => 100, 'config' => []],
+        ]])->save();
+
+        $template->update(['nodes' => collect($template->nodes)->map(static function (array $node): array {
+            if ('t-in' === $node['id']) {
+                $node['config']['value'] = 'v2';
+            }
+
+            return $node;
+        })->all()]);
+        $this->publish($template->flow_id);
+
+        $active = FlowDefinition::query()->where('flow_id', $host->flow_id)->active()->sole();
+        $this->assertSame(2, $active->version);
+        $this->assertSame($template->flow_id, $active->republished_by_template_flow_id);
+        $this->assertEquals($published, $active->triggers, 'the republished definition carries the active definition list');
+
+        $rows = FlowTrigger::query()->where('flow_id', $host->flow_id)->get();
+        $this->assertCount(1, $rows);
+        $this->assertSame(['live'], $rows[0]->config['keywords']);
+        $this->assertSame(100, $rows[0]->priority);
+        $this->assertSame('2026-12-01 10:00:00', $rows[0]->next_run_at?->format('Y-m-d H:i:s'), 'run state is untouched');
+        $this->assertCount(2, $host->refresh()->triggers, 'the draft edits stay unpublished');
+    }
+
+    public function test_a_template_definition_carries_no_triggers(): void
+    {
+        $template = $this->publishedTemplate();
+
+        $this->assertSame([], FlowDefinition::query()->where('flow_id', $template->flow_id)->sole()->triggers);
+    }
+
     public function test_a_template_publish_that_breaks_a_host_is_refused_with_the_host_listed(): void
     {
         $template = $this->publishedTemplate(withButtons: false);
@@ -348,7 +398,7 @@ final class FlowTemplatePublishTest extends FeatureTestCase
             flowId: $template->flow_id,
             nodes: $template->nodes,
             edges: $template->edges,
-            trigger: ['type' => 'message', 'config' => ['keywords' => ['hi']]],
+            triggers: [['id' => (string) Str::uuid(), 'type' => 'message', 'config' => ['keywords' => ['hi']]]],
             expectedDraftVersion: $template->draft_version,
         );
     }

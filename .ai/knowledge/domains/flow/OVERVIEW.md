@@ -50,7 +50,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 | State | `State/` (`ScopedStateReader`, `Writers/ContactWriter`, `SystemStateNamespacePolicy`, `SystemStateKeys`, `Variables/`) |
 | Subflow | `Subflow/` (starter, resumer, call-graph validator, timeout sweeper) |
 | Flow templates | `Templates/` (`TemplateExpander` copies a template's active definition into a host at publish, `TemplateUsageRepository` over `flow_template_usages`, `TemplateUsageFinder`, `TemplateNodeOrigins` labels copied nodes by `origin` on the session and log screens); handlers `TemplateNodeHandler`, `TemplateOutputNodeHandler` are pass-throughs (`adr-20261111-flow-templates-expanded-at-publish`) |
-| Triggers and events | `Services/Resolvers/`, `SyncFlowTriggerService`, `ResolveEventTriggersService`, `Events/`, `app/Jobs/Flow/` |
+| Triggers and events | `Services/Resolvers/`, `Services/FlowTriggerSet` (a flow's trigger list; synced into `flow_triggers` on publish), `ResolveEventTriggersService`, `Events/`, `app/Jobs/Flow/` |
 | Call, RAG, Action, Expression | `Call/`, `Rag/`, `Action/`, `Expression/` — small registries |
 | History and logging | `History/`, `Logging/` (partitioned `flow_logs`) |
 | Translations | `Translations/`, `app/Infrastructure/Flow/CachedContentTranslator.php` |

@@ -442,6 +442,20 @@ body {
   display: flex; align-items: center; justify-content: center;
   color: var(--sky); font-size: 13px; flex-shrink: 0;
 }
+.trigger-card + .trigger-card { margin-top: 8px; }
+.trigger-card--selected { border-color: var(--builder-accent); }
+.trigger-body { flex: 1; min-width: 0; }
+.trigger-remove {
+  border: 0; background: transparent; color: var(--text-3);
+  font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+}
+.trigger-remove:hover { background: var(--surface-2); color: var(--text); }
+.trigger-add {
+  margin-top: 8px; padding: 3px 10px; border-radius: 5px;
+  font-size: 11.5px; font-weight: 500; color: var(--text-2);
+  border: 1px dashed var(--border-2); background: var(--surface-2); cursor: pointer;
+}
+.trigger-add:hover { color: var(--text); border-color: var(--text-3); }
 .trigger-label { font-weight: 500; color: var(--text); }
 .trigger-sub   { font-size: 11.5px; color: var(--text-3); }
 

@@ -64,6 +64,7 @@ final class PublishFlowServiceTest extends TestCase
             $table->boolean('is_public')->default(true);
             $table->boolean('logging_enabled')->default(false);
             $table->string('expression_engine', 32)->default('template');
+            $table->json('triggers')->nullable();
             $table->timestamps();
         });
 
@@ -96,8 +97,16 @@ final class PublishFlowServiceTest extends TestCase
         Schema::dropIfExists('flow_triggers');
         Schema::create('flow_triggers', function (Blueprint $table): void {
             $table->uuid('id')->primary();
+            $table->uuid('tenant_id')->nullable();
+            $table->uuid('assistant_id')->nullable();
             $table->uuid('flow_id');
             $table->string('type');
+            $table->boolean('is_active')->default(true);
+            $table->unsignedInteger('priority')->default(100);
+            $table->json('config')->nullable();
+            $table->timestamp('last_run_at')->nullable();
+            $table->timestamp('next_run_at')->nullable();
+            $table->timestamps();
         });
 
         Schema::dropIfExists('flow_template_usages');
@@ -123,6 +132,7 @@ final class PublishFlowServiceTest extends TestCase
             $table->boolean('is_public')->default(true);
             $table->boolean('logging_enabled')->default(false);
             $table->string('expression_engine')->default('template');
+            $table->json('triggers')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
             $table->unique(['flow_id', 'version']);
