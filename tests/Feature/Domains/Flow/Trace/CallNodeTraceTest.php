@@ -118,6 +118,20 @@ final class CallNodeTraceTest extends FeatureTestCase
         $this->assertStringNotContainsString('key-value-1', $encoded);
     }
 
+    public function test_a_secret_query_parameter_is_masked_in_the_input(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+
+        $completed = $this->completed($this->runCall([
+            'target'     => 'GET https://api.example.com/maps',
+            'parameters' => ['query.key' => 'AIzaSECRETvalue', 'query.page' => '2'],
+        ]));
+
+        $this->assertSame('***', $completed['input']['node']['parameters']['query.key']);
+        $this->assertSame('2', $completed['input']['node']['parameters']['query.page']);
+        $this->assertStringNotContainsString('AIzaSECRETvalue', (string) json_encode($completed, JSON_UNESCAPED_SLASHES));
+    }
+
     public function test_a_secret_in_the_response_under_a_sensitive_key_is_masked_in_the_output(): void
     {
         Http::fake(['api.example.com/*' => Http::response(['token' => 'issued-token', 'user' => ['password' => 'pw', 'id' => 5]], 200)]);

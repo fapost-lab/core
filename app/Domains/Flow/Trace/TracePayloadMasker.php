@@ -13,7 +13,8 @@ use App\Domains\Flow\Support\SecretRedactor;
  *
  * - the value of a key with a sensitive name ({@see self::SENSITIVE_KEYS}) becomes {@see self::MASK}. The name matches
  *   case-insensitively, whole or as the suffix after `.`, `-` or `_` (`headers.Authorization`, `auth.password`,
- *   `x-telegram-bot-api-secret-token`);
+ *   `x-telegram-bot-api-secret-token`). A `query.<name>` key — the http transport's query parameter — is judged as that
+ *   parameter of a URL would be, so `query.key` is masked like `?key=`;
  * - in every string, each http(s) URL keeps its shape but loses the password of its `user:pass@` part and the values
  *   of its query parameters with a sensitive name (the keys above and {@see self::SENSITIVE_URL_PARAMETERS}) — also a
  *   URL quoted inside an error message;
@@ -68,6 +69,17 @@ final readonly class TracePayloadMasker
         return self::matches(mb_strtolower($name), self::SENSITIVE_KEYS);
     }
 
+    /**
+     * Whether a URL query parameter of this name carries a secret: a sensitive key or one of
+     * {@see self::SENSITIVE_URL_PARAMETERS}.
+     */
+    public function isSensitiveQueryParameter(string $name): bool
+    {
+        $lowerName = mb_strtolower($name);
+
+        return self::matches($lowerName, self::SENSITIVE_KEYS) || self::matches($lowerName, self::SENSITIVE_URL_PARAMETERS);
+    }
+
     public function maskUrls(string $text): string
     {
         if (false === mb_stripos($text, 'http')) {
@@ -98,6 +110,23 @@ final readonly class TracePayloadMasker
         return false;
     }
 
+    /**
+     * A key with a sensitive name, or a `query.<name>` call parameter whose name is a sensitive query parameter. The URL
+     * parameter names are not matched against other keys: `sort_key` or `cache_key` outside a query is innocent.
+     */
+    private function isSensitiveEntry(string $key): bool
+    {
+        if ($this->isSensitiveKey($key)) {
+            return true;
+        }
+
+        if (0 !== strncasecmp($key, 'query.', 6)) {
+            return false;
+        }
+
+        return $this->isSensitiveQueryParameter(mb_substr($key, 6));
+    }
+
     private function maskStructure(mixed $value): mixed
     {
         if (is_string($value)) {
@@ -111,7 +140,7 @@ final readonly class TracePayloadMasker
         $masked = [];
 
         foreach ($value as $key => $item) {
-            $masked[$key] = is_string($key) && $this->isSensitiveKey($key)
+            $masked[$key] = is_string($key) && $this->isSensitiveEntry($key)
                 ? self::MASK
                 : $this->maskStructure($item);
         }
@@ -145,9 +174,7 @@ final readonly class TracePayloadMasker
                 continue;
             }
 
-            $name = mb_strtolower(urldecode(mb_substr($pair, 0, $separator)));
-
-            if (self::matches($name, self::SENSITIVE_KEYS) || self::matches($name, self::SENSITIVE_URL_PARAMETERS)) {
+            if ($this->isSensitiveQueryParameter(urldecode(mb_substr($pair, 0, $separator)))) {
                 $pairs[$index] = mb_substr($pair, 0, $separator) . '=' . self::MASK;
             }
         }

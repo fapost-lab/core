@@ -60,6 +60,21 @@ final class TracePayloadMaskerTest extends TestCase
         yield 'upper case' => ['API_KEY'];
     }
 
+    /**
+     * @return iterable<string, array{0: string}>
+     */
+    public static function sensitiveQueryParameterKeys(): iterable
+    {
+        yield 'key' => ['query.key'];
+        yield 'sig' => ['query.sig'];
+        yield 'signature' => ['query.signature'];
+        yield 'code' => ['query.code'];
+        yield 'upper case name' => ['query.KEY'];
+        yield 'upper case prefix' => ['QUERY.Signature'];
+        yield 'sensitive key' => ['query.api_key'];
+        yield 'token' => ['query.access_token'];
+    }
+
     public function test_a_sensitive_key_is_masked_at_any_depth(): void
     {
         $masked = $this->masker->mask([
@@ -123,6 +138,19 @@ final class TracePayloadMaskerTest extends TestCase
             "https://h.example/x?a=1&{$parameter}=***",
             $this->masker->mask("https://h.example/x?a=1&{$parameter}=zzz"),
         );
+    }
+
+    #[DataProvider('sensitiveQueryParameterKeys')]
+    public function test_a_query_call_parameter_is_masked_like_the_same_url_parameter(string $key): void
+    {
+        $this->assertSame([$key => '***', 'query.page' => '2'], $this->masker->mask([$key => 'AIzaSECRET', 'query.page' => '2']));
+    }
+
+    public function test_url_parameter_names_are_not_masked_outside_a_query(): void
+    {
+        $value = ['key' => 'k', 'code' => 'c', 'body.key' => 'b', 'sort_key' => 's', 'cache_key' => 'x'];
+
+        $this->assertSame($value, $this->masker->mask($value));
     }
 
     public function test_the_fragment_of_a_url_is_kept(): void
