@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Validation;
 
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Contracts\NamesOwnRecipientInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Enums\AssignTarget;
@@ -24,7 +25,8 @@ use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
  * none, a node needs a contact when:
  *
  * - its handler needs one: it declares {@see NodeContextRequirement::Contact}, or declares nothing
- *   ({@see DeclaresContextRequirementInterface}, Foundation's, so a Solution's node can declare too);
+ *   ({@see DeclaresContextRequirementInterface}, Foundation's, so a Solution's node can declare too) — unless the
+ *   node's config names its own recipient ({@see NamesOwnRecipientInterface}, a `send_message` addressee);
  * - its config reads `contact.*` or `module.*` — a reference of the flow's expression engine (a `{{…}}` placeholder
  *   of the `template` engine), a bare state path, or a `source` operand (a data accessor is asked for a contact, so
  *   `module.*` cannot be read without one either);
@@ -140,13 +142,14 @@ final readonly class ContactContextChecker
             ? $handler->contextRequirement()
             : NodeContextRequirement::Contact;
 
-        if (NodeContextRequirement::Contact === $requirement) {
+        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+        if (NodeContextRequirement::Contact === $requirement
+            && ! ($handler instanceof NamesOwnRecipientInterface && $handler->namesRecipient($config))) {
             return "the node type '{$type}' reaches the contact of the run";
         }
 
-        $config = $node['config'] ?? null;
-
-        return is_array($config) ? $this->configNeed($config, $engine) : null;
+        return $this->configNeed($config, $engine);
     }
 
     /**

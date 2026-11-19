@@ -23,6 +23,16 @@ something rather different from a send.
 
 Message text is written per language on the builder's **Content** tab.
 
+To message someone other than the contact of the conversation, fill in **Send to**:
+a contact id, usually from a variable, such as `{{flow.customer_id}}`. A flow
+started by a schedule, a webhook or an API call has no contact, so there every
+Send message block needs one. A message sent this way cannot wait for an answer: no
+keyboard, timeout or saved answer. If the contact id comes out empty or malformed,
+nothing is sent and the block leaves through its **error** exit with
+`addressee_unresolved`. The text is in the flow's language, and `contact.*` in it
+still means the contact of the conversation, which a flow without a contact cannot
+read.
+
 If the send fails, the flow leaves through the block's **error** exit, and the flow log
 shows `send_failure: ...` with the reason on the block. When the
 tenant has used up its outbound messages for the period, the message is not sent

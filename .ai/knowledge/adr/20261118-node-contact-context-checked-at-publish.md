@@ -9,6 +9,7 @@ domains:
 paths:
   - app/Domains/Flow/Validation/ContactContextChecker.php
   - app/Domains/Flow/Handlers/CallNodeHandler.php
+  - app/Domains/Flow/Contracts/NamesOwnRecipientInterface.php
 summary: Why node handlers declare contact|none|any through an optional interface, now Foundation's (default contact), and why validate/publish refuse a node that needs a contact in a flow whose trigger gives none
 reviewed_at: 2026-11-19
 ---
@@ -83,3 +84,31 @@ published while anything in it needs one, and that every handler declares the co
   expression engine must also be scanned by `ContactContextChecker` (through its own `extractReferences`), or a
   contact read in its syntax publishes into a contactless flow and fails at run time on the reader. Lifted by
   `adr-20261119-expression-engine-chosen-per-flow`: the checker now reads references with the flow's own engine.
+
+## Amendment 2026-11-19: a node that names its own recipient
+
+Spec `flow-automations` gives `send_message` an addressee — a contact by expression — so a flow whose trigger gives no
+contact can still message a person, and publishing refuses `send_message` there only without one
+(`flow-send-message-addressee`).
+
+- The requirement stays per handler type, and `send_message` keeps `contact`. A Core handler may also implement
+  `App\Domains\Flow\Contracts\NamesOwnRecipientInterface::namesRecipient(array $config)`; when it answers yes for a
+  node, `ContactContextChecker` skips the type refusal for that node only and still runs the config check, so
+  `{{contact.name}}` in the text, a `storage: contact` variable or a `contact.*` read inside the addressee expression is
+  still refused. Rejected: declaring `send_message` `any` (it would pass without an addressee), and exempting any node
+  with an `addressee` key (a Solution node with that key would pass without honouring it). Core-only: Foundation's
+  contract is untouched until a Solution needs it.
+- The addressee is `{kind: "contact", contact: "<expression>"}`, the kind leaving room for tags, segments and staff
+  without a new handler version. A blank expression — the builder's untouched default — is no addressee; an unknown
+  kind is `addressee_kind_unknown`.
+- A node with an addressee never waits for an answer: a keyboard, `timeout_seconds`, `save_to` or `save_to_variable`
+  is `addressee_cannot_wait`, in every flow, since a press would reach the addressee's own session and not this run;
+  waiting for a person's answer is the spec's later "ask a person and wait". The addressee is allowed in flows with a
+  contact too; `contact.*` there still means the run's contact.
+- At run time the expression is rendered with the flow's engine; an empty or malformed id takes `error` with
+  `addressee_unresolved` and sends nothing — never the run's contact instead. The channel is the addressee's active
+  one on the run's assistant (`FlowMessageSender`); none is an ordinary `send_failure`. The text uses the run's
+  language, not the addressee's.
+- Open: a contactless run with no assistant (a global trigger) can find no channel for any addressee; once triggers
+  start such runs, publish should warn or the sender should look beyond the assistant.
+
