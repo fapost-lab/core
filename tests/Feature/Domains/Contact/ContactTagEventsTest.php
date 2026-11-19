@@ -26,7 +26,7 @@ final class ContactTagEventsTest extends FeatureTestCase
     public function test_adding_a_new_tag_announces_it_once_and_an_existing_tag_announces_nothing(): void
     {
         $contact  = Contact::factory()->create();
-        $taggedBy = (string) Str::ulid();
+        $taggedBy = Str::ulid()->toRfc4122();
 
         $this->assertTrue($this->tags->add($contact->id, 'vip', $taggedBy));
         $this->assertFalse($this->tags->add($contact->id, 'vip', $taggedBy));
@@ -72,7 +72,7 @@ final class ContactTagEventsTest extends FeatureTestCase
         $this->tags->add($contact->id, 'old', null);
         $this->tags->add($contact->id, 'keep', null);
         $this->fakeEvents();
-        $taggedBy = (string) Str::ulid();
+        $taggedBy = Str::ulid()->toRfc4122();
 
         $this->tags->syncForContact($contact->id, ['keep', 'new'], $taggedBy);
 
