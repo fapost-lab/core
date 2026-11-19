@@ -69,6 +69,12 @@ export interface AvailableTemplate {
     parameters?: AvailableTemplateParameter[]
 }
 
+export interface WebhookEndpointInfo {
+    url: string
+    has_secret: boolean
+    secret_rotated_at: string | null
+}
+
 export interface BuilderFlowPayload {
     flowId: string
     kind?: FlowKind
@@ -80,6 +86,8 @@ export interface BuilderFlowPayload {
     definition?: unknown
     triggers?: BuilderTrigger[]
     availableEvents?: string[]
+    /** Webhook URLs that already exist, keyed by lower-cased trigger id. */
+    webhookEndpoints?: Record<string, WebhookEndpointInfo>
     availableLanguages?: string[]
     contentBaseLanguage?: string
     publishedAt?: string | null

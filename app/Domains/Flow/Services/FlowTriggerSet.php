@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
@@ -46,7 +47,7 @@ final readonly class FlowTriggerSet
      * Checks the shape a draft save needs and nothing deeper (autosave never validates): a list of objects, each with
      * a UUID `id`, a non-empty string `type`, an object `config`, and when given a boolean `is_active` and a
      * non-negative integer `priority`. Ids are lowercased, as Postgres returns a uuid;
-     * `is_active` defaults to true and `priority` to 100.
+     * `is_active` defaults to true and `priority` to 100. A webhook trigger's `secret` key is dropped.
      *
      * @return list<Trigger>
      *
@@ -79,6 +80,12 @@ final readonly class FlowTriggerSet
 
             if (! is_array($trigger['config'] ?? null)) {
                 throw new InvalidTriggerPayloadException('Trigger config must be an object.');
+            }
+
+            // A webhook's secret lives on its endpoint, encrypted, so a draft (and every definition after it) never
+            // holds one. The old builder put one in the config; it is dropped, not refused, so such a draft still saves.
+            if (FlowTriggerType::Webhook->value === $type) {
+                unset($payload[$index]['config']['secret']);
             }
 
             // A value of the wrong type is refused, not defaulted: publish checks the stored list and would never see it.

@@ -34,10 +34,12 @@ return [
             'webhook_hash_rotated' => 'Адресу вебхука каналу перевипущено',
         ],
         'flow' => [
-            'created'   => 'Сценарій створено',
-            'updated'   => 'Сценарій змінено',
-            'deleted'   => 'Сценарій видалено',
-            'published' => 'Сценарій опубліковано',
+            'created'                => 'Сценарій створено',
+            'updated'                => 'Сценарій змінено',
+            'deleted'                => 'Сценарій видалено',
+            'published'              => 'Сценарій опубліковано',
+            'webhook_url_created'    => 'Створено URL webhook-тригера',
+            'webhook_secret_rotated' => 'Секрет webhook-тригера замінено',
         ],
         'flow_group' => [
             'created' => 'Групу сценаріїв створено',

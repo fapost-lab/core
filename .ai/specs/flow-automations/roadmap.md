@@ -71,7 +71,7 @@ Goal: other systems start flows. Done when: a third-party webhook starts a run a
 the flow's answer within 30 s, and an API call with a tenant token starts a run.
 
 - [x] Tenant API-token ADR — one token model for this spec and `mcp-server`
-- [ ] Webhook trigger — served by Laravel, signature or secret, `(trigger, delivery id)` dedup, response mode 202 or "respond to webhook" with a 30 s limit (after: `flow-engine-v1x` outbound idempotency for `call` — a redelivered webhook would repeat calls; after: `flow-segmented-execution` — the delivery is the fire key)
+- [ ] Webhook trigger — served by Laravel, signature or secret, `(trigger, delivery id)` dedup, response mode 202 or "respond to webhook" with a 30 s limit — the asynchronous 202 mode is done (task `flow-webhook-trigger`); the synchronous "respond to webhook" mode is task `flow-webhook-sync-response` (after: `flow-engine-v1x` outbound idempotency for `call` — a redelivered webhook would repeat calls; after: `flow-segmented-execution` — the delivery is the fire key)
 - [ ] API trigger — start a flow with a tenant token and a payload (after: Tenant API-token ADR — the token model; after: Webhook trigger — the same inbound path)
 
 ## Phase 8 — The graph as a builder mode

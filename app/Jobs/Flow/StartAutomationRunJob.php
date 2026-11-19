@@ -21,7 +21,8 @@ use Illuminate\Support\Carbon;
  * Starts the contactless run a trigger fired, once per fire key ({@see AutomationRunner::start()}); its first segment
  * runs here, the rest in {@see ContinueAutomationRunJob}. A retry finds the run it already created and continues it.
  *
- * No trigger dispatches it yet: the schedule, event and webhook triggers of spec `flow-automations` will.
+ * The webhook trigger dispatches it ({@see \App\Domains\Flow\Webhook\FlowWebhookReceiver}), with the delivery id as the
+ * fire key; the schedule and event triggers of spec `flow-automations` will.
  *
  * A busy trigger lock — another run of the same trigger is executing a segment — puts the job back in the queue
  * instead of spending an attempt; {@see retryUntil()} bounds how long it waits. A stopped tenant drops the start: the

@@ -43,6 +43,7 @@ use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowWebhookEndpointRepositoryInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
@@ -111,6 +112,7 @@ use App\Domains\Flow\Repositories\FlowDefinitionRepository;
 use App\Domains\Flow\Repositories\FlowDraftRepository;
 use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Repositories\FlowTriggerRepository;
+use App\Domains\Flow\Repositories\FlowWebhookEndpointRepository;
 use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
 use App\Domains\Flow\Retention\AutomationRunRetention;
@@ -157,6 +159,10 @@ use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
 use App\Domains\Flow\Validation\ListSizeChecker;
 use App\Domains\Flow\Validation\LoopConfigChecker;
 use App\Domains\Flow\Validation\VariablePathConflictChecker;
+use App\Domains\Flow\Webhook\FlowWebhookEndpointService;
+use App\Domains\Flow\Webhook\FlowWebhookReceiver;
+use App\Domains\Flow\Webhook\RedisWebhookDeliveryDedup;
+use App\Domains\Flow\Webhook\WebhookDeliveryDedupInterface;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
@@ -343,6 +349,19 @@ final class FlowServiceProvider extends ServiceProvider
             label: 'Node input and output in automation run traces',
             description: 'Whether the trace of an automation run keeps what each node received and produced (a call node: the request and the response body), masked and cut to 1 MB a row. Off, trace rows keep only the status, exit, duration and error. Conversation traces never keep them. A change applies to nodes that run afterwards.',
             group: 'Flow',
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: FlowWebhookReceiver::PER_TOKEN_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.webhook.per_token_per_minute',
+            fallback: 120,
+            label: 'Webhook trigger requests per minute',
+            description: 'How many requests one webhook trigger URL accepts in a minute, signed or not, before it answers 429 Too Many Requests. Applies to every tenant.',
+            group: 'Flow',
+            unit: 'requests',
+            min: 1,
+            max: 6000,
         ));
 
         // Seed Core's system translation keys. Features and Solutions register
@@ -598,6 +617,10 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(FlowTriggerRepository::class);
         $this->app->scoped(FlowTriggerRepositoryInterface::class, FlowTriggerRepository::class);
         $this->app->scoped(FlowTriggerConfigValidatorInterface::class, FlowTriggerConfigValidator::class);
+        $this->app->scoped(FlowWebhookEndpointRepositoryInterface::class, FlowWebhookEndpointRepository::class);
+        $this->app->scoped(WebhookDeliveryDedupInterface::class, RedisWebhookDeliveryDedup::class);
+        $this->app->scoped(FlowWebhookEndpointService::class);
+        $this->app->scoped(FlowWebhookReceiver::class);
         $this->app->scoped(MessageTriggerResolver::class);
         $this->app->scoped(ScheduleTriggerResolver::class);
         $this->app->scoped(WebhookTriggerResolver::class);

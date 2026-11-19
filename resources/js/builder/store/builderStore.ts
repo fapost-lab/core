@@ -18,6 +18,7 @@ import type {
   FlowKind,
   BuilderFlowPayload,
   BuilderTrigger,
+  WebhookEndpointInfo,
   FlowDefinition,
   FlowEdge,
   FlowNode,
@@ -99,6 +100,8 @@ export const useBuilderStore = defineStore('builder', () => {
    * tenant registry.
    */
   const tenantEvents = ref<string[]>([])
+    /** Webhook endpoints that exist for this flow's triggers, keyed by lower-cased trigger id. */
+    const webhookEndpoints = ref<Record<string, WebhookEndpointInfo>>({})
     const contentBaseLanguage = ref('en')
     const availableLanguages = ref<string[]>([])
     const availableFlows     = ref<Array<{id: string; name: string}>>([])
@@ -326,6 +329,7 @@ export const useBuilderStore = defineStore('builder', () => {
         const healedEnd   = healTerminalEnd(definition.value)
         triggers.value = normalizeTriggers(flow.triggers)
       tenantEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
+        webhookEndpoints.value = flow.webhookEndpoints && !Array.isArray(flow.webhookEndpoints) ? { ...flow.webhookEndpoints } : {}
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
         availableLanguages.value = Array.isArray(flow.availableLanguages) ? flow.availableLanguages : []
         availableFlows.value     = Array.isArray(flow.availableFlows) ? flow.availableFlows : []
@@ -392,6 +396,21 @@ export const useBuilderStore = defineStore('builder', () => {
     function deleteTrigger(id: string) {
         if (readOnly.value) return
         triggers.value = triggers.value.filter((item) => item.id !== id)
+    }
+
+    function setWebhookEndpoint(triggerId: string, info: WebhookEndpointInfo) {
+        webhookEndpoints.value = { ...webhookEndpoints.value, [triggerId.toLowerCase()]: info }
+    }
+
+    // The autosave composable registers how to push the draft now; callers that act on the saved draft await it.
+    let draftFlusher: (() => Promise<boolean>) | null = null
+
+    function registerDraftFlusher(flusher: () => Promise<boolean>) {
+        draftFlusher = flusher
+    }
+
+    async function flushDraft(): Promise<boolean> {
+        return draftFlusher === null ? true : draftFlusher()
     }
 
     function setSaveStatus(status: SaveStatus) {
@@ -1185,6 +1204,10 @@ export const useBuilderStore = defineStore('builder', () => {
         definition,
         triggers,
         availableEvents,
+        webhookEndpoints,
+        setWebhookEndpoint,
+        registerDraftFlusher,
+        flushDraft,
         contentBaseLanguage,
         availableLanguages,
         availableFlows,

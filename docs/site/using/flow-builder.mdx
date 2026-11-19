@@ -33,6 +33,9 @@ A trigger takes effect when the flow is [published](/using/publishing), not when
 the draft is saved: editing, adding or removing a trigger changes nothing for
 contacts until the next publish.
 
+A **Webhook** trigger starts the flow when another system sends a request to the trigger's own URL; setting it
+up — the URL, the secret, the signature — is described in [Webhook trigger](/using/webhook-trigger).
+
 A new flow shows **No trigger configured**. That is not an error and the flow can
 still be built, but nothing will start it: it can only run as another flow's
 subflow, or as the assistant's default flow.

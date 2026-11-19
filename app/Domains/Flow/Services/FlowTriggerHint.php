@@ -69,14 +69,11 @@ final class FlowTriggerHint
      */
     private static function webhookText(array $config): ?string
     {
-        $method = self::nonEmpty($config['method'] ?? null);
-        $path   = self::nonEmpty($config['path'] ?? null);
-
-        if (null === $method && null === $path) {
-            return null;
-        }
-
-        return mb_trim(($method ?? '') . ' ' . ($path ?? ''));
+        return match ($config['verification'] ?? null) {
+            'hmac_sha256'   => 'POST, HMAC-SHA256',
+            'header_equals' => 'POST, secret header',
+            default         => null,
+        };
     }
 
     /**

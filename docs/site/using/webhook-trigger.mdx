@@ -1,0 +1,91 @@
+---
+title: "Webhook trigger"
+description: "Start a flow when another system sends an HTTP request, signed with a secret only the two of you know."
+---
+
+A webhook trigger starts a flow when another system — a CRM, a shop, GitHub, your own backend — sends a `POST`
+request to the trigger's URL. The flow runs without a contact, as an automation run, with the request available
+under `flow.webhook`.
+
+## Setting it up
+
+1. Add a trigger to the flow and choose **Webhook**.
+2. Pick a **verification preset** — *HMAC-SHA256*, *HMAC with timestamp*, *GitHub* or *Secret in a header* — and adjust the fields to
+   what the sending system does (see [Verification](#verification)).
+3. Click **Get URL**. The URL looks like `https://<your-workspace-host>/hooks/flow/<token>`; the token is random and
+   is the only part that identifies the trigger. Copy it into the sending system.
+4. Click **Generate secret** and copy the secret into the sending system. **It is shown once**: after you leave the
+   panel only "Secret set" is shown. If the sending system issues its own signing secret, paste it under
+   **Use a secret from the sender** instead.
+5. [Publish](/using/publishing) the flow. Until the flow is published with the trigger active, the URL answers
+   `404`, so you can set up the sender first.
+
+Getting the URL needs the permission to edit the flow; generating or replacing the secret needs the permission to
+publish it, because the secret is what lets an outside system start the flow. Replacing the secret is recorded in the
+[activity log](/using/activity-log); the old secret stops working at once.
+
+The secret never appears in the trigger's settings, the draft, a published version or a template: it is stored
+encrypted, apart from the flow. Deleting the trigger (or changing its type) and publishing deletes its URL and secret.
+
+## Verification
+
+Every request is checked before anything else happens.
+
+| Method | What the sender does |
+|---|---|
+| **HMAC-SHA256** | Signs the raw request body with the secret and sends the hex digest in the **signature header**, optionally after a **prefix** such as `sha256=`. |
+| **Secret in a header** | Sends the secret itself in the **signature header** (for example `X-Webhook-Secret`). Simpler, but anyone who sees one request sees the secret: prefer HMAC when the sender supports it. |
+
+**Against replays (HMAC only).** When the sender also sends the time it signed the request, set the **timestamp
+header** and the **signed string** — what the sender actually signs, with `{raw}` for the body and the timestamp
+header as a placeholder, for example `{header.X-Timestamp}.{raw}` or `v0:{header.X-Slack-Request-Timestamp}:{raw}`.
+A request whose Unix time is further than the **tolerance** (300 seconds by default) from now is refused, and
+because the timestamp is part of the signature, an old request cannot be resent with a fresh one. A timestamp
+header without a signed string that contains it is refused at publish.
+
+A secret in the query string is never accepted. The signature, timestamp, `Authorization` and `Cookie` headers are
+not passed on to the flow.
+
+## Delivery id: no request runs twice
+
+Senders retry when they do not get an answer in time, so the same event can arrive more than once. Set **Delivery
+id** to where the sender puts a unique id of each delivery, as one placeholder:
+
+- `{header.X-GitHub-Delivery}` — a request header;
+- `{body.id}` or `{body.event.id}` — a field of a JSON body;
+- `{header.X-Delivery-Id|body.id}` — the first of several that is present.
+
+A request whose delivery id was already seen starts nothing and is answered `200` with `"status": "duplicate"`.
+Repeats are recognised for a day by a quick check, and for as long as the earlier run is kept in the history.
+
+Without a delivery id — the field is empty, or the request lacks it — every request gets a new id, so a resent
+request starts the flow again. The builder warns about an empty field.
+
+## What the flow receives
+
+| Variable | Value |
+|---|---|
+| `flow.webhook.body` | The JSON body, decoded; or the fields of a form post; or the body as text |
+| `flow.webhook.query` | The query string parameters |
+| `flow.webhook.headers` | The request headers, names in lower case, without the credentials and signature headers |
+| `flow.webhook.method` | Always `POST` |
+| `flow.webhook.delivery_id` | The delivery id (or the one generated for the request) |
+| `flow.webhook.received_at` | When the request arrived, ISO 8601 |
+
+The flow has no contact, so blocks that need one cannot be published in it; see
+[Publishing](/using/publishing).
+
+## Answers
+
+| Code | Meaning |
+|---|---|
+| `202` | Accepted: the run is queued. The body is `{"status": "accepted", "delivery_id": "…"}` |
+| `200` | A repeat of a delivery already accepted; nothing new runs |
+| `401` | The signature, the secret or the timestamp did not check out, or no secret is set yet |
+| `404` | No published, active webhook trigger behind this URL |
+| `405` | A method other than `POST` |
+| `413` | The body is larger than 256 KB |
+| `429` | Too many requests for this URL (see `flow.webhook.per_token_per_minute` in [Platform settings](/self-hosting/platform-settings)), or too many requests to unknown URLs from one address; wait for `Retry-After` |
+| `503` | The workspace is stopped; retry after `Retry-After` seconds |
+
+The trigger always answers `202` as soon as the run is queued; it does not wait for the flow to finish.

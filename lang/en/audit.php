@@ -34,10 +34,12 @@ return [
             'webhook_hash_rotated' => 'Channel webhook address rotated',
         ],
         'flow' => [
-            'created'   => 'Flow created',
-            'updated'   => 'Flow updated',
-            'deleted'   => 'Flow deleted',
-            'published' => 'Flow published',
+            'created'                => 'Flow created',
+            'updated'                => 'Flow updated',
+            'deleted'                => 'Flow deleted',
+            'published'              => 'Flow published',
+            'webhook_url_created'    => 'Webhook trigger URL created',
+            'webhook_secret_rotated' => 'Webhook trigger secret replaced',
         ],
         'flow_group' => [
             'created' => 'Flow group created',
