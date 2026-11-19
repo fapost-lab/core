@@ -22,7 +22,7 @@ interface FlowEngineInterface
 
     /**
      * The platform setting that caps the iterations of one loop (env default `FLOW_MAX_LOOP_ITERATIONS`), checked
-     * against the loop's persisted iterator — per engine call for a conversation, over the whole run for an
+     * against the loop's persisted iterator — per outermost engine call for a conversation, over the whole run for an
      * automation; past it the session fails like at {@see MAX_ITERATIONS_SETTING}. It accepts at most
      * {@see MAX_LOOP_ITERATIONS_LIMIT}.
      */

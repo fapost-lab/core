@@ -6,13 +6,15 @@ namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Models\FlowSession;
 use Carbon\CarbonImmutable;
+use Closure;
 
 /**
- * The budget of one engine call of an automation run: how many steps it ran and since when, and which session
- * stopped when the budget ran out.
+ * What one outermost engine call shares with the calls nested in it: since when it runs, how many steps an
+ * automation run took in it and which session stopped when that ran out, and the step budget of each conversation
+ * session it runs ({@see conversationBudget()}).
  *
  * One engine call nests others — a subflow child runs inside its parent's step, a parent resumes inside its child's
- * last step — and all of them share this budget, so a job never spends it once per level. The outermost call opens
+ * last step — and all of them share this, so a job never spends a budget once per level. The outermost call opens
  * the segment ({@see enter()} at depth 0) and closes it ({@see leave()} back at depth 0); nothing survives that, so
  * a console command or a sync queue running several engine calls in one scope starts each with a fresh segment.
  *
@@ -27,6 +29,9 @@ final class ExecutionSegment
     private int $steps = 0;
 
     private ?FlowSession $stoppedSession = null;
+
+    /** @var array<string, StepBudget> per conversation session id, its budget for this outermost call */
+    private array $conversationBudgets = [];
 
     /**
      * Enter an engine call; the outermost one starts the segment's clock.
@@ -78,6 +83,26 @@ final class ExecutionSegment
     }
 
     /**
+     * When the outermost engine call started; now when called outside one.
+     */
+    public function startedAt(): CarbonImmutable
+    {
+        return $this->startedAt ?? CarbonImmutable::now();
+    }
+
+    /**
+     * The step budget of a conversation session for this outermost call: built by {@code $make} on the first call
+     * that runs the session, the same object for every nested call that resumes it — a parent resumed after its
+     * child ended keeps its loop's iteration count and the call's clock instead of starting both afresh.
+     *
+     * @param  Closure(): StepBudget  $make
+     */
+    public function conversationBudget(string $sessionId, Closure $make): StepBudget
+    {
+        return $this->conversationBudgets[$sessionId] ??= $make();
+    }
+
+    /**
      * Record the session that stopped at its saved position, to be continued in a new job.
      */
     public function stopAt(FlowSession $session): void
@@ -87,8 +112,9 @@ final class ExecutionSegment
 
     private function reset(): void
     {
-        $this->startedAt      = null;
-        $this->steps          = 0;
-        $this->stoppedSession = null;
+        $this->startedAt           = null;
+        $this->steps               = 0;
+        $this->stoppedSession      = null;
+        $this->conversationBudgets = [];
     }
 }

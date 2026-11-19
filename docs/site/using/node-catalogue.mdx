@@ -159,7 +159,7 @@ One loop repeats at most as many times as the installation's
 [loop limit](/self-hosting/platform-settings) allows, 1000 by default: a fixed repeat
 count above it is refused at publish, and a session that reaches it fails. A loop that
 waits for the contact counts again from each message; in a conversation, a loop that keeps
-working for more than 30 seconds without waiting fails too. The steps inside a loop do not use
+working for more than 30 seconds without waiting — subflows it runs included — fails too. The steps inside a loop do not use
 up the flow's general step limit, but one run never takes more than 10,000 steps, so a
 loop with many blocks inside stops sooner.
 

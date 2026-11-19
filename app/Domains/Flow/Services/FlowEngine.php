@@ -366,7 +366,8 @@ final readonly class FlowEngine implements FlowEngineInterface
         $maxLoopIterations = $this->platformSettings->integer(FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING);
 
         // An automation run counts over all its segments: a runaway would otherwise start a fresh count in every
-        // segment and dispatch itself forever.
+        // segment and dispatch itself forever. A conversation keeps one budget per session for the outermost call, so
+        // a parent resumed after its child ended — a nested call — keeps its loop's count and the call's clock.
         $budget = $automation
             ? StepBudget::forAutomationRun(
                 $maxSteps,
@@ -376,7 +377,10 @@ final readonly class FlowEngine implements FlowEngineInterface
                 $definition->nodes ?? [],
                 $session->state ?? [],
             )
-            : StepBudget::forConversation($maxSteps, $maxLoopIterations);
+            : $this->segment->conversationBudget(
+                (string) $session->getKey(),
+                fn (): StepBudget => StepBudget::forConversation($maxSteps, $maxLoopIterations, $this->segment->startedAt()),
+            );
         $incomingStep          = $incoming;
         $resumedAfterDelayStep = $resumedAfterDelay;
 

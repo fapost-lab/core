@@ -12,8 +12,14 @@ use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowExecutionLimitExceededException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use Carbon\CarbonImmutable;
+use Fapost\Foundation\Contracts\NodeHandlerInterface;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionResult;
+use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -378,6 +384,42 @@ final class LoopEngineTest extends FeatureTestCase
         }
     }
 
+    public function test_a_conversation_loop_with_a_subflow_body_fails_at_the_time_bound_of_the_outermost_call(): void
+    {
+        // Each child run takes 10 s; the parent resumes inside the child's last step, in a nested engine call, and
+        // must still stop on the clock of the call that started it.
+        Config::set('flow.execution.max_loop_iterations', 1000);
+        CarbonImmutable::setTestNow('2026-11-19 10:00:00');
+
+        try {
+            $this->runSubflowLoop(count: 300, childSeconds: 10);
+            $this->fail('Expected FlowExecutionLimitExceededException');
+        } catch (FlowExecutionLimitExceededException $exception) {
+            $this->assertStringContainsString("Loop node 'loop' was still running after 30 seconds", $exception->getMessage());
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
+
+        $parent = FlowSession::query()->whereNull('parent_session_id')->sole();
+
+        $this->assertSame(FlowSessionStatus::Failed, $parent->status);
+        $this->assertLessThanOrEqual(4, (int) ($parent->state['flow']['i'] ?? 0));
+    }
+
+    public function test_a_conversation_loop_with_a_subflow_body_holds_its_iteration_limit(): void
+    {
+        Config::set('flow.execution.max_loop_iterations', 3);
+
+        try {
+            $this->runSubflowLoop(count: 5, childSeconds: 0);
+            $this->fail('Expected FlowExecutionLimitExceededException');
+        } catch (FlowExecutionLimitExceededException $exception) {
+            $this->assertStringContainsString("Loop node 'loop' exceeded 3 iterations", $exception->getMessage());
+        }
+
+        $this->assertSame(FlowSessionStatus::Failed, FlowSession::query()->whereNull('parent_session_id')->sole()->status);
+    }
+
     /**
      * Runs start -> loop(count) -> body (assign) -> loop_end, exiting through `after` to an end node. The start node
      * keeps the loop from being the entry even when an edge leads back to it.
@@ -423,5 +465,114 @@ final class LoopEngineTest extends FeatureTestCase
         ]);
 
         return $this->app->make(FlowEngineInterface::class)->start($definition, $contact);
+    }
+
+    /**
+     * Runs a conversation start -> loop(count) -> subflow -> loop_end, exiting to an end node; the child is one
+     * {@see ClockAdvancingTestHandler} node taking {@code $childSeconds} and an end node.
+     */
+    private function runSubflowLoop(int $count, int $childSeconds): FlowSession
+    {
+        $tenantId = (string) Str::uuid();
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: $tenantId, schemaName: 'main'));
+        $this->app->make(NodeHandlerRegistry::class)->register(ClockAdvancingTestHandler::class);
+
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create();
+
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $childFlowId = (string) Str::uuid();
+
+        FlowDefinition::query()->create([
+            'tenant_id'       => $tenantId,
+            'flow_id'         => $childFlowId,
+            'version'         => 1,
+            'name'            => 'Slow Child',
+            'is_active'       => true,
+            'logging_enabled' => false,
+            'nodes'           => [
+                ['id' => 'c-slow', 'type' => 'clock_advancing_test', 'version' => 1, 'config' => ['seconds' => $childSeconds]],
+                ['id' => 'c-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            'edges' => [
+                ['id' => 'c-e1', 'from' => 'c-slow', 'to' => 'c-end', 'handle' => 'default'],
+            ],
+        ]);
+
+        $parent = FlowDefinition::query()->create([
+            'tenant_id'       => $tenantId,
+            'flow_id'         => (string) Str::uuid(),
+            'version'         => 1,
+            'name'            => 'Subflow Loop',
+            'is_active'       => true,
+            'logging_enabled' => false,
+            'nodes'           => [
+                ['id' => 'start', 'type' => 'assign', 'version' => 1, 'config' => ['operations' => []]],
+                ['id' => 'loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                    'mode'          => 'counted',
+                    'iterator_name' => 'i',
+                    'count_source'  => ['type' => 'literal', 'value' => $count],
+                ]],
+                ['id' => 'sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H']],
+                ['id' => 'le', 'type' => 'loop_end', 'version' => 1, 'config' => ['loop_node_id' => 'loop', 'iterator_name' => 'i']],
+                ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            'edges' => [
+                ['id' => 'e0', 'from' => 'start', 'to' => 'loop', 'handle' => 'default'],
+                ['id' => 'e1', 'from' => 'loop', 'to' => 'sub', 'handle' => 'loop'],
+                ['id' => 'e2', 'from' => 'sub', 'to' => 'le', 'handle' => 'success'],
+                ['id' => 'e3', 'from' => 'loop', 'to' => 'end', 'handle' => 'default'],
+            ],
+        ]);
+
+        return $this->app->make(FlowEngineInterface::class)->start($parent, $contact);
+    }
+}
+
+/**
+ * Moves the test clock forward by {@code config.seconds}, standing in for a slow node (a call to a slow endpoint).
+ */
+final class ClockAdvancingTestHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'clock_advancing_test';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Clock Advancing Test';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        $seconds = $nodeConfig['config']['seconds'] ?? 0;
+
+        if (is_int($seconds) && $seconds > 0) {
+            CarbonImmutable::setTestNow(CarbonImmutable::now()->addSeconds($seconds));
+        }
+
+        return new NodeExecutionResult(status: NodeExecutionStatus::Executed, sourceHandle: 'default');
     }
 }

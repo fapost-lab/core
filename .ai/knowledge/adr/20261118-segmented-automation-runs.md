@@ -115,5 +115,7 @@ through its persisted iterator, over the whole run. A segment that starts inside
 in state (the first `loop` node whose iterator is set), so a long loop spread over many segments charges its body to
 the loop budget, not to `max_iterations`. Rejected: checking `step_count` (all steps) against the ceiling only — no
 migration, but a runaway with no loop would have run about 10,000 steps (some 200 segments, its side effects repeated
-that often) instead of 100. Conversations count everything per engine call; a conversation counts a loop's iterations
-from the iterator the call found, so a loop that waits for the contact keeps working.
+that often) instead of 100. Conversations count everything per outermost engine call (one budget per session, shared with the nested call that
+resumes a parent after its subflow child ended, so a subflow body neither restarts the loop's count nor its 30 s
+clock); a conversation counts a loop's iterations from the iterator the call found, so a loop that waits for the
+contact keeps working.

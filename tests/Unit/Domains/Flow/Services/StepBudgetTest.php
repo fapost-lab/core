@@ -17,7 +17,7 @@ final class StepBudgetTest extends TestCase
     public function test_a_conversation_counts_a_loop_s_iterations_from_where_the_call_found_it(): void
     {
         // The contact answered in the loop's body 10 times before: this call starts the 11th iteration.
-        $budget = StepBudget::forConversation(100, 5);
+        $budget = StepBudget::forConversation(100, 5, CarbonImmutable::now());
 
         for ($iterator = 11; $iterator <= 15; ++$iterator) {
             $this->assertNull($budget->record(self::LOOP, $this->intoBody(), ['flow' => ['i' => $iterator]]));
@@ -27,6 +27,21 @@ final class StepBudgetTest extends TestCase
 
         $this->assertNotNull($limit);
         $this->assertStringContainsString("Loop node 'loop' exceeded 5 iterations", $limit->getMessage());
+    }
+
+    public function test_a_conversation_loop_entered_again_after_its_exit_counts_from_its_first_iteration(): void
+    {
+        // The call resumed the loop at its 4th iteration, the loop finished, and the flow enters it again.
+        $budget = StepBudget::forConversation(100, 3, CarbonImmutable::now());
+
+        $this->assertNull($budget->record(self::LOOP, $this->intoBody(), ['flow' => ['i' => 4]]));
+        $this->assertNull($budget->record(self::LOOP, new NodeExecutionResult(status: NodeExecutionStatus::Executed, sourceHandle: 'default'), []));
+
+        for ($iterator = 1; $iterator <= 3; ++$iterator) {
+            $this->assertNull($budget->record(self::LOOP, $this->intoBody(), ['flow' => ['i' => $iterator]]));
+        }
+
+        $this->assertNotNull($budget->record(self::LOOP, $this->intoBody(), ['flow' => ['i' => 4]]));
     }
 
     public function test_an_automation_run_counts_a_loop_s_iterations_from_its_first_one(): void
@@ -47,8 +62,8 @@ final class StepBudgetTest extends TestCase
 
     public function test_the_ceiling_follows_small_settings_and_never_passes_ten_thousand(): void
     {
-        $this->assertSame(20, StepBudget::forConversation(10, 1)->ceiling());
-        $this->assertSame(10000, StepBudget::forConversation(100, 1000)->ceiling());
+        $this->assertSame(20, StepBudget::forConversation(10, 1, CarbonImmutable::now())->ceiling());
+        $this->assertSame(10000, StepBudget::forConversation(100, 1000, CarbonImmutable::now())->ceiling());
     }
 
     public function test_an_automation_run_starts_from_its_persisted_counts(): void
@@ -82,7 +97,7 @@ final class StepBudgetTest extends TestCase
         CarbonImmutable::setTestNow('2026-11-19 10:00:00');
 
         try {
-            $budget = StepBudget::forConversation(100, 1000);
+            $budget = StepBudget::forConversation(100, 1000, CarbonImmutable::now());
             $this->assertNull($budget->record(self::LOOP, $this->intoBody(), ['flow' => ['i' => 1]]));
             $this->assertNull($budget->charge('body'));
 
@@ -102,7 +117,7 @@ final class StepBudgetTest extends TestCase
         CarbonImmutable::setTestNow('2026-11-19 10:00:00');
 
         try {
-            $conversation = StepBudget::forConversation(100, 1000);
+            $conversation = StepBudget::forConversation(100, 1000, CarbonImmutable::now());
             $automation   = StepBudget::forAutomationRun(100, 1000, 0, 0, [self::LOOP], ['flow' => ['i' => 2]]);
 
             CarbonImmutable::setTestNow('2026-11-19 10:05:00');

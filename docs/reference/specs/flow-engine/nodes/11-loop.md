@@ -48,7 +48,9 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
 - **`max_size` editor:** `VariableStorageEditor` shows "Keep last" under the list toggle for a list saved to the
   contact; it compiles to `properties.max_size` and publish writes it to the registry (7.3). `list_max_size_invalid`
   (`ListSizeChecker`) rejects a value that is not a whole number from 1 to 1000, or one set on a session list.
-- **Loop-aware step budget (14.1, option a):** `StepBudget`, one per engine call. Steps inside a loop body — the body,
+- **Loop-aware step budget (14.1, option a):** `StepBudget`, one per engine call of an automation, one per session per
+  outermost engine call of a conversation (shared with the nested call that resumes a parent after its subflow child
+  ended). Steps inside a loop body — the body,
   its `loop_end` and the loop node's re-evaluations — do not count against `flow.execution.max_iterations`; entering a
   loop costs it one step. A loop may run `flow.execution.max_loop_iterations` iterations (platform setting, default
   1000, at most 3000), checked against its persisted iterator when it takes the `loop` exit — over the whole run for an
@@ -57,8 +59,10 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
   run never takes more than `min(10000, max_iterations × (max_loop_iterations + 1))` steps in all. An automation run counts
   over all its segments: steps outside loop bodies in `flow_sessions.step_count` (capped by `max_iterations`), steps
   inside them in `loop_step_count` (the sum capped by the ceiling); a segment that starts inside a body knows it from the
-  iterator in state. In a conversation, which has no segments, a loop body also stops once the engine call has run 30
-  seconds (`FlowEngineInterface::MAX_SEGMENT_SECONDS`), before the job timeout. Each limit fails the session with `FlowExecutionLimitExceededException`
+  iterator in state. In a conversation, which has no segments, a loop body also stops once the outermost engine call — a
+  subflow body's child runs included — has run 30 seconds (`FlowEngineInterface::MAX_SEGMENT_SECONDS`), before the job
+  timeout. In an automation the per-iteration allowance restarts with each segment, so a body that never reaches its
+  `loop_end` is stopped by the ceiling. Each limit fails the session with `FlowExecutionLimitExceededException`
   naming the node. See 8.8 and 14.1.
 - **Tests:** `tests/Feature/Domains/Flow/LoopEngineTest.php`, `LoopNodeHandlerTest.php`, and the loop cases in
   `tests/Unit/Domains/Flow/ValidateFlowServiceTest.php`, `LoopConfigCheckerTest`, `LoopPublishChecksTest`.

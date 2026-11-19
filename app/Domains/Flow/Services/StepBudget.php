@@ -24,24 +24,25 @@ use Fapost\Foundation\DTO\NodeExecutionStatus;
  * - Every step counts against the run's ceiling ({@see ceiling()}): the most steps the two settings could need, and
  *   never more than {@see FlowEngineInterface::MAX_STEPS_PER_RUN}.
  *
- * A conversation ({@see forConversation()}) counts all of this per engine call; a loop's iterations from the iterator
- * the call found when it first reached the loop, so a loop that waits for the contact in its body ("show the menu
- * again") goes round once per message and is not stopped after so many messages. A conversation call has no
- * execution segments, so a loop body there also stops once the call has run {@see FlowEngineInterface::MAX_SEGMENT_SECONDS}
- * seconds: a long loop of slow nodes fails with the loop named instead of outliving the job's timeout and leaving the
- * session stuck `active`. An automation run
+ * A conversation ({@see forConversation()}) counts all of this per outermost engine call — one budget per session,
+ * shared through {@see ExecutionSegment::conversationBudget()} with the nested calls that resume the session after a
+ * subflow child ended in it; a loop's iterations from the iterator the call found when it first reached the loop, so a
+ * loop that waits for the contact in its body ("show the menu again") goes round once per message and is not stopped
+ * after so many messages. A conversation call has no execution segments, so a loop body there also stops once the
+ * outermost call has run {@see FlowEngineInterface::MAX_SEGMENT_SECONDS} seconds — subflow children it ran
+ * synchronously included: a long loop of slow nodes fails with the loop named instead of outliving the job's timeout
+ * and leaving the session stuck `active`. An automation run
  * ({@see forAutomationRun()}) counts it over the whole run: it starts from the session's persisted `step_count` (steps
  * outside loop bodies) and `loop_step_count` (steps inside them), knows from the iterators in state which loop body a
  * segment starts in, and counts a loop's iterations from its first one — so neither a runaway nor a loop escapes its
  * limit by spreading over segments, delay wake-ups and job retries. The engine persists each step's count by
  * {@see lastStepInLoop()}.
  *
- * A new instance per engine call (built with `new`, never bound): plain values only, nothing survives the call.
+ * Never bound: an automation run builds one per engine call, a conversation one per session per outermost call (held
+ * by the scoped {@see ExecutionSegment}, cleared when that call returns). Plain values only, nothing survives the call.
  */
 final class StepBudget
 {
-    private ?string $activeLoopNodeId;
-
     private int $iterationSteps = 0;
 
     private bool $lastStepInLoop = false;
@@ -49,24 +50,28 @@ final class StepBudget
     /** @var array<string, int> per loop node, the iterations it had started before this call reached it */
     private array $iteratorBaselines = [];
 
-    /** When a conversation call started; null for an automation run, whose segments bound its time. */
-    private readonly ?CarbonImmutable $startedAt;
-
+    /**
+     * @param  CarbonImmutable|null  $startedAt  when the conversation's outermost engine call started; null for an
+     *                                           automation run, whose segments bound its time
+     */
     private function __construct(
         private readonly int $maxSharedSteps,
         private readonly int $maxLoopIterations,
         private readonly bool $runWide,
         private int $sharedSteps,
         private int $loopSteps,
-        ?string $activeLoopNodeId,
+        private ?string $activeLoopNodeId,
+        private readonly ?CarbonImmutable $startedAt,
     ) {
-        $this->activeLoopNodeId = $activeLoopNodeId;
-        $this->startedAt        = $runWide ? null : CarbonImmutable::now();
     }
 
-    public static function forConversation(int $maxSharedSteps, int $maxLoopIterations): self
+    /**
+     * @param  CarbonImmutable  $startedAt  when the outermost engine call started ({@see ExecutionSegment::startedAt()}),
+     *                                      so the subflow calls it runs synchronously share its clock
+     */
+    public static function forConversation(int $maxSharedSteps, int $maxLoopIterations, CarbonImmutable $startedAt): self
     {
-        return new self($maxSharedSteps, $maxLoopIterations, false, 0, 0, null);
+        return new self($maxSharedSteps, $maxLoopIterations, false, 0, 0, null, $startedAt);
     }
 
     /**
@@ -83,7 +88,7 @@ final class StepBudget
         array $nodes,
         array $state,
     ): self {
-        return new self($maxSharedSteps, $maxLoopIterations, true, $sharedSteps, $loopSteps, self::loopInProgress($nodes, $state));
+        return new self($maxSharedSteps, $maxLoopIterations, true, $sharedSteps, $loopSteps, self::loopInProgress($nodes, $state), null);
     }
 
     /**
@@ -160,9 +165,11 @@ final class StepBudget
         $nodeId = is_string($node['id'] ?? null) ? $node['id'] : '';
 
         if (LoopNodeHandler::LOOP_HANDLE !== $result->sourceHandle) {
-            // The loop exits: what follows counts against the shared budget again.
+            // The loop exits: what follows counts against the shared budget again, and a later pass through the
+            // loop in this call counts its iterations afresh.
             $this->activeLoopNodeId = null;
             $this->iterationSteps   = 0;
+            unset($this->iteratorBaselines[$nodeId]);
 
             return null;
         }
