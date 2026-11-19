@@ -25,8 +25,9 @@ use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
  *
  * - its handler needs one: it declares {@see NodeContextRequirement::Contact}, or declares nothing
  *   ({@see DeclaresContextRequirementInterface}, Foundation's, so a Solution's node can declare too);
- * - its config reads `contact.*` or `module.*` — a `{{…}}` placeholder, a bare state path, or a `source` operand
- *   (a data accessor is asked for a contact, so `module.*` cannot be read without one either);
+ * - its config reads `contact.*` or `module.*` — a reference of the flow's expression engine (a `{{…}}` placeholder
+ *   of the `template` engine), a bare state path, or a `source` operand (a data accessor is asked for a contact, so
+ *   `module.*` cannot be read without one either);
  * - its config reads or writes a contact variable (`storage: contact`), or is a legacy `assign` to the contact.
  *
  * Each such node gets one error, at `nodes.<id>`, naming the node, the reason and the trigger. Unregistered node types
@@ -54,10 +55,14 @@ final readonly class ContactContextChecker
      * @param  array<string, array<string, mixed>>  $nodeMap  the flow's nodes by id, annotations removed
      * @param  array<string, mixed>|null            $trigger  the trigger as the builder sends it; null keeps the
      *                                                        stored one of {@see $flowId}
+     * @param  string|null                          $engineId the flow's expression engine, whose references are read
+     *                                                        from config strings; null means `template`. An engine the
+     *                                                        registry does not know reads none: the flow is refused
+     *                                                        for it with `expression_engine_unknown` anyway
      *
      * @return list<FlowValidationErrorDto>
      */
-    public function check(array $nodeMap, ?array $trigger, ?string $flowId): array
+    public function check(array $nodeMap, ?array $trigger, ?string $flowId, ?string $engineId = null): array
     {
         $contactless = $this->contactlessTrigger($trigger, $flowId);
 
@@ -65,10 +70,12 @@ final readonly class ContactContextChecker
             return [];
         }
 
+        $engineId ??= TemplateEngine::ID;
+        $engine = $this->expressionEngines->has($engineId) ? $this->expressionEngines->get($engineId) : null;
         $errors = [];
 
         foreach ($nodeMap as $nodeId => $node) {
-            $reason = $this->contactNeed($node);
+            $reason = $this->contactNeed($node, $engine);
 
             if (null === $reason) {
                 continue;
@@ -118,7 +125,7 @@ final readonly class ContactContextChecker
      *
      * @param  array<string, mixed>  $node
      */
-    private function contactNeed(array $node): ?string
+    private function contactNeed(array $node, ?ExpressionEngineInterface $engine): ?string
     {
         $type    = $node['type'] ?? null;
         $raw     = $node['version'] ?? 1;
@@ -139,13 +146,13 @@ final readonly class ContactContextChecker
 
         $config = $node['config'] ?? null;
 
-        return is_array($config) ? $this->configNeed($config, $this->expressionEngines->get(TemplateEngine::ID)) : null;
+        return is_array($config) ? $this->configNeed($config, $engine) : null;
     }
 
     /**
      * @param  array<array-key, mixed>  $config
      */
-    private function configNeed(array $config, ExpressionEngineInterface $engine): ?string
+    private function configNeed(array $config, ?ExpressionEngineInterface $engine): ?string
     {
         $variableName = $config['name'] ?? null;
 
@@ -179,13 +186,13 @@ final readonly class ContactContextChecker
         return null;
     }
 
-    private function stringNeed(string $value, ExpressionEngineInterface $engine): ?string
+    private function stringNeed(string $value, ?ExpressionEngineInterface $engine): ?string
     {
         if (1 === preg_match(self::BARE_CONTACT_PATH_PATTERN, $value)) {
             return "it reads '{$value}'";
         }
 
-        foreach ($engine->extractReferences($value) as $path) {
+        foreach ($engine?->extractReferences($value) ?? [] as $path) {
             if (1 === preg_match(self::CONTACT_PATH_PATTERN, $path)) {
                 return "it reads '{$path}'";
             }

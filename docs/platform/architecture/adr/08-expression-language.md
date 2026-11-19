@@ -1,13 +1,18 @@
 # ADR-08 — Expression Language Pluggability
 
-> **Superseded in part (2026-10).** What the code does differs from the target described below:
+> **Superseded in part (2026-11): the choice of engine.** Who chooses the engine is replaced by
+> `adr-20261119-expression-engine-chosen-per-flow` (`.ai/knowledge/adr/20261119-expression-engine-chosen-per-flow.md`):
 >
-> - There is **no tenant-level `settings['expression_engine']`**, no tenant boot validation and no engine snapshot taken
->   at save/publish time. `PublishFlowService` does not set the column.
-> - The engine is read from `flow_definitions.expression_engine` (column default `template`) in `FlowEngine` (around
->   line 347); an empty or unregistered value falls back to `template`.
-> - `TemplateEngine` is the only engine that exists (`app/Domains/Flow/Expression/Engines/`); the registry
->   (`ExpressionEngineRegistry`) and the immutable per-definition column are the parts that were built.
+> - The engine is chosen **per flow** by its author, not per tenant: `flow_drafts.expression_engine` (default
+>   `template`), set on the console flow form. There is **no** `tenant.settings.expression_engine` and no tenant boot
+>   validation; "Per-tenant config, не per-flow", "Tenant Configuration", "Tenant boot validation" and the V1 scope
+>   line "Per-flow engine override (always per-tenant)" below no longer hold.
+> - `PublishFlowService` writes `flow_definitions.expression_engine` explicitly: the draft's choice on publish, the
+>   active definition's snapshot on a republish by a template. Validate and publish check the flow with that engine
+>   and refuse an id the registry does not know (`expression_engine_unknown`) and a template of another engine
+>   (`template_engine_mismatch`).
+> - Still as built before: the engine's `validate()` is not run at save or publish (Save semantics step 3), and
+>   `FlowEngine` falls back to `template` for an empty or unregistered value. `TemplateEngine` is the only engine.
 
 **Status:** Accepted
 

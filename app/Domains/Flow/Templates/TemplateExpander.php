@@ -175,10 +175,12 @@ final readonly class TemplateExpander
     /**
      * Expands every reference node of a host graph whose drafts belong to `$assistantId`.
      *
-     * @param  array<int, mixed>  $nodes  the host graph in its draft shape, annotations already stripped
+     * @param  array<int, mixed>  $nodes     the host graph in its draft shape, annotations already stripped
      * @param  array<int, mixed>  $edges
+     * @param  string             $engineId  the host's expression engine; a template published with another one is
+     *                                       refused (`template_engine_mismatch`), since one definition runs one engine
      */
-    public function expand(array $nodes, array $edges, string $assistantId): TemplateExpansion
+    public function expand(array $nodes, array $edges, string $assistantId, string $engineId): TemplateExpansion
     {
         $errors      = [];
         $templateIds = [];
@@ -232,7 +234,7 @@ final readonly class TemplateExpander
             }
 
             $refId  = (string) $node['id'];
-            $result = $this->expandReference($node, $exitsByRef[$refId] ?? [], $assistantId);
+            $result = $this->expandReference($node, $exitsByRef[$refId] ?? [], $assistantId, $engineId);
 
             if ([] !== $result['errors']) {
                 array_push($errors, ...$result['errors']);
@@ -261,16 +263,17 @@ final readonly class TemplateExpander
      *
      * @param  array<int|string, mixed>  $nodes
      * @param  array<int|string, mixed>  $edges
+     * @param  string                    $engineId  the draft's expression engine
      *
      * @return list<FlowValidationErrorDto>
      */
-    public function draftErrors(array $nodes, array $edges, string $assistantId, bool $isTemplate): array
+    public function draftErrors(array $nodes, array $edges, string $assistantId, bool $isTemplate, string $engineId): array
     {
         [$nodes, $edges] = AnnotationNodeTypes::strip(array_values($nodes), array_values($edges));
 
         return $isTemplate
             ? $this->validateTemplateGraph($nodes, $edges)
-            : $this->expand($nodes, $edges, $assistantId)->errors;
+            : $this->expand($nodes, $edges, $assistantId, $engineId)->errors;
     }
 
     /**
@@ -535,11 +538,12 @@ final readonly class TemplateExpander
 
     /**
      * @param  array<string, mixed>   $reference
-     * @param  array<string, string>  $exits  handle → target node id, from the host's draft edges
+     * @param  array<string, string>  $exits     handle → target node id, from the host's draft edges
+     * @param  string                 $engineId  the host's expression engine
      *
      * @return array{errors: list<FlowValidationErrorDto>, reference: array<string, mixed>, nodes: list<array<string, mixed>>, edges: list<array<string, mixed>>, template_flow_id: string}
      */
-    private function expandReference(array $reference, array $exits, string $assistantId): array
+    private function expandReference(array $reference, array $exits, string $assistantId, string $engineId): array
     {
         $refId  = (string) $reference['id'];
         $path   = "nodes.{$refId}";
@@ -577,6 +581,12 @@ final readonly class TemplateExpander
 
         if (null === $definition) {
             return $fail('template_not_published', "Template '{$draft->name}' has not been published yet.");
+        }
+
+        // The copy carries expressions in the template's syntax and the host's parameter values are written in the
+        // host's: one definition is evaluated by one engine, so the two must match.
+        if ((string) $definition->expression_engine !== $engineId) {
+            return $fail('template_engine_mismatch', "Template '{$draft->name}' v{$definition->version} uses the expression engine '{$definition->expression_engine}', but this flow uses '{$engineId}'. A template can only be placed in a flow with the same expression engine.");
         }
 
         $templateNodes = is_array($definition->nodes) ? $definition->nodes : [];

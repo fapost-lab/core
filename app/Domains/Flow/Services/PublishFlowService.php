@@ -126,10 +126,14 @@ final readonly class PublishFlowService
         ?FlowDefinition $source = null,
         ?FlowDefinition $republishedBy = null,
     ): FlowDefinition {
+        // The engine this version is checked with and snapshotted with: a republish keeps the one the host's active
+        // definition was published with, so a changed but unpublished choice in the host's draft is not published.
+        $engineId = $this->engineOf($draft, $source);
+
         // Replace each template reference with a copy of the template's active
         // definition, before loop_end denormalization: the copy re-issues ids,
         // including loop_end.loop_node_id.
-        $expansion = $this->templates->expand($nodes, $edges, (string) $draft->assistant_id);
+        $expansion = $this->templates->expand($nodes, $edges, (string) $draft->assistant_id, $engineId);
 
         if ([] !== $expansion->errors) {
             throw new FlowValidationException($expansion->errors);
@@ -148,6 +152,7 @@ final readonly class PublishFlowService
             nodes: $nodes,
             edges: $edges,
             flowId: $draft->flow_id,
+            engineId: $engineId,
         );
         if (!$result->valid) {
             throw new FlowValidationException($result->errors);
@@ -162,7 +167,7 @@ final readonly class PublishFlowService
             throw new FlowValidationException($crossAssistantErrors);
         }
 
-        $definition = $this->createDefinition($draft, $nodes, $edges, FlowKind::Flow, $source, $republishedBy);
+        $definition = $this->createDefinition($draft, $nodes, $edges, FlowKind::Flow, $engineId, $source, $republishedBy);
 
         // Reverse-index subflow.flow_id references so the next publish can
         // run cycle / depth checks transactionally. Replaces any rows from
@@ -239,8 +244,9 @@ final readonly class PublishFlowService
     {
         $nodes = $this->denormalizeLoopEndIteratorNames($nodes);
 
-        $errors = $this->templates->validateTemplateGraph($nodes, $edges);
-        $result = $this->validator->execute(nodes: $nodes, edges: $edges);
+        $engineId = $this->engineOf($draft, null);
+        $errors   = $this->templates->validateTemplateGraph($nodes, $edges);
+        $result   = $this->validator->execute(nodes: $nodes, edges: $edges, engineId: $engineId);
 
         array_push($errors, ...$result->errors);
 
@@ -248,7 +254,7 @@ final readonly class PublishFlowService
             throw new FlowValidationException($errors);
         }
 
-        $definition = $this->createDefinition($draft, $nodes, $edges, FlowKind::Template);
+        $definition = $this->createDefinition($draft, $nodes, $edges, FlowKind::Template, $engineId);
 
         $this->republishHosts($draft, $definition);
 
@@ -316,7 +322,16 @@ final readonly class PublishFlowService
     }
 
     /**
-     * Writes the next version of the draft's flow and makes it the active one.
+     * The expression engine a publish uses: the snapshot of the definition being republished, else the draft's choice.
+     */
+    private function engineOf(FlowDraft $draft, ?FlowDefinition $source): string
+    {
+        return (string) (null !== $source ? $source->expression_engine : $draft->expression_engine);
+    }
+
+    /**
+     * Writes the next version of the draft's flow and makes it the active one. The expression engine is always
+     * written, never left to the column default: it is the author's choice, snapshotted.
      *
      * @param  array<int, mixed>  $nodes
      * @param  array<int, mixed>  $edges
@@ -326,6 +341,7 @@ final readonly class PublishFlowService
         array $nodes,
         array $edges,
         FlowKind $kind,
+        string $engineId,
         ?FlowDefinition $source = null,
         ?FlowDefinition $republishedBy = null,
     ): FlowDefinition {
@@ -341,22 +357,19 @@ final readonly class PublishFlowService
             ->update(['is_active' => false]);
 
         $attributes = [
-            'tenant_id'       => $draft->tenant_id,
-            'flow_id'         => $draft->flow_id,
-            'version'         => $newVersion,
-            'kind'            => $kind,
-            'name'            => $source->name ?? $draft->name,
-            'nodes'           => $nodes,
-            'edges'           => $edges,
-            'is_active'       => true,
-            'is_public'       => null !== $source ? (bool) $source->is_public : (bool) $draft->is_public,
-            'logging_enabled' => null !== $source ? $source->logging_enabled : (bool) $draft->logging_enabled,
-            'published_at'    => now(),
+            'tenant_id'         => $draft->tenant_id,
+            'flow_id'           => $draft->flow_id,
+            'version'           => $newVersion,
+            'kind'              => $kind,
+            'name'              => $source->name ?? $draft->name,
+            'nodes'             => $nodes,
+            'edges'             => $edges,
+            'is_active'         => true,
+            'is_public'         => null !== $source ? (bool) $source->is_public : (bool) $draft->is_public,
+            'logging_enabled'   => null !== $source ? $source->logging_enabled : (bool) $draft->logging_enabled,
+            'expression_engine' => $engineId,
+            'published_at'      => now(),
         ];
-
-        if (null !== $source && null !== $source->expression_engine) {
-            $attributes['expression_engine'] = $source->expression_engine;
-        }
 
         if (null !== $republishedBy) {
             $attributes['republished_by_template_flow_id'] = $republishedBy->flow_id;

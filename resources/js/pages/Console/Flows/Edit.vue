@@ -11,8 +11,9 @@ import FlowForm from './Form.vue'
 import type { FlowGroupOption, FlowsPageProps } from './types'
 
 defineProps<{
-  flow: { id: string; name: string; flowGroupId: string | null; description: string | null; isPublic: boolean; loggingEnabled: boolean }
+  flow: { id: string; name: string; flowGroupId: string | null; description: string | null; isPublic: boolean; loggingEnabled: boolean; expressionEngine: string }
   groups: FlowGroupOption[]
+  expressionEngines: string[]
   can: { createGroup: boolean }
   urls: { index: string; submit: string; storeGroup: string }
 }>()
@@ -33,6 +34,7 @@ const t = computed(() => usePage<FlowsPageProps>().props.translations.console.fl
       :submit-url="urls.submit"
       :cancel-url="urls.index"
       :groups="groups"
+      :expression-engines="expressionEngines"
       :can-create-group="can.createGroup"
       :store-group-url="urls.storeGroup"
     />

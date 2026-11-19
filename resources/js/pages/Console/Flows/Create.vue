@@ -12,6 +12,8 @@ import type { FlowGroupOption, FlowsPageProps } from './types'
 
 defineProps<{
   groups: FlowGroupOption[]
+  expressionEngines: string[]
+  defaultEngine: string
   can: { createGroup: boolean }
   urls: { index: string; submit: string; storeGroup: string }
 }>()
@@ -26,11 +28,12 @@ const t = computed(() => usePage<FlowsPageProps>().props.translations.console.fl
     <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.create_title }}</h1>
 
     <FlowForm
-      :initial="{ name: '', flowGroupId: null, description: null, isPublic: true, loggingEnabled: false }"
+      :initial="{ name: '', flowGroupId: null, description: null, isPublic: true, loggingEnabled: false, expressionEngine: defaultEngine }"
       method="post"
       :submit-url="urls.submit"
       :cancel-url="urls.index"
       :groups="groups"
+      :expression-engines="expressionEngines"
       :can-create-group="can.createGroup"
       :store-group-url="urls.storeGroup"
       :submit-label="t.create_and_open"

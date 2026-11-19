@@ -14,6 +14,7 @@ use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
+use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
@@ -364,6 +365,7 @@ final class FlowTemplatePublishTest extends FeatureTestCase
             edges: [['id' => 'e', 'from' => 'b', 'to' => 'a', 'handle' => 'default']],
             assistantId: (string) $this->assistant->getKey(),
             isTemplate: true,
+            engineId: TemplateEngine::ID,
         );
         $codes = array_map(static fn ($error): string => $error->code, $templateErrors);
         $this->assertContains('template_output_invalid_name', $codes);
@@ -375,6 +377,7 @@ final class FlowTemplatePublishTest extends FeatureTestCase
             edges: [['id' => 'e', 'from' => 'ref', 'to' => 'x', 'handle' => 'gone']],
             assistantId: (string) $this->assistant->getKey(),
             isTemplate: false,
+            engineId: TemplateEngine::ID,
         );
         $this->assertSame(['template_unknown_output'], array_map(static fn ($error): string => $error->code, $flowErrors));
     }

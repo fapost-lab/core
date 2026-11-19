@@ -15,6 +15,7 @@ use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Enums\SendMessageContentType;
+use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\LoopNodeHandler;
@@ -62,6 +63,7 @@ final readonly class ValidateFlowService
         private ?LoopConfigChecker $loopConfig = null,
         private ?ListSizeChecker $listSize = null,
         private ?VariablePathConflictChecker $variablePaths = null,
+        private ?ExpressionEngineRegistry $expressionEngines = null,
     ) {
     }
 
@@ -69,6 +71,9 @@ final readonly class ValidateFlowService
      * @param  array<string, mixed>              $nodes
      * @param  array<string, mixed>|null         $trigger
      * @param  array<int, array<string, mixed>>  $edges
+     * @param  string|null                       $engineId  the expression engine the flow is checked with: the draft's
+     *                                                      choice, or the snapshot of a republished definition; null
+     *                                                      checks with the `template` engine (callers without a flow)
      */
     public function execute(
         array $nodes,
@@ -76,10 +81,13 @@ final readonly class ValidateFlowService
         ?string $flowId = null,
         array $edges = [],
         ?string $assistantId = null,
+        ?string $engineId = null,
     ): FlowValidationResultDto {
         $errors   = [];
         $warnings = [];
         $nodeMap  = $this->normalizeNodeMap($nodes, $errors);
+
+        $this->validateExpressionEngine($engineId, $errors);
 
         foreach ($nodeMap as $nodeId => $node) {
             // Annotation nodes (comment) are builder-only — no handler, no runtime
@@ -128,7 +136,7 @@ final readonly class ValidateFlowService
         // A flow whose trigger gives no contact may hold no node that needs one. Without a trigger in the request
         // (publish), the stored trigger of the flow decides. Skipped when the checker was not injected (legacy unit tests).
         if (null !== $this->contactContext) {
-            array_push($errors, ...$this->contactContext->check($this->withoutAnnotations($nodeMap), $trigger, $flowId));
+            array_push($errors, ...$this->contactContext->check($this->withoutAnnotations($nodeMap), $trigger, $flowId, $engineId));
         }
 
         // Loop mistakes that would otherwise surface at runtime: iterator/variable clash, non-numeric count, a while
@@ -176,6 +184,26 @@ final readonly class ValidateFlowService
         return array_filter(
             $nodeMap,
             static fn (array $node): bool => ! AnnotationNodeTypes::isAnnotation($node['type'] ?? null),
+        );
+    }
+
+    /**
+     * A flow is checked and published only with an engine the registry knows: a definition snapshotted with an
+     * engine that is gone (a removed Solution or plugin) would fail every session it starts. Skipped when no engine
+     * is given or the registry was not injected (legacy unit tests).
+     *
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateExpressionEngine(?string $engineId, array &$errors): void
+    {
+        if (null === $engineId || null === $this->expressionEngines || $this->expressionEngines->has($engineId)) {
+            return;
+        }
+
+        $errors[] = new FlowValidationErrorDto(
+            path: 'expression_engine',
+            code: 'expression_engine_unknown',
+            message: "The flow's expression engine '{$engineId}' is not installed. Choose another expression engine for the flow.",
         );
     }
 

@@ -104,12 +104,17 @@ Trigger checks (when a trigger payload is sent): `invalid_trigger_type`, `invali
 `invalid_trigger_priority`, `invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`),
 `duplicate_exact_trigger_keyword`, `missing_event_trigger_selection`, `unknown_event_trigger_selection`.
 
+Expression engine: the flow is checked with the engine it uses — the draft's (`flow_drafts.expression_engine`) on
+validate and publish, the active definition's snapshot on a republish by a template. An id `ExpressionEngineRegistry`
+does not know is refused with `expression_engine_unknown` (path `expression_engine`)
+(`adr-20261119-expression-engine-chosen-per-flow`).
+
 Contact context (`ContactContextChecker`, code `node_needs_contact`, path `nodes.<id>`): when the flow's trigger gives
 no contact — `schedule`, `webhook`, `api` (`FlowTriggerType::givesContact()`) — no node may need one. The trigger is
 the one in the request; without one (publish) the stored trigger of the flow, active or not; `_delete` or no trigger
 at all means a contact. A node needs a contact when its handler declares `NodeContextRequirement::Contact` or declares
 nothing (Foundation's `DeclaresContextRequirementInterface`, which a Solution's handler may implement too), or when its config reads `contact.*` or
-`module.*` (a `{{…}}` placeholder, a bare path, a `source` operand), uses a variable with `storage: contact`, or is a
+`module.*` (a reference of the flow's expression engine — a `{{…}}` placeholder of `template` —, a bare path, a `source` operand), uses a variable with `storage: contact`, or is a
 legacy `assign` to the contact. Core handlers declaring `any`: `branch`, `delay`, `assign`, `end`, `loop`, `loop_end`,
 `template`, `template_output`, `call` (its `CallContext::$contactId` is `null` without a contact); every other Core node
 needs a contact — `subflow` (its target is not followed) included. A template's publish republishes its hosts, so it is refused (`template_breaks_flow`) when a host
@@ -160,7 +165,8 @@ actual number. A limit a channel leaves `null` is not checked. What is counted m
 Before `ValidateFlowService`, each `template` node is expanded into a copy of its template
 (`TemplateExpander`, `adr-20261111-flow-templates-expanded-at-publish`), and the copy is then validated
 with the rest of the graph. Expansion refuses `template_missing`, `template_not_found`,
-`template_cross_assistant`, `template_not_published`, `template_nested`, `template_unknown_output` (an
+`template_cross_assistant`, `template_not_published`, `template_engine_mismatch` (the template's active
+definition was published with another expression engine than the flow's), `template_nested`, `template_unknown_output` (an
 edge from an output the template no longer has), `template_unknown_parameter` (a non-empty
 `parameter_values` entry for a parameter the template no longer has) and
 `template_output_outside_template`. A template's own publish checks `template_entry_not_single`,

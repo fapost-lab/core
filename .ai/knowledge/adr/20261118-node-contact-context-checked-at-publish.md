@@ -81,4 +81,5 @@ published while anything in it needs one, and that every handler declares the co
   `TemplateRenderer` hands the run's contact id — `null` without a contact — to whatever engine the definition
   snapshotted (`ExpressionContext::$contactId`). That is complete while the template engine is the only one; a second
   expression engine must also be scanned by `ContactContextChecker` (through its own `extractReferences`), or a
-  contact read in its syntax publishes into a contactless flow and fails at run time on the reader.
+  contact read in its syntax publishes into a contactless flow and fails at run time on the reader. Lifted by
+  `adr-20261119-expression-engine-chosen-per-flow`: the checker now reads references with the flow's own engine.
