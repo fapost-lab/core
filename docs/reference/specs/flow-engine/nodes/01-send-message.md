@@ -1,7 +1,8 @@
 # Node · `send_message`
 
 Sends content to the contact through the active channel, with optional inline/reply
-keyboards and dynamic keyboards built from state data.
+keyboards and dynamic keyboards built from state data. With an `addressee` it sends to the contact
+an expression names instead, which lets a flow without a contact (schedule, webhook, API trigger) message a person.
 
 **Type:** `send_message`
 **Version:** 1
@@ -43,10 +44,12 @@ keyboards and dynamic keyboards built from state data.
 | `save_to_variable` | object `{name, type, storage, group}` | no | Preferred target for a pressed static button's `value`; wins over `save_to`. |
 | `timeout_seconds` | int ≥ 1 | no | When set, schedules a timeout resume for inline keyboards. |
 | `remove_keyboard_after_press` | bool | no | Default `true`. |
+| `addressee` | object `{kind, contact}` | no | `kind` is `contact` (the only kind so far; tags and segments come as further kinds); `contact` is an expression of the flow's engine giving a contact id, e.g. `{{flow.customer_id}}`. Absent, empty, or `contact` blank (the builder's default) means the contact of the run. Validation (`validate()`, `NodeConfigValidatorInterface`): an unknown kind is `addressee_kind_unknown`; with an addressee the node cannot wait for an answer, so `content_type = text_with_keyboard`, `timeout_seconds`, `save_to` and `save_to_variable` are each `addressee_cannot_wait`, in every flow. In a flow whose trigger gives no contact it satisfies the contact-context check (see [06-validation](../06-validation.md)); `contact.*` reads elsewhere in the config are still refused there. |
 
 ## Output handles
 
 - `error` — `MessageSenderInterface::send()` threw; metadata carries `error` and `error_type: 'send_failure'`, the flow log entry carries `send_failure: <message>`, and the failure is logged as a warning (`flow.send_message_failed`).
+- `error` with `error_type: 'addressee_unresolved'` — the addressee's expression rendered to no valid contact id (empty or not a UUID); nothing is sent and no marker is written. The handler never falls back to the run's contact.
 - `no_response` — an inline-keyboard prompt timed out without a button press.
 - The pressed button's handle when `content_type = text_with_keyboard` and `keyboard_mode = inline`:
   - static keyboard — the button's own UUID `id` string;
@@ -59,7 +62,7 @@ keyboards and dynamic keyboards built from state data.
 2. If the message was already sent, the content is `text_with_keyboard` + `keyboard_mode = inline`, and an incoming message is present, the handler resumes waiting for the button press (`resumeInlineKeyboard()`), reloading generated buttons from `system.send_message.dynamic_buttons.{nodeId}` when `dynamic_buttons` was configured.
 3. If already sent and no incoming to resume with: `NodeExecutionResult::waiting()` for inline keyboards, `NodeExecutionResult::executed()` otherwise.
 4. On the first pass: if `dynamic_buttons` is set, buttons are generated from the state collection at `source` (`generateDynamicButtons()` — see below); the payload's `text`/`caption`/button labels are resolved through `ContentTranslatorInterface::resolveField()` then rendered through `TemplateRenderer`, merging session state with a small `contact` context (`id`, `language`, `name`/`first_name`, `username`, `channel`).
-5. `MessageSenderInterface::send(tenantId, contactId, sessionId, payload)` is called. A thrown exception routes to `error`.
+5. `MessageSenderInterface::send(tenantId, contactId, sessionId, payload)` is called — `contactId` is the run's contact, or the addressee's id, rendered through `TemplateRenderer` just before the send. A thrown exception routes to `error` (a contact with no active channel on the run's assistant is a `send_failure`). The message is in the run's resolved language, not the addressee's.
 6. `system.sent_messages.{nodeId}` is set to the returned external message id.
 7. For `text_with_keyboard` + `inline`:
    - if dynamic, the generated buttons are persisted to `system.send_message.dynamic_buttons.{nodeId}` so a resume doesn't need to regenerate them;

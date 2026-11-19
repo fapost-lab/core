@@ -1407,6 +1407,85 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertArrayNotHasKey(SystemStateKeys::SENT_MESSAGES, $result->stateChanges);
     }
 
+    public function test_send_message_with_an_addressee_sends_to_the_contact_its_expression_gives(): void
+    {
+        $addresseeId = '01938f3e-7c1a-7d2b-8e4f-123456789abc';
+        $sender      = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldReceive('send')->once()->withArgs(
+            static fn (string $tenantId, string $contactId): bool => $addresseeId === $contactId,
+        )->andReturn('ext-1');
+
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')->andReturn('Order shipped');
+
+        $result = $this->makeHandler($sender, $translator)->execute([
+            'id'     => 'node-1',
+            'config' => [
+                'content_type' => 'text',
+                'text'         => ['en' => 'Order shipped'],
+                'addressee'    => ['kind' => 'contact', 'contact' => '{{flow.customer_id}}'],
+            ],
+        ], ['flow' => ['customer_id' => " {$addresseeId} "]], $this->contactlessContext());
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('ext-1', $result->stateChanges[SystemStateKeys::SENT_MESSAGES]['node-1']);
+    }
+
+    public function test_send_message_with_an_addressee_that_gives_no_contact_id_takes_error_and_sends_nothing(): void
+    {
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldNotReceive('send');
+
+        $handler = $this->makeHandler($sender, Mockery::mock(ContentTranslatorInterface::class));
+
+        foreach ([[], ['flow' => ['customer_id' => 'not-an-id']]] as $state) {
+            $result = $handler->execute([
+                'id'     => 'node-1',
+                'config' => [
+                    'content_type' => 'text',
+                    'text'         => ['en' => 'Hi'],
+                    'addressee'    => ['kind' => 'contact', 'contact' => '{{flow.customer_id}}'],
+                ],
+            ], $state, $this->context());
+
+            $this->assertSame('error', $result->sourceHandle);
+            $this->assertSame('addressee_unresolved', $result->metadata['error_type']);
+            $this->assertSame([], $result->stateChanges);
+        }
+    }
+
+    public function test_send_message_validates_its_addressee(): void
+    {
+        $handler = $this->makeHandler(Mockery::mock(MessageSenderInterface::class), Mockery::mock(ContentTranslatorInterface::class));
+        $codes   = static fn (array $config): array => array_map(
+            static fn ($issue): string => "{$issue->code}@{$issue->field}",
+            $handler->validate(['id' => 'n', 'type' => 'send_message', 'config' => $config]),
+        );
+
+        $this->assertSame([], $codes(['content_type' => 'text_with_keyboard', 'timeout_seconds' => 60]), 'no addressee');
+        $this->assertSame([], $codes(['content_type' => 'text', 'addressee' => ['kind' => 'contact', 'contact' => '']]), 'the untouched default');
+        $this->assertSame([], $codes(['content_type' => 'text', 'addressee' => ['kind' => 'contact', 'contact' => '{{flow.id}}']]));
+        $this->assertSame(
+            ['addressee_kind_unknown@addressee.kind'],
+            $codes(['content_type' => 'text', 'addressee' => ['kind' => 'segment', 'contact' => '']]),
+        );
+        $this->assertSame(
+            ['addressee_cannot_wait@content_type', 'addressee_cannot_wait@timeout_seconds', 'addressee_cannot_wait@save_to_variable'],
+            $codes([
+                'content_type'     => 'text_with_keyboard',
+                'keyboard_mode'    => 'inline',
+                'timeout_seconds'  => 60,
+                'save_to_variable' => ['name' => 'answer', 'storage' => 'session'],
+                'addressee'        => ['contact' => '{{flow.id}}'],
+            ]),
+        );
+
+        $this->assertTrue($handler->namesRecipient(['addressee' => ['kind' => 'contact', 'contact' => '{{flow.id}}']]));
+        $this->assertFalse($handler->namesRecipient(['addressee' => ['kind' => 'contact', 'contact' => ' ']]));
+        $this->assertFalse($handler->namesRecipient(['addressee' => ['kind' => 'segment', 'contact' => '{{flow.id}}']]));
+        $this->assertFalse($handler->namesRecipient([]));
+    }
+
     public function test_send_message_hint_uses_catalog_key_when_user_types_during_button_wait(): void
     {
         $sessionUuid = '00000000-0000-4000-8000-000000000050';
@@ -1676,6 +1755,18 @@ final class BuiltInNodeHandlersTest extends TestCase
             idempotencyKey: 'idem-1',
             platform: 'telegram',
             incoming: $incoming,
+        );
+    }
+
+    private function contactlessContext(): NodeExecutionContext
+    {
+        return new NodeExecutionContext(
+            tenantId: 'tenant-1',
+            contactId: null,
+            sessionId: 'session-1',
+            nodeId: 'node-1',
+            idempotencyKey: 'idem-1',
+            platform: null,
         );
     }
 

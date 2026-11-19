@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Handlers;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
+use App\Domains\Flow\Contracts\NamesOwnRecipientInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\Contracts\SendMessageTimeoutSchedulerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
@@ -22,6 +23,8 @@ use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\Contracts\ContactWriterInterface;
+use Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface;
+use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
 use Fapost\Foundation\Flow\Enums\KeyboardMode;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
@@ -40,9 +43,20 @@ use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Throwable;
 
-final class SendMessageNodeHandler extends AbstractVersionedHandler
+/**
+ * Sends a message to the contact of the run, or to the contact its `addressee` names.
+ *
+ * An addressee (`{kind: "contact", contact: "<expression>"}`) lets a flow whose trigger gives no contact message a
+ * person: the expression is rendered with the flow's engine and must give a contact id, or the node takes `error`
+ * with `addressee_unresolved` and sends nothing. A node with an addressee never waits for an answer — no keyboard,
+ * timeout or saved answer — since the answer would reach the addressee's own session, not this run.
+ */
+final class SendMessageNodeHandler extends AbstractVersionedHandler implements NamesOwnRecipientInterface, NodeConfigValidatorInterface
 {
     final public const string TYPE = 'send_message';
+
+    /** The one addressee kind so far; tags and segments come as further kinds of the same field. */
+    final public const string ADDRESSEE_KIND_CONTACT = 'contact';
 
     private const string EXTERNAL_MESSAGE_ID_META = 'external_message_id';
     private const string NO_RESPONSE_HANDLE       = 'no_response';
@@ -157,6 +171,25 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                     ]),
             )
             ->section(
+                Section::make('addressee', 'Send to')
+                    ->icon('user')
+                    ->collapsed()
+                    ->fields([
+                        ObjectField::make('addressee')
+                            ->label('Addressee')
+                            ->help('Leave empty to send to the contact of the run. A flow started by a schedule, a webhook or an API call has no contact and needs one. A message to an addressee cannot wait for an answer.')
+                            ->fields([
+                                SelectField::make('kind')
+                                    ->label('Kind')
+                                    ->options([self::ADDRESSEE_KIND_CONTACT])
+                                    ->default(self::ADDRESSEE_KIND_CONTACT),
+                                TextField::make('contact')
+                                    ->label('Contact id')
+                                    ->placeholder('{{flow.contact_id}}'),
+                            ]),
+                    ]),
+            )
+            ->section(
                 Section::make('response', 'Response')
                     ->icon('arrow-down-tray')
                     ->collapsed()
@@ -187,6 +220,48 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                     ]),
             )
             ->toArray();
+    }
+
+    public function namesRecipient(array $config): bool
+    {
+        return self::ADDRESSEE_KIND_CONTACT === self::addresseeOf($config)['kind'];
+    }
+
+    /**
+     * An addressee must be of a known kind and must not wait for an answer.
+     *
+     * @param  array<string, mixed>  $node
+     *
+     * @return list<NodeConfigIssue>
+     */
+    public function validate(array $node): array
+    {
+        $config    = is_array($node['config'] ?? null) ? $node['config'] : [];
+        $addressee = self::addresseeOf($config);
+
+        if (null === $addressee['kind']) {
+            return [];
+        }
+
+        if (self::ADDRESSEE_KIND_CONTACT !== $addressee['kind']) {
+            return [NodeConfigIssue::error(
+                'addressee_kind_unknown',
+                "The addressee kind '{$addressee['kind']}' is not supported; use 'contact'.",
+                'addressee.kind',
+            )];
+        }
+
+        $issues = [];
+
+        foreach (self::answerFields($config) as $field) {
+            $issues[] = NodeConfigIssue::error(
+                'addressee_cannot_wait',
+                "A message to an addressee cannot wait for an answer: remove '{$field}' or the addressee.",
+                $field,
+            );
+        }
+
+        return $issues;
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
@@ -229,12 +304,28 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
             );
         }
 
+        $recipientId = $context->contactId;
+        $addressee   = self::addresseeOf($config);
+
+        if (null !== $addressee['kind']) {
+            $recipientId = $this->resolveAddressee($addressee, $state, $context);
+
+            if (null === $recipientId) {
+                return new NodeExecutionResult(
+                    status: NodeExecutionStatus::Executed,
+                    sourceHandle: 'error',
+                    metadata: ['error' => 'The addressee gave no contact id.', 'error_type' => 'addressee_unresolved'],
+                    errorMessage: 'addressee_unresolved: the addressee gave no contact id.',
+                );
+            }
+        }
+
         $payload = $this->resolveMultilingualPayload($normalized, $context, $state);
 
         try {
             $externalMessageId = $this->sender->send(
                 tenantId: $context->tenantId,
-                contactId: $context->contactId,
+                contactId: $recipientId,
                 sessionId: $context->sessionId,
                 payload: $payload,
             );
@@ -309,6 +400,67 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
             stateChanges: $stateChanges,
             metadata: [self::EXTERNAL_MESSAGE_ID_META => $externalMessageId],
         );
+    }
+
+    /**
+     * The addressee a node's config names: its kind (null when the config names none) and its contact expression.
+     *
+     * No `addressee`, an empty one, or the builder's untouched default (kind `contact`, no expression) names none; a
+     * kind other than `contact` is named even without an expression, so validation can refuse it.
+     *
+     * @param  array<array-key, mixed>  $config
+     *
+     * @return array{kind: string|null, contact: string}
+     */
+    private static function addresseeOf(array $config): array
+    {
+        $addressee = $config['addressee'] ?? null;
+
+        if (! is_array($addressee)) {
+            return ['kind' => null, 'contact' => ''];
+        }
+
+        $rawKind = $addressee['kind'] ?? null;
+        $kind    = is_string($rawKind) && '' !== mb_trim($rawKind) ? mb_trim($rawKind) : self::ADDRESSEE_KIND_CONTACT;
+        $contact = is_string($addressee['contact'] ?? null) ? mb_trim($addressee['contact']) : '';
+
+        if (self::ADDRESSEE_KIND_CONTACT === $kind && '' === $contact) {
+            return ['kind' => null, 'contact' => ''];
+        }
+
+        return ['kind' => $kind, 'contact' => $contact];
+    }
+
+    /**
+     * The config fields that make the node wait for, or save, an answer.
+     *
+     * @param  array<array-key, mixed>  $config
+     *
+     * @return list<string>
+     */
+    private static function answerFields(array $config): array
+    {
+        $fields = [];
+
+        if (SendMessageContentType::TextWithKeyboard->value === ($config['content_type'] ?? null)) {
+            $fields[] = 'content_type';
+        }
+
+        if (is_numeric($config['timeout_seconds'] ?? null)) {
+            $fields[] = 'timeout_seconds';
+        }
+
+        if (is_string($config['save_to'] ?? null) && '' !== $config['save_to']) {
+            $fields[] = 'save_to';
+        }
+
+        $variable = $config['save_to_variable'] ?? null;
+
+        if (is_array($variable) && is_string($variable['name'] ?? null) && '' !== $variable['name']) {
+            $fields[] = 'save_to_variable';
+        }
+
+        return $fields;
     }
 
     /**
@@ -414,6 +566,10 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
             ? $config['save_to_variable']
             : null;
 
+        if (null !== self::addresseeOf($config)['kind'] && [] !== self::answerFields($config)) {
+            throw new InvalidNodeConfigException('send_message with an addressee cannot wait for an answer.');
+        }
+
         return [
             'content_type'    => $contentType,
             'text'            => $config['text'] ?? null,
@@ -431,6 +587,25 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
             'save_to_variable'            => $saveToVariable,
             'remove_keyboard_after_press' => true === ($config['remove_keyboard_after_press'] ?? true),
         ];
+    }
+
+    /**
+     * The contact id the addressee's expression gives, rendered with the flow's engine; null when it gives none.
+     * Never the contact of the run: a missing id must not message somebody else.
+     *
+     * @param  array{kind: string|null, contact: string}  $addressee
+     * @param  array<string, mixed>                       $state
+     */
+    private function resolveAddressee(array $addressee, array $state, NodeExecutionContext $context): ?string
+    {
+        if (self::ADDRESSEE_KIND_CONTACT !== $addressee['kind']) {
+            return null;
+        }
+
+        $rendered = $this->templates->render($addressee['contact'], $context, $state);
+        $id       = is_scalar($rendered) ? mb_trim((string) $rendered) : '';
+
+        return Uuid::isValid($id) ? mb_strtolower($id) : null;
     }
 
     /**
