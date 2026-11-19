@@ -127,7 +127,7 @@ broken.
 ## Rules
 
 - **Check authorization through policies against the `Permission` enum.** This is the pattern in
-  every domain. Review only.
+  every domain; tenant API token surfaces are the exception (see the token rule below). Review only.
   The enum has 25 cases in seven groups (assistants, content, users, contacts, conversations,
   analytics, system), the deprecated `ManageFlow` included; the policies are `AssistantPolicy`, `ChannelPolicy`, `ContactPolicy`,
   `ContactGroupPolicy`, `ConversationPolicy`, the Flow policies (`FlowDraftPolicy`,
@@ -137,6 +137,14 @@ broken.
   `PublishFlow`, `ManageRoles`, `ViewConversations`, `ReplyConversations`, `ViewOperatorScreens`,
   `ViewActivityLog`); the Roles UI badges
   those. A new permission with elevated risk is added to that `match`, not flagged elsewhere.
+- **A machine credential of a tenant is a tenant API token, one model for every surface.** The API
+  trigger, MCP and any later machine surface use the tenant's `api_tokens` (Staff), the `api-token`
+  guard and stack, and `Permission` values as abilities through `Gate` — never a token table or a
+  scope vocabulary of their own. A token surface is the one exception to "check authorization
+  through policies" above: it asks `Gate` by `Permission` value only (`Gate::allows(Permission::X->value)`)
+  and never a policy ability such as `Gate::authorize('view', $model)`, which the token's fail-closed
+  branch denies. Shape, storage, issuing, rotation, lifetime, limits and audit:
+  `adr-20261119-tenant-api-tokens` (proposed). Review only (nothing is built yet).
 - **`Permission::ManageFlow` is `@deprecated`** and kept for backward compatibility; use the granular
   flow permissions (`ManageFlowDefinitions`, `PublishFlow`, `ViewFlowSessions`, `ManageFlowGroups`,
   `ManageTranslations`) for new checks.
