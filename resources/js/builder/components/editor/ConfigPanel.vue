@@ -161,6 +161,11 @@ function deleteTrigger() {
                                 <TriggerConfig
                                     :trigger="selectedTrigger"
                                     :available-events="builderStore.availableEvents"
+                                    :flow-id="builderStore.flowId"
+                                    :webhook-endpoints="builderStore.webhookEndpoints"
+                                    :read-only="builderStore.readOnly"
+                                    :flush-draft="builderStore.flushDraft"
+                                    @webhook-endpoint="builderStore.setWebhookEndpoint"
                                     @update:trigger="updateTrigger"
                                     @delete:trigger="deleteTrigger"
                                 />

@@ -54,8 +54,9 @@ final class FlowTriggerHintTest extends TestCase
     public function test_the_other_trigger_types_name_their_main_setting(): void
     {
         $this->assertSame(['type' => 'schedule', 'text' => '0 9 * * *'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Schedule, ['cron' => ' 0 9 * * * '])));
-        $this->assertSame(['type' => 'webhook', 'text' => 'POST /orders'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Webhook, ['method' => 'POST', 'path' => '/orders'])));
-        $this->assertSame(['type' => 'webhook', 'text' => '/orders'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Webhook, ['path' => '/orders'])));
+        $this->assertSame(['type' => 'webhook', 'text' => 'POST, HMAC-SHA256'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Webhook, ['verification' => 'hmac_sha256', 'signature_header' => 'X-Signature'])));
+        $this->assertSame(['type' => 'webhook', 'text' => 'POST, secret header'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Webhook, ['verification' => 'header_equals', 'signature_header' => 'X-Webhook-Secret'])));
+        $this->assertNull(FlowTriggerHint::for($this->trigger(FlowTriggerType::Webhook, ['method' => 'POST', 'path' => '/orders'])));
         $this->assertSame(['type' => 'event', 'text' => 'employee_registered'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Event, ['event_name' => 'employee_registered'])));
         $this->assertSame(['type' => 'api', 'text' => 'start_onboarding'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Api, ['route_key' => 'start_onboarding'])));
     }

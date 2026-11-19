@@ -8,10 +8,12 @@ use App\Domains\Audit\Contracts\AuditTrailInterface;
 use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowWebhookEndpointRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Enums\FlowKind;
+use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Exceptions\VariableTypeConflictException;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
@@ -45,6 +47,7 @@ final readonly class PublishFlowService
         private TemplateUsageRepository $templateUsages,
         private FlowTriggerSet $triggerSet,
         private FlowTriggerRepositoryInterface $triggerRows,
+        private FlowWebhookEndpointRepositoryInterface $webhookEndpoints,
     ) {
     }
 
@@ -182,7 +185,12 @@ final readonly class PublishFlowService
 
         // Every trigger goes live here, never on draft save: rows are synced by id, keeping a kept trigger's run state.
         if (is_array($carried)) {
+            $liveWebhooks = $this->webhookTriggerIds($this->triggerSet->live($draft->flow_id));
             $this->triggerRows->syncForFlow($draft, $triggers);
+
+            // A live webhook trigger this version deletes, or turns into another type, loses its URL and secret.
+            // An endpoint made for a trigger that never went live is left alone: it may be waiting for this draft.
+            $this->webhookEndpoints->deleteForTriggers(array_values(array_diff($liveWebhooks, $this->webhookTriggerIds($triggers))));
         }
 
         // Reverse-index subflow.flow_id references so the next publish can
@@ -242,6 +250,24 @@ final readonly class PublishFlowService
         ));
 
         return $definition;
+    }
+
+    /**
+     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $triggers
+     *
+     * @return list<string>
+     */
+    private function webhookTriggerIds(array $triggers): array
+    {
+        $ids = [];
+
+        foreach ($triggers as $trigger) {
+            if (FlowTriggerType::Webhook->value === $trigger['type']) {
+                $ids[] = mb_strtolower($trigger['id']);
+            }
+        }
+
+        return $ids;
     }
 
     /**

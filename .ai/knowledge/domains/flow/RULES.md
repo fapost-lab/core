@@ -289,6 +289,17 @@ broken.
   alone. Nothing writes `flow_triggers` outside this sync. Why: a draft edit must not change what runs, and a live
   trigger must survive the release that introduced the list (`adr-20261119-flow-triggers-in-definition-live-on-publish`).
   Enforced: `FlowTriggersPublishTest`, `SaveDraftServiceTest`, `FlowTemplatePublishTest`, `FlowTriggerSetTest`.
+- **A webhook trigger's secret never enters its config, and its URL starts a run only while someone can revoke it.**
+  The secret lives encrypted in `flow_webhook_endpoints` (one row per trigger id, bound to its `flow_id`), is shown only
+  in the answer that generated it, and never reaches the draft, a definition or a template: `WebhookTriggerConfig`
+  refuses any key it does not know and a draft save drops `secret`. `FlowWebhookReceiver` serves a token only for a
+  live, active webhook row of the endpoint's flow whose flow has an active runnable definition and still has its draft
+  and assistant; a timestamp check is accepted only inside the signed string. A publish that deletes a live webhook
+  trigger or changes its type deletes its endpoint, and deleting a flow deletes its endpoints. A delivery runs once:
+  Redis `SET NX` per `(tenant, trigger, fire key)` for a day, then the session's unique `(trigger_id, fire_key)`. Why:
+  the config is copied into every version and template, and a URL held by an outside system must stop working when its
+  flow cannot be managed (`adr-20261119-flow-webhook-trigger`). Enforced: `FlowWebhookTriggerTest`,
+  `FlowWebhookEndpointTest`, `FlowWebhookHostModeTest`, `WebhookTriggerConfigTest`, `RedisWebhookDeliveryDedupRedisTest`.
 - **A definition's expression engine is the flow's choice, written explicitly at publish and checked with.** The draft
   holds it (`flow_drafts.expression_engine`); `PublishFlowService` passes the engine on to `ValidateFlowService` and
   `TemplateExpander` and writes it onto the definition — the draft's on a publish, the active definition's on a

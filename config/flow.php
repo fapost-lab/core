@@ -35,6 +35,12 @@ return [
         'max_run_hours'   => (int) env('FLOW_AUTOMATION_MAX_RUN_HOURS', 24),
     ],
 
+    // Only the default of the platform setting `flow.webhook.per_token_per_minute`: how many requests one webhook
+    // trigger URL accepts in a minute before it answers 429.
+    'webhook' => [
+        'per_token_per_minute' => (int) env('FLOW_WEBHOOK_PER_TOKEN_PER_MINUTE', 120),
+    ],
+
     // Only the defaults of the platform settings `flow.automation_runs.succeeded_retention_days` and
     // `flow.automation_runs.failed_retention_days`: how many days a finished automation run is kept before the daily
     // `flow:prune-automation-runs` deletes it with its history and logs. 0 keeps that class forever; a value that is

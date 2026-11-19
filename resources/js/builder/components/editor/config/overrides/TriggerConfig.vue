@@ -1,13 +1,32 @@
 <script setup lang="ts">
-import {computed, ref} from 'vue'
+import {computed, ref, watch} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
+import {createWebhookEndpoint, generateWebhookSecret, setWebhookSecret} from '@builder/api/builderApi'
+import type {ApiError} from '@builder/api/builderApi'
+import type {WebhookEndpointInfo} from '@builder/dto/types'
+import {useConfirm} from '@builder/composables/useConfirm'
+import {
+    WEBHOOK_PRESETS,
+    defaultWebhookConfig,
+    isLegacyWebhookConfig,
+    webhookConfigFromPreset,
+    withWebhookField,
+    withWebhookVerification,
+} from '@builder/utils/webhookTrigger'
 
 const props = defineProps({
     trigger: { type: Object as () => Record<string, unknown> | null, default: null },
     availableEvents: { type: Array as () => string[], default: () => [] },
+    flowId: { type: String as () => string | null, default: null },
+    webhookEndpoints: { type: Object as () => Record<string, WebhookEndpointInfo>, default: () => ({}) },
+    readOnly: { type: Boolean, default: false },
+    /** Pushes the unsaved draft to the server; resolves false when it could not be saved. */
+    flushDraft: { type: Function as unknown as () => () => Promise<boolean>, default: null },
 })
 
-const emit = defineEmits(['update:trigger', 'delete:trigger'])
+const emit = defineEmits(['update:trigger', 'delete:trigger', 'webhook-endpoint'])
+
+const { confirm } = useConfirm()
 
 const triggerTypes = [
     { value: 'message', label: 'Message' },
@@ -70,6 +89,162 @@ function update(patch: Record<string, unknown>) {
     })
 }
 
+/**
+ * Webhook config edits replace the whole config (a plain `update` merges, so it could not drop a key).
+ */
+function setWebhookConfig(config: Record<string, unknown>): void {
+    emit('update:trigger', { ...currentTrigger.value, config })
+}
+
+const webhookLegacy = computed(() => isLegacyWebhookConfig(triggerCfg.value))
+const webhookIsHmac = computed(() => triggerCfg.value.verification === 'hmac_sha256')
+
+function webhookText(key: string): string {
+    const value = triggerCfg.value[key]
+
+    return typeof value === 'string' ? value : ''
+}
+
+function webhookNumber(key: string): string {
+    const value = triggerCfg.value[key]
+
+    return typeof value === 'number' ? String(value) : ''
+}
+
+function setWebhookField(key: string, value: string): void {
+    setWebhookConfig(withWebhookField(triggerCfg.value, key, value.trim() === '' ? null : value.trim()))
+}
+
+function setWebhookNumberField(key: string, value: string): void {
+    const parsed = Number.parseInt(value, 10)
+
+    setWebhookConfig(withWebhookField(triggerCfg.value, key, Number.isNaN(parsed) ? null : parsed))
+}
+
+const webhookPresetValue = ref('')
+
+function applyWebhookPreset(value: string): void {
+    if (value === '') {
+        return
+    }
+
+    setWebhookConfig(webhookConfigFromPreset(value))
+    webhookPresetValue.value = ''
+}
+
+const triggerId = computed(() => String(currentTrigger.value.id ?? ''))
+const endpoint = computed<WebhookEndpointInfo | null>(() => props.webhookEndpoints[triggerId.value.toLowerCase()] ?? null)
+
+const webhookBusy = ref(false)
+const webhookError = ref<string | null>(null)
+const generatedSecret = ref<string | null>(null)
+const pastedSecret = ref('')
+const copied = ref<'url' | 'secret' | null>(null)
+
+watch(triggerId, () => {
+    generatedSecret.value = null
+    pastedSecret.value = ''
+    webhookError.value = null
+    copied.value = null
+})
+
+const secretRotatedLabel = computed(() => {
+    const at = endpoint.value?.secret_rotated_at
+
+    return at ? new Date(at).toLocaleString() : null
+})
+
+function errorMessage(error: unknown): string {
+    const err = error as ApiError & { body?: { errors?: Record<string, string[]> } }
+    const first = err.body?.errors ? Object.values(err.body.errors)[0]?.[0] : null
+
+    return first ?? err.message ?? 'Request failed'
+}
+
+/** The trigger must be in the saved draft before the server can mint a URL or secret for it. */
+async function runWebhookAction(action: () => Promise<void>): Promise<void> {
+    if (props.flowId === null || triggerId.value === '' || webhookBusy.value) {
+        return
+    }
+
+    webhookBusy.value = true
+    webhookError.value = null
+
+    try {
+        if (props.flushDraft !== null && !(await props.flushDraft())) {
+            webhookError.value = 'The draft could not be saved. Fix the problem and try again.'
+
+            return
+        }
+
+        await action()
+    } catch (error) {
+        webhookError.value = errorMessage(error)
+    } finally {
+        webhookBusy.value = false
+    }
+}
+
+function getWebhookUrl(): Promise<void> {
+    return runWebhookAction(async () => {
+        emit('webhook-endpoint', triggerId.value, await createWebhookEndpoint(props.flowId as string, triggerId.value))
+    })
+}
+
+async function generateSecret(): Promise<void> {
+    if (endpoint.value?.has_secret && !(await confirm({
+        title: 'Replace secret',
+        message: 'The current secret stops working at once. Senders must be updated with the new one.',
+        confirmLabel: 'Replace',
+        danger: true,
+    }))) {
+        return
+    }
+
+    await runWebhookAction(async () => {
+        const result = await generateWebhookSecret(props.flowId as string, triggerId.value)
+        const { secret, ...info } = result
+
+        emit('webhook-endpoint', triggerId.value, info)
+        generatedSecret.value = secret
+    })
+}
+
+async function savePastedSecret(): Promise<void> {
+    const value = pastedSecret.value.trim()
+
+    if (value === '') {
+        return
+    }
+
+    if (endpoint.value?.has_secret && !(await confirm({
+        title: 'Replace secret',
+        message: 'The current secret stops working at once.',
+        confirmLabel: 'Replace',
+        danger: true,
+    }))) {
+        return
+    }
+
+    await runWebhookAction(async () => {
+        const { secret: _shown, ...info } = await setWebhookSecret(props.flowId as string, triggerId.value, value)
+
+        emit('webhook-endpoint', triggerId.value, info)
+        generatedSecret.value = null
+        pastedSecret.value = ''
+    })
+}
+
+async function copyText(kind: 'url' | 'secret', text: string): Promise<void> {
+    try {
+        await navigator.clipboard.writeText(text)
+        copied.value = kind
+        setTimeout(() => { copied.value = null }, 1500)
+    } catch {
+        webhookError.value = 'Copying failed. Select the text and copy it by hand.'
+    }
+}
+
 function updateType(type: string) {
     emit('update:trigger', { ...createDefaultTrigger(type), id: currentTrigger.value.id })
 }
@@ -119,7 +294,7 @@ function defaultConfig(type: string): Record<string, unknown> {
         case 'schedule':
             return { cron: '', timezone: 'UTC' }
         case 'webhook':
-            return { method: 'POST', path: '', secret: '' }
+            return defaultWebhookConfig()
         case 'api':
             return { route_key: '', allowed_sources: [] }
         case 'event':
@@ -227,39 +402,161 @@ function defaultConfig(type: string): Record<string, unknown> {
         </AccordionSection>
 
         <AccordionSection v-else-if="currentTrigger.type === 'webhook'" title="Webhook" default-open>
+            <div v-if="webhookError" class="webhook-error" role="alert">{{ webhookError }}</div>
+
             <div class="config-field">
-                <div class="field-label">Method</div>
+                <div class="field-label">URL</div>
+                <div v-if="endpoint" class="webhook-row">
+                    <input class="field-input webhook-mono" type="text" readonly :value="endpoint.url" @focus="($event.target as HTMLInputElement).select()">
+                    <button type="button" class="webhook-btn" @click="copyText('url', endpoint.url)">
+                        {{ copied === 'url' ? 'Copied' : 'Copy' }}
+                    </button>
+                </div>
+                <button v-else type="button" class="webhook-btn" :disabled="readOnly || webhookBusy" @click="getWebhookUrl">
+                    {{ webhookBusy ? 'Working…' : 'Get URL' }}
+                </button>
+                <div class="field-hint">Requests are accepted once the flow is published with this trigger active.</div>
+            </div>
+
+            <div v-if="endpoint" class="config-field">
+                <div class="field-label">Secret</div>
+                <div v-if="endpoint.has_secret" class="field-hint webhook-status">
+                    Secret set<template v-if="secretRotatedLabel"> · {{ secretRotatedLabel }}</template>
+                </div>
+                <div v-else class="field-hint webhook-status-warn">
+                    No secret yet — requests are refused until one is set.
+                </div>
+
+                <div v-if="generatedSecret" class="webhook-secret-box">
+                    <div class="webhook-row">
+                        <input class="field-input webhook-mono" type="text" readonly :value="generatedSecret" @focus="($event.target as HTMLInputElement).select()">
+                        <button type="button" class="webhook-btn" @click="copyText('secret', generatedSecret)">
+                            {{ copied === 'secret' ? 'Copied' : 'Copy' }}
+                        </button>
+                    </div>
+                    <div class="field-hint webhook-status-warn">Copy it now — it will not be shown again.</div>
+                </div>
+
+                <button type="button" class="webhook-btn" :disabled="readOnly || webhookBusy" @click="generateSecret">
+                    {{ endpoint.has_secret ? 'Replace secret' : 'Generate secret' }}
+                </button>
+
+                <div class="field-label webhook-sub">Use a secret from the sender</div>
+                <div class="webhook-row">
+                    <input
+                        v-model="pastedSecret"
+                        class="field-input webhook-mono"
+                        type="password"
+                        autocomplete="off"
+                        placeholder="16–512 characters, no spaces"
+                    >
+                    <button type="button" class="webhook-btn" :disabled="readOnly || webhookBusy || pastedSecret.trim() === ''" @click="savePastedSecret">Save</button>
+                </div>
+            </div>
+
+            <div class="config-field">
+                <div class="field-label">Verification preset</div>
+                <div v-if="webhookLegacy" class="webhook-error">
+                    This trigger uses an old format; pick a verification preset to update it.
+                </div>
                 <select
                     class="field-input"
-                    :value="(triggerCfg.method as string) ?? 'POST'"
-                    @change="update({ config: { method: ($event.target as HTMLSelectElement).value } })"
+                    :value="webhookPresetValue"
+                    @change="applyWebhookPreset(($event.target as HTMLSelectElement).value)"
                 >
-                    <option value="POST">POST</option>
-                    <option value="GET">GET</option>
-                    <option value="PUT">PUT</option>
-                    <option value="PATCH">PATCH</option>
-                    <option value="DELETE">DELETE</option>
+                    <option value="">Choose a preset…</option>
+                    <option v-for="preset in WEBHOOK_PRESETS" :key="preset.value" :value="preset.value">{{ preset.label }}</option>
                 </select>
+                <div class="field-hint">A preset replaces the verification settings below.</div>
             </div>
 
-            <div class="config-field">
-                <div class="field-label">Path</div>
-                <input
-                    class="field-input"
-                    :value="(triggerCfg.path as string) ?? ''"
-                    placeholder="/webhooks/hr"
-                    @input="update({ config: { path: ($event.target as HTMLInputElement).value } })"
-                >
-            </div>
+            <template v-if="!webhookLegacy">
+                <div class="config-field">
+                    <div class="field-label">Verification</div>
+                    <select
+                        class="field-input"
+                        :value="webhookText('verification')"
+                        @change="setWebhookConfig(withWebhookVerification(triggerCfg, ($event.target as HTMLSelectElement).value))"
+                    >
+                        <option value="hmac_sha256">HMAC-SHA256</option>
+                        <option value="header_equals">Secret in a header</option>
+                    </select>
+                </div>
 
-            <div class="config-field">
-                <div class="field-label">Secret</div>
-                <input
-                    class="field-input"
-                    :value="(triggerCfg.secret as string) ?? ''"
-                    @input="update({ config: { secret: ($event.target as HTMLInputElement).value } })"
-                >
-            </div>
+                <div class="config-field">
+                    <div class="field-label">Signature header</div>
+                    <input
+                        class="field-input"
+                        :value="webhookText('signature_header')"
+                        placeholder="X-Signature"
+                        @input="setWebhookField('signature_header', ($event.target as HTMLInputElement).value)"
+                    >
+                </div>
+
+                <template v-if="webhookIsHmac">
+                    <div class="config-field">
+                        <div class="field-label">Signature prefix</div>
+                        <input
+                            class="field-input"
+                            :value="webhookText('signature_prefix')"
+                            placeholder="sha256="
+                            @input="setWebhookField('signature_prefix', ($event.target as HTMLInputElement).value)"
+                        >
+                    </div>
+
+                    <div class="config-field">
+                        <div class="field-label">Timestamp header</div>
+                        <input
+                            class="field-input"
+                            :value="webhookText('timestamp_header')"
+                            placeholder="X-Timestamp"
+                            @input="setWebhookField('timestamp_header', ($event.target as HTMLInputElement).value)"
+                        >
+                    </div>
+
+                    <div v-if="webhookText('timestamp_header') !== '' || webhookText('signed_payload') !== ''" class="config-field">
+                        <div class="field-label">Signed string</div>
+                        <input
+                            class="field-input webhook-mono"
+                            :value="webhookText('signed_payload')"
+                            placeholder="v0:{header.X-Timestamp}:{raw}"
+                            @input="setWebhookField('signed_payload', ($event.target as HTMLInputElement).value)"
+                        >
+                        <div class="field-hint">
+                            What the sender signs. Must contain {raw} (the body) and the timestamp header, e.g. v0:{header.X-Timestamp}:{raw}
+                        </div>
+                    </div>
+
+                    <div v-if="webhookText('timestamp_header') !== ''" class="config-field">
+                        <div class="field-label">Timestamp tolerance (seconds)</div>
+                        <input
+                            class="field-input"
+                            type="number"
+                            min="1"
+                            max="3600"
+                            :value="webhookNumber('timestamp_tolerance')"
+                            placeholder="300"
+                            @input="setWebhookNumberField('timestamp_tolerance', ($event.target as HTMLInputElement).value)"
+                        >
+                    </div>
+                </template>
+
+                <div class="config-field">
+                    <div class="field-label">Delivery id</div>
+                    <input
+                        class="field-input"
+                        :value="webhookText('delivery_id')"
+                        placeholder="{header.X-Delivery-Id}"
+                        @input="setWebhookField('delivery_id', ($event.target as HTMLInputElement).value)"
+                    >
+                    <div class="field-hint">
+                        One placeholder: <code>{header.Name}</code> or <code>{body.path.to.id}</code>; separate alternatives with <code>|</code>.
+                    </div>
+                    <div v-if="webhookText('delivery_id') === ''" class="field-hint webhook-status-warn">
+                        Without a delivery id, a resent request starts the flow again.
+                    </div>
+                </div>
+            </template>
         </AccordionSection>
 
         <AccordionSection v-else-if="currentTrigger.type === 'api'" title="API" default-open>
@@ -354,6 +651,52 @@ function defaultConfig(type: string): Record<string, unknown> {
 </template>
 
 <style scoped>
+.webhook-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.webhook-mono {
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+.webhook-btn {
+    padding: 6px 10px;
+    border: 1px solid var(--border-2);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.webhook-btn:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.webhook-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+.webhook-sub {
+    margin-top: 10px;
+}
+.webhook-secret-box {
+    margin-bottom: 8px;
+}
+.webhook-status-warn {
+    color: var(--error);
+}
+.webhook-error {
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--error);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--error);
+}
 .event-combo {
     position: relative;
 }

@@ -16,20 +16,27 @@ export function useAutoSave() {
      */
     let inFlight = false;
     let queued   = false;
+    let current: Promise<void> | null = null;
 
-    async function persist(): Promise<void> {
+    function persist(): Promise<void> {
+        if (inFlight && current !== null) {
+            queued = true;
+
+            return current;
+        }
+
+        current = doPersist();
+
+        return current;
+    }
+
+    async function doPersist(): Promise<void> {
         // A stopped tenant refuses every write, so nothing is sent from a view-only builder.
         if (store.readOnly) {
             return;
         }
 
         if (store.flowId == null || store.draftVersion == null) {
-            return;
-        }
-
-        if (inFlight) {
-            queued = true;
-
             return;
         }
 
@@ -74,7 +81,34 @@ export function useAutoSave() {
 
     const save = useDebounceFn(persist, 1500);
 
+    /**
+     * Sends any unsaved edit now and resolves once the draft on the server is current: `true` when
+     * it is, `false` when the save failed or the builder is view-only. Callers that act on the
+     * saved draft (for instance minting a webhook URL for a trigger) await this first.
+     */
+    async function flush(): Promise<boolean> {
+        if (store.readOnly) {
+            return false;
+        }
+
+        while (inFlight && current !== null) {
+            await current;
+        }
+
+        if (store.isDirty || store.saveStatus === 'error') {
+            await persist();
+
+            while (inFlight && current !== null) {
+                await current;
+            }
+        }
+
+        return store.saveStatus === 'saved' || store.saveStatus === 'idle';
+    }
+
+    store.registerDraftFlusher(flush);
+
     watch(() => [store.definition, store.triggers], save, { deep: true });
 
-    return { save };
+    return { save, flush };
 }

@@ -66,6 +66,7 @@
               "using/flows",
               "using/flow-groups",
               "using/flow-builder",
+              "using/webhook-trigger",
               "using/node-catalogue",
               "using/flow-templates",
               "using/publishing"

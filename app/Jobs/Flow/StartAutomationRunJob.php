@@ -22,7 +22,8 @@ use Illuminate\Support\Carbon;
  * runs here, the rest in {@see ContinueAutomationRunJob}. A retry finds the run it already created and continues it.
  *
  * A Core event dispatches it ({@see DispatchFlowTriggerEventJob}), with the event id as the fire key and the event's
- * chain depth; the schedule and webhook triggers of spec `flow-automations` will too. The depth is read with a
+ * chain depth; the webhook trigger dispatches it ({@see \App\Domains\Flow\Webhook\FlowWebhookReceiver}), with the
+ * delivery id as the fire key; the schedule trigger of spec `flow-automations` will too. The depth is read with a
  * fallback: a job queued before it existed unserializes without it.
  *
  * A busy trigger lock — another run of the same trigger is executing a segment — puts the job back in the queue

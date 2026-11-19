@@ -17,6 +17,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Templates\TemplateExpander;
 use App\Domains\Flow\Templates\TemplateUsageFinder;
+use App\Domains\Flow\Webhook\FlowWebhookEndpointService;
 use App\Domains\Tenancy\Settings\TenantSettings;
 
 final readonly class LoadBuilderFlowService
@@ -32,6 +33,7 @@ final readonly class LoadBuilderFlowService
         private CountryCatalog $countries,
         private TemplateExpander $expander,
         private TemplateUsageFinder $templateUsages,
+        private FlowWebhookEndpointService $webhookEndpoints,
     ) {
     }
 
@@ -66,6 +68,7 @@ final readonly class LoadBuilderFlowService
             usedBy: $draft->isTemplate()
                 ? array_map(static fn (FlowDraft $host): array => ['id' => $host->flow_id, 'name' => $host->name], $this->templateUsages->hostsOf($draft))
                 : [],
+            webhookEndpoints: $draft->isTemplate() ? [] : $this->webhookEndpoints->describe($draft->flow_id),
         );
     }
 
