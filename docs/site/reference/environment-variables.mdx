@@ -50,7 +50,8 @@ value stored in the database wins over them, and resetting the stored value brin
 
 | Variable | Default | Platform setting |
 |---|---|---|
-| `FLOW_MAX_ITERATIONS` | `100` | `flow.execution.max_iterations`: how many nodes one flow run may pass through before the session fails |
+| `FLOW_MAX_ITERATIONS` | `100` | `flow.execution.max_iterations`: how many nodes one flow run may pass through outside loops before the session fails |
+| `FLOW_MAX_LOOP_ITERATIONS` | `1000` | `flow.execution.max_loop_iterations`: how many times one loop node may run its body before the session fails |
 | `FLOW_CALL_DEDUP_TTL_HOURS` | `192` | `flow.call.dedup_ttl_hours`: how many hours the `call` node remembers a successful call, so a retried step is not sent again |
 | `FLOW_AUTOMATION_SEGMENT_STEPS` | `50` | `flow.automation.segment_steps`: how many nodes an automation run passes through in one queue job |
 | `FLOW_AUTOMATION_SEGMENT_SECONDS` | `20` | `flow.automation.segment_seconds`: how many seconds an automation run executes in one queue job, at most 30 |

@@ -5,10 +5,12 @@ declare(strict_types=1);
 use App\Domains\Flow\Retention\AutomationRunRetention;
 
 return [
-    // Only the default of the platform setting `flow.execution.max_iterations`: a stored value wins
+    // Only the defaults of the platform settings `flow.execution.max_iterations` (steps outside loops, and steps of one
+    // loop iteration) and `flow.execution.max_loop_iterations` (iterations of one loop): a stored value wins
     // (`platform:settings:set`, or Platform settings in a single-tenant admin).
     'execution' => [
-        'max_iterations' => (int) env('FLOW_MAX_ITERATIONS', 100),
+        'max_iterations'      => (int) env('FLOW_MAX_ITERATIONS', 100),
+        'max_loop_iterations' => (int) env('FLOW_MAX_LOOP_ITERATIONS', 1000),
     ],
 
     // Only the default of the platform setting `flow.call.dedup_ttl_hours`: how long the `call` node remembers a

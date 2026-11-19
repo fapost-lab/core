@@ -45,8 +45,8 @@ use Throwable;
 
 final readonly class ValidateFlowService
 {
-    /** The step budget a literal loop count is checked against when no platform settings are given (tests). */
-    private const int DEFAULT_STEP_BUDGET = 100;
+    /** The loop iteration limit a literal loop count is checked against when no platform settings are given (tests). */
+    private const int DEFAULT_LOOP_ITERATIONS = 1000;
 
     public function __construct(
         private NodeHandlerRegistryInterface $registry,
@@ -1372,20 +1372,20 @@ final readonly class ValidateFlowService
             }
         }
 
-        // Rule 8.8: for literal counted mode, warn if count exceeds the platform's step budget.
+        // Rule 8.8: a literal count above the platform's loop iteration limit would fail every run at that limit.
         $mode        = is_string($config['mode'] ?? null) ? $config['mode'] : 'counted';
         $countSource = is_array($config['count_source'] ?? null) ? $config['count_source'] : null;
 
         if ('counted' === $mode && is_array($countSource) && 'literal' === ($countSource['type'] ?? null)) {
             $literal = $countSource['value'] ?? null;
 
-            $budget = $this->platformSettings?->integer(FlowEngineInterface::MAX_ITERATIONS_SETTING) ?? self::DEFAULT_STEP_BUDGET;
+            $budget = $this->platformSettings?->integer(FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING) ?? self::DEFAULT_LOOP_ITERATIONS;
 
             if (is_numeric($literal) && (int) $literal > $budget) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config.count_source",
                     code: 'loop_count_exceeds_budget',
-                    message: "Static loop count {$literal} exceeds the recommended maximum of {$budget} iterations per session.",
+                    message: "Static loop count {$literal} exceeds the maximum of {$budget} iterations per loop.",
                 );
             }
         }

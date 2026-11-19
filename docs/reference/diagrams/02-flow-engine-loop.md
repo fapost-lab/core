@@ -10,7 +10,7 @@ from the public API `start()`, `resume()`, `runSession()`, `resumeFromNode()` an
 flowchart TD
     START([start / resume / runSession]) --> BUDGET
 
-    BUDGET{iterations ><br/>flow.execution.max_iterations<br/>platform setting, default 100}
+    BUDGET{StepBudget::charge<br/>steps outside loops > max_iterations,<br/>one loop iteration > max_iterations,<br/>all steps > ceiling;<br/>automation: from persisted<br/>step_count + loop_step_count}
     BUDGET -- yes --> ERR_BUDGET([session = failed<br/>subflow child: hand failed exit to parent, return<br/>otherwise FlowExecutionLimitExceededException])
     BUDGET -- no --> CUR
 
@@ -46,7 +46,11 @@ flowchart TD
     THROWS -- yes --> MARK_FAILED([session = failed,<br/>failed flow log<br/>subflow child: hand failed exit to parent, return<br/>otherwise rethrow])
     THROWS -- no --> RESULT
 
-    RESULT[NodeExecutionResult<br/>status, sourceHandle, stateChanges,<br/>logResolved, metadata,<br/>errorMessage, resumeAt] --> NEXT
+    RESULT[NodeExecutionResult<br/>status, sourceHandle, stateChanges,<br/>logResolved, metadata,<br/>errorMessage, resumeAt] --> LOOP_BUDGET
+
+    LOOP_BUDGET{StepBudget::record<br/>loop takes its loop exit with<br/>iterator > max_loop_iterations?}
+    LOOP_BUDGET -- yes --> ERR_BUDGET
+    LOOP_BUDGET -- no --> NEXT
 
     NEXT[Executed + sourceHandle:<br/>next node = edge from node<br/>with handle = sourceHandle] --> SPECIAL
 
@@ -105,7 +109,7 @@ flowchart TD
 
 | Condition | Result |
 |-----------|--------|
-| Iteration budget exceeded (platform setting `flow.execution.max_iterations`, default from env `FLOW_MAX_ITERATIONS`, 100) | session `failed`, `FlowExecutionLimitExceededException`; a subflow child instead hands its parent the `failed` exit and the run returns |
+| Step budget exceeded (`StepBudget`): more steps outside loop bodies than `flow.execution.max_iterations` (default 100), one loop iteration longer than that without reaching its `loop_end` (in an automation counted per segment, so there a body that never reaches it stops at the ceiling), a conversation's loop body still running after 30 seconds of the outermost call, subflow children included (`MAX_SEGMENT_SECONDS`), a `loop` node taking its `loop` exit past `flow.execution.max_loop_iterations` (default 1000, checked against its persisted iterator after the node ran: over the whole run for an automation, per outermost engine call for a conversation, a parent resumed after its subflow child included), or more steps in all than the ceiling `min(10000, max_iterations × (max_loop_iterations + 1))` — an automation run counts over all segments: steps outside loop bodies in `step_count`, steps inside them in `loop_step_count` | session `failed`, `FlowExecutionLimitExceededException` naming the limit and the node; a subflow child instead hands its parent the `failed` exit and the run returns |
 | No current node / node not in the graph / node without type | `InvalidFlowGraphException::sessionHasNoCurrentNode()` / `missingNode()` / `nodeMissingType()` |
 | No handler for `type@version` | `HandlerNotFoundException` |
 | Handler throws | session `failed`, failed flow log, exception rethrown to the queue retry policy; a subflow child instead hands its parent the `failed` exit and the run returns |

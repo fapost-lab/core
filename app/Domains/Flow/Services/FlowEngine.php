@@ -360,26 +360,39 @@ final readonly class FlowEngine implements FlowEngineInterface
         ?Contact $contact,
         bool $resumedAfterDelay = false,
     ): void {
-        $maxIterations         = $this->platformSettings->integer(FlowEngineInterface::MAX_ITERATIONS_SETTING);
-        $iterations            = 0;
+        $automation = FlowRunKind::Automation === $session->run_kind;
+
+        $maxSteps          = $this->platformSettings->integer(FlowEngineInterface::MAX_ITERATIONS_SETTING);
+        $maxLoopIterations = $this->platformSettings->integer(FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING);
+
+        // An automation run counts over all its segments: a runaway would otherwise start a fresh count in every
+        // segment and dispatch itself forever. A conversation keeps one budget per session for the outermost call, so
+        // a parent resumed after its child ended — a nested call — keeps its loop's count and the call's clock.
+        $budget = $automation
+            ? StepBudget::forAutomationRun(
+                $maxSteps,
+                $maxLoopIterations,
+                (int) $session->step_count,
+                (int) $session->loop_step_count,
+                $definition->nodes ?? [],
+                $session->state ?? [],
+            )
+            : $this->segment->conversationBudget(
+                (string) $session->getKey(),
+                fn (): StepBudget => StepBudget::forConversation($maxSteps, $maxLoopIterations, $this->segment->startedAt()),
+            );
         $incomingStep          = $incoming;
         $resumedAfterDelayStep = $resumedAfterDelay;
 
-        $automation = FlowRunKind::Automation === $session->run_kind;
-
         while (true) {
-            // An automation run counts its steps over all its segments: a loop with no exit would otherwise start a
-            // fresh count in every segment and dispatch itself forever.
-            if (++$iterations > $maxIterations || ($automation && $session->step_count >= $maxIterations)) {
-                $this->persistStepLimitFailure($session);
+            $limit = $budget->charge((string) ($session->current_node_id ?? ''));
 
-                // A child that hit the limit hands control back to its parent, as it does when it ends. The
-                // failure is then dealt with (like the volume limit), so the job does not fail and retry.
-                if ($this->handBackFailedChild($session)) {
+            if (null !== $limit) {
+                if ($this->failAtStepLimit($session, $limit)) {
                     return;
                 }
 
-                throw new FlowExecutionLimitExceededException();
+                throw $limit;
             }
 
             if ($automation && $this->segmentRanOut($session)) {
@@ -507,6 +520,17 @@ final readonly class FlowEngine implements FlowEngineInterface
                 }
             }
 
+            // A loop about to start one iteration too many fails before its body runs; the node has no side effects.
+            $limit = $budget->record($node, $result, $session->state ?? []);
+
+            if (null !== $limit) {
+                if ($this->failAtStepLimit($session, $limit)) {
+                    return;
+                }
+
+                throw $limit;
+            }
+
             $nextNodeId = null;
 
             if (NodeExecutionStatus::Executed === $result->status && null !== $result->sourceHandle) {
@@ -548,9 +572,11 @@ final readonly class FlowEngine implements FlowEngineInterface
                 }
             }
 
-            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId, $automation): void {
+            $stepInLoop = $budget->lastStepInLoop();
+
+            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId, $automation, $stepInLoop): void {
                 if ($automation) {
-                    $this->countRunStep($session);
+                    $this->countRunStep($session, $stepInLoop ? 'loop_step_count' : 'step_count');
                 }
 
                 if ($skipPersist) {
@@ -649,6 +675,26 @@ final readonly class FlowEngine implements FlowEngineInterface
     }
 
     /**
+     * Fails a session that crossed a step limit. A child then hands control back to its parent, as it does when it
+     * ends, and the failure is dealt with (like the volume limit), so the job does not fail and retry; the caller
+     * throws the limit for any other session.
+     *
+     * @return bool true when the session was a child and its parent was resumed
+     */
+    private function failAtStepLimit(FlowSession $session, FlowExecutionLimitExceededException $limit): bool
+    {
+        $this->persistStepLimitFailure($session);
+
+        // Nothing rethrows a child's limit, so its message would otherwise be lost.
+        $this->logger->warning('flow.step_limit_reached', [
+            'session_id' => (string) $session->getKey(),
+            'message'    => $limit->getMessage(),
+        ]);
+
+        return $this->handBackFailedChild($session);
+    }
+
+    /**
      * Record the failure of a session that reached the step limit; the caller hands a child back or stops the job.
      */
     private function persistStepLimitFailure(FlowSession $session): void
@@ -697,14 +743,17 @@ final readonly class FlowEngine implements FlowEngineInterface
     }
 
     /**
-     * One more step of an automation session, in the transaction of the step itself. The column is not part of the
-     * optimistic lock: the step's own write bumps the version.
+     * One more step of an automation session, in the transaction of the step itself: in `step_count` outside a loop
+     * body, in `loop_step_count` inside one. The columns are not part of the optimistic lock: the step's own write
+     * bumps the version.
+     *
+     * @param  'step_count'|'loop_step_count'  $column
      */
-    private function countRunStep(FlowSession $session): void
+    private function countRunStep(FlowSession $session, string $column): void
     {
-        $session->newQuery()->whereKey($session->getKey())->increment('step_count');
-        $session->setAttribute('step_count', (int) $session->step_count + 1);
-        $session->syncOriginalAttribute('step_count');
+        $session->newQuery()->whereKey($session->getKey())->increment($column);
+        $session->setAttribute($column, (int) $session->getAttribute($column) + 1);
+        $session->syncOriginalAttribute($column);
     }
 
     /**

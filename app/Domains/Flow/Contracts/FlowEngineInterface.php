@@ -13,11 +13,33 @@ use Fapost\Foundation\DTO\IncomingMessage;
 interface FlowEngineInterface
 {
     /**
-     * The platform setting that caps the steps of one engine run (env default `FLOW_MAX_ITERATIONS`);
-     * past it the session fails with `FlowExecutionLimitExceededException`, except a subflow child, which hands
-     * its parent the `failed` exit and returns.
+     * The platform setting that caps the steps of one engine run outside loop bodies, and the steps of one loop
+     * iteration (env default `FLOW_MAX_ITERATIONS`); past it the session fails with
+     * `FlowExecutionLimitExceededException`, except a subflow child, which hands its parent the `failed` exit and
+     * returns.
      */
     public const string MAX_ITERATIONS_SETTING = 'flow.execution.max_iterations';
+
+    /**
+     * The platform setting that caps the iterations of one loop (env default `FLOW_MAX_LOOP_ITERATIONS`), checked
+     * against the loop's persisted iterator — per outermost engine call for a conversation, over the whole run for an
+     * automation; past it the session fails like at {@see MAX_ITERATIONS_SETTING}. It accepts at most
+     * {@see MAX_LOOP_ITERATIONS_LIMIT}.
+     */
+    public const string MAX_LOOP_ITERATIONS_SETTING = 'flow.execution.max_loop_iterations';
+
+    /**
+     * The hard ceiling on every step of one engine run, loop bodies included, whatever the settings say; an
+     * automation run counts its steps over all its segments (`flow_sessions.step_count` + `loop_step_count`). Small
+     * settings lower it ({@see \App\Domains\Flow\Services\StepBudget::ceiling()}).
+     */
+    public const int MAX_STEPS_PER_RUN = 10000;
+
+    /**
+     * The highest value {@see MAX_LOOP_ITERATIONS_SETTING} accepts: three steps per iteration (loop, a one-node body,
+     * loop_end) still fit under {@see MAX_STEPS_PER_RUN}.
+     */
+    public const int MAX_LOOP_ITERATIONS_LIMIT = (self::MAX_STEPS_PER_RUN - 1000) / 3;
 
     /**
      * The platform setting that caps the steps of one execution segment of an automation run (env default

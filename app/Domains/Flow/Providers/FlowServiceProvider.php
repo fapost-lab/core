@@ -231,11 +231,27 @@ final class FlowServiceProvider extends ServiceProvider
             configKey: 'flow.execution.max_iterations',
             fallback: 100,
             label: 'Steps per flow run',
-            description: 'How many nodes one run of a flow may pass through before the session fails. It stops a loop in a flow from holding a worker; a loop iteration costs its body plus two steps.',
+            description: 'How many nodes one run of a flow may pass through outside loops before the session fails, and how many one loop iteration may take. Steps inside a loop count against the loop iterations instead.',
             group: 'Flow',
             unit: 'steps',
             min: 10,
             max: 10000,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.execution.max_loop_iterations',
+            fallback: 1000,
+            label: 'Iterations per loop',
+            description: sprintf(
+                'How many times one loop node may run its body before the session fails: in one go for a conversation, over the whole run for an automation. A run never takes more than %s steps in all, so a loop with a long body stops sooner.',
+                number_format(FlowEngineInterface::MAX_STEPS_PER_RUN),
+            ),
+            group: 'Flow',
+            unit: 'iterations',
+            min: 1,
+            max: FlowEngineInterface::MAX_LOOP_ITERATIONS_LIMIT,
         ));
 
         $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
