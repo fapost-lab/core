@@ -33,18 +33,19 @@ use Fapost\Foundation\DTO\NodeExecutionStatus;
  * synchronously included: a long loop of slow nodes fails with the loop named instead of outliving the job's timeout
  * and leaving the session stuck `active`. An automation run
  * ({@see forAutomationRun()}) counts it over the whole run: it starts from the session's persisted `step_count` (steps
- * outside loop bodies) and `loop_step_count` (steps inside them), knows from the iterators in state which loop body a
- * segment starts in, and counts a loop's iterations from its first one — so neither a runaway nor a loop escapes its
- * limit by spreading over segments, delay wake-ups and job retries. The engine persists each step's count by
- * {@see lastStepInLoop()}.
+ * outside loop bodies), `loop_step_count` (steps inside them) and `loop_iteration_step_count` (steps of the iteration in
+ * progress), knows from the iterators in state which loop body a segment starts in, and counts a loop's iterations from
+ * its first one — so neither a runaway nor a loop escapes its limit by spreading over segments, delay wake-ups and job
+ * retries. A runaway that never reaches its `loop_end` — a body that leads back to its `loop` node, or one that leaves
+ * the body by an edge other than the loop's `default` exit and keeps its iterator set — therefore stops at
+ * `max_iterations` steps of that iteration, not only at the ceiling. The engine persists each step's count by
+ * {@see lastStepInLoop()} and {@see iterationSteps()}.
  *
  * Never bound: an automation run builds one per engine call, a conversation one per session per outermost call (held
  * by the scoped {@see ExecutionSegment}, cleared when that call returns). Plain values only, nothing survives the call.
  */
 final class StepBudget
 {
-    private int $iterationSteps = 0;
-
     private bool $lastStepInLoop = false;
 
     /** @var array<string, int> per loop node, the iterations it had started before this call reached it */
@@ -60,6 +61,7 @@ final class StepBudget
         private readonly bool $runWide,
         private int $sharedSteps,
         private int $loopSteps,
+        private int $iterationSteps,
         private ?string $activeLoopNodeId,
         private readonly ?CarbonImmutable $startedAt,
     ) {
@@ -71,12 +73,14 @@ final class StepBudget
      */
     public static function forConversation(int $maxSharedSteps, int $maxLoopIterations, CarbonImmutable $startedAt): self
     {
-        return new self($maxSharedSteps, $maxLoopIterations, false, 0, 0, null, $startedAt);
+        return new self($maxSharedSteps, $maxLoopIterations, false, 0, 0, 0, null, $startedAt);
     }
 
     /**
      * @param  int  $sharedSteps  the run's persisted steps outside loop bodies (`step_count`)
      * @param  int  $loopSteps  the run's persisted steps inside loop bodies (`loop_step_count`)
+     * @param  int  $iterationSteps  the run's persisted steps of the loop iteration in progress (`loop_iteration_step_count`);
+     *                               ignored when the run is not inside a loop body
      * @param  list<mixed>  $nodes  the definition's nodes, to find the loop body the call starts in
      * @param  array<string, mixed>  $state  the session state
      */
@@ -85,10 +89,22 @@ final class StepBudget
         int $maxLoopIterations,
         int $sharedSteps,
         int $loopSteps,
+        int $iterationSteps,
         array $nodes,
         array $state,
     ): self {
-        return new self($maxSharedSteps, $maxLoopIterations, true, $sharedSteps, $loopSteps, self::loopInProgress($nodes, $state), null);
+        $loopInProgress = self::loopInProgress($nodes, $state);
+
+        return new self(
+            $maxSharedSteps,
+            $maxLoopIterations,
+            true,
+            $sharedSteps,
+            $loopSteps,
+            null !== $loopInProgress ? max(0, $iterationSteps) : 0,
+            $loopInProgress,
+            null,
+        );
     }
 
     /**
@@ -127,6 +143,16 @@ final class StepBudget
     public function lastStepInLoop(): bool
     {
         return $this->lastStepInLoop;
+    }
+
+    /**
+     * The steps of the loop iteration in progress, after the last step was counted and followed ({@see charge()},
+     * {@see record()}): 0 outside a loop body and after a `loop_end` or the loop's exit. An automation run persists it in
+     * `loop_iteration_step_count`, so the next segment goes on counting the same iteration.
+     */
+    public function iterationSteps(): int
+    {
+        return $this->iterationSteps;
     }
 
     /**
@@ -185,10 +211,14 @@ final class StepBudget
             return FlowExecutionLimitExceededException::loopIterationsExceeded($nodeId, $this->maxLoopIterations);
         }
 
-        if ($this->activeLoopNodeId !== $nodeId) {
-            $this->activeLoopNodeId = $nodeId;
-            $this->iterationSteps   = 0;
+        // Entering a loop from outside starts its first iteration's count. Passing from one loop's body into another
+        // loop without its exit — a runaway that escaped the first body, or a segment that guessed the wrong one of two
+        // loops sharing an iterator name — keeps counting the same steps, so neither restarts the allowance.
+        if (null === $this->activeLoopNodeId) {
+            $this->iterationSteps = 0;
         }
+
+        $this->activeLoopNodeId = $nodeId;
 
         return null;
     }

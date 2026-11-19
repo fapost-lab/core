@@ -3,6 +3,7 @@ import {computed, ref, watch} from 'vue'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useInsertAtCursor} from '@builder/composables/useInsertAtCursor'
 import {useKnownGroups} from '@builder/composables/useKnownGroups'
+import {useTranslations} from '@builder/composables/useTranslations'
 import KeyboardListEditor from './KeyboardListEditor.vue'
 import VariablePicker from '../VariablePicker.vue'
 import AccordionSection from '../AccordionSection.vue'
@@ -49,6 +50,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:config'])
 const builderStore = useBuilderStore()
+const {t} = useTranslations()
 
 const config = computed((): Record<string, unknown> => (props.node.config as Record<string, unknown>) ?? {})
 
@@ -231,6 +233,40 @@ const captionRef = ref<HTMLTextAreaElement | null>(null)
 const insertText    = useInsertAtCursor(textRef,    (next) => update({ text: next }))
 const insertCaption = useInsertAtCursor(captionRef, (next) => update({ caption: next }))
 
+// ── Addressee ────────────────────────────────────────────────────────────────
+
+// A contact named by an expression gets the message instead of the contact of the
+// run. The only kind so far is `contact`; a blank expression means no addressee.
+const addressee = computed(() => (config.value.addressee as Record<string, unknown> | null | undefined) ?? null)
+const addresseeContact = computed(() => String(addressee.value?.contact ?? ''))
+const hasAddressee = computed(() => addresseeContact.value.trim() !== '')
+const addresseeRef = ref<HTMLInputElement | null>(null)
+
+function updateAddressee(contact: string) {
+    if (contact.trim() === '') {
+        update({ addressee: null })
+        return
+    }
+
+    // A message to an addressee cannot wait for an answer, so the controls that make it wait are cleared.
+    const patch: Record<string, unknown> = { addressee: { kind: 'contact', contact } }
+    if (contentType.value === 'text_with_keyboard') {
+        patch.content_type = 'text'
+        patch.keyboard_mode = null
+        patch.buttons = []
+        patch.dynamic_buttons = null
+    }
+    patch.timeout_seconds = null
+    patch.save_to_variable = undefined
+    patch.save_to = undefined
+    patch.save_to_type = undefined
+    answerVariable.value = null
+    saveAnswerEnabled.value = false
+    update(patch)
+}
+
+const insertAddressee = useInsertAtCursor(addresseeRef, (next) => updateAddressee(next))
+
 function dropInsert(e: DragEvent, currentValue: string): string | null {
     e.preventDefault()
     const snippet = e.dataTransfer?.getData('text/plain')
@@ -283,7 +319,7 @@ function updateKeyboardMode(value: string) {
                     @change="updateContentType(($event.target as HTMLSelectElement).value)"
                 >
                     <option value="text">Text</option>
-                    <option value="text_with_keyboard">Text with keyboard</option>
+                    <option value="text_with_keyboard" :disabled="hasAddressee">Text with keyboard</option>
                     <option value="image">Image</option>
                     <option value="document">Document</option>
                     <option value="video">Video</option>
@@ -301,6 +337,27 @@ function updateKeyboardMode(value: string) {
                     <option value="inline">Inline</option>
                     <option value="reply">Reply</option>
                 </select>
+            </div>
+        </AccordionSection>
+
+        <AccordionSection
+            :title="t('nodes.send_message.addressee_title')"
+            :badge="hasAddressee ? t('nodes.send_message.addressee_badge') : null"
+        >
+            <div class="config-field">
+                <div class="field-label field-label--row">
+                    {{ t('nodes.send_message.addressee_label') }}
+                    <VariablePicker @select="insertAddressee" />
+                </div>
+                <input
+                    ref="addresseeRef"
+                    class="field-input"
+                    data-test="addressee-contact"
+                    :value="addresseeContact"
+                    placeholder="{{flow.customer_id}}"
+                    @change="updateAddressee(($event.target as HTMLInputElement).value)"
+                >
+                <p class="field-hint">{{ t('nodes.send_message.addressee_hint') }}</p>
             </div>
         </AccordionSection>
 

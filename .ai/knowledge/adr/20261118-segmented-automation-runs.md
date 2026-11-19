@@ -14,6 +14,7 @@ paths:
   - "database/migrations/tenant/*segmented_execution*"
   - app/Domains/Flow/Services/StepBudget.php
   - "database/migrations/tenant/*loop_step_count*"
+  - "database/migrations/tenant/*loop_iteration_step_count*"
 summary: Why an automation run starts once per (trigger, fire key), runs in engine-level execution segments continued by a single valid segment_id, counts its steps per session, and is serialized on a (tenant, trigger) lock on its own queue flow.automations
 reviewed_at: 2026-11-19
 ---
@@ -120,3 +121,19 @@ that often) instead of 100. Conversations count everything per outermost engine 
 resumes a parent after its subflow child ended, so a subflow body neither restarts the loop's count nor its 30 s
 clock); a conversation counts a loop's iterations from the iterator the call found, so a loop that waits for the
 contact keeps working.
+
+## Amendment 2026-11-19: the iteration in progress is persisted too
+
+The per-iteration allowance above ("one loop iteration takes at most `max_iterations` steps until its `loop_end`") was
+an in-memory count, so in an automation it restarted with every segment (task `loop-escape-step-cap`). Two runaways
+used that: a body that leads back to its `loop` node without a `loop_end` (the iterator never moves), and a body left by
+an edge other than the loop's `default` exit (the iterator stays set, so every later step is a loop step). Both were
+stopped only by the ceiling — up to 10,000 steps, some 200 segments, their side effects repeated that often.
+`loop_iteration_step_count` (tenant migration `2026_11_19_200001_add_loop_iteration_step_count_to_flow_sessions`) now
+holds the steps of the iteration in progress, written with each step's count in the step's own transaction as a value
+rather than an increment (so the one step a killed segment repeats sets it again), reset by a `loop_end` and by the
+loop's exit, and read back when a segment starts inside a loop body. Both runaways stop at `max_iterations` steps of
+that iteration, as many as a runaway with no loop. Passing from one loop's body into another loop without
+leaving the first keeps the count rather than restarting it, so neither an escaped body nor a segment that guessed the
+wrong one of two loops sharing an iterator name gets a fresh allowance. Rejected: clearing the loop context when
+control leaves the body — it needs the body worked out from the graph, and the first runaway never leaves the body.

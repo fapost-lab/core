@@ -121,7 +121,9 @@ nothing (Foundation's `DeclaresContextRequirementInterface`, which a Solution's 
 `module.*` (a reference of the flow's expression engine — a `{{…}}` placeholder of `template` —, a bare path, a `source` operand), uses a variable with `storage: contact`, or is a
 legacy `assign` to the contact. Core handlers declaring `any`: `branch`, `delay`, `assign`, `end`, `loop`, `loop_end`,
 `template`, `template_output`, `call` (its `CallContext::$contactId` is `null` without a contact); every other Core node
-needs a contact — `subflow` (its target is not followed) included. A template's publish republishes its hosts, so it is refused (`template_breaks_flow`) when a host
+needs a contact — `subflow` (its target is not followed) included. A `send_message` whose `addressee` names a contact
+(`NamesOwnRecipientInterface`, Core-only) is not refused for its type, though its config is still checked for
+contact reads. A template's publish republishes its hosts, so it is refused (`template_breaks_flow`) when a host
 with such a trigger would get a contact node.
 
 There is **no** requirement that a flow contains an `end` node and no check that a knowledge base
