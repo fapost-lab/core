@@ -14,6 +14,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
 use App\Domains\Flow\Templates\TemplateNodeOrigins;
+use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use BackedEnum;
 use Carbon\CarbonImmutable;
@@ -193,7 +194,8 @@ final readonly class FlowSessionInspector
 
     /**
      * Whether the session has an audit trail to show: its flow logs history, or rows were written anyway (the flag can
-     * change while a session runs).
+     * change while a session runs). The node trace does not count: it is written for every session, and no screen
+     * shows it until it is gated by its own permission.
      */
     public function hasHistory(FlowSession $session): bool
     {
@@ -201,11 +203,12 @@ final readonly class FlowSessionInspector
             return true;
         }
 
-        return $session->historyEntries()->exists();
+        return $session->historyEntries()->whereNotIn('event_type', NodeTraceRecorder::EVENT_TYPES)->exists();
     }
 
     /**
-     * The newest {@see self::HISTORY_LIMIT} audit rows of a session.
+     * The newest {@see self::HISTORY_LIMIT} audit rows of a session, without its node trace ({@see NodeTraceRecorder}):
+     * the trace holds the nodes' input and output, which this page must not show.
      *
      * @return list<array{id: string, createdAt: string|null, nodeId: string, nodeOrigin: array{template: string, version: int, nodeId: string, nodeType: string}|null, event: string, path: string|null, payload: string|null}>
      */
@@ -213,6 +216,7 @@ final readonly class FlowSessionInspector
     {
         return $session->historyEntries()
             ->where('tenant_id', $this->tenantId())
+            ->whereNotIn('event_type', NodeTraceRecorder::EVENT_TYPES)
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit(self::HISTORY_LIMIT)

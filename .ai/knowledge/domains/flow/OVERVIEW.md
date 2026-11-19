@@ -52,7 +52,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 | Flow templates | `Templates/` (`TemplateExpander` copies a template's active definition into a host at publish, `TemplateUsageRepository` over `flow_template_usages`, `TemplateUsageFinder`, `TemplateNodeOrigins` labels copied nodes by `origin` on the session and log screens); handlers `TemplateNodeHandler`, `TemplateOutputNodeHandler` are pass-throughs (`adr-20261111-flow-templates-expanded-at-publish`) |
 | Triggers and events | `Services/Resolvers/`, `Services/FlowTriggerSet` (a flow's trigger list; synced into `flow_triggers` on publish), `ResolveEventTriggersService`, `Events/`, `app/Jobs/Flow/` |
 | Call, RAG, Action, Expression | `Call/`, `Rag/`, `Action/`, `Expression/` — small registries |
-| History and logging | `History/`, `Logging/` (partitioned `flow_logs`) |
+| History and logging | `History/`, `Logging/` (partitioned `flow_logs`), `Trace/` (node trace in `flow_session_history`) |
 | Translations | `Translations/`, `app/Infrastructure/Flow/CachedContentTranslator.php` |
 | Node usage statistics | `Statistics/NodeUsageStatisticsService` behind `Contracts/NodeUsageStatisticsInterface`; command `app/Console/Commands/Flow/NodeUsageCommand.php` (`flow:node-usage`), run on demand, not scheduled |
 

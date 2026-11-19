@@ -75,6 +75,7 @@ final class FlowRuntimeIsolationTest
             Selector::inNamespace('App\\Domains\\Flow\\Routing'),
             Selector::inNamespace('App\\Domains\\Flow\\State'),
             Selector::inNamespace('App\\Domains\\Flow\\Subflow'),
+            Selector::inNamespace('App\\Domains\\Flow\\Trace'),
         ];
     }
 }

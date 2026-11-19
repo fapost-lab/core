@@ -8,6 +8,9 @@ A per-flow boolean `logging_enabled` (default `false`). When it is on, the runti
 rows into `flow_session_history` for every session of that flow. When it is off, only the base
 execution logs (`flow_logs`) are written.
 
+The flag does not control the node trace (`node_entered`, `node_completed`, `node_failed`), which the engine
+writes to the same table for every session; see `docs/platform/architecture/platform/11-logging-retention.md`.
+
 ## What is built
 
 - **Schema.** `flow_definitions.logging_enabled` comes from
@@ -29,7 +32,7 @@ execution logs (`flow_logs`) are written.
   only in that form.
 - **Session detail.** The console's session page (`FlowSessionInspector`, `Console/FlowSessions/Show.vue`) shows a
   "History" section (the newest 200 entries: timestamp, node, event, path, payload) when the flow has logging
-  enabled or the session already has history entries.
+  enabled or the session already has history entries. Node trace rows are not shown and do not count.
 
 ## Not built
 

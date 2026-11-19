@@ -82,7 +82,8 @@ The draft treated runtime tracking as unsolved and proposed Redis counters to wo
 gaps. Those gaps do not exist:
 
 - **`logging_enabled` does not gate `flow_logs`.** It selects `DefaultHistoryWriter` versus
-  `NoOpHistoryWriter` for `flow_session_history` (`HistoryWriterFactory`). `FlowEngine` writes
+  `NoOpHistoryWriter` for the audit rows of `flow_session_history` (`HistoryWriterFactory`); the
+  node trace in the same table is written whatever the flag. `FlowEngine` writes
   a flow log for every node it executes regardless of the flag.
 - **Delay executions are logged.** `ResumeDelayedFlowSessionJob` → `DelayedSessionResumer` →
   `FlowEngine::runSession()` goes through the normal loop. Parking a node is logged too: a

@@ -82,6 +82,13 @@ The part of an automation run one queue job executes: at most `flow.automation.s
 `flow.automation.segment_seconds` seconds, after which the run continues in a new job carrying the `segment_id`
 of the run's root session (`adr-20261118-segmented-automation-runs`). Informal synonym: segment.
 
+## Node trace
+
+The rows `node_entered`, `node_completed` and `node_failed` the engine writes to `flow_session_history` for every node
+of every session, whatever `logging_enabled`; an automation run's rows also carry the node's masked `input` and
+`output` (`adr-20261119-node-trace-in-session-history`). Not the flow log (`flow_logs`) and not the audit trail
+(`state_change`, `subflow_*`). Informal synonym: run trace.
+
 ## Run deadline
 
 The moment an automation run must be over, `deadline_at` on its sessions: its start plus

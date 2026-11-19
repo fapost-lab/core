@@ -23,7 +23,7 @@ use DateTimeInterface;
  *   ({@see \App\Console\Commands\PruneFlowLogsCommand} drops partitions older
  *   than 30 days), but it is a complete record inside that window: `FlowEngine`
  *   writes a row for every node it executes, regardless of `logging_enabled`
- *   (that flag gates `flow_session_history` only).
+ *   (that flag gates the audit rows of `flow_session_history` only).
  *
  * The static slice is aggregated in PHP rather than pushed into SQL on purpose.
  * Expanding the `nodes` jsonb in the database needs `jsonb_array_elements` on

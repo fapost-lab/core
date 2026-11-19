@@ -175,6 +175,9 @@ Result fields:
 - `logResolved` - the values actually read, for `flow_logs.resolved`.
 - `errorMessage` - for `Failed`.
 - `resumeAt` - for `Delayed`.
+- `trace` - `{input?, output?}` for the run's node trace only (experimental, Foundation `^0.44`): what the node
+  received and produced, such as the `call` node's request and response body. The engine masks and truncates it and
+  writes it nowhere else; it is kept only for automation runs. Never put a raw secret under an innocent key.
 
 The result carries no messages: handlers send messages themselves through `MessageSenderInterface`.
 
