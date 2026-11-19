@@ -380,6 +380,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                 $maxLoopIterations,
                 (int) $session->step_count,
                 (int) $session->loop_step_count,
+                (int) $session->loop_iteration_step_count,
                 $definition->nodes ?? [],
                 $session->state ?? [],
             )
@@ -578,11 +579,12 @@ final readonly class FlowEngine implements FlowEngineInterface
                 }
             }
 
-            $stepInLoop = $budget->lastStepInLoop();
+            $stepInLoop     = $budget->lastStepInLoop();
+            $iterationSteps = $budget->iterationSteps();
 
-            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId, $automation, $stepInLoop): void {
+            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId, $automation, $stepInLoop, $iterationSteps): void {
                 if ($automation) {
-                    $this->countRunStep($session, $stepInLoop ? 'loop_step_count' : 'step_count');
+                    $this->countRunStep($session, $stepInLoop ? 'loop_step_count' : 'step_count', $iterationSteps);
                 }
 
                 if ($skipPersist) {
@@ -750,16 +752,19 @@ final readonly class FlowEngine implements FlowEngineInterface
 
     /**
      * One more step of an automation session, in the transaction of the step itself: in `step_count` outside a loop
-     * body, in `loop_step_count` inside one. The columns are not part of the optimistic lock: the step's own write
-     * bumps the version.
+     * body, in `loop_step_count` inside one; and the steps of the loop iteration in progress after it
+     * (`loop_iteration_step_count`, 0 once a `loop_end` or the loop's exit ran), written as a value rather than
+     * incremented, so the one step a killed segment repeats sets it again instead of counting twice. The columns are
+     * not part of the optimistic lock: the step's own write bumps the version.
      *
      * @param  'step_count'|'loop_step_count'  $column
      */
-    private function countRunStep(FlowSession $session, string $column): void
+    private function countRunStep(FlowSession $session, string $column, int $iterationSteps): void
     {
-        $session->newQuery()->whereKey($session->getKey())->increment($column);
+        $session->newQuery()->whereKey($session->getKey())->increment($column, 1, ['loop_iteration_step_count' => $iterationSteps]);
         $session->setAttribute($column, (int) $session->getAttribute($column) + 1);
-        $session->syncOriginalAttribute($column);
+        $session->setAttribute('loop_iteration_step_count', $iterationSteps);
+        $session->syncOriginalAttributes([$column, 'loop_iteration_step_count']);
     }
 
     /**
