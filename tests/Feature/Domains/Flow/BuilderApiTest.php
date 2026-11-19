@@ -33,7 +33,7 @@ final class BuilderApiTest extends FeatureTestCase
     public function test_show_returns_builder_flow_dto(): void
     {
         $draft = $this->draft();
-        FlowTrigger::query()->create([
+        $row   = FlowTrigger::query()->create([
             'tenant_id'    => $draft->tenant_id,
             'assistant_id' => $draft->assistant_id,
             'flow_id'      => $draft->flow_id,
@@ -52,13 +52,15 @@ final class BuilderApiTest extends FeatureTestCase
         $this->actingAs($user)
             ->get("/builder/flows/{$draft->flow_id}")
             ->assertOk()
-            ->assertInertia(function (AssertableInertia $page) use ($draft): void {
+            ->assertInertia(function (AssertableInertia $page) use ($draft, $row): void {
                 $page->component('FlowBuilder/FlowEditor')
                     ->has('flow', fn (AssertableInertia $flow): AssertableInertia => $flow
                         ->where('flowId', $draft->flow_id)
                         ->where('name', $draft->name)
                         ->where('draftVersion', $draft->draft_version)
-                        ->where('trigger.type', 'event')
+                        ->has('triggers', 1)
+                        ->where('triggers.0.id', mb_strtolower((string) $row->getKey()))
+                        ->where('triggers.0.type', 'event')
                         ->where('availableEvents.0', 'employee_registered')
                         ->etc());
             });
@@ -109,7 +111,8 @@ final class BuilderApiTest extends FeatureTestCase
             ->putJson("/builder/flows/{$draft->flow_id}/draft", [
                 'draft_version' => 5,
                 'definition'    => ['nodes' => []],
-                'trigger'       => [
+                'triggers'      => [[
+                    'id'        => (string) Str::uuid(),
                     'type'      => 'message',
                     'is_active' => true,
                     'priority'  => 100,
@@ -117,15 +120,68 @@ final class BuilderApiTest extends FeatureTestCase
                         'keywords' => ['help'],
                         'phrases'  => [],
                     ],
-                ],
+                ]],
             ])
             ->assertOk()
             ->assertJsonFragment(['draft_version' => 6]);
 
-        $this->assertDatabaseHas('flow_triggers', [
-            'flow_id' => $draft->flow_id,
-            'type'    => 'message',
+        $draft->refresh();
+        $this->assertSame('message', $draft->triggers[0]['type'] ?? null);
+        $this->assertDatabaseMissing('flow_triggers', ['flow_id' => $draft->flow_id]);
+    }
+
+    public function test_save_draft_without_the_triggers_key_leaves_the_draft_list_and_live_rows_alone(): void
+    {
+        $stored = [['id' => (string) Str::uuid(), 'type' => 'message', 'is_active' => true, 'priority' => 100, 'config' => ['keywords' => ['hi'], 'phrases' => []]]];
+        $draft  = $this->draft(['draft_version' => 5, 'triggers' => $stored]);
+        $live   = FlowTrigger::query()->create([
+            'tenant_id'    => $draft->tenant_id,
+            'assistant_id' => $draft->assistant_id,
+            'flow_id'      => $draft->flow_id,
+            'type'         => 'message',
+            'config'       => ['keywords' => ['live'], 'phrases' => []],
         ]);
+        $user = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $this->actingAs($user)
+            ->putJson("/builder/flows/{$draft->flow_id}/draft", ['draft_version' => 5, 'definition' => ['nodes' => []]])
+            ->assertOk();
+
+        $this->assertEquals($stored, $draft->refresh()->triggers);
+        $this->assertSame(['live'], $live->refresh()->config['keywords']);
+        $this->assertSame(1, FlowTrigger::query()->count());
+    }
+
+    public function test_save_draft_with_an_empty_triggers_list_stores_an_empty_list(): void
+    {
+        $draft = $this->draft(['draft_version' => 5, 'triggers' => [['id' => (string) Str::uuid(), 'type' => 'message', 'is_active' => true, 'priority' => 100, 'config' => []]]]);
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $this->actingAs($user)
+            ->putJson("/builder/flows/{$draft->flow_id}/draft", ['draft_version' => 5, 'definition' => ['nodes' => []], 'triggers' => []])
+            ->assertOk();
+
+        $this->assertSame([], $draft->refresh()->triggers);
+    }
+
+    public function test_save_draft_rejects_a_malformed_triggers_list_with_422(): void
+    {
+        $draft = $this->draft(['draft_version' => 5]);
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $this->actingAs($user)
+            ->putJson("/builder/flows/{$draft->flow_id}/draft", [
+                'draft_version' => 5,
+                'definition'    => ['nodes' => []],
+                'triggers'      => [['id' => 'not-a-uuid', 'type' => 'message', 'config' => []]],
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.0.path', 'triggers');
+
+        $this->assertSame(5, $draft->refresh()->draft_version);
     }
 
     /**
@@ -160,7 +216,8 @@ final class BuilderApiTest extends FeatureTestCase
             ->putJson("/builder/flows/{$draft->flow_id}/draft", [
                 'draft_version' => 5,
                 'definition'    => ['nodes' => []],
-                'trigger'       => [
+                'triggers'      => [[
+                    'id'        => (string) Str::uuid(),
                     'type'      => 'message',
                     'is_active' => true,
                     'priority'  => 100,
@@ -168,16 +225,13 @@ final class BuilderApiTest extends FeatureTestCase
                         'keywords' => ['HELP!!!'],
                         'phrases'  => [],
                     ],
-                ],
+                ]],
             ])
             ->assertOk();
 
         $draft->refresh();
         $this->assertSame(6, $draft->draft_version);
-        $this->assertDatabaseHas('flow_triggers', [
-            'flow_id' => $draft->flow_id,
-            'type'    => 'message',
-        ]);
+        $this->assertSame(['HELP!!!'], $draft->triggers[0]['config']['keywords']);
     }
 
     public function test_validate_endpoint_reports_duplicate_message_keywords(): void
@@ -204,7 +258,8 @@ final class BuilderApiTest extends FeatureTestCase
         $this->actingAs($user)
             ->postJson("/builder/flows/{$draft->flow_id}/validate", [
                 'definition' => ['nodes' => []],
-                'trigger'    => [
+                'triggers'   => [[
+                    'id'        => (string) Str::uuid(),
                     'type'      => 'message',
                     'is_active' => true,
                     'priority'  => 100,
@@ -212,7 +267,7 @@ final class BuilderApiTest extends FeatureTestCase
                         'keywords' => ['HELP!!!'],
                         'phrases'  => [],
                     ],
-                ],
+                ]],
             ])
             ->assertOk()
             ->assertJsonPath('valid', false)
@@ -235,8 +290,9 @@ final class BuilderApiTest extends FeatureTestCase
 
     public function test_validate_returns_trigger_errors_when_trigger_payload_is_invalid(): void
     {
-        $draft = $this->draft();
-        $user  = $this->staffUser();
+        $draft     = $this->draft();
+        $triggerId = (string) Str::uuid();
+        $user      = $this->staffUser();
         /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
 
         $this->actingAs($user)
@@ -254,16 +310,17 @@ final class BuilderApiTest extends FeatureTestCase
                         ],
                     ],
                 ]],
-                'trigger' => [
+                'triggers' => [[
+                    'id'        => $triggerId,
                     'type'      => 'event',
                     'is_active' => true,
                     'priority'  => 100,
                     'config'    => ['event_name' => 'Bad Name'],
-                ],
+                ]],
             ])
             ->assertOk()
             ->assertJsonPath('valid', false)
-            ->assertJsonPath('errors.0.path', 'trigger.config');
+            ->assertJsonPath('errors.0.path', 'triggers.' . $triggerId . '.config');
     }
 
     public function test_validate_returns_capability_warnings_without_invalidating_the_flow(): void
@@ -358,12 +415,13 @@ final class BuilderApiTest extends FeatureTestCase
                         ],
                     ],
                 ]],
-                'trigger' => [
+                'triggers' => [[
+                    'id'        => (string) Str::uuid(),
                     'type'      => 'event',
                     'is_active' => true,
                     'priority'  => 100,
                     'config'    => ['event_name' => 'employee_registered'],
-                ],
+                ]],
             ])
             ->assertOk()
             ->assertJsonPath('valid', false)
@@ -406,7 +464,8 @@ final class BuilderApiTest extends FeatureTestCase
                         ],
                     ],
                 ]],
-                'trigger' => [
+                'triggers' => [[
+                    'id'        => (string) Str::uuid(),
                     'type'      => 'message',
                     'is_active' => true,
                     'priority'  => 100,
@@ -414,7 +473,7 @@ final class BuilderApiTest extends FeatureTestCase
                         'keywords' => ['Vacation!!!'],
                         'phrases'  => [],
                     ],
-                ],
+                ]],
             ])
             ->assertOk()
             ->assertJsonPath('valid', false)
@@ -483,21 +542,19 @@ final class BuilderApiTest extends FeatureTestCase
             ->putJson("/builder/flows/{$draft->flow_id}/draft", [
                 'draft_version' => 5,
                 'definition'    => ['nodes' => []],
-                'trigger'       => [
+                'triggers'      => [[
+                    'id'        => (string) Str::uuid(),
                     'type'      => 'event',
                     'is_active' => true,
                     'priority'  => 100,
                     'config'    => [
                         'event_name' => 'employee_registered',
                     ],
-                ],
+                ]],
             ])
             ->assertOk();
 
-        $this->assertDatabaseHas('flow_triggers', [
-            'flow_id' => $draft->flow_id,
-            'type'    => 'event',
-        ]);
+        $this->assertSame('event', $draft->refresh()->triggers[0]['type'] ?? null);
     }
 
     public function test_validate_endpoint_reports_unknown_event_trigger(): void
@@ -509,14 +566,15 @@ final class BuilderApiTest extends FeatureTestCase
         $this->actingAs($user)
             ->postJson("/builder/flows/{$draft->flow_id}/validate", [
                 'definition' => ['nodes' => []],
-                'trigger'    => [
+                'triggers'   => [[
+                    'id'        => (string) Str::uuid(),
                     'type'      => 'event',
                     'is_active' => true,
                     'priority'  => 100,
                     'config'    => [
                         'event_name' => 'employee_registered',
                     ],
-                ],
+                ]],
             ])
             ->assertOk()
             ->assertJsonPath('valid', false)

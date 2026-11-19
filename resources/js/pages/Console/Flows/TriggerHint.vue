@@ -8,6 +8,8 @@ import type { FlowsPageProps, FlowTrigger } from './types'
 /** What starts a flow, under its name in the list: an icon for the kind of trigger and the summary the server wrote. */
 const props = defineProps<{
   trigger: FlowTrigger
+  /** How many other live triggers the flow has; shown as ` +N` after the hint. */
+  moreTriggers?: number
 }>()
 
 const icons: Record<string, Component> = {
@@ -27,5 +29,6 @@ const typeLabel = computed(() => t.value.trigger_types[props.trigger.type] ?? pr
   <div class="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
     <component :is="icon" class="size-3.5 shrink-0" role="img" :aria-label="typeLabel" />
     <span class="truncate">{{ trigger.text }}</span>
+    <span v-if="(moreTriggers ?? 0) > 0" class="shrink-0">+{{ moreTriggers }}</span>
   </div>
 </template>

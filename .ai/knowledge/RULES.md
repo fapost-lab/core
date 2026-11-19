@@ -26,7 +26,9 @@ domain rules named as its source; this file is the index of what holds and how i
   tenant context, module activation, or another module's tables. Source: `conventions/migration-isolation.md`. Enforced: `tests/Architecture/MigrationTest.php` forbids dependencies on
   `App\Domains` and `App\Services`; helpers such as `config()`, `env()` and `app()` are review only.
 - **Tenant-schema models use ULID primary keys in `uuid` columns** through `HasUlidPrimaryKey`,
-  with no database default. Source: ADR-03 (`docs/platform/architecture/adr/03-id-strategy-ulid.md`).
+  with no database default. Source: ADR-03 (`docs/platform/architecture/adr/03-id-strategy-ulid.md`). One named
+  exception to "through the trait": a `flow_triggers` key is minted by the builder in the same ULID form, because it is
+  the trigger's id in the flow definition before its row exists (`adr-20261119-flow-triggers-in-definition-live-on-publish`).
   Enforced: `tests/Architecture/IdStrategyTest.php` (models in `App\Domains\*\Models` and Eloquent models in `App\Domains\*\Infrastructure`, with named
   exceptions such as the composite-key `FlowCallgraphEdge`).
 - **A tenant's effective Solution activation is answered only by `ActiveSolutions`.** It is bound `scoped`,

@@ -105,7 +105,8 @@ the message resumes the child (`ResumeWaiting`).
 
 ## Trigger
 
-What starts a flow: `message`, `schedule`, `webhook`, `api`, `event`.
+What starts a flow: `message`, `schedule`, `webhook`, `api`, `event`. A flow may have several; each has a stable id,
+the primary key of its live `flow_triggers` row, and goes live when the flow is published, not when the draft is saved.
 
 ## Subflow
 

@@ -1,5 +1,7 @@
 import {defineStore} from 'pinia'
-import {ref} from 'vue'
+import {computed, ref} from 'vue'
+
+const TRIGGER_PREFIX = '__trigger__:'
 
 export const useSelectionStore = defineStore('selection', () => {
     const selectedNodeId = ref<string | null>(null)
@@ -18,9 +20,15 @@ export const useSelectionStore = defineStore('selection', () => {
         selectedNodeId.value = null
     }
 
-    function selectTrigger() {
-        selectedNodeId.value = selectedNodeId.value === '__trigger__' ? null : '__trigger__'
+    function selectTrigger(id: string) {
+        const key = `${TRIGGER_PREFIX}${id}`
+        selectedNodeId.value = selectedNodeId.value === key ? null : key
     }
+
+    /** The id of the selected trigger, or null when a node (or nothing) is selected. */
+    const selectedTriggerId = computed<string | null>(() =>
+        selectedNodeId.value?.startsWith(TRIGGER_PREFIX) ? selectedNodeId.value.slice(TRIGGER_PREFIX.length) : null,
+    )
 
     function setActiveBranch(path: string[]) {
         activeBranch.value = path
@@ -36,6 +44,7 @@ export const useSelectionStore = defineStore('selection', () => {
         select,
         toggle,
         selectTrigger,
+        selectedTriggerId,
         clear,
         setActiveBranch,
         clearBranch,

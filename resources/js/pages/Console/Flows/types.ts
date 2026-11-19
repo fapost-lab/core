@@ -68,6 +68,8 @@ export interface FlowRow extends Record<string, unknown> {
   groupName: string | null
   publishedVersion: number | null
   trigger: FlowTrigger | null
+  /** How many other live triggers the flow has besides the one hinted. */
+  moreTriggers: number
   editUrl: string
   deleteUrl: string
   activityUrl: string

@@ -163,7 +163,7 @@ function toggleActivity(): void {
 
       <template #cell-name="{ row }">
         <span class="font-medium">{{ row.name }}</span>
-        <TriggerHint v-if="row.trigger" :trigger="row.trigger" />
+        <TriggerHint v-if="row.trigger" :trigger="row.trigger" :more-triggers="row.moreTriggers" />
       </template>
 
       <template #cell-groupName="{ row }">

@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Audit\Contracts\AuditTrailInterface;
 use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Audit\Enums\AuditAction;
+use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
@@ -42,6 +43,8 @@ final readonly class PublishFlowService
         private AuditTrailInterface $audit,
         private TemplateExpander $templates,
         private TemplateUsageRepository $templateUsages,
+        private FlowTriggerSet $triggerSet,
+        private FlowTriggerRepositoryInterface $triggerRows,
     ) {
     }
 
@@ -146,12 +149,20 @@ final readonly class PublishFlowService
         // LoopEnd nodes so handlers stay graph-unaware at runtime.
         $nodes = $this->denormalizeLoopEndIteratorNames($nodes);
 
+        // The triggers this version makes live: the draft's on a publish, the active definition's on a republish by a
+        // template, never the host draft's (that would publish the host's unpublished trigger edits). A list never
+        // written (null: a draft untouched since triggers were carried, or a definition published before) leaves the
+        // live rows as they are; the definition records them, so the next publish manages them.
+        $carried  = null !== $source ? $source->triggers : $draft->triggers;
+        $triggers = is_array($carried) ? FlowTriggerSet::normalize($carried) : $this->triggerSet->live($draft->flow_id);
+
         // Pass flowId so the validator can run subflow call-graph checks
         // (cycle / depth) against the existing edges table.
         $result = $this->validator->execute(
             nodes: $nodes,
-            edges: $edges,
+            triggers: $triggers,
             flowId: $draft->flow_id,
+            edges: $edges,
             engineId: $engineId,
         );
         if (!$result->valid) {
@@ -167,7 +178,12 @@ final readonly class PublishFlowService
             throw new FlowValidationException($crossAssistantErrors);
         }
 
-        $definition = $this->createDefinition($draft, $nodes, $edges, FlowKind::Flow, $engineId, $source, $republishedBy);
+        $definition = $this->createDefinition($draft, $nodes, $edges, $triggers, FlowKind::Flow, $engineId, $source, $republishedBy);
+
+        // Every trigger goes live here, never on draft save: rows are synced by id, keeping a kept trigger's run state.
+        if (is_array($carried)) {
+            $this->triggerRows->syncForFlow($draft, $triggers);
+        }
 
         // Reverse-index subflow.flow_id references so the next publish can
         // run cycle / depth checks transactionally. Replaces any rows from
@@ -254,7 +270,8 @@ final readonly class PublishFlowService
             throw new FlowValidationException($errors);
         }
 
-        $definition = $this->createDefinition($draft, $nodes, $edges, FlowKind::Template, $engineId);
+        // A template never starts on its own: it has no triggers.
+        $definition = $this->createDefinition($draft, $nodes, $edges, [], FlowKind::Template, $engineId);
 
         $this->republishHosts($draft, $definition);
 
@@ -335,11 +352,13 @@ final readonly class PublishFlowService
      *
      * @param  array<int, mixed>  $nodes
      * @param  array<int, mixed>  $edges
+     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $triggers
      */
     private function createDefinition(
         FlowDraft $draft,
         array $nodes,
         array $edges,
+        array $triggers,
         FlowKind $kind,
         string $engineId,
         ?FlowDefinition $source = null,
@@ -364,6 +383,7 @@ final readonly class PublishFlowService
             'name'              => $source->name ?? $draft->name,
             'nodes'             => $nodes,
             'edges'             => $edges,
+            'triggers'          => $triggers,
             'is_active'         => true,
             'is_public'         => null !== $source ? (bool) $source->is_public : (bool) $draft->is_public,
             'logging_enabled'   => null !== $source ? $source->logging_enabled : (bool) $draft->logging_enabled,

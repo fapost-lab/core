@@ -18,6 +18,7 @@ function load(readOnly: boolean) {
     const store = useBuilderStore()
     store.init({
         flowId: 'f1', name: 'F', draftVersion: 1, readOnly,
+        triggers: [{id: 't1', type: 'message', is_active: true, priority: 100, config: {keywords: ['hi']}}],
         definition: {nodes: [{id: 'a', type: 'send_message', version: 1, config: {text: 'hi'}}, {id: 'e', type: 'end', version: 1, config: {}}], edges: [{id: 'x', from: 'a', to: 'e', handle: 'default'}]},
     } as never)
 
@@ -39,10 +40,13 @@ describe('view-only builder', () => {
         expect(store.insertNode('a', 'default', 'delay', 1)).toBeNull()
         expect(store.deleteNode('a')).toBe(false)
         store.moveNodeDown('a')
-        store.deleteTrigger()
+        store.deleteTrigger('t1')
+        store.updateTrigger('t1', {priority: 5})
+        expect(store.addTrigger()).toBe('')
 
         expect(store.readOnly).toBe(true)
-        expect(store.trigger).toBeNull()
+        expect(store.triggers).toHaveLength(1)
+        expect(store.triggers[0].priority).toBe(100)
         expect(JSON.stringify(store.definition)).toBe(before)
     })
 

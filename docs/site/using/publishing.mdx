@@ -8,10 +8,11 @@ A flow has two states at once: the **draft** being worked on, and the
 
 ## Save draft, then publish
 
-**Save draft** stores your work. Nothing reaches contacts.
+**Save draft** stores your work. Nothing reaches contacts — trigger changes
+included.
 
-**Publish** promotes the draft to live. From that moment, new conversations use
-it.
+**Publish** promotes the draft to live, together with its triggers. From that
+moment, new conversations use it.
 
 <Warning>
   There is no staging step between the click and the contacts. A published flow
@@ -28,7 +29,8 @@ Publishing runs the same checks and refuses a flow whose graph is broken: a conn
 that no longer exists, two connections leaving one step on the same outcome, more or fewer than one step that
 nothing leads into (the step the flow starts at), or steps that cannot be reached from the start. It also
 refuses broken variable settings (for example an assign step with no variable name or storage, or an unknown
-storage) and malformed branch rules. A flow with no steps cannot be published either.
+storage) and malformed branch rules. It checks each trigger's settings too — an event trigger needs an event
+that exists. A flow with no steps cannot be published either.
 
 ## The version badge
 

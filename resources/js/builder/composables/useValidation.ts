@@ -8,7 +8,7 @@ export function useValidation() {
     async function validate(options: { open?: boolean } = {}): Promise<ValidationResult> {
         const { open = true } = options;
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const result = await validateFlow(store.flowId!, store.definition, store.trigger);
+        const result = await validateFlow(store.flowId!, store.definition, store.triggers);
         store.setValidationResult(result, open);
 
         return result;

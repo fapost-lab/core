@@ -25,7 +25,8 @@ final class SaveDraftRequest extends FormRequest
         return [
             'draft_version' => ['required', 'integer', 'min:1'],
             'definition'    => ['required', 'array'],
-            'trigger'       => ['nullable', 'array'],
+            // Absent: the draft's triggers stay as they are. Each entry is checked by SaveDraftService.
+            'triggers' => ['sometimes', 'array'],
         ];
     }
 }

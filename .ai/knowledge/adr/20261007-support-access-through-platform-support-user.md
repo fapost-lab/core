@@ -123,3 +123,13 @@ events, and absorbing it would mean a data migration and rebuilding a working sc
 Instead every audit entry written while an operator acts carries `actor_kind = support`, the operator's name and
 the `support_entry_id` of their visit, and the activity log screen links to Support access. The support user's own
 sign-in and sign-out are not repeated in the audit log. Decided with the owner at the `activity-log` gate.
+
+## Amendment 2026-11-19: no tenant API tokens
+
+Proposed by `adr-20261119-tenant-api-tokens` (it takes effect when that ADR is accepted). The support user is an
+admin in every tenant with one exception: it cannot issue tenant API tokens (`ManageApiTokens`), nor rotate,
+revoke or view them, because a token would outlive the operator's 60-minute visit. The refusal is a check keyed
+on the actor, in `Gate::before` ahead of the admin bypass — unlike `PlatformSupportProtection`, which guards the
+support user as a target. An operator who must revoke a leaked token does it through an operator action that is
+given the token itself, never through the support user in the console. Decided in the review of
+`tenant-api-token-adr` and confirmed by the owner on 2026-11-19.

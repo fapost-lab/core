@@ -9,7 +9,6 @@ use App\Domains\Assistant\Support\CountryCatalog;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
-use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\BuilderFlowDto;
@@ -25,7 +24,7 @@ final readonly class LoadBuilderFlowService
     public function __construct(
         private FlowDraftRepositoryInterface $drafts,
         private FlowDefinitionRepositoryInterface $definitions,
-        private FlowTriggerRepositoryInterface $triggers,
+        private FlowTriggerSet $triggers,
         private TenantEventRepositoryInterface $tenantEvents,
         private TenantSettings $tenantSettings,
         private ActionHandlerRegistry $actionHandlers,
@@ -40,7 +39,6 @@ final readonly class LoadBuilderFlowService
     {
         $draft     = $this->drafts->findByFlowId($flowId);
         $published = $this->definitions->findLatestPublishedByFlowId($flowId);
-        $trigger   = $this->triggers->findByFlowId($flowId);
 
         $availableFlows = FlowDraft::query()
             ->where('assistant_id', $draft->assistant_id)
@@ -57,7 +55,7 @@ final readonly class LoadBuilderFlowService
         return BuilderFlowDto::fromDraftAndDefinition(
             draft: $draft,
             published: $published,
-            trigger: $trigger,
+            triggers: $draft->isTemplate() ? [] : $this->triggers->ofDraft($draft),
             availableEvents: $this->tenantEvents->getEventNamesByTenant($draft->tenant_id),
             contentBaseLanguage: $this->tenantSettings->content_base_language,
             availableLanguages: $this->tenantSettings->available_languages,

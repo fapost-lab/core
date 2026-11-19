@@ -15,11 +15,11 @@ reported by the builder's Validate button.
 
 - **Save draft** (`BuilderFlowController::saveDraft` -> `SaveDraftService`) deliberately runs **no**
   flow validation. Drafts may be empty or half-edited; the only failures are an optimistic-lock
-  conflict (409), an unparseable trigger payload (422), and request validation (422: `draft_version` and
+  conflict (409), an unparseable trigger list (422, path `triggers`), and request validation (422: `draft_version` and
   `definition` are required). There are no "warnings" on save.
 - **Validate** is an explicit author action. It runs `ValidateFlowService` on the posted definition
-  and trigger and returns every error at once.
-- **Publish** runs `ValidateFlowService` again on the stored draft inside the publish transaction
+  and trigger list (`triggers`; without one, the draft's) and returns every error at once.
+- **Publish** runs `ValidateFlowService` again on the stored draft and the triggers it makes live inside the publish transaction
   (after stripping builder-only annotation nodes and denormalising loop iterator names). Any error
   aborts the publish with `FlowValidationException`.
 
@@ -100,19 +100,23 @@ Graph-level checks (need `edges`):
 | `button_value_type_mismatch` | a button value matches the declared `save_to` variable type |
 | call-graph codes (`CallGraphViolation::$code`) | subflow cycles and depth over the limit, via `CallGraphValidator`; skipped when no flow id is known |
 
-Trigger checks (when a trigger payload is sent): `invalid_trigger_type`, `invalid_trigger_active_flag`,
-`invalid_trigger_priority`, `invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`),
-`duplicate_exact_trigger_keyword`, `missing_event_trigger_selection`, `unknown_event_trigger_selection`.
+Trigger checks, per trigger of the list, at `triggers.<id>.…` (`triggers.<index>` for an entry without an id):
+`invalid_trigger`, `invalid_trigger_type`, `invalid_trigger_active_flag`, `invalid_trigger_priority`,
+`invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`), `duplicate_exact_trigger_keyword` (against other
+flows' live triggers), `missing_event_trigger_selection`, `unknown_event_trigger_selection`; the id — it becomes the
+`flow_triggers` primary key — `invalid_trigger_id` (not UUID-shaped), `duplicate_trigger_id` (twice in the list),
+`trigger_id_taken` (a live trigger of another flow); and `duplicate_event_trigger` for two event triggers on one event
+(`adr-20261119-flow-triggers-in-definition-live-on-publish`).
 
 Expression engine: the flow is checked with the engine it uses — the draft's (`flow_drafts.expression_engine`) on
 validate and publish, the active definition's snapshot on a republish by a template. An id `ExpressionEngineRegistry`
 does not know is refused with `expression_engine_unknown` (path `expression_engine`)
 (`adr-20261119-expression-engine-chosen-per-flow`).
 
-Contact context (`ContactContextChecker`, code `node_needs_contact`, path `nodes.<id>`): when the flow's trigger gives
-no contact — `schedule`, `webhook`, `api` (`FlowTriggerType::givesContact()`) — no node may need one. The trigger is
-the one in the request; without one (publish) the stored trigger of the flow, active or not; `_delete` or no trigger
-at all means a contact. A node needs a contact when its handler declares `NodeContextRequirement::Contact` or declares
+Contact context (`ContactContextChecker`, code `node_needs_contact`, path `nodes.<id>`): when any trigger of the flow,
+active or not, gives no contact — `schedule`, `webhook`, `api` (`FlowTriggerType::givesContact()`) — no node may need
+one. The triggers are the list being validated or published; without a list, the flow's live triggers. No trigger at
+all means a contact. A node needs a contact when its handler declares `NodeContextRequirement::Contact` or declares
 nothing (Foundation's `DeclaresContextRequirementInterface`, which a Solution's handler may implement too), or when its config reads `contact.*` or
 `module.*` (a reference of the flow's expression engine — a `{{…}}` placeholder of `template` —, a bare path, a `source` operand), uses a variable with `storage: contact`, or is a
 legacy `assign` to the contact. Core handlers declaring `any`: `branch`, `delay`, `assign`, `end`, `loop`, `loop_end`,

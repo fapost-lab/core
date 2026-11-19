@@ -6,7 +6,6 @@ namespace App\Domains\Flow\DTOs;
 
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
-use App\Domains\Flow\Models\FlowTrigger;
 use Illuminate\Support\Carbon;
 use Spatie\LaravelData\Data;
 
@@ -20,8 +19,13 @@ final class BuilderFlowDto extends Data
         public readonly ?int $publishedVersion,
         /** @var array<string, mixed> */
         public readonly array $definition,
-        /** @var array<string, mixed>|null */
-        public readonly ?array $trigger,
+        /**
+         * The flow's triggers as the author edits them: the draft's list, or the live ones while the draft carries
+         * none. Each entry: `{id, type, is_active, priority, config}`.
+         *
+         * @var list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>
+         */
+        public readonly array $triggers,
         /** @var list<string> */
         public readonly array $availableEvents,
         public readonly ?Carbon $publishedAt,
@@ -69,6 +73,7 @@ final class BuilderFlowDto extends Data
     }
 
     /**
+     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $triggers
      * @param  list<string>                                $availableEvents
      * @param  list<string>                                $availableLanguages
      * @param  list<array{id: string, name: string}>       $availableFlows
@@ -80,7 +85,7 @@ final class BuilderFlowDto extends Data
     public static function fromDraftAndDefinition(
         FlowDraft $draft,
         ?FlowDefinition $published,
-        ?FlowTrigger $trigger,
+        array $triggers,
         array $availableEvents,
         string $contentBaseLanguage,
         array $availableLanguages,
@@ -100,14 +105,7 @@ final class BuilderFlowDto extends Data
                 'nodes' => is_array($draft->nodes) ? $draft->nodes : [],
                 'edges' => is_array($draft->edges) ? $draft->edges : [],
             ],
-            trigger: null === $trigger
-                ? null
-                : [
-                    'type'      => $trigger->type->value,
-                    'is_active' => $trigger->is_active,
-                    'priority'  => $trigger->priority,
-                    'config'    => $trigger->config,
-                ],
+            triggers: $triggers,
             availableEvents: $availableEvents,
             publishedAt: $published?->published_at,
             contentBaseLanguage: $contentBaseLanguage,
