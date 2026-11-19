@@ -32,9 +32,19 @@ function findBranchPath(nodes: TreeNode[], targetId: string, acc: string[]): str
     return null
 }
 
+/** The trigger id inside a `triggers.<id>…` path, or null for any other path. */
+function triggerIdOf(path?: string): string | null {
+    if (!path?.startsWith('triggers.')) return null
+    const id = path.slice('triggers.'.length).split('.')[0]
+
+    return id === '' ? null : id
+}
+
 async function jumpToNode(error: { path?: string; message?: string }) {
-    if (error?.path?.startsWith('trigger.')) {
-        selectionStore.selectTrigger()
+    const triggerId = triggerIdOf(error?.path)
+    if (triggerId !== null) {
+        // Select (never toggle off) the trigger the error points at.
+        selectionStore.select(`__trigger__:${triggerId}`)
         return
     }
 
@@ -75,9 +85,9 @@ function humanPath(path: string | undefined): string {
 
     if (isFlowLevelPath(path)) return t('validation.flow_level');
 
-    if (path.startsWith('trigger.')) {
-        const rest = path.slice('trigger.'.length);
-        return rest ? `Trigger → ${rest}` : 'Trigger';
+    if (path === 'triggers' || path.startsWith('triggers.')) {
+        const field = path.split('.').slice(2);
+        return field.length > 0 ? `Trigger → ${field.join('.')}` : 'Trigger';
     }
 
     const match = path.match(/^nodes\.([^.]+)(?:\.(.+))?$/);

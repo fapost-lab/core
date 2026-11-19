@@ -11,17 +11,19 @@ use App\Domains\Flow\Enums\AssignTarget;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
+use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\State\Variables\VariableStorage;
 use Fapost\Foundation\Flow\Contracts\DeclaresContextRequirementInterface;
 use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
 use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
 
 /**
- * Refuses a node that needs a contact in a flow whose trigger starts it without one.
+ * Refuses a node that needs a contact in a flow that one of its triggers starts without one.
  *
- * A flow's run has a contact unless its trigger gives none ({@see FlowTriggerType::givesContact()}); a flow without a
- * trigger (a default flow, a global command's flow, a subflow) is started for a contact. In a flow whose trigger gives
- * none, a node needs a contact when:
+ * A flow's run has a contact unless the trigger that started it gives none ({@see FlowTriggerType::givesContact()}); a
+ * flow without a trigger (a default flow, a global command's flow, a subflow) is started for a contact. So a flow is
+ * contactless when any of its triggers, active or not, gives none — switching a trigger on does not publish the flow
+ * again. In such a flow, a node needs a contact when:
  *
  * - its handler needs one: it declares {@see NodeContextRequirement::Contact}, or declares nothing
  *   ({@see DeclaresContextRequirementInterface}, Foundation's, so a Solution's node can declare too);
@@ -30,7 +32,7 @@ use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
  *   `module.*` cannot be read without one either);
  * - its config reads or writes a contact variable (`storage: contact`), or is a legacy `assign` to the contact.
  *
- * Each such node gets one error, at `nodes.<id>`, naming the node, the reason and the trigger. Unregistered node types
+ * Each such node gets one error, at `nodes.<id>`, naming the node, the reason and the triggers. Unregistered node types
  * are reported by the other checks and skipped here. The registry builds a handler per resolve (ADR-0001), so the
  * checker keeps no handler between calls.
  */
@@ -53,8 +55,8 @@ final readonly class ContactContextChecker
 
     /**
      * @param  array<string, array<string, mixed>>  $nodeMap  the flow's nodes by id, annotations removed
-     * @param  array<string, mixed>|null            $trigger  the trigger as the builder sends it; null keeps the
-     *                                                        stored one of {@see $flowId}
+     * @param  list<mixed>|null                     $triggers the flow's trigger list (the builder's, or the one being
+     *                                                        published); null reads the live triggers of {@see $flowId}
      * @param  string|null                          $engineId the flow's expression engine, whose references are read
      *                                                        from config strings; null means `template`. An engine the
      *                                                        registry does not know reads none: the flow is refused
@@ -62,13 +64,16 @@ final readonly class ContactContextChecker
      *
      * @return list<FlowValidationErrorDto>
      */
-    public function check(array $nodeMap, ?array $trigger, ?string $flowId, ?string $engineId = null): array
+    public function check(array $nodeMap, ?array $triggers, ?string $flowId, ?string $engineId = null): array
     {
-        $contactless = $this->contactlessTrigger($trigger, $flowId);
+        $contactless = $this->contactlessTriggerTypes($triggers, $flowId);
 
-        if (null === $contactless) {
+        if ([] === $contactless) {
             return [];
         }
+
+        $triggerNames = implode(', ', array_map(static fn (FlowTriggerType $type): string => $type->value, $contactless));
+        $triggerNoun  = 1 === count($contactless) ? 'trigger starts' : 'triggers start';
 
         $engineId ??= TemplateEngine::ID;
         $engine = $this->expressionEngines->has($engineId) ? $this->expressionEngines->get($engineId) : null;
@@ -86,7 +91,7 @@ final readonly class ContactContextChecker
                 path: "nodes.{$nodeId}",
                 code: self::CODE,
                 message: "Node '{$nodeId}' ({$type}) needs a contact: {$reason}. "
-                    . "The flow's {$contactless->value} trigger starts it without one.",
+                    . "The flow's {$triggerNames} {$triggerNoun} it without one.",
             );
         }
 
@@ -94,30 +99,38 @@ final readonly class ContactContextChecker
     }
 
     /**
-     * The trigger type that starts this flow without a contact, or null when every run of it has one.
+     * The types of the flow's triggers that start it without a contact, each once, in list order; empty when every
+     * run of the flow has one.
      *
-     * @param  array<string, mixed>|null  $trigger
+     * @param  list<mixed>|null  $triggers
+     *
+     * @return list<FlowTriggerType>
      */
-    private function contactlessTrigger(?array $trigger, ?string $flowId): ?FlowTriggerType
+    private function contactlessTriggerTypes(?array $triggers, ?string $flowId): array
     {
-        if (null !== $trigger) {
-            if (true === ($trigger['_delete'] ?? false)) {
-                return null;
+        if (null === $triggers) {
+            if (null === $flowId) {
+                return [];
             }
 
-            $type = is_string($trigger['type'] ?? null) ? FlowTriggerType::tryFrom($trigger['type']) : null;
-
-            return null !== $type && ! $type->givesContact() ? $type : null;
+            $triggers = array_map(
+                static fn (FlowTrigger $row): array => ['type' => $row->type->value],
+                $this->triggers->getByFlowId($flowId),
+            );
         }
 
-        if (null === $flowId) {
-            return null;
+        $types = [];
+
+        foreach ($triggers as $trigger) {
+            $raw  = is_array($trigger) ? ($trigger['type'] ?? null) : null;
+            $type = is_string($raw) ? FlowTriggerType::tryFrom($raw) : null;
+
+            if (null !== $type && ! $type->givesContact() && ! in_array($type, $types, true)) {
+                $types[] = $type;
+            }
         }
 
-        // An inactive trigger counts too: switching it on does not publish the flow again.
-        $type = $this->triggers->findByFlowId($flowId)?->type;
-
-        return null !== $type && ! $type->givesContact() ? $type : null;
+        return $types;
     }
 
     /**

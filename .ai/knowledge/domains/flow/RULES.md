@@ -214,10 +214,19 @@ broken.
   `nodes.<id>`. Declare `any` only for a handler checked never to use `NodeExecutionContext::$contactId`,
   `$platform` (both `null` there) or the contact writer without a contact, and hands them on only where the
   receiver takes `null` — `call` is `any` because `CallContext::$contactId` is nullable; `subflow` stays `contact`
-  until its target is followed. Known gap: a trigger
-  changed on draft save goes live before any publish runs this check.
+  until its target is followed. A flow is contactless when any of its triggers is, active or not.
   Why: a contactless run reaches a contact through an empty id or dies on a typed error nobody watches
   (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`.
+- **A trigger goes live only on publish, and its id is its row's primary key.** A flow's triggers are a list
+  `{id, type, is_active, priority, config}` in `flow_drafts.triggers` and `flow_definitions.triggers`; `null` there
+  means "not written yet", and the flow's live `flow_triggers` rows count (`FlowTriggerSet`), `[]` means none. A draft
+  save writes only the list; `PublishFlowService` validates every trigger and syncs the rows by id
+  (`FlowTriggerRepository::syncForFlow`), keeping `last_run_at`/`next_run_at` of a trigger whose type and config did
+  not change (compared ignoring key order: jsonb reorders keys) and resetting `next_run_at` when they did. A republish
+  by a template takes the list from the host's active definition, never its draft, and a `null` list leaves the rows
+  alone. Nothing writes `flow_triggers` outside this sync. Why: a draft edit must not change what runs, and a live
+  trigger must survive the release that introduced the list (`adr-20261119-flow-triggers-in-definition-live-on-publish`).
+  Enforced: `FlowTriggersPublishTest`, `SaveDraftServiceTest`, `FlowTemplatePublishTest`, `FlowTriggerSetTest`.
 - **A definition's expression engine is the flow's choice, written explicitly at publish and checked with.** The draft
   holds it (`flow_drafts.expression_engine`); `PublishFlowService` passes the engine on to `ValidateFlowService` and
   `TemplateExpander` and writes it onto the definition — the draft's on a publish, the active definition's on a

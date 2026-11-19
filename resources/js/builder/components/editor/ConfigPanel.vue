@@ -3,7 +3,7 @@ import {computed} from 'vue'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useRegistryStore} from '@builder/store/registryStore'
-import type {BuilderTriggerPayload, NodeConfig} from '@builder/dto/types'
+import type {NodeConfig} from '@builder/dto/types'
 import {useConfigResize} from '@builder/composables/useConfigResize'
 import {NON_PARAMETERIZABLE_NODE_TYPES} from '@builder/utils/templateNodes'
 import {nodeColors} from '@builder/utils/nodeColors'
@@ -52,7 +52,11 @@ const selectedNode = computed(() =>
     builderStore.definition.nodes.find((n) => n.id === selectionStore.selectedNodeId) ?? null
 )
 
-const isTriggerSelected = computed(() => selectionStore.selectedNodeId === '__trigger__')
+const selectedTrigger = computed(() =>
+    builderStore.triggers.find((item) => item.id === selectionStore.selectedTriggerId) ?? null
+)
+
+const isTriggerSelected = computed(() => null !== selectedTrigger.value)
 
 // The panel is a right-side drawer: it slides in only while a node (or the
 // trigger) is selected, leaving the canvas full-width the rest of the time.
@@ -101,12 +105,16 @@ function updateConfig(patch: unknown) {
     builderStore.updateNodeConfig(selectionStore.selectedNodeId, patch as NodeConfig)
 }
 
-function updateTrigger(trigger: unknown) {
-    builderStore.setTrigger(trigger as BuilderTriggerPayload | null)
+function updateTrigger(patch: unknown) {
+    if (!selectedTrigger.value) return
+    builderStore.updateTrigger(selectedTrigger.value.id, patch as Record<string, unknown>)
 }
 
 function deleteTrigger() {
-    builderStore.deleteTrigger()
+    if (!selectedTrigger.value) return
+    const id = selectedTrigger.value.id
+    selectionStore.clear()
+    builderStore.deleteTrigger(id)
 }
 </script>
 
@@ -151,7 +159,7 @@ function deleteTrigger() {
                         <div class="config-card-body">
                             <div :class="{ 'config-readonly': builderStore.readOnly }" :inert="builderStore.readOnly">
                                 <TriggerConfig
-                                    :trigger="builderStore.trigger"
+                                    :trigger="selectedTrigger"
                                     :available-events="builderStore.availableEvents"
                                     @update:trigger="updateTrigger"
                                     @delete:trigger="deleteTrigger"

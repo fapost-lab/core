@@ -23,6 +23,7 @@ use Fapost\Support\Models\BaseModel;
  * @property bool   $is_active
  * @property string $expression_engine  Engine id snapshot (immutable per definition row)
  * @property bool   $logging_enabled    Opt-in audit trail into flow_session_history
+ * @property list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>|null $triggers  The triggers published with this version; null on a version published before triggers were carried
  * @property \Illuminate\Support\Carbon|null $published_at
  * @method static FlowDefinitionBuilder<static>|FlowDefinition active()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition runnable()
@@ -65,6 +66,7 @@ final class FlowDefinition extends BaseModel
         'is_public',
         'expression_engine',
         'logging_enabled',
+        'triggers',
         'published_at',
         'republished_by_template_flow_id',
         'republished_by_template_version',
@@ -85,6 +87,7 @@ final class FlowDefinition extends BaseModel
         return [
             'nodes'                           => 'array',
             'edges'                           => 'array',
+            'triggers'                        => 'array',
             'kind'                            => FlowKind::class,
             'is_active'                       => 'boolean',
             'is_public'                       => 'boolean',

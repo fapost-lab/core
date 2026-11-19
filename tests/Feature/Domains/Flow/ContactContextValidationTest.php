@@ -115,7 +115,7 @@ final class ContactContextValidationTest extends FeatureTestCase
     #[DataProvider('nodesThatNeedAContact')]
     public function test_a_node_that_needs_a_contact_is_refused_under_a_schedule_trigger(array $node, string $reason): void
     {
-        $errors = $this->contactErrors(['n1' => ['id' => 'n1', 'version' => 1, ...$node]], self::SCHEDULE);
+        $errors = $this->contactErrors(['n1' => ['id' => 'n1', 'version' => 1, ...$node]], [self::SCHEDULE]);
 
         $this->assertCount(1, $errors);
         $this->assertSame('nodes.n1', $errors[0]->path);
@@ -134,7 +134,7 @@ final class ContactContextValidationTest extends FeatureTestCase
             'delay'  => ['id' => 'delay', 'type' => 'delay', 'version' => 1, 'config' => ['seconds' => 60]],
             'free'   => ['id' => 'free', 'type' => 'contact_free_test', 'version' => 1, 'config' => []],
             'end'    => ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
-        ], self::SCHEDULE);
+        ], [self::SCHEDULE]);
 
         $this->assertSame([], $errors);
     }
@@ -158,12 +158,12 @@ final class ContactContextValidationTest extends FeatureTestCase
         $this->assertSame(1, $definition->version);
     }
 
-    public function test_a_message_trigger_a_deleted_trigger_and_no_trigger_allow_contact_nodes(): void
+    public function test_a_message_trigger_an_empty_list_and_no_trigger_allow_contact_nodes(): void
     {
         $nodes = ['ask' => ['id' => 'ask', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text', 'text' => ['en' => 'Hi']]]];
 
-        $this->assertSame([], $this->contactErrors($nodes, self::MESSAGE));
-        $this->assertSame([], $this->contactErrors($nodes, ['_delete' => true]));
+        $this->assertSame([], $this->contactErrors($nodes, [self::MESSAGE]));
+        $this->assertSame([], $this->contactErrors($nodes, []));
         $this->assertSame([], $this->contactErrors($nodes, null));
     }
 
@@ -171,12 +171,12 @@ final class ContactContextValidationTest extends FeatureTestCase
     {
         $nodes = ['ask' => ['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]];
 
-        $this->assertCount(1, $this->contactErrors($nodes, ['type' => 'webhook']));
-        $this->assertCount(1, $this->contactErrors($nodes, ['type' => 'api']));
-        $this->assertSame([], $this->contactErrors($nodes, ['type' => 'event']));
+        $this->assertCount(1, $this->contactErrors($nodes, [['type' => 'webhook']]));
+        $this->assertCount(1, $this->contactErrors($nodes, [['type' => 'api']]));
+        $this->assertSame([], $this->contactErrors($nodes, [['type' => 'event']]));
     }
 
-    public function test_without_a_trigger_in_the_request_the_stored_trigger_of_the_flow_decides(): void
+    public function test_without_a_trigger_list_the_live_triggers_of_the_flow_decide(): void
     {
         $draft = $this->draft([['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]]);
         $nodes = ['ask' => $draft->nodes[0]];
@@ -186,7 +186,51 @@ final class ContactContextValidationTest extends FeatureTestCase
         $this->storeTrigger($draft, ['type' => 'schedule', 'is_active' => false, 'config' => self::SCHEDULE['config']]);
 
         $this->assertCount(1, $this->contactErrors($nodes, null, $draft->flow_id), 'an inactive schedule trigger counts');
-        $this->assertSame([], $this->contactErrors($nodes, self::MESSAGE, $draft->flow_id), 'the request trigger wins');
+        $this->assertSame([], $this->contactErrors($nodes, [self::MESSAGE], $draft->flow_id), 'the given list wins');
+    }
+
+    public function test_a_message_and_a_schedule_trigger_together_refuse_a_contact_node_and_name_the_schedule(): void
+    {
+        $nodes = ['ask' => ['id' => 'ask', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text', 'text' => ['en' => 'Hi']]]];
+
+        $errors = $this->contactErrors($nodes, [self::MESSAGE, self::SCHEDULE]);
+
+        $this->assertCount(1, $errors);
+        $this->assertSame('nodes.ask', $errors[0]->path);
+        $this->assertStringContainsString("The flow's schedule trigger starts it without one.", $errors[0]->message);
+        $this->assertStringNotContainsString('message', mb_substr($errors[0]->message, (int) mb_strpos($errors[0]->message, "The flow's")));
+    }
+
+    public function test_an_inactive_contactless_trigger_in_the_list_still_counts(): void
+    {
+        $nodes = ['ask' => ['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]];
+
+        $this->assertCount(1, $this->contactErrors($nodes, [self::MESSAGE, [...self::SCHEDULE, 'is_active' => false]]));
+    }
+
+    public function test_every_contactless_type_is_named_once(): void
+    {
+        $nodes = ['ask' => ['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]];
+
+        $errors = $this->contactErrors($nodes, [self::SCHEDULE, ['type' => 'webhook'], self::SCHEDULE]);
+
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString("The flow's schedule, webhook triggers start it without one.", $errors[0]->message);
+    }
+
+    public function test_without_a_list_the_live_message_and_schedule_rows_together_refuse_a_contact_node(): void
+    {
+        $draft = $this->draft([['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]]);
+        $nodes = ['ask' => $draft->nodes[0]];
+
+        $this->storeTrigger($draft, self::MESSAGE);
+        $this->assertSame([], $this->contactErrors($nodes, null, $draft->flow_id), 'a message row alone gives a contact');
+
+        $this->storeTrigger($draft, self::SCHEDULE);
+        $errors = $this->contactErrors($nodes, null, $draft->flow_id);
+
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString('schedule trigger starts', $errors[0]->message);
     }
 
     public function test_publish_refuses_a_contact_node_in_a_flow_with_a_schedule_trigger_and_allows_it_with_a_message_trigger(): void
@@ -258,13 +302,13 @@ final class ContactContextValidationTest extends FeatureTestCase
 
     /**
      * @param  array<string, array<string, mixed>>  $nodes
-     * @param  array<string, mixed>|null            $trigger
+     * @param  list<array<string, mixed>>|null      $triggers
      *
      * @return list<\App\Domains\Flow\DTOs\FlowValidationErrorDto>
      */
-    private function contactErrors(array $nodes, ?array $trigger, ?string $flowId = null): array
+    private function contactErrors(array $nodes, ?array $triggers, ?string $flowId = null): array
     {
-        $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $nodes, trigger: $trigger, flowId: $flowId);
+        $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $nodes, triggers: $triggers, flowId: $flowId);
 
         return array_values(array_filter($result->errors, static fn ($error): bool => ContactContextChecker::CODE === $error->code));
     }

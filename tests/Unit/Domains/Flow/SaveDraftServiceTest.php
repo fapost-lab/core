@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Exceptions\DraftVersionConflictException;
+use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Services\SaveDraftService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class SaveDraftServiceTest extends TestCase
@@ -32,6 +34,7 @@ final class SaveDraftServiceTest extends TestCase
             $table->string('name');
             $table->json('nodes')->nullable();
             $table->json('edges')->nullable();
+            $table->json('triggers')->nullable();
             $table->timestamps();
         });
 
@@ -40,7 +43,7 @@ final class SaveDraftServiceTest extends TestCase
             $table->uuid('id')->primary();
             $table->uuid('tenant_id');
             $table->uuid('assistant_id')->nullable();
-            $table->uuid('flow_id')->unique();
+            $table->uuid('flow_id');
             $table->string('type', 32);
             $table->boolean('is_active')->default(true);
             $table->unsignedInteger('priority')->default(100);
@@ -69,27 +72,19 @@ final class SaveDraftServiceTest extends TestCase
         $service->execute($draft->flow_id, [], [], null, expectedDraftVersion: 3);
     }
 
-    public function test_updates_nodes_and_returns_incremented_version(): void
+    public function test_updates_nodes_stores_triggers_and_returns_incremented_version(): void
     {
         $draft = FlowDraft::factory()->create([
             'draft_version' => 2,
             'nodes'         => [],
         ]);
-        $service = app(SaveDraftService::class);
+        $trigger = $this->trigger();
 
-        $newVersion = $service->execute(
+        $newVersion = app(SaveDraftService::class)->execute(
             $draft->flow_id,
             ['node_1' => ['id' => 'node_1', 'type' => 'input']],
             [],
-            [
-                'type'      => 'message',
-                'is_active' => true,
-                'priority'  => 100,
-                'config'    => [
-                    'keywords' => ['help'],
-                    'phrases'  => [],
-                ],
-            ],
+            [$trigger],
             expectedDraftVersion: 2,
         );
 
@@ -98,157 +93,114 @@ final class SaveDraftServiceTest extends TestCase
         $this->assertSame(3, $draft->draft_version);
         $this->assertIsArray($draft->nodes);
         $this->assertSame('input', $draft->nodes['node_1']['type']);
-        $this->assertSame('message', FlowTrigger::query()->sole()->type->value);
+        $this->assertEquals([$trigger], $draft->triggers);
     }
 
-    public function test_it_keeps_existing_trigger_when_trigger_payload_is_null(): void
+    public function test_saving_never_makes_a_trigger_live(): void
     {
-        $draft = FlowDraft::factory()->create([
-            'draft_version' => 2,
-            'nodes'         => [],
-        ]);
+        $draft = FlowDraft::factory()->create(['draft_version' => 1, 'nodes' => []]);
 
-        FlowTrigger::query()->create([
-            'tenant_id'    => $draft->tenant_id,
-            'assistant_id' => $draft->assistant_id,
-            'flow_id'      => $draft->flow_id,
-            'type'         => 'message',
-            'is_active'    => true,
-            'priority'     => 100,
-            'config'       => [
-                'keywords' => ['help'],
-                'phrases'  => [],
-            ],
-        ]);
-
-        $service = app(SaveDraftService::class);
-
-        $service->execute(
-            $draft->flow_id,
-            [],
-            [],
-            null,
-            expectedDraftVersion: 2,
-        );
-
-        $this->assertDatabaseCount('flow_triggers', 1);
-    }
-
-    public function test_it_deletes_existing_trigger_only_when_delete_flag_is_explicit(): void
-    {
-        $draft = FlowDraft::factory()->create([
-            'draft_version' => 2,
-            'nodes'         => [],
-        ]);
-
-        FlowTrigger::query()->create([
-            'tenant_id'    => $draft->tenant_id,
-            'assistant_id' => $draft->assistant_id,
-            'flow_id'      => $draft->flow_id,
-            'type'         => 'message',
-            'is_active'    => true,
-            'priority'     => 100,
-            'config'       => [
-                'keywords' => ['help'],
-                'phrases'  => [],
-            ],
-        ]);
-
-        $service = app(SaveDraftService::class);
-
-        $service->execute(
-            $draft->flow_id,
-            [],
-            [],
-            ['_delete' => true],
-            expectedDraftVersion: 2,
-        );
+        app(SaveDraftService::class)->execute($draft->flow_id, [], [], [$this->trigger()], expectedDraftVersion: 1);
 
         $this->assertDatabaseCount('flow_triggers', 0);
     }
 
-    public function test_it_preserves_runtime_schedule_fields_when_updating_existing_trigger(): void
+    public function test_it_keeps_the_draft_list_and_live_rows_when_triggers_payload_is_null(): void
     {
-        $draft = FlowDraft::factory()->create([
+        $stored = [$this->trigger()];
+        $draft  = FlowDraft::factory()->create([
             'draft_version' => 2,
             'nodes'         => [],
+            'triggers'      => $stored,
         ]);
 
-        $trigger = FlowTrigger::query()->create([
+        FlowTrigger::query()->create([
             'tenant_id'    => $draft->tenant_id,
             'assistant_id' => $draft->assistant_id,
             'flow_id'      => $draft->flow_id,
-            'type'         => 'schedule',
-            'is_active'    => true,
-            'priority'     => 100,
-            'config'       => [
-                'cron'     => '0 9 * * *',
-                'timezone' => 'UTC',
-            ],
-            'last_run_at' => '2026-04-01 09:00:00',
-            'next_run_at' => '2026-04-02 09:00:00',
+            'type'         => 'message',
+            'config'       => ['keywords' => ['live'], 'phrases' => []],
         ]);
 
-        $service = app(SaveDraftService::class);
+        app(SaveDraftService::class)->execute($draft->flow_id, [], [], null, expectedDraftVersion: 2);
 
-        $service->execute(
-            $draft->flow_id,
-            [],
-            [],
-            [
-                'type'      => 'schedule',
-                'is_active' => true,
-                'priority'  => 200,
-                'config'    => [
-                    'cron'     => '0 10 * * *',
-                    'timezone' => 'UTC',
-                ],
-            ],
-            expectedDraftVersion: 2,
-        );
-
-        $trigger->refresh();
-
-        $this->assertSame(200, $trigger->priority);
-        $this->assertSame('2026-04-01 09:00:00', $trigger->last_run_at?->format('Y-m-d H:i:s'));
-        $this->assertSame('2026-04-02 09:00:00', $trigger->next_run_at?->format('Y-m-d H:i:s'));
+        $this->assertEquals($stored, $draft->refresh()->triggers);
+        $this->assertDatabaseCount('flow_triggers', 1);
     }
 
-    /**
-     * SaveDraft no longer enforces tenant-event registry membership — that
-     * check moved to {@see \App\Domains\Flow\Services\ValidateFlowService}
-     * (covered by `test_validate_endpoint_reports_unknown_event_trigger`).
-     * Drafts may reference an event before it appears in the registry; the
-     * trigger row simply never fires at runtime until the event is declared.
-     */
-    public function test_it_persists_event_trigger_even_when_event_is_not_yet_registered(): void
+    public function test_null_payload_leaves_a_never_written_list_null(): void
+    {
+        $draft = FlowDraft::factory()->create(['draft_version' => 1, 'nodes' => []]);
+
+        app(SaveDraftService::class)->execute($draft->flow_id, [], [], null, expectedDraftVersion: 1);
+
+        $this->assertNull($draft->refresh()->triggers);
+    }
+
+    public function test_an_empty_list_clears_the_draft_list_but_not_the_live_rows(): void
     {
         $draft = FlowDraft::factory()->create([
-            'draft_version' => 2,
+            'draft_version' => 1,
             'nodes'         => [],
+            'triggers'      => [$this->trigger()],
         ]);
 
-        $service = app(SaveDraftService::class);
+        FlowTrigger::query()->create([
+            'tenant_id' => $draft->tenant_id,
+            'flow_id'   => $draft->flow_id,
+            'type'      => 'message',
+            'config'    => ['keywords' => ['live'], 'phrases' => []],
+        ]);
 
-        $service->execute(
+        app(SaveDraftService::class)->execute($draft->flow_id, [], [], [], expectedDraftVersion: 1);
+
+        $this->assertSame([], $draft->refresh()->triggers);
+        $this->assertDatabaseCount('flow_triggers', 1);
+    }
+
+    public function test_it_stores_the_list_normalized_with_lowercased_ids_and_defaults(): void
+    {
+        $draft = FlowDraft::factory()->create(['draft_version' => 1, 'nodes' => []]);
+        $id    = (string) Str::uuid();
+
+        app(SaveDraftService::class)->execute(
             $draft->flow_id,
             [],
             [],
-            [
-                'type'      => 'event',
-                'is_active' => true,
-                'priority'  => 100,
-                'config'    => [
-                    'event_name' => 'employee_registered',
-                ],
-            ],
-            expectedDraftVersion: 2,
+            [['id' => mb_strtoupper($id), 'type' => 'message', 'config' => []]],
+            expectedDraftVersion: 1,
         );
 
-        $this->assertDatabaseHas('flow_triggers', [
-            'flow_id' => $draft->flow_id,
-            'type'    => 'event',
-        ]);
+        $this->assertEquals(
+            [['id' => $id, 'type' => 'message', 'is_active' => true, 'priority' => 100, 'config' => []]],
+            $draft->refresh()->triggers,
+        );
+    }
+
+    public function test_it_rejects_a_malformed_list_without_touching_the_draft(): void
+    {
+        $draft = FlowDraft::factory()->create(['draft_version' => 1, 'nodes' => []]);
+
+        try {
+            app(SaveDraftService::class)->execute($draft->flow_id, [], [], [['id' => 'nope', 'type' => 'message', 'config' => []]], expectedDraftVersion: 1);
+            $this->fail('A trigger without a UUID id must be rejected.');
+        } catch (InvalidTriggerPayloadException) {
+            $this->assertSame(1, $draft->refresh()->draft_version);
+            $this->assertNull($draft->triggers);
+        }
+    }
+
+    public function test_a_template_accepts_an_empty_list_and_refuses_a_non_empty_one(): void
+    {
+        $draft   = FlowDraft::factory()->template()->create(['draft_version' => 1, 'nodes' => []]);
+        $service = app(SaveDraftService::class);
+
+        $service->execute($draft->flow_id, [], [], [], expectedDraftVersion: 1);
+        $this->assertSame([], $draft->refresh()->triggers);
+
+        $this->expectException(InvalidTriggerPayloadException::class);
+
+        $service->execute($draft->flow_id, [], [], [$this->trigger()], expectedDraftVersion: 2);
     }
 
     public function test_it_registers_emitted_events_tenant_wide_on_draft_save(): void
@@ -273,5 +225,21 @@ final class SaveDraftServiceTest extends TestCase
             'tenant_id'  => $draft->tenant_id,
             'event_name' => 'order.created',
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     *
+     * @return array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}
+     */
+    private function trigger(array $overrides = []): array
+    {
+        return array_merge([
+            'id'        => (string) Str::uuid(),
+            'type'      => 'message',
+            'is_active' => true,
+            'priority'  => 100,
+            'config'    => ['keywords' => ['help'], 'phrases' => []],
+        ], $overrides);
     }
 }

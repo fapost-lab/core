@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Repositories;
 
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Services\FlowTriggerSet;
 use Illuminate\Database\Eloquent\Builder;
 
 final class FlowTriggerRepository implements FlowTriggerRepositoryInterface
@@ -35,30 +37,70 @@ final class FlowTriggerRepository implements FlowTriggerRepositoryInterface
             ->get();
     }
 
-    public function findByFlowId(string $flowId): ?FlowTrigger
+    public function getByFlowId(string $flowId): array
     {
         return FlowTrigger::query()
             ->where('flow_id', $flowId)
-            ->first();
+            ->orderBy('priority')
+            ->orderBy('id')
+            ->get()
+            ->all();
     }
 
-    public function upsertForFlow(string $flowId, array $attributes): FlowTrigger
+    public function syncForFlow(FlowDraft $draft, array $triggers): void
     {
-        $trigger = FlowTrigger::query()->firstOrNew([
-            'flow_id' => $flowId,
-        ]);
+        $existing = [];
 
-        $trigger->fill($attributes);
-        $trigger->save();
+        foreach ($this->getByFlowId($draft->flow_id) as $row) {
+            $existing[mb_strtolower($row->id)] = $row;
+        }
 
-        return $trigger;
-    }
+        foreach ($triggers as $trigger) {
+            $id  = mb_strtolower($trigger['id']);
+            $row = $existing[$id] ?? null;
+            unset($existing[$id]);
 
-    public function deleteByFlowId(string $flowId): void
-    {
-        FlowTrigger::query()
-            ->where('flow_id', $flowId)
-            ->delete();
+            if (null === $row) {
+                $row = new FlowTrigger();
+                $row->forceFill([
+                    'id'           => $id,
+                    'tenant_id'    => $draft->tenant_id,
+                    'assistant_id' => $draft->assistant_id,
+                    'flow_id'      => $draft->flow_id,
+                    'type'         => $trigger['type'],
+                    'is_active'    => $trigger['is_active'],
+                    'priority'     => $trigger['priority'],
+                    'config'       => $trigger['config'],
+                ])->save();
+
+                continue;
+            }
+
+            $row->fill([
+                'tenant_id'    => $draft->tenant_id,
+                'assistant_id' => $draft->assistant_id,
+                'is_active'    => $trigger['is_active'],
+                'priority'     => $trigger['priority'],
+            ]);
+
+            if ($row->type->value !== $trigger['type'] || ! FlowTriggerSet::sameConfig($row->config, $trigger['config'])) {
+                $row->fill([
+                    'type'        => $trigger['type'],
+                    'config'      => $trigger['config'],
+                    'next_run_at' => null,
+                ]);
+            }
+
+            // An unchanged row is not saved: saving runs today's config validator, and a row an older validator
+            // accepted must not block a publish that does not touch it.
+            if ($row->isDirty()) {
+                $row->save();
+            }
+        }
+
+        foreach ($existing as $gone) {
+            $gone->delete();
+        }
     }
 
     public function getActiveEventTriggers(string $tenantId, string $eventName): iterable
