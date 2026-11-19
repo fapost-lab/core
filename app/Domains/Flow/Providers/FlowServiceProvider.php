@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Providers;
 
+use App\Domains\Broadcasting\Events\BroadcastCompleted;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Contact\Events\ContactCreated;
+use App\Domains\Contact\Events\ContactTagAdded;
+use App\Domains\Contact\Events\ContactTagRemoved;
 use App\Domains\Conversation\Events\OperatorRequestStateChanged;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Call\CallExecutionLedgerInterface;
@@ -89,6 +93,7 @@ use App\Domains\Flow\History\DefaultHistoryWriter;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\History\NoOpHistoryWriter;
 use App\Domains\Flow\Listeners\ContinueAfterOperatorRequest;
+use App\Domains\Flow\Listeners\PublishCoreEvents;
 use App\Domains\Flow\Live\FlowSessionActivityObserver;
 use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Logging\FlowLogPartitionManager;
@@ -214,6 +219,13 @@ final class FlowServiceProvider extends ServiceProvider
 
         // The Conversation → Flow seam of operator requests: Conversation announces, Flow continues the contact's side.
         Event::listen(OperatorRequestStateChanged::class, ContinueAfterOperatorRequest::class);
+
+        // Core events as event triggers: the domains raise plain events, Flow publishes them.
+        Event::listen(ContactCreated::class, [PublishCoreEvents::class, 'contactCreated']);
+        Event::listen(ContactTagAdded::class, [PublishCoreEvents::class, 'contactTagAdded']);
+        Event::listen(ContactTagRemoved::class, [PublishCoreEvents::class, 'contactTagRemoved']);
+        Event::listen(BroadcastCompleted::class, [PublishCoreEvents::class, 'broadcastCompleted']);
+        Event::listen(OperatorRequestStateChanged::class, [PublishCoreEvents::class, 'operatorRequestStateChanged']);
 
         // Registered the way a Solution registers its keys: from boot(), before the registry is frozen.
         $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
@@ -536,6 +548,8 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(SessionLockRegistry::class);
         // Per-job budget of an automation run's execution segment, shared by nested engine calls.
         $this->app->scoped(\App\Domains\Flow\Services\ExecutionSegment::class);
+        // The event chain depth of the session running now, for events raised inside it.
+        $this->app->scoped(\App\Domains\Flow\Services\EventChainContext::class);
         $this->app->singleton(CallTransportRegistry::class, function ($app): CallTransportRegistry {
             $registry = new CallTransportRegistry();
             $registry->register($app->make(HttpTransport::class));

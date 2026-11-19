@@ -283,7 +283,7 @@ final readonly class OperatorRequests implements OperatorRequestsInterface
         }
 
         $this->activity->touched($released->tenantId, $released->assistantId);
-        $this->events->dispatch(new OperatorRequestStateChanged($released->tenantId, $released->id, $state));
+        $this->events->dispatch(new OperatorRequestStateChanged($released->tenantId, $released->id, $state, null, $released->assistantId, $released->contactId));
 
         return true;
     }

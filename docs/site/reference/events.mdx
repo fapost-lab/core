@@ -1,21 +1,52 @@
 ---
 title: "Events"
-description: "Flow-level events, and the state of the platform event surface."
+description: "Flow events, Core events that start flows, and the limits on chains of events."
 ---
 
 <Note>
-  Core does not publish a catalogue of platform events yet. There is no stable
-  set of domain events an extension can subscribe to, and this page will not
-  invent one. What exists today is the flow-level event mechanism described
-  below.
+  The events below start flows through an event trigger. They are not a
+  subscription surface for extensions: there is no stable set of domain events an
+  extension can listen to, and a Solution cannot register events of its own yet.
 </Note>
 
 ## Flow events
 
 A flow emits an event through the `emit_event` node. Emission is queued rather
 than synchronous — `QueuedFlowTriggerEventPublisher` hands it to the
-`scheduled.triggers` queue, so a flow that emits does not wait for whatever
-consumes the event.
+`scheduled.triggers` queue, after the change that raised it is committed, so a flow that
+emits does not wait for whatever consumes the event. A flow started by such an
+event runs for the contact whose conversation emitted it; an event emitted by a
+flow without a contact starts nothing.
+
+## Core events
+
+Core raises these events itself. An event trigger on one of them starts its flow
+**without a contact** — even when the event is about a contact, whose id is then
+in the event data — so the flow cannot be published with a step that needs one.
+Every active event trigger on the event starts once per event, whichever
+assistant it belongs to.
+
+| Event | When | Data in `flow.event.*` |
+|---|---|---|
+| `core.contact.created` | A new contact is created | `contact_id`, `platform`, `language` |
+| `core.contact.tag_added` | A contact gets a tag it did not have | `contact_id`, `tag`, `tagged_by` |
+| `core.contact.tag_removed` | A tag the contact had is removed | `contact_id`, `tag` |
+| `core.broadcast.completed` | A broadcast finishes sending | `broadcast_id`, `name`, `recipients_total`, `sent`, `failed` |
+| `core.operator_request.timed_out` | No operator took a request before its timeout | `request_id`, `contact_id`, `assistant_id` |
+
+Every event also carries `event_id` and `occurred_at` (ISO 8601). The data holds
+identifiers, never a contact's name or phone. Names starting with `core.` belong to
+Core: an `emit_event` step cannot use them.
+
+## Chains of events
+
+An event raised while a flow runs — by `emit_event`, or by something the flow does,
+such as setting a tag — is one level deeper than the run that raised it; an event
+raised outside any flow is level 1. An event deeper than level 5 starts nothing,
+and the log records `flow.event.chain_depth_exceeded`. This stops flows that keep
+setting each other off. A conversation started by an event keeps its level for as
+long as it lives, so a conversation started at level 5 raises no events later on,
+whatever message continues it.
 
 ## Triggers
 

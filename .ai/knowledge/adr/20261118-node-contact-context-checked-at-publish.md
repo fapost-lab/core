@@ -115,3 +115,11 @@ contact can still message a person, and publishing refuses `send_message` there 
 - Open: a contactless run with no assistant (a global trigger) can find no channel for any addressee; once triggers
   start such runs, publish should warn or the sender should look beyond the assistant.
 
+
+## Amendment 2026-11-19: an event trigger on a Core event gives no contact
+
+Whether a trigger gives a contact is now decided per trigger, not per type: `TriggerContactContext::givesContact(type,
+config)` answers like `FlowTriggerType::givesContact()` except for an `event` trigger whose `event_name` is in Core's
+catalog (`CoreEventCatalog`), which starts a contactless run and so gives none. A flow's own event (`emit_event` in a
+conversation) still gives the emitting contact. The checker reads the config of the live `flow_triggers` rows too when
+it is given no list (`adr-20261119-core-events-start-contactless-runs`).

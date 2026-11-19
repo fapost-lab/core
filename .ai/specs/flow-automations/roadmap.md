@@ -41,7 +41,7 @@ Goal: things that happen in Core or a Solution start flows. Done when: reference
 event with no contact) passes e2e, a test Solution registers its own trigger type, and an automation that
 re-raises its own event stops at depth 5.
 
-- [ ] Core events start contactless runs — three to five Core domain events, `event_id` dedup per trigger, chain depth through a scoped run context, `flow.event.chain_depth_exceeded` (after: `flow-segmented-execution` — the event fire key is `(trigger, event_id)`)
+- [x] Core events start contactless runs — three to five Core domain events, `event_id` dedup per trigger, chain depth through a scoped run context, `flow.event.chain_depth_exceeded` (after: `flow-segmented-execution` — the event fire key is `(trigger, event_id)`)
 - [ ] Registrable trigger types — a Foundation contract for Solutions and forms, a test Solution in the suite (after: Core events start contactless runs — the contract generalises the first non-message trigger path)
 - [ ] `emit_event` `assistant_filter` on event triggers — moved here from `flow-engine-v1x` (after: Core events start contactless runs — the filter's meaning depends on assistant-less events)
 

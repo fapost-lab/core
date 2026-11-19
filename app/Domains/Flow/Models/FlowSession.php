@@ -37,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<string, mixed> $state
  * @property FlowSessionStatus   $status
  * @property int                 $version
+ * @property int                 $event_chain_depth how deep in a chain of events the run was started (0: no event)
  * @property \Illuminate\Support\Carbon|null $expires_at
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession newQuery()
@@ -83,6 +84,7 @@ final class FlowSession extends BaseModel
         'step_count',
         'loop_step_count',
         'loop_iteration_step_count',
+        'event_chain_depth',
         'segment_id',
         'deadline_at',
         'failure_reason',
@@ -103,6 +105,7 @@ final class FlowSession extends BaseModel
         'step_count'                => 0,
         'loop_step_count'           => 0,
         'loop_iteration_step_count' => 0,
+        'event_chain_depth'         => 0,
     ];
 
     /**
@@ -189,6 +192,7 @@ final class FlowSession extends BaseModel
             'step_count'                => 'integer',
             'loop_step_count'           => 'integer',
             'loop_iteration_step_count' => 'integer',
+            'event_chain_depth'         => 'integer',
             'expires_at'                => 'datetime',
             'deadline_at'               => 'datetime',
             'failure_reason'            => FlowRunFailureReason::class,

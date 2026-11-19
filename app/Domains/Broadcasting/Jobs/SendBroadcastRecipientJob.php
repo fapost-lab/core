@@ -6,6 +6,7 @@ namespace App\Domains\Broadcasting\Jobs;
 
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\RecipientStatus;
+use App\Domains\Broadcasting\Events\BroadcastCompleted;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Models\BroadcastRecipient;
 use App\Domains\Broadcasting\Services\BroadcastService;
@@ -238,13 +239,29 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
         }
 
         // Conditional transition — only the last finisher flips Running → Completed.
-        Broadcast::query()
+        $completed = Broadcast::query()
             ->whereKey($broadcastId)
             ->where('status', BroadcastStatus::Running->value)
             ->update([
                 'status'       => BroadcastStatus::Completed->value,
                 'completed_at' => Carbon::now(),
             ]);
+
+        if (1 !== $completed) {
+            return;
+        }
+
+        // Re-read: the counters moved while this job was settling its own recipient.
+        $broadcast->refresh();
+
+        event(new BroadcastCompleted(
+            $this->tenantId,
+            $broadcastId,
+            (string) $broadcast->name,
+            (int) $broadcast->total_recipients,
+            (int) $broadcast->sent_count,
+            (int) $broadcast->failed_count,
+        ));
     }
 
     private function resolveLanguage(string $contactLanguage, string $assistantLanguage, string $fallback): string

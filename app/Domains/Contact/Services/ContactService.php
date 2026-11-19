@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Contact\Services;
 
 use App\Domains\Contact\Contracts\ContactServiceInterface;
+use App\Domains\Contact\Events\ContactCreated;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
@@ -17,6 +19,10 @@ use Illuminate\Database\UniqueConstraintViolationException;
  */
 final readonly class ContactService implements ContactServiceInterface
 {
+    public function __construct(private Dispatcher $events)
+    {
+    }
+
     /**
      * Find an existing contact by (tenant, platform, external id) or create it.
      *
@@ -48,6 +54,10 @@ final readonly class ContactService implements ContactServiceInterface
                 ->where('platform', $platform)
                 ->where('external_id', $externalId)
                 ->firstOrFail();
+        }
+
+        if ($contact->wasRecentlyCreated) {
+            $this->events->dispatch(new ContactCreated($tenantId, (string) $contact->getKey(), $contact->platform, (string) $contact->language));
         }
 
         return $contact;

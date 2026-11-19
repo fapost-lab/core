@@ -25,7 +25,7 @@ final class SetTagNodeHandlerTest extends FeatureTestCase
         parent::setUp();
 
         $this->handler = new SetTagNodeHandler(
-            new ContactTagRepository(),
+            $this->app->make(ContactTagRepository::class),
             $this->app->make(TemplateRenderer::class),
         );
         $this->sessionId = (string) Str::uuid();
@@ -116,13 +116,13 @@ final class SetTagNodeHandlerTest extends FeatureTestCase
         ContactTag::factory()->create(['contact_id' => $a->id, 'tag' => 'lead']);
         ContactTag::factory()->create(['contact_id' => $b->id, 'tag' => 'vip']);
 
-        $this->assertSame(['lead', 'vip'], (new ContactTagRepository())->distinctTags());
+        $this->assertSame(['lead', 'vip'], ($this->app->make(ContactTagRepository::class))->distinctTags());
     }
 
     public function test_sync_for_contact_adds_and_removes_to_match_desired_set(): void
     {
         $contact = Contact::factory()->create();
-        $repo    = new ContactTagRepository();
+        $repo    = $this->app->make(ContactTagRepository::class);
         $repo->add($contact->id, 'old', null);
         $repo->add($contact->id, 'keep', null);
 

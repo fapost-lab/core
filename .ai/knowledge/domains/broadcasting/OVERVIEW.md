@@ -15,7 +15,7 @@ paths:
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-reviewed_at: 2026-11-18
+reviewed_at: 2026-11-19
 ---
 # Broadcasting
 
@@ -34,7 +34,9 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
   `ContactSegment`, `ChannelContact`, `Contact`), Flow's `ContentTranslatorInterface`, the
   `Channel` and `Assistant` models, Conversation's `MessageOrigin`, Tenancy, and the foundation
   `MessageSenderInterface`.
-- The only consumer is the console (`BroadcastController`, Inertia).
+- The console (`BroadcastController`, Inertia) drives it. The domain raises `Events/BroadcastCompleted` when a
+  broadcast completes (only from the conditional update that wins); Flow listens and publishes it as the Core event
+  `core.broadcast.completed`, so Flow now imports this event class (`adr-20261119-core-events-start-contactless-runs`).
 - Tenant settings `broadcast_*` in `TenantSettings` control backpressure and batching.
 
 ## Entry points

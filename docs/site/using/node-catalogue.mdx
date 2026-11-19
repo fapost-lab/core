@@ -25,7 +25,7 @@ Message text is written per language on the builder's **Content** tab.
 
 To message someone other than the contact of the conversation, fill in **Send to**:
 a contact id, usually from a variable, such as `{{flow.customer_id}}`. A flow
-started by a schedule, a webhook or an API call has no contact, so there every
+started by a schedule, a webhook, an API call or a Core event has no contact, so there every
 Send message block needs one. A message sent this way cannot wait for an answer: no
 keyboard, timeout or saved answer. If the contact id comes out empty or malformed,
 nothing is sent and the block leaves through its **error** exit with

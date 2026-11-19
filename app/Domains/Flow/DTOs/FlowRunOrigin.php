@@ -17,6 +17,9 @@ use InvalidArgumentException;
  *
  * The fire key is what fired the trigger — a schedule slot, an event id, a webhook delivery id. It exists only inside
  * a trigger: `(trigger_id, fire_key)` is unique, so a run is started once per fire.
+ *
+ * The chain depth is how deep in a chain of events the run starts: 0 when no event started it, n when an event of depth
+ * n did ({@see \App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface::MAX_CHAIN_DEPTH}).
  */
 final readonly class FlowRunOrigin
 {
@@ -28,6 +31,7 @@ final readonly class FlowRunOrigin
         public ?string $triggerId = null,
         public ?string $assistantId = null,
         public ?string $fireKey = null,
+        public int $chainDepth = 0,
     ) {
         if (null !== $fireKey && ('' === $fireKey || null === $triggerId || '' === $triggerId)) {
             throw new InvalidArgumentException('A fire key needs the trigger it belongs to, and cannot be empty.');
@@ -36,15 +40,23 @@ final readonly class FlowRunOrigin
         if (null !== $fireKey && mb_strlen($fireKey) > self::MAX_FIRE_KEY_LENGTH) {
             throw new InvalidArgumentException(sprintf('A fire key is at most %d characters.', self::MAX_FIRE_KEY_LENGTH));
         }
+
+        if ($chainDepth < 0) {
+            throw new InvalidArgumentException('An event chain depth cannot be negative.');
+        }
     }
 
-    public static function conversation(?string $triggerId = null): self
+    public static function conversation(?string $triggerId = null, int $chainDepth = 0): self
     {
-        return new self(FlowRunKind::Conversation, $triggerId);
+        return new self(FlowRunKind::Conversation, $triggerId, chainDepth: $chainDepth);
     }
 
-    public static function automation(?string $triggerId = null, ?string $assistantId = null, ?string $fireKey = null): self
-    {
-        return new self(FlowRunKind::Automation, $triggerId, $assistantId, $fireKey);
+    public static function automation(
+        ?string $triggerId = null,
+        ?string $assistantId = null,
+        ?string $fireKey = null,
+        int $chainDepth = 0,
+    ): self {
+        return new self(FlowRunKind::Automation, $triggerId, $assistantId, $fireKey, $chainDepth);
     }
 }

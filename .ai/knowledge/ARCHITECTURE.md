@@ -58,7 +58,7 @@ both use to list and drop partitions) carry no domain logic and have no knowledg
 
 Domain folders are bounded contexts in naming more than in isolation: Flow reads Contact, Staff,
 Assistant and Media models directly, and import cycles exist (for example Contact↔Flow through
-`NotifyNodeHandler`). Credentials is another: Flow asks the Foundation `CredentialStoreInterface` (bound to
+`NotifyNodeHandler`, Broadcasting↔Flow through Flow's listener on `BroadcastCompleted`). Credentials is another: Flow asks the Foundation `CredentialStoreInterface` (bound to
 Credentials' store) for a call's secret and uses Credentials' type registry, `SecretRedactor` and `HostMatcher` in
 `HttpTransport`, while Credentials' OAuth2 type fetches its token through Flow's `GuardedHttpClient`, the egress guard
 (`EgressGuardTest` covers `App\Domains\Credentials` too). The rules below are the boundaries that do hold.

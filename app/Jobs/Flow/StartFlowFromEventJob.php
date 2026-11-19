@@ -10,6 +10,7 @@ use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
+use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Domains\Tenancy\Queue\StoppedTenantAction;
@@ -32,7 +33,9 @@ use Throwable;
  * this event — so the contact-facing access policy (public/auth gate for inbound
  * starts) is intentionally not applied here.
  *
- * The event payload is exposed to the started flow under `flow.event.*`.
+ * The event payload is exposed to the started flow under `flow.event.*`. The session records the event's chain
+ * depth, so an event the flow raises in turn is one level deeper (read with a fallback: a job queued before the
+ * depth existed unserializes without it).
  */
 final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
 {
@@ -49,6 +52,7 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
         public readonly string $contactId,
         public readonly array $payload,
         public readonly string $eventName,
+        public readonly int $chainDepth = 1,
     ) {
         $this->onQueue('scheduled.triggers');
     }
@@ -129,9 +133,12 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
                 tenantId: (string)$contact->tenant_id,
                 contactId: (string)$contact->getKey(),
                 assistantId: $this->assistantId,
-                callback: fn () => $engine->start($definition, $contact, [
-                    'flow' => ['event' => $this->payload],
-                ]),
+                callback: fn () => $engine->start(
+                    $definition,
+                    $contact,
+                    ['flow' => ['event' => $this->payload]],
+                    FlowRunOrigin::conversation(chainDepth: $this->chainDepth ?? 1),
+                ),
             );
         });
     }

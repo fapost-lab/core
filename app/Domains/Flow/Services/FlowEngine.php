@@ -89,6 +89,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private SegmentHandOff $handOff,
         private AutomationRunDeadline $runDeadline,
         private NodeTraceRecorder $trace,
+        private EventChainContext $eventChain,
     ) {
     }
 
@@ -133,6 +134,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             'trigger_id'         => $origin->triggerId,
             'fire_key'           => $origin->fireKey,
             'deadline_at'        => $deadlineAt,
+            'event_chain_depth'  => $origin->chainDepth,
             'version'            => 1,
         ]));
 
@@ -341,6 +343,9 @@ final readonly class FlowEngine implements FlowEngineInterface
         bool $resumedAfterDelay = false,
     ): void {
         $this->segment->enter();
+        // An event raised while this session runs is one level deeper than the session; the depth comes from the row,
+        // so it survives every job boundary.
+        $this->eventChain->enter((int) $session->event_chain_depth);
 
         try {
             $this->runSteps($definition, $session, $incoming, $contact, $resumedAfterDelay);
@@ -349,6 +354,8 @@ final readonly class FlowEngine implements FlowEngineInterface
             $this->segment->leave();
 
             throw $exception;
+        } finally {
+            $this->eventChain->leave();
         }
 
         $stopped = $this->segment->leave();

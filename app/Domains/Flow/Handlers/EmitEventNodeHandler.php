@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
+use App\Domains\Flow\Events\CoreEventCatalog;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -15,6 +16,7 @@ use Fapost\Support\Builder\Schema\Fields\JsonField;
 use Fapost\Support\Builder\Schema\Fields\TextField;
 use Fapost\Support\Builder\Schema\Schema;
 use Fapost\Support\Builder\Schema\Section;
+use Psr\Log\LoggerInterface;
 
 /**
  * Publishes a tenant-scoped event so subscribed event-triggers can asynchronously
@@ -23,6 +25,10 @@ use Fapost\Support\Builder\Schema\Section;
  *
  * Naming is convention-only ({@code domain.entity.action}); event scope is the
  * whole tenant. Per-assistant filtering is V1.x.
+ *
+ * Names under {@see CoreEventCatalog::RESERVED_PREFIX} belong to Core: validation refuses them, and a definition
+ * published before the reservation has its event dropped here with a warning — the node still takes `success`, so
+ * the flow runs on as it did — rather than faking a Core event with a payload of its own.
  */
 final class EmitEventNodeHandler extends AbstractVersionedHandler
 {
@@ -33,6 +39,7 @@ final class EmitEventNodeHandler extends AbstractVersionedHandler
     public function __construct(
         private readonly FlowTriggerEventPublisherInterface $publisher,
         private readonly TemplateRenderer $templates,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -81,6 +88,21 @@ final class EmitEventNodeHandler extends AbstractVersionedHandler
 
         if ('' === $eventType) {
             throw new InvalidNodeConfigException('emit_event: missing or empty event_type');
+        }
+
+        if (CoreEventCatalog::isReserved($eventType)) {
+            $this->logger->warning('flow.event.reserved_name_dropped', [
+                'tenant_id'  => $context->tenantId,
+                'session_id' => $context->sessionId,
+                'node_id'    => $context->nodeId,
+                'event_name' => $eventType,
+            ]);
+
+            return new NodeExecutionResult(
+                status: NodeExecutionStatus::Executed,
+                sourceHandle: 'success',
+                metadata: [self::EVENT_TYPE_META => $eventType],
+            );
         }
 
         $rawPayload = is_array($config['payload'] ?? null) ? $config['payload'] : [];

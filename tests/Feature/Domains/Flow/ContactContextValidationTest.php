@@ -176,6 +176,29 @@ final class ContactContextValidationTest extends FeatureTestCase
         $this->assertSame([], $this->contactErrors($nodes, [['type' => 'event']]));
     }
 
+    public function test_an_event_trigger_on_a_core_event_gives_no_contact_and_one_on_a_flow_event_does(): void
+    {
+        $nodes = ['ask' => ['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]];
+
+        $errors = $this->contactErrors($nodes, [['type' => 'event', 'config' => ['event_name' => 'core.contact.tag_added']]]);
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString("The flow's event trigger starts it without one.", $errors[0]->message);
+
+        $this->assertSame([], $this->contactErrors($nodes, [['type' => 'event', 'config' => ['event_name' => 'orders.paid']]]));
+    }
+
+    public function test_without_a_list_a_live_core_event_trigger_makes_the_flow_contactless(): void
+    {
+        $draft = $this->draft([['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]]);
+        $nodes = ['ask' => $draft->nodes[0]];
+
+        $this->storeTrigger($draft, ['type' => 'event', 'config' => ['event_name' => 'orders.paid']]);
+        $this->assertSame([], $this->contactErrors($nodes, null, $draft->flow_id), "a flow's event gives a contact");
+
+        $this->storeTrigger($draft, ['type' => 'event', 'config' => ['event_name' => 'core.broadcast.completed']]);
+        $this->assertCount(1, $this->contactErrors($nodes, null, $draft->flow_id), 'a Core event gives none');
+    }
+
     public function test_without_a_trigger_list_the_live_triggers_of_the_flow_decide(): void
     {
         $draft = $this->draft([['id' => 'ask', 'type' => 'undeclared_test', 'version' => 1, 'config' => []]]);

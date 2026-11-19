@@ -58,6 +58,7 @@ final readonly class AutomationRunner
      * Start the run a trigger fired, once per fire key, or continue it if a previous attempt already started it.
      *
      * @param  array<string, mixed>  $initialState  merged into the new session's state
+     * @param  int                   $chainDepth    the depth of the event that fired the trigger; 0 when none did
      *
      * @return FlowSession|null the run, or null when the flow has no active definition
      *
@@ -70,10 +71,11 @@ final readonly class AutomationRunner
         string $fireKey,
         array $initialState = [],
         ?string $assistantId = null,
+        int $chainDepth = 0,
     ): ?FlowSession {
         return $this->guard->runInScope(
             LockScope::forTrigger($tenantId, $triggerId),
-            function () use ($flowId, $triggerId, $fireKey, $initialState, $assistantId): ?FlowSession {
+            function () use ($flowId, $triggerId, $fireKey, $initialState, $assistantId, $chainDepth): ?FlowSession {
                 $fired = $this->sessions->findByFireKey($triggerId, $fireKey);
 
                 if (null !== $fired) {
@@ -97,7 +99,7 @@ final readonly class AutomationRunner
                         $definition,
                         null,
                         $initialState,
-                        FlowRunOrigin::automation($triggerId, $assistantId, $fireKey),
+                        FlowRunOrigin::automation($triggerId, $assistantId, $fireKey, $chainDepth),
                     );
                 } catch (UniqueConstraintViolationException $exception) {
                     // Another worker created the run past the lock (its TTL lapsed): continue that one.

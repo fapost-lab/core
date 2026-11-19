@@ -135,7 +135,9 @@ final readonly class SubflowStarterService
                 'run_kind'     => $parent->run_kind,
                 'trigger_id'   => $parent->trigger_id,
                 // A child lives within its run: it carries the deadline of the run's root, not one of its own.
-                'deadline_at'           => $parent->deadline_at,
+                'deadline_at' => $parent->deadline_at,
+                // A child is part of the same link of an event chain as its parent.
+                'event_chain_depth'     => (int) $parent->event_chain_depth,
                 'flow_definition_id'    => $definition->getKey(),
                 'flow_version'          => $definition->version,
                 'current_node_id'       => $entryNode,

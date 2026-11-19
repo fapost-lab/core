@@ -21,7 +21,8 @@ use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
 /**
  * Refuses a node that needs a contact in a flow that one of its triggers starts without one.
  *
- * A flow's run has a contact unless the trigger that started it gives none ({@see FlowTriggerType::givesContact()}); a
+ * A flow's run has a contact unless the trigger that started it gives none ({@see TriggerContactContext::givesContact()}:
+ * by its type, and for an event trigger by its event — a Core event gives none); a
  * flow without a trigger (a default flow, a global command's flow, a subflow) is started for a contact. So a flow is
  * contactless when any of its triggers, active or not, gives none — switching a trigger on does not publish the flow
  * again. In such a flow, a node needs a contact when:
@@ -116,7 +117,7 @@ final readonly class ContactContextChecker
             }
 
             $triggers = array_map(
-                static fn (FlowTrigger $row): array => ['type' => $row->type->value],
+                static fn (FlowTrigger $row): array => ['type' => $row->type->value, 'config' => $row->config],
                 $this->triggers->getByFlowId($flowId),
             );
         }
@@ -127,7 +128,9 @@ final readonly class ContactContextChecker
             $raw  = is_array($trigger) ? ($trigger['type'] ?? null) : null;
             $type = is_string($raw) ? FlowTriggerType::tryFrom($raw) : null;
 
-            if (null !== $type && ! $type->givesContact() && ! in_array($type, $types, true)) {
+            $config = is_array($trigger) && is_array($trigger['config'] ?? null) ? $trigger['config'] : [];
+
+            if (null !== $type && ! TriggerContactContext::givesContact($type, $config) && ! in_array($type, $types, true)) {
                 $types[] = $type;
             }
         }

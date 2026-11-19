@@ -15,6 +15,7 @@ use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Enums\SendMessageContentType;
+use App\Domains\Flow\Events\CoreEventCatalog;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
@@ -562,7 +563,8 @@ final readonly class ValidateFlowService
     /**
      * Enforces emit_event constraints from spec §07: event_type is a non-empty
      * string, literal (no template placeholders), and matches the recommended
-     * naming convention (alphanumeric segments + dot). The full validity of
+     * naming convention (alphanumeric segments + dot), outside Core's reserved
+     * `core.` namespace ({@see CoreEventCatalog}). The full validity of
      * the resolved payload is the handler's runtime responsibility.
      *
      * @param  array<string, mixed>  $node
@@ -602,6 +604,16 @@ final readonly class ValidateFlowService
                 path: "{$path}.config.event_type",
                 code: 'emit_event_invalid_type',
                 message: 'event_type must contain only alphanumerics, underscores and dots (e.g. "sales.order.created").',
+            );
+
+            return;
+        }
+
+        if (CoreEventCatalog::isReserved($eventType)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.event_type",
+                code: 'reserved_event_name',
+                message: sprintf('Event names starting with "%s" belong to Core; a flow cannot emit them.', CoreEventCatalog::RESERVED_PREFIX),
             );
         }
     }

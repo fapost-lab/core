@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Flow\Events\CoreEventCatalog;
+
 /**
  * Collects event names declared by `emit_event` nodes in a flow's node list.
  *
  * Used to feed the tenant-wide event registry from both draft saves and
  * publishes, so trigger pickers can reference events of any flow/assistant
- * while still preparing flows (before publishing).
+ * while still preparing flows (before publishing). A name in Core's reserved
+ * namespace is left out: a flow never emits it, and the registry never lists it.
  */
 final class EmittedEventCollector
 {
@@ -29,7 +32,7 @@ final class EmittedEventCollector
             $config = is_array($node['config'] ?? null) ? $node['config'] : [];
             $name   = $config['event_type'] ?? $config['event_name'] ?? null;
 
-            if (is_string($name) && '' !== mb_trim($name)) {
+            if (is_string($name) && '' !== mb_trim($name) && ! CoreEventCatalog::isReserved($name)) {
                 $names[] = mb_trim($name);
             }
         }

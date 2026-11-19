@@ -193,6 +193,19 @@ broken.
   `TracePayloadMaskerTest`, `TracePayloadLimiterTest`, `FlowSessionsConsoleTest`
   (`adr-20261119-node-trace-in-session-history`).
 
+- **A Core event starts each listening trigger's run once, and no chain of events is longer than five.** Core's events
+  are the `CoreEventCatalog` names under the reserved `core.` prefix: validation refuses an `emit_event` with one
+  (`reserved_event_name`), the handler drops one at runtime, and the registry never stores one. The publisher mints the
+  event id before anything is queued and queues the fan-out after commit; a Core event's runs are automation runs with
+  `fire_key = event_id`. An event raised while a session runs is one deeper than the session's `event_chain_depth`
+  (written at start, copied to subflow children, pushed by `FlowEngine::executeLoop()` into the scoped
+  `EventChainContext`); one deeper than `FlowTriggerEventPublisherInterface::MAX_CHAIN_DEPTH` starts nothing
+  (`flow.event.chain_depth_exceeded`), on the contact path too. The Core domains raise plain events and never depend on
+  Flow; `PublishCoreEvents` never throws into them. Why: a retried fan-out must not start a run twice, a flow must not
+  fake a Core fact, and flows that set each other off must stop (`adr-20261119-core-events-start-contactless-runs`).
+  Enforced: `CoreEventTriggersTest`, `QueuedFlowTriggerEventPublisherTest`, `PublishCoreEventsTest`,
+  `ContactTagEventsTest`, `ValidateFlowServiceTest`, `BuiltInNodeHandlersTest`, `ConversationBoundariesTest`.
+
 ## Rules
 
 - **Keep old handler versions registered after a breaking change.** The registry resolves by
@@ -253,7 +266,7 @@ broken.
   `PruneAutomationRunsCommandTest`.
 - **A node that needs a contact is never published into a flow whose trigger gives none.** A handler declares
   `contact`, `none` or `any` through Foundation's `DeclaresContextRequirementInterface` (Solutions too); one that
-  declares nothing needs a contact. Under a `schedule`, `webhook` or `api` trigger, validate and publish refuse such a node, and
+  declares nothing needs a contact. Under a `schedule`, `webhook` or `api` trigger, or an `event` trigger on a Core event (`TriggerContactContext`), validate and publish refuse such a node, and
   any node whose config reads `contact.*` or `module.*` or uses a contact variable, with `node_needs_contact` at
   `nodes.<id>`. Declare `any` only for a handler checked never to use `NodeExecutionContext::$contactId`,
   `$platform` (both `null` there) or the contact writer without a contact, and hands them on only where the

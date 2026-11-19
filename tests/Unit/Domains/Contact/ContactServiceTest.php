@@ -10,6 +10,7 @@ use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
+use App\Domains\Contact\Events\ContactCreated;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Tenancy\Models\Tenant;
@@ -17,6 +18,7 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Closure;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Event;
 use Mockery;
 use Mockery\MockInterface;
 use Tests\Feature\FeatureTestCase;
@@ -70,6 +72,27 @@ final class ContactServiceTest extends FeatureTestCase
         $this->assertSame($first->id, $second->id);
         $this->assertSame(['username' => 'u1'], $first->fresh()->meta);
         $this->assertSame(1, Contact::query()->count());
+    }
+
+    public function test_find_or_create_announces_only_a_really_created_contact(): void
+    {
+        Event::fake([ContactCreated::class]);
+        $tenant = $this->tenant();
+
+        $contact = $this->runInTenant($tenant, function () use ($tenant): Contact {
+            $service = app(ContactServiceInterface::class);
+
+            $created = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram->value, 'ext-evt', [], 'ru');
+            $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram->value, 'ext-evt', [], 'ru');
+
+            return $created;
+        });
+
+        Event::assertDispatchedTimes(ContactCreated::class, 1);
+        Event::assertDispatched(ContactCreated::class, fn (ContactCreated $event): bool => $tenant->getId() === $event->tenantId
+            && $contact->id === $event->contactId
+            && PlatformEnum::Telegram->value === $event->platform
+            && 'ru' === $event->language);
     }
 
     public function test_find_or_create_separates_contacts_by_platform_for_same_external_id(): void

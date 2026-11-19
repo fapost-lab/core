@@ -6,6 +6,7 @@ namespace App\Domains\Broadcasting\Jobs;
 
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\RecipientStatus;
+use App\Domains\Broadcasting\Events\BroadcastCompleted;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Services\BroadcastRecipientResolver;
 use App\Domains\Broadcasting\Services\BroadcastService;
@@ -93,11 +94,19 @@ final class RunBroadcastJob implements ShouldQueue, TenantAccessGatedJob
             $recipients = $resolver->resolve($broadcast);
 
             if ($recipients->isEmpty()) {
-                $broadcast->update([
-                    'status'           => BroadcastStatus::Completed->value,
-                    'total_recipients' => 0,
-                    'completed_at'     => Carbon::now(),
-                ]);
+                // Conditional, like the last recipient's: a cancel that landed since the read keeps the broadcast cancelled.
+                $completed = Broadcast::query()
+                    ->whereKey($this->broadcastId)
+                    ->where('status', BroadcastStatus::Running->value)
+                    ->update([
+                        'status'           => BroadcastStatus::Completed->value,
+                        'total_recipients' => 0,
+                        'completed_at'     => Carbon::now(),
+                    ]);
+
+                if (1 === $completed) {
+                    event(new BroadcastCompleted($this->tenantId, $this->broadcastId, (string) $broadcast->name, 0, 0, 0));
+                }
 
                 return;
             }
