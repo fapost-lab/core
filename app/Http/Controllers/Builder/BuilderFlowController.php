@@ -54,6 +54,7 @@ final class BuilderFlowController extends Controller
                 'kind'                => $dto->kind,
                 'availableTemplates'  => $dto->availableTemplates,
                 'usedBy'              => $dto->usedBy,
+                'webhookEndpoints'    => (object) $dto->webhookEndpoints,
                 'readOnly'            => $writeGuard->refusesWritesFor($request->user()),
             ],
             'backUrl' => route('template' === $dto->kind ? 'console.flow-templates.index' : 'console.flows.index', ['assistant' => $dto->assistantId]),

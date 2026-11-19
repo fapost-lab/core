@@ -25,13 +25,15 @@ enum AuditAction: string
     case ChannelTokenRotated       = 'channel.token_rotated';
     case ChannelWebhookHashRotated = 'channel.webhook_hash_rotated';
 
-    case FlowCreated      = 'flow.created';
-    case FlowUpdated      = 'flow.updated';
-    case FlowDeleted      = 'flow.deleted';
-    case FlowPublished    = 'flow.published';
-    case FlowGroupCreated = 'flow_group.created';
-    case FlowGroupUpdated = 'flow_group.updated';
-    case FlowGroupDeleted = 'flow_group.deleted';
+    case FlowCreated              = 'flow.created';
+    case FlowUpdated              = 'flow.updated';
+    case FlowDeleted              = 'flow.deleted';
+    case FlowPublished            = 'flow.published';
+    case FlowWebhookUrlCreated    = 'flow.webhook_url_created';
+    case FlowWebhookSecretRotated = 'flow.webhook_secret_rotated';
+    case FlowGroupCreated         = 'flow_group.created';
+    case FlowGroupUpdated         = 'flow_group.updated';
+    case FlowGroupDeleted         = 'flow_group.deleted';
 
     case BroadcastCreated   = 'broadcast.created';
     case BroadcastUpdated   = 'broadcast.updated';
@@ -86,6 +88,8 @@ enum AuditAction: string
             self::FlowUpdated,
             self::FlowDeleted,
             self::FlowPublished,
+            self::FlowWebhookUrlCreated,
+            self::FlowWebhookSecretRotated,
             self::FlowGroupCreated,
             self::FlowGroupUpdated,
             self::FlowGroupDeleted => AuditArea::Flows,

@@ -10,6 +10,7 @@ use App\Domains\Audit\DTOs\AuditChanges;
 use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Actions\CreateFlowAction;
+use App\Domains\Flow\Contracts\FlowWebhookEndpointRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowLimitStatus;
 use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
@@ -62,6 +63,7 @@ final readonly class FlowDraftService
         private AuditTrailInterface $audit,
         private TemplateUsageFinder $templateUsages,
         private TemplateUsageRepository $templateIndex,
+        private FlowWebhookEndpointRepositoryInterface $webhookEndpoints,
     ) {
     }
 
@@ -285,6 +287,10 @@ final readonly class FlowDraftService
             $flow->delete();
 
             $this->templateIndex->forgetHost($flow->flow_id);
+
+            // The flow's live trigger rows stay (adr-20261119-flow-triggers-in-definition-live-on-publish), but a webhook
+            // URL is a credential held by an outside system: with the draft gone nobody could rotate or revoke it.
+            $this->webhookEndpoints->deleteForFlow($flow->flow_id);
 
             $this->audit->record(new AuditRecord(
                 action: AuditAction::FlowDeleted,

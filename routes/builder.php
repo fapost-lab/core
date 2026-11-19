@@ -9,6 +9,7 @@ use App\Http\Controllers\Builder\ContactTagsController;
 use App\Http\Controllers\Builder\CredentialOptionsController;
 use App\Http\Controllers\Builder\NodeTypesController;
 use App\Http\Controllers\Builder\StaffOptionsController;
+use App\Http\Controllers\Builder\WebhookEndpointController;
 use App\Http\Middleware\EnsureTenantOnboarded;
 use App\Http\Middleware\RefuseWritesWhenTenantStopped;
 use App\Http\Middleware\SetBuilderRootView;
@@ -21,6 +22,10 @@ Route::middleware(['auth', 'tenant', 'verified', EnsureTenantOnboarded::class, R
     Route::post('/flows/{flow}/validate', [BuilderFlowController::class, 'validate'])
         ->withoutMiddleware(RefuseWritesWhenTenantStopped::class);
     Route::post('/flows/{flow}/publish', [BuilderFlowController::class, 'publish']);
+    Route::post('/flows/{flow}/triggers/{trigger}/webhook', [WebhookEndpointController::class, 'store'])
+        ->whereUuid('trigger');
+    Route::post('/flows/{flow}/triggers/{trigger}/webhook/secret', [WebhookEndpointController::class, 'secret'])
+        ->whereUuid('trigger');
     Route::get('/node-types', [NodeTypesController::class, 'index']);
     Route::get('/tags', [ContactTagsController::class, 'index']);
     Route::get('/staff', [StaffOptionsController::class, 'index']);

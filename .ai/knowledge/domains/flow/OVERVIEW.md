@@ -31,7 +31,7 @@ reviewed_at: 2026-11-19
 ## Responsibility
 
 Flow executes published flow definitions for a contact, or as a contactless automation run
-(no contact, optionally no assistant; started through `Orchestration/AutomationRunner` by `StartAutomationRunJob`, which no trigger dispatches yet). It routes an inbound message or event
+(no contact, optionally no assistant; started through `Orchestration/AutomationRunner` by `StartAutomationRunJob`, which the webhook trigger dispatches). It routes an inbound message or event
 to a flow session, runs node handlers until the flow waits, ends or fails, and persists session
 state. It also owns triggers, subflows, the session lock, run history and logs, the template
 expression engine, and content translation (`Translations/`, `ContentTranslatorInterface`),
@@ -120,6 +120,11 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   transaction (`PublishFlowService`), refusing the publish if any host would break. A host's
   parameter values (`config.parameter_values` on the reference) replace the fields the template
   exposes, in the copy (`adr-20261111-flow-template-parameters`).
+- Webhook triggers: `POST /hooks/flow/{token}` on the tenant's host (`routes/flow-webhook.php`, no `web` group) →
+  `Http/Controllers/Flow/FlowWebhookController` → `Webhook/FlowWebhookReceiver` (endpoint by token, live trigger,
+  limits, Foundation `IngressSpecExecutor`, dedup) → `StartAutomationRunJob` with the request under `flow.webhook`, 202.
+  The builder makes the URL and the secret through `Webhook/FlowWebhookEndpointService`
+  (`adr-20261119-flow-webhook-trigger`).
 - Events and schedules: `StartFlowFromEventJob` (queue `scheduled.triggers`) and
   `DispatchFlowTriggerEventJob`. Timeouts: `ResumeTimedOutSendMessageNodeJob`.
 - Delays: the `delay` handler schedules `ResumeDelayedFlowSessionJob` (queue `flow.execution`)

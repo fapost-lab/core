@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Validation;
 
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
+use App\Domains\Flow\Webhook\WebhookTriggerConfig;
 use InvalidArgumentException;
 
 final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInterface
@@ -77,19 +78,7 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
      */
     private function validateWebhookConfig(array $config): void
     {
-        $method = $config['method'] ?? null;
-        $path   = $config['path'] ?? null;
-        $secret = $config['secret'] ?? null;
-
-        if (! is_string($method) || ! in_array($method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], true)
-             || ! is_string($secret)
-             || '' === mb_trim($secret)) {
-            throw new InvalidArgumentException('Invalid webhook trigger config.');
-        }
-
-        if (null !== $path && (! is_string($path) || '' === mb_trim($path))) {
-            throw new InvalidArgumentException('Invalid webhook trigger config.');
-        }
+        WebhookTriggerConfig::fromConfig($config);
     }
 
     /**

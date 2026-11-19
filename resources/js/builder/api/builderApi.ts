@@ -1,4 +1,4 @@
-import type {BuilderTrigger, FlowDefinition, NodeGroup, NodeTypePayload, ReadOnlyNotice, StateNamespaceEntry, ValidationResult,} from '@builder/dto/types'
+import type {BuilderTrigger, FlowDefinition, NodeGroup, NodeTypePayload, ReadOnlyNotice, StateNamespaceEntry, ValidationResult, WebhookEndpointInfo,} from '@builder/dto/types'
 import {xsrfHeaders} from '@shared/http'
 
 const BASE = '/builder'
@@ -120,3 +120,20 @@ export const testCall = (
     sample: Record<string, string>,
 ): Promise<CallTestResult> =>
     request<{ data: CallTestResult }>('POST', '/call/test', { config, sample }).then((r) => r.data)
+
+export type WebhookSecretResult = WebhookEndpointInfo & { secret: string | null }
+
+/** Creates the flow's webhook URL for a trigger when it has none. The trigger must be in the saved draft. */
+export const createWebhookEndpoint = (flowId: string, triggerId: string): Promise<WebhookEndpointInfo> =>
+    request<{ data: WebhookEndpointInfo }>('POST', `/flows/${flowId}/triggers/${triggerId}/webhook`, {}).then((r) => r.data)
+
+/** Generates a secret (shown once, in `secret`), or stores the sender's own when `secret` is given. */
+export const setWebhookSecret = (flowId: string, triggerId: string, secret: string | null = null): Promise<WebhookSecretResult> =>
+    request<{ data: WebhookSecretResult }>(
+        'POST',
+        `/flows/${flowId}/triggers/${triggerId}/webhook/secret`,
+        secret === null ? {} : { secret },
+    ).then((r) => r.data)
+
+export const generateWebhookSecret = (flowId: string, triggerId: string): Promise<WebhookSecretResult> =>
+    setWebhookSecret(flowId, triggerId)

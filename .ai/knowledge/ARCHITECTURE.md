@@ -143,7 +143,10 @@ Credentials' store) for a call's secret and uses Credentials' type registry, `Se
    `scheduled.triggers`; a `delay` node wakes its session through `ResumeDelayedFlowSessionJob`
    on `flow.execution`, and send-message timeouts through `ResumeTimedOutSendMessageNodeJob`. An automation run
    (a flow started by a trigger, not a message) starts and continues in segments on `flow.automations`
-   (`StartAutomationRunJob`, `ContinueAutomationRunJob`).
+   (`StartAutomationRunJob`, `ContinueAutomationRunJob`). A flow's webhook trigger is a second inbound HTTP path,
+   owned by `flow`, not `channel-ingress`: `POST /hooks/flow/{token}` on the tenant's host, checked with Foundation's
+   `IngressSpec`, deduplicated by delivery id, answered 202 once `StartAutomationRunJob` is queued
+   (`adr-20261119-flow-webhook-trigger`).
 3. **Broadcast fan-out.** `BroadcastDispatcher` → `RunBroadcastJob` → `SendBroadcastRecipientJob`
    on `messaging.broadcast`, throttled by backpressure before the provider limit is hit.
 
