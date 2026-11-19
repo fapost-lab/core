@@ -122,7 +122,12 @@ broken.
   it ran synchronously included — so a long loop of slow nodes never outlives the 60 s job timeout and leaves the
   session stuck `active`. An automation also persists the steps of the iteration in progress (`loop_iteration_step_count`,
   reset by a `loop_end` and by the loop's exit), so a runaway inside or after a loop body that never reaches its
-  `loop_end` stops at `max_iterations` steps of that iteration however many segments it spans. Settings are read through the scoped
+  `loop_end` stops at `max_iterations` steps of that iteration however many segments it spans; a subflow step whose parent a nested
+  call already took further (its child ended in the same call) leaves that call's `loop_iteration_step_count` in place
+  and counts itself only in `step_count`/`loop_step_count`. Known gap: that nested call starts from the count before the
+  subflow step, so each such step is missing from the iteration count until the next `loop_end`; a runaway body with a
+  subflow in it is held by a looser bound than `max_iterations` (about twice it, or only the ceiling and the run
+  deadline for a cycle of subflow nodes alone). Settings are read through the scoped
   `PlatformSettingsReaderInterface`; a lost session lock aborts with `SessionLockLostException`. Why: a loop over a long
   list is legitimate and must not trip the shared budget, while a runaway flow must still free its worker
   (`adr-20261118-segmented-automation-runs`, amendment 2026-11-19). Enforced: `LoopEngineTest`, `AutomationRunTest`,
