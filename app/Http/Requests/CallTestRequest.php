@@ -29,6 +29,7 @@ final class CallTestRequest extends FormRequest
             'config.target'            => ['nullable', 'string'],
             'config.parameters'        => ['nullable', 'array'],
             'config.transport_options' => ['nullable', 'array'],
+            'config.credential_id'     => ['nullable', 'string'],
             'config.success_statuses'  => ['nullable', 'array'],
             'sample'                   => ['nullable', 'array'],
         ];

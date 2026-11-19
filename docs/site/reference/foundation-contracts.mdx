@@ -58,6 +58,24 @@ DTOs: `NodeExecutionContext`, `NodeExecutionResult`, `NodeExecutionStatus`,
 `ExpressionContext`, `ResolvedTrigger`, `TriggerContext`, `CallContext`,
 `CallRequest`, `CallResult`. Enums: `KeyboardMode`, `HistoryEventType`.
 
+### Credentials
+
+Experimental. A read-only view of the tenant's [saved credentials](/using/credentials), for a call transport
+that authorizes requests with them. Core owns writing them.
+
+| Contract | Role |
+|---|---|
+| `Credentials\Contracts\CredentialStoreInterface` | `references()` lists the current tenant's credentials without values; `secret($id)` returns one with its decrypted values. Every call reads in the current tenant and fails without one; another tenant's credential is not found (`CredentialNotFoundException`). Implemented by Core; resolve it for each call and do not keep it |
+| `Credentials\Contracts\CredentialTypeInterface`, `HttpCredentialTypeInterface` | A kind of credential: the fields an admin fills in and, for the HTTP one, how it becomes headers or query parameters (`HttpAuthorization`). Core ships bearer, basic, API key in a header, API key in the query and OAuth 2.0 client credentials |
+| `Credentials\DTO\CredentialReference`, `CredentialField`, `CredentialSecret`, `HttpAuthorization` | A listed credential, a field of a type, a credential with its values, and what to apply to a request. `CredentialSecret` keeps its values private and refuses serialization, so it never reaches a queue or a cache |
+| `Credentials\Enums\CredentialFieldKind` | The kinds of field a type declares |
+| `Credentials\Exceptions\CredentialNotFoundException`, `CredentialUnavailableException` | No such credential in the tenant; the stored secret cannot be read |
+
+`Flow\Call\CallRequest::$credential` carries the credential the `call` node chose, already resolved,
+and is null when there is none. A transport that supports credentials applies it, and keeps its values out of
+the parameters, the options and the result. A request that holds
+a credential cannot be serialized.
+
 ## Channels and ingress
 
 | Contract | Role |

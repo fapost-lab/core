@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domains\Channels\Providers\ChannelsServiceProvider;
 use App\Domains\Contact\Providers\ContactServiceProvider;
 use App\Domains\Conversation\Providers\ConversationServiceProvider;
+use App\Domains\Credentials\Providers\CredentialsServiceProvider;
 use App\Domains\Flow\Providers\FlowServiceProvider;
 use App\Domains\Health\Providers\HealthServiceProvider;
 use App\Domains\Media\Providers\MediaServiceProvider;
@@ -26,6 +27,7 @@ return [
     ChannelsServiceProvider::class,
     ContactServiceProvider::class,
     ConversationServiceProvider::class,
+    CredentialsServiceProvider::class,
     FlowServiceProvider::class,
     HealthServiceProvider::class,
     MediaServiceProvider::class,

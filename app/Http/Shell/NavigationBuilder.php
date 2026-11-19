@@ -13,6 +13,7 @@ use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Conversation\Services\ConversationInbox;
+use App\Domains\Credentials\Models\Credential;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowLog;
@@ -147,6 +148,7 @@ final readonly class NavigationBuilder
                 $user->can(Permission::ViewSystem->value),
             ),
             $this->entry($system, 'console.admin.usage.index', __('console.usage.navigation'), 'gauge', 90, $user->can(Permission::ManageSettings->value)),
+            $this->entry($system, 'console.admin.credentials.index', __('console.credentials.navigation'), 'key-round', 96, $this->canViewAny($user, Credential::class)),
             $this->entry($system, 'console.admin.solutions.index', __('console.solutions.navigation'), 'puzzle', 95, $user->can(Permission::ManageSettings->value)),
             $this->entry(
                 $system,

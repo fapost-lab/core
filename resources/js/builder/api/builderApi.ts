@@ -72,6 +72,17 @@ export interface SelectOption {
 export const fetchStaffOptions = (): Promise<SelectOption[]> =>
     request<{ data: SelectOption[] }>('GET', '/staff').then((r) => r.data)
 
+/** A saved credential as the call node's picker lists it: never a setting, host or secret. */
+export interface CredentialOption {
+    id: string
+    name: string
+    type: string
+}
+
+/** The tenant's saved credentials for the call node's authorization picker. */
+export const fetchCredentialOptions = (): Promise<CredentialOption[]> =>
+    request<{ data: CredentialOption[] }>('GET', '/credentials').then((r) => r.data)
+
 /** Tenant assistants for the notify node (contacts mode) target picker. */
 export const fetchAssistantOptions = (): Promise<SelectOption[]> =>
     request<{ data: SelectOption[] }>('GET', '/assistants').then((r) => r.data)

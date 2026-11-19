@@ -6,6 +6,7 @@ namespace Tests\Feature\Console;
 
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
+use App\Http\Controllers\Admin\CredentialController as AdminCredentialController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
@@ -206,6 +207,13 @@ final class ConsoleRouteInterceptionTest extends FeatureTestCase
             'admin platform settings update' => ['console.admin.platform-settings.update', AdminPlatformSettingsController::class, 'update', 'PUT', 'admin/platform-settings'],
             // Support access log: never a Filament screen.
             'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
+            // Credentials: a new screen, never a Filament one.
+            'admin credentials'         => ['console.admin.credentials.index', AdminCredentialController::class, 'index', 'GET', 'admin/credentials'],
+            'admin credentials create'  => ['console.admin.credentials.create', AdminCredentialController::class, 'create', 'GET', 'admin/credentials/create'],
+            'admin credentials edit'    => ['console.admin.credentials.edit', AdminCredentialController::class, 'edit', 'GET', 'admin/credentials/{record}/edit'],
+            'admin credentials store'   => ['console.admin.credentials.store', AdminCredentialController::class, 'store', 'POST', 'admin/credentials'],
+            'admin credentials update'  => ['console.admin.credentials.update', AdminCredentialController::class, 'update', 'PUT', 'admin/credentials/{record}'],
+            'admin credentials destroy' => ['console.admin.credentials.destroy', AdminCredentialController::class, 'destroy', 'DELETE', 'admin/credentials/{record}'],
             // Usage and limits: a new screen, never a Filament one.
             'admin usage' => ['console.admin.usage.index', AdminUsageController::class, 'index', 'GET', 'admin/usage'],
             // Solutions: a new screen, never a Filament one.

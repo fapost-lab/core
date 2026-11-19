@@ -15,6 +15,7 @@ use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use Tests\Support\FakeUsageMeter;
 use Tests\Support\InMemoryCallExecutionLedger;
+use Tests\Support\InMemoryCredentialStore;
 use Tests\Support\UsageGates;
 use Tests\TestCase;
 
@@ -68,7 +69,7 @@ final class CallNodeExecutionKeyTest extends TestCase
         $meter = FakeUsageMeter::allowing();
 
         return [
-            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger()),
+            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore()),
             $transport,
             $meter,
         ];

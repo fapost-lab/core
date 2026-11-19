@@ -11,7 +11,8 @@ paths:
   - "resources/js/pages/Console/**"
   - "resources/js/console/shell/**"
   - "resources/js/console/lib/**"
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-19
+summary: "How an admin or assistant console screen is built: routes, controllers, props, secrets, tables, confirmation steps"
 ---
 # Console screens
 
@@ -125,7 +126,9 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   shows it empty and an empty value means "keep what is stored". When an external provider refuses after the
   record is saved, the write still succeeds; the toast is a fixed, translated error chosen from the stored outcome
   (the channel's status, or the request's sync outcome), never from an exception, whose message can carry the
-  request URL and with it the secret. Example: `ChannelController`.
+  request URL and with it the secret. A secret form field also goes into the exception handler's `dontFlash`
+  (`bootstrap/app.php`): a refused form flashes its input to the session, and a FormRequest property is not
+  read for that. Examples: `ChannelController`, `CredentialController` (`secrets`).
 - **A step that reaches people carries what the person confirmed and is conditional on the status.**
   The confirmation dialog holds the row's `revision`; the service locks the record, compares it, and
   the write itself carries the status in its `WHERE`, so a double click, a second tab or a replayed POST

@@ -40,6 +40,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | `staff` | `app/Domains/Staff` | Staff users, roles, staff notifications | — |
 | `solution` | `app/Domains/Solution` | Installed extension packages — Solutions and, experimental, connectors (`adr-20261016-connector-package-type`): manifest discovery and validation, the catalog and its cache, `platform:update`, per-tenant activation (`ActiveSolutions`, `SolutionActivator`), the console extension registry (`Console/ConsoleExtensionRegistry`) and the check and publication of a Solution's prebuilt console UI (`SolutionUiBundleReader`, `SolutionUiPublisher`, `PublishedSolutionUi`) | Depend on a domain other than the Tenancy contracts, or on the database outside `Infrastructure` |
 | `audit` | `app/Domains/Audit`, `app/Infrastructure/Audit` | The tenant's audit log: what staff and platform support did in the console and builder, recorded explicitly by the write-path services in their transaction (`AuditTrailInterface`, `adr-20261111-audit-log-explicit-recording`); actor resolution, the screen's policy, sign-in listeners and the retention setting live in `Infrastructure/Audit`; `audit:prune` | Depend on a domain other than the Tenancy contracts; be called from the flow runtime, Messaging, Webhook or broadcast jobs (`AuditBoundariesTest`) |
+| `credentials` | `app/Domains/Credentials` | A tenant's saved credentials: the encrypted store (`EloquentCredentialStore`, the Foundation `CredentialStoreInterface`), credential types and their registry, allowed-host matching, secret masking, the OAuth2 token cache, the write path with its audit entry (`adr-20261119-credentials-store`) | Hand a secret to a log, a queue, a browser or the audit; keep a decrypted secret beyond one call |
 
 `app/Infrastructure/<X>` also holds the seams that compose two domains so neither knows the other:
 `app/Infrastructure/Solution` writes a Solution's actions into the Flow registry and answers Flow's
@@ -57,7 +58,10 @@ both use to list and drop partitions) carry no domain logic and have no knowledg
 
 Domain folders are bounded contexts in naming more than in isolation: Flow reads Contact, Staff,
 Assistant and Media models directly, and import cycles exist (for example Contact↔Flow through
-`NotifyNodeHandler`). The rules below are the boundaries that do hold.
+`NotifyNodeHandler`). Credentials is another: Flow asks the Foundation `CredentialStoreInterface` (bound to
+Credentials' store) for a call's secret and uses Credentials' type registry, `SecretRedactor` and `HostMatcher` in
+`HttpTransport`, while Credentials' OAuth2 type fetches its token through Flow's `GuardedHttpClient`, the egress guard
+(`EgressGuardTest` covers `App\Domains\Credentials` too). The rules below are the boundaries that do hold.
 
 ## Boundaries and dependency direction
 

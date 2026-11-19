@@ -54,6 +54,7 @@ use Psr\Log\NullLogger;
 use RuntimeException;
 use Tests\Support\FakeUsageMeter;
 use Tests\Support\InMemoryCallExecutionLedger;
+use Tests\Support\InMemoryCredentialStore;
 use Tests\Support\UsageGates;
 use Tests\TestCase;
 
@@ -1093,7 +1094,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_call_unknown_transport_routes_to_error(): void
     {
-        $handler = new CallNodeHandler(new CallTransportRegistry(), new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger());
+        $handler = new CallNodeHandler(new CallTransportRegistry(), new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore());
 
         $result = $handler->execute([
             'id'     => 'call-u',
@@ -1709,7 +1710,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $registry = new CallTransportRegistry();
         $registry->register($transport);
 
-        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger());
+        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore());
     }
 
     private function makeHandler(

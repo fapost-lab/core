@@ -112,6 +112,22 @@ messaging platform itself (Telegram, WhatsApp) is the *platform*, not the channe
 Informal synonyms: messenger, bot connection.
 Use in: source code, schema, documentation.
 
+## Credential
+
+A secret a tenant saved once (a bearer token, a basic login, an API key in a header or query, OAuth2 client
+credentials) so that a flow's `call` node can authorize a request without the value sitting in the flow
+definition. A flow names it by `credential_id`; the value is never shown again after saving. A credential
+works only against its allowed hosts.
+
+Use in: source code (`App\Domains\Credentials`), schema, documentation.
+
+## Allowed hosts
+
+The mandatory list (at least one host name or `*.domain`) a credential may be sent to; a call to any other host
+is refused with `credential_host_denied` before a connection is made.
+
+Use in: source code, schema, documentation.
+
 ## Contact
 
 A person who writes to an assistant on a channel. Never a person who works in the admin panels —

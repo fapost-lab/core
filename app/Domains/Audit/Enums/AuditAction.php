@@ -59,6 +59,9 @@ enum AuditAction: string
     case RoleDeleted          = 'role.deleted';
 
     case SettingsUpdated            = 'settings.updated';
+    case CredentialCreated          = 'credential.created';
+    case CredentialUpdated          = 'credential.updated';
+    case CredentialDeleted          = 'credential.deleted';
     case WorkspaceDeletionRequested = 'workspace.deletion_requested';
     case WorkspaceDeletionCancelled = 'workspace.deletion_cancelled';
 
@@ -113,6 +116,9 @@ enum AuditAction: string
             self::RoleDeleted => AuditArea::Staff,
 
             self::SettingsUpdated,
+            self::CredentialCreated,
+            self::CredentialUpdated,
+            self::CredentialDeleted,
             self::WorkspaceDeletionRequested,
             self::WorkspaceDeletionCancelled => AuditArea::Settings,
 

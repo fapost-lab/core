@@ -13,6 +13,7 @@ use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Illuminate\Support\Facades\Http;
 use Tests\Support\InMemoryCallExecutionLedger;
+use Tests\Support\InMemoryCredentialStore;
 use Tests\Support\UsageGates;
 use Tests\TestCase;
 
@@ -24,7 +25,7 @@ final class CallNodeEgressTest extends TestCase
 
         $registry = new CallTransportRegistry();
         $registry->register($this->app->make(HttpTransport::class));
-        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger());
+        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore());
 
         $result = $handler->execute(
             [

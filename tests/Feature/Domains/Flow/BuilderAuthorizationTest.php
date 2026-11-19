@@ -138,6 +138,23 @@ final class BuilderAuthorizationTest extends FeatureTestCase
             ->assertJsonPath('data.status_code', 409);
     }
 
+    public function test_call_test_endpoint_passes_the_credential_id_to_the_tester(): void
+    {
+        Http::fake();
+
+        $this->actingAs($this->userWithFlowPermissions())
+            ->postJson('/builder/call/test', ['config' => [
+                'transport'     => 'http',
+                'target'        => 'GET https://api.example.com/me',
+                'credential_id' => (string) Str::uuid(),
+            ]])
+            ->assertOk()
+            ->assertJsonPath('data.success', false)
+            ->assertJsonPath('data.error_code', 'credential_not_found');
+
+        Http::assertNothingSent();
+    }
+
     private function assertFlowEndpointsForbidden(User $user, FlowDraft $draft): void
     {
         $this->actingAs($user)->get("/builder/flows/{$draft->flow_id}")->assertForbidden();

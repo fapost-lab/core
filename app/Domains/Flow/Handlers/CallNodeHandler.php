@@ -20,6 +20,11 @@ use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Support\UsageUnitKey;
 use Carbon\CarbonImmutable;
+use Fapost\Foundation\Credentials\Contracts\CredentialStoreInterface;
+use Fapost\Foundation\Credentials\DTO\CredentialReference;
+use Fapost\Foundation\Credentials\DTO\CredentialSecret;
+use Fapost\Foundation\Credentials\Exceptions\CredentialNotFoundException;
+use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
@@ -61,6 +66,10 @@ use stdClass;
  *  - `strict_mapping` sends a successful call to `error` (`error_code = mapping_missing`) when a mapped path is absent
  *    from the response, instead of writing null.
  *
+ * The optional `credential_id` names a saved credential of the tenant, applied by the `http` transport: the id is read
+ * as it is, never through a template, so a flow variable cannot pick another credential. A credential that is missing,
+ * cannot be read, or sits on a transport that cannot use one ends the node on `error` before any quota is spent.
+ *
  * The optional `retry` sends a failed call again, with backoff, inside the node's window ({@see CallRetryPolicy}).
  *
  * Legacy nodes (no `transport`/`target`) keep their original behavior through
@@ -95,6 +104,14 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
 
     private const string ERROR_MAPPING_MISSING = 'mapping_missing';
 
+    private const string CREDENTIAL_ID_META = 'credential_id';
+
+    private const string ERROR_CREDENTIAL_UNSUPPORTED = 'credential_unsupported';
+
+    private const string ERROR_CREDENTIAL_NOT_FOUND = 'credential_not_found';
+
+    private const string ERROR_CREDENTIAL_UNAVAILABLE = 'credential_unavailable';
+
     private const string ERROR_SOLUTION_INACTIVE = 'solution_inactive';
 
     private const string ERROR_SOLUTION_NOT_READY = 'solution_not_ready';
@@ -110,6 +127,7 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
         private readonly VariableResolverInterface $variableResolver,
         private readonly PeriodQuota $quota,
         private readonly CallExecutionLedgerInterface $ledger,
+        private readonly CredentialStoreInterface $credentials,
     ) {
     }
 
@@ -152,6 +170,8 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
                         TextField::make('target')
                             ->label('Target')
                             ->placeholder('POST https://example.com/webhook'),
+                        TextField::make('credential_id')
+                            ->label('Saved credential'),
                     ]),
             )
             ->section(
@@ -212,7 +232,7 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
             );
         }
 
-        return $issues;
+        return [...$issues, ...$this->credentialIssues($config)];
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
@@ -251,15 +271,31 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
         $options    = $this->templates->render($rawOptions, $context, $state);
         $options    = is_array($options) ? $options : [];
 
+        $credentialId = is_string($config['credential_id'] ?? null) && '' !== $config['credential_id']
+            ? $config['credential_id']
+            : null;
+
         $callContext = $this->buildContext($context);
         $earlier     = $this->ledger->completed($callContext->tenantId, $callContext->idempotencyKey);
-        $refused     = $this->refuseWhenVolumeUsedUp($context, $earlier);
+        $credential  = null;
+
+        // A replay of a successful call sends nothing, so it needs no credential; any other run resolves it first, so
+        // a refused credential costs no quota.
+        if (null !== $credentialId && null === $earlier) {
+            $credential = $this->resolveCredential($credentialId, $transportId);
+
+            if ($credential instanceof NodeExecutionResult) {
+                return $credential;
+            }
+        }
+
+        $refused = $this->refuseWhenVolumeUsedUp($context, $earlier);
 
         if (null !== $refused) {
             return $refused;
         }
 
-        $request = new CallRequest(target: $target, parameters: $parameters, options: $options);
+        $request = new CallRequest(target: $target, parameters: $parameters, options: $options, credential: $credential);
         $outcome = $this->dispatch(
             $transportId,
             $request,
@@ -282,6 +318,7 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
             metadata: array_filter([
                 self::STATUS_CODE_META     => $result->metadata['status_code'] ?? null,
                 self::ERROR_CODE_META      => $errorCode,
+                self::CREDENTIAL_ID_META   => $credentialId,
                 self::MISSING_PATHS_META   => $mappingFails ? $missing : null,
                 self::IDEMPOTENCY_KEY_META => $callContext->idempotencyKey,
                 self::ATTEMPT_META         => $outcome->attempt,
@@ -296,6 +333,83 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
                     ? $result->errorCode . ': ' . (is_string($result->metadata['solution_id'] ?? null) ? $result->metadata['solution_id'] : 'unknown')
                     : null),
             trace: $this->trace($transportId, $request, $outcome),
+        );
+    }
+
+    /**
+     * The `credential_id` must be a string that names an existing credential of the tenant, on the `http` transport.
+     * Draft saving and publishing share this check: the validator does not tell them apart, so a problem blocks publishing.
+     *
+     * @param  array<string, mixed>  $config
+     *
+     * @return list<NodeConfigIssue>
+     */
+    private function credentialIssues(array $config): array
+    {
+        $id = $config['credential_id'] ?? null;
+
+        if (null === $id || '' === $id) {
+            return [];
+        }
+
+        if (! is_string($id)) {
+            return [NodeConfigIssue::error('call_invalid_credential', 'credential_id must be the id of a saved credential.', 'credential_id')];
+        }
+
+        $transport = is_string($config['transport'] ?? null) && '' !== $config['transport'] ? $config['transport'] : self::DEFAULT_TRANSPORT;
+
+        if (HttpTransport::ID !== $transport) {
+            return [NodeConfigIssue::error(
+                'call_credential_unsupported',
+                'A saved credential can only be used with the http transport.',
+                'credential_id',
+            )];
+        }
+
+        $known = array_filter(
+            $this->credentials->references(),
+            static fn (CredentialReference $reference): bool => $reference->id === $id,
+        );
+
+        if ([] === $known) {
+            return [NodeConfigIssue::error('call_credential_not_found', 'The saved credential does not exist.', 'credential_id')];
+        }
+
+        return [];
+    }
+
+    /**
+     * Reads the credential the node names, or says why the node cannot use it.
+     *
+     * Only the `http` transport applies a credential. The refusal is the node's `error` handle with the code in its
+     * metadata; the credential id is not secret and is kept there.
+     */
+    private function resolveCredential(string $id, string $transportId): CredentialSecret|NodeExecutionResult
+    {
+        if (HttpTransport::ID !== $transportId) {
+            return $this->credentialRefusal(self::ERROR_CREDENTIAL_UNSUPPORTED, $id);
+        }
+
+        try {
+            return $this->credentials->secret($id);
+        } catch (CredentialNotFoundException) {
+            return $this->credentialRefusal(self::ERROR_CREDENTIAL_NOT_FOUND, $id);
+        } catch (CredentialUnavailableException) {
+            return $this->credentialRefusal(self::ERROR_CREDENTIAL_UNAVAILABLE, $id);
+        }
+    }
+
+    private function credentialRefusal(string $code, string $credentialId): NodeExecutionResult
+    {
+        return new NodeExecutionResult(
+            status: NodeExecutionStatus::Executed,
+            sourceHandle: self::HANDLE_ERROR,
+            metadata: [
+                self::ERROR_CODE_META    => $code,
+                self::CREDENTIAL_ID_META => $credentialId,
+            ],
+            // The flow log keeps only this field, so the reason is visible there.
+            errorMessage: $code . ': ' . $credentialId,
         );
     }
 
@@ -551,6 +665,7 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
                 target: $prepared->target,
                 parameters: $prepared->parameters,
                 options: [...$options, CallAttempt::OPTION => $attempt],
+                credential: $prepared->credential,
             );
 
             $result = $this->transports->get($transportId)->execute($request, $callContext);

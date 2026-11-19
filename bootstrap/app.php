@@ -142,6 +142,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustHosts(at: fn (): array => TenantHost::trustedHostPatterns(), subdomains: false);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // A refused form is sent back with its input flashed to the session; the secrets of a credential form are not
+        // flashed (the form shows them empty again), and Laravel's own defaults (passwords) are kept.
+        $exceptions->dontFlash(['secrets']);
+
         // A slug a tenant gave up redirects to its new host for a while, but only for requests that can safely be
         // repeated there. 302 on purpose: a browser keeps no 302, so a tenant that takes its slug back or a redirect
         // that expires is not stuck behind a cached one. Any other method gets the 404 a missing tenant gets. Not an

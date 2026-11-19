@@ -16,7 +16,7 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-11-12
+reviewed_at: 2026-11-19
 ---
 # Staff rules
 
@@ -130,7 +130,7 @@ broken.
   every domain; tenant API token surfaces are the exception (see the token rule below). Review only.
   The enum has 25 cases in seven groups (assistants, content, users, contacts, conversations,
   analytics, system), the deprecated `ManageFlow` included; the policies are `AssistantPolicy`, `ChannelPolicy`, `ContactPolicy`,
-  `ContactGroupPolicy`, `ConversationPolicy`, the Flow policies (`FlowDraftPolicy`,
+  `ContactGroupPolicy`, `ConversationPolicy`, `CredentialPolicy`, the Flow policies (`FlowDraftPolicy`,
   `FlowGroupPolicy`, `FlowLogPolicy`, `FlowSessionPolicy`), `MediaFilePolicy`, `MediaFolderPolicy`,
   `RolePolicy` and `UserPolicy`.
 - **The sensitive permission set lives in `Permission::isSensitive()`** (`RotateChannelToken`,

@@ -12,7 +12,7 @@
  * verbatim params form. Response handling (whole-response save + optional
  * field mapping) is shared.
  */
-import {computed, reactive, ref, watch} from 'vue'
+import {computed, onMounted, reactive, ref, watch} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
 import TemplateInput from './TemplateInput.vue'
 import SearchableSelect from '../SearchableSelect.vue'
@@ -20,7 +20,7 @@ import JsonTree from '../JsonTree.vue'
 import VariableStorageEditor from '@builder/components/editor/variables/VariableStorageEditor.vue'
 import {useKnownGroups} from '@builder/composables/useKnownGroups'
 import {useBuilderStore} from '@builder/store/builderStore'
-import {type CallTestResult, testCall} from '@builder/api/builderApi'
+import {type CallTestResult, fetchCredentialOptions, type CredentialOption, testCall} from '@builder/api/builderApi'
 import type {Variable} from '@builder/dto/types'
 
 const props = defineProps({
@@ -52,6 +52,15 @@ const SUCCESS_WHEN  = [
 interface KvRow { field: string; value: string }
 interface MapRow { from: string; to: Variable | null }
 
+// Saved credentials, loaded once (http transport only uses them). An empty list when the user may not list them.
+const credentialOptions = ref<CredentialOption[]>([])
+const credentialsLoaded = ref(false)
+
+onMounted(async () => {
+    credentialOptions.value = await fetchCredentialOptions().catch(() => [])
+    credentialsLoaded.value = true
+})
+
 const form = reactive({
     transport:    'http' as 'http' | 'handler',
     method:       'POST',
@@ -67,7 +76,8 @@ const form = reactive({
     queryRows:    [] as KvRow[],
     headerRows:   [] as KvRow[],
     // auth
-    authMode:     'none' as 'none' | 'bearer' | 'basic',
+    authMode:     'none' as 'none' | 'credential' | 'bearer' | 'basic',
+    credentialId: '',
     authBearer:   '',
     authUser:     '',
     authPass:     '',
@@ -140,15 +150,19 @@ function hydrate() {
     // handler params = everything (no prefixes expected)
     form.handlerParams = Object.entries(params).map(([field, value]) => ({ field, value: String(value ?? '') }))
 
-    // auth
-    if (typeof params['auth.bearer'] === 'string') {
-        form.authMode = 'bearer'; form.authBearer = params['auth.bearer'] as string
+    // auth: a saved credential wins; the inline modes keep working for flows that already carry them
+    if (typeof cfg.credential_id === 'string' && cfg.credential_id !== '') {
+        form.authMode = 'credential'; form.credentialId = cfg.credential_id
+        form.authBearer = ''; form.authUser = ''; form.authPass = ''
+    } else if (typeof params['auth.bearer'] === 'string') {
+        form.authMode = 'bearer'; form.authBearer = params['auth.bearer'] as string; form.credentialId = ''
     } else if (typeof params['auth.basic.username'] === 'string' || typeof params['auth.basic.password'] === 'string') {
         form.authMode = 'basic'
         form.authUser = String(params['auth.basic.username'] ?? '')
         form.authPass = String(params['auth.basic.password'] ?? '')
+        form.credentialId = ''
     } else {
-        form.authMode = 'none'; form.authBearer = ''; form.authUser = ''; form.authPass = ''
+        form.authMode = 'none'; form.authBearer = ''; form.authUser = ''; form.authPass = ''; form.credentialId = ''
     }
 
     form.bodyRaw     = typeof opts.body_raw === 'string' ? opts.body_raw : ''
@@ -220,6 +234,8 @@ function commit() {
         body_mode:         form.transport === 'http' ? form.bodyMode : undefined,
         success_statuses:  parseStatuses(form.successStatuses).length > 0 ? parseStatuses(form.successStatuses) : undefined,
         strict_mapping:    form.strictMapping ? true : undefined,
+        // A saved credential is for the http transport only; the key is dropped when another mode (or the handler) is chosen.
+        credential_id:     form.transport === 'http' && form.authMode === 'credential' && form.credentialId !== '' ? form.credentialId : undefined,
         retry:             form.retryEnabled
             ? { max_attempts: form.retryAttempts, delay_ms: form.retryDelay, backoff: form.retryBackoff, on: form.retryOn }
             : undefined,
@@ -363,6 +379,7 @@ async function runTest() {
                 parameters:        cfg.parameters,
                 transport_options: cfg.transport_options,
                 success_statuses:  cfg.success_statuses,
+                credential_id:     cfg.transport === 'http' ? cfg.credential_id : undefined,
             },
             sample,
         )
@@ -441,14 +458,35 @@ async function runTest() {
                 <button class="add-btn" @click="addRow(form.headerRows)">+ Add header</button>
             </AccordionSection>
 
-            <AccordionSection title="Auth">
+            <AccordionSection title="Authorization" default-open>
                 <div class="config-field">
-                    <select class="field-input" :value="form.authMode" @change="form.authMode = ($event.target as HTMLSelectElement).value as 'none'|'bearer'|'basic'; commit()">
+                    <select class="field-input" data-testid="auth-mode" :value="form.authMode" @change="form.authMode = ($event.target as HTMLSelectElement).value as 'none'|'credential'|'bearer'|'basic'; commit()">
                         <option value="none">None</option>
-                        <option value="bearer">Bearer token</option>
-                        <option value="basic">Basic auth</option>
+                        <option value="credential">Saved credential</option>
+                        <option value="bearer">Bearer token (stored in the flow definition)</option>
+                        <option value="basic">Basic auth (stored in the flow definition)</option>
                     </select>
                 </div>
+                <div v-if="form.authMode === 'credential'" class="config-field">
+                    <div class="field-label">Credential</div>
+                    <select class="field-input" data-testid="credential-select" :value="form.credentialId" @change="form.credentialId = ($event.target as HTMLSelectElement).value; commit()">
+                        <option value="">—</option>
+                        <option v-for="c in credentialOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
+                        <!-- A saved id the list does not have (deleted, or not listed to this user) stays visible rather than silently cleared. -->
+                        <option v-if="form.credentialId !== '' && !credentialOptions.some(c => c.id === form.credentialId)" :value="form.credentialId">
+                            {{ credentialsLoaded ? 'Unavailable credential' : '…' }}
+                        </option>
+                    </select>
+                    <p v-if="credentialsLoaded && credentialOptions.length === 0" class="field-help">
+                        No saved credentials yet. Add one in Administration → System → Credentials.
+                    </p>
+                    <p v-else class="field-help">
+                        The secret is applied when the call runs and is never stored in the flow. It is sent only to the hosts the credential allows.
+                    </p>
+                </div>
+                <p v-if="form.authMode === 'bearer' || form.authMode === 'basic'" class="field-help auth-warn">
+                    ⚠ These values are stored in the flow definition, readable by everyone who can open the flow. Prefer a saved credential for a real secret.
+                </p>
                 <div v-if="form.authMode === 'bearer'" class="config-field">
                     <div class="field-label">Token</div>
                     <TemplateInput v-model="form.authBearer" placeholder="{{flow.api_token}}" @update:model-value="commit" />
@@ -696,6 +734,7 @@ async function runTest() {
 .kv-key { flex: 0 0 38%; }
 .field-help { margin: 5px 0 0; font-size: 11.5px; color: var(--text-3); line-height: 1.5; }
 .field-help code { font-family: var(--font-mono); }
+.auth-warn { color: var(--warning, var(--text-3)); }
 .mode-toggle { display: flex; gap: 4px; }
 .mode-pill {
     flex: 1; padding: 5px; border: 1px solid var(--border); border-radius: 6px;
