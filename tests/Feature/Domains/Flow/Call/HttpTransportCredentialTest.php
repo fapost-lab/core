@@ -246,6 +246,50 @@ final class HttpTransportCredentialTest extends CredentialsTestCase
         Http::assertNotSent(static fn (Request $request): bool => str_contains($request->url(), 'api.example.com'));
     }
 
+    public function test_a_static_credential_with_a_one_second_timeout_is_sent(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+        $secret = $this->secretOf($this->credential());
+
+        $result = $this->execute(new CallRequest('GET https://api.example.com/x', options: ['timeout' => 1], credential: $secret));
+
+        $this->assertTrue($result->success);
+        Http::assertSent(static fn (Request $request): bool => ['Bearer ' . self::SECRET] === $request->header('Authorization'));
+    }
+
+    public function test_a_static_secret_the_client_refuses_as_a_header_value_comes_back_masked(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+        $secret = $this->secretOf($this->credential(['secret' => ['token' => self::SECRET . "\x01"]]));
+
+        $result = $this->execute(new CallRequest('GET https://api.example.com/x', credential: $secret));
+
+        $this->assertSame('transport_failure', $result->errorCode);
+        $this->assertStringContainsString('***', $result->metadata['exception']);
+        $this->assertStringNotContainsString(self::SECRET, $result->metadata['exception']);
+        Http::assertNothingSent();
+    }
+
+    public function test_an_oauth2_token_the_client_refuses_as_a_header_value_comes_back_masked(): void
+    {
+        Http::fake([
+            'auth.example.com/*' => Http::response(['access_token' => "tok-ctrl\x01-1234", 'expires_in' => 3600]),
+            'api.example.com/*'  => Http::response([], 200),
+        ]);
+        $secret = $this->secretOf($this->credential([
+            'type'          => OAuth2ClientCredentialsType::ID,
+            'allowed_hosts' => ['api.example.com', 'auth.example.com'],
+            'settings'      => ['token_url' => 'https://auth.example.com/oauth/token', 'client_id' => 'client-1', 'client_auth' => 'basic'],
+            'secret'        => ['client_secret' => self::SECRET],
+        ]));
+
+        $result = $this->execute(new CallRequest('GET https://api.example.com/x', credential: $secret));
+
+        $this->assertSame('transport_failure', $result->errorCode);
+        $this->assertStringNotContainsString('tok-ctrl', $result->metadata['exception']);
+        Http::assertNotSent(static fn (Request $request): bool => str_contains($request->url(), 'api.example.com'));
+    }
+
     public function test_a_401_from_an_oauth2_target_drops_the_cached_token(): void
     {
         Http::fake([

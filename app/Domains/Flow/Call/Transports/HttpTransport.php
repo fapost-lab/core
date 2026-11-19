@@ -59,7 +59,8 @@ use Psr\Log\LoggerInterface;
  *  - the credential's type supplies the headers and query, which replace the author's of the same name (headers
  *    compared case-insensitively); the author's `auth.bearer` / `auth.basic.*` are ignored;
  *  - a redirect is not followed, the 3xx is the answer;
- *  - every returned result, error ones and exception messages included, has the credential's secret strings
+ *  - every returned result, error ones and exception messages included (a header value or URL the HTTP client
+ *    refuses is `transport_failure`, not a thrown exception), has the credential's secret strings
  *    replaced by `***` ({@see SecretRedactor}), so what the ledger, the state and the logs get is already masked;
  *  - a type that cannot authorize (the OAuth2 endpoint did not give a token, a setting is missing) is
  *    `credential_unavailable`; a 401 from an OAuth2 target drops the cached token.
@@ -79,6 +80,8 @@ final readonly class HttpTransport implements CallTransportInterface
 
     /**
      * The least time worth sending the target request with, once authorizing a credential has spent part of the timeout.
+     * A short timeout lowers it to half of itself, so a call with a 1 s timeout (or a retry cut to 1 s) is still sent
+     * when authorizing took only milliseconds.
      */
     private const float MIN_TARGET_SECONDS = 1.0;
 
@@ -129,7 +132,7 @@ final readonly class HttpTransport implements CallTransportInterface
         $timeout = (int) ($request->options['timeout'] ?? self::DEFAULT_TIMEOUT_SECONDS);
         $left    = $timeout - (hrtime(true) - $startedAt) / 1e9;
 
-        if ($timeout > 0 && $left < self::MIN_TARGET_SECONDS) {
+        if ($timeout > 0 && $left < min(self::MIN_TARGET_SECONDS, $timeout / 2)) {
             $this->logger->warning('Call node credential took the whole timeout to authorize; the request was not sent.', [
                 'tenant_id'     => $context->tenantId,
                 'node_id'       => $context->nodeId,
@@ -139,7 +142,14 @@ final readonly class HttpTransport implements CallTransportInterface
             return CallResult::error('credential_unavailable', metadata: ['reason' => 'timeout']);
         }
 
-        $result = $this->send($method, $url, $request, $context, $authorization, $timeout > 0 ? $left : null);
+        try {
+            $result = $this->send($method, $url, $request, $context, $authorization, $timeout > 0 ? $left : null);
+        } catch (InvalidArgumentException $exception) {
+            // The HTTP client refuses a header value or a URL it cannot send by quoting it whole, and the value may be
+            // the credential's (an IdP may hand back any token): the message leaves here masked, as a result, never
+            // as an exception a worker log or the builder would print.
+            $result = CallResult::error('transport_failure', metadata: ['exception' => $exception->getMessage()]);
+        }
 
         if (401 === ($result->metadata['status_code'] ?? null) && OAuth2ClientCredentialsType::ID === $credential->type) {
             $this->container->make(OAuth2TokenCache::class)->forget($credential->tenantId, $credential->id);
