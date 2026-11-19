@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue'
+import type {BuilderTrigger} from '@builder/dto/types'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useNavigationStore} from '@builder/store/navigationStore'
@@ -35,7 +36,7 @@ const navigationStore = useNavigationStore()
  */
 function onCanvasClick(event: MouseEvent) {
     const target = event.target as HTMLElement | null
-    if (target && !target.closest('.node-card, .trigger-card')) {
+    if (target && !target.closest('.node-card, .trigger-card, .trigger-add')) {
         selectionStore.clear()
     }
 }
@@ -288,20 +289,13 @@ function goToBreadcrumb(branch: string[]) {
 
 const isAtRoot = computed(() => selectionStore.activeBranch.length === 0)
 
-const triggerLabel = computed(() => {
-    if (!builderStore.trigger || builderStore.trigger._delete === true) {
-        return {
-            label: 'No trigger configured',
-            sub: 'Click to add a trigger',
-        }
-    }
-
-    const type = builderStore.trigger.type.replace(/_/g, ' ')
+function describeTrigger(trigger: BuilderTrigger): { label: string; sub: string } {
+    const type = trigger.type.replace(/_/g, ' ')
     const label = `${type.charAt(0).toUpperCase()}${type.slice(1)} trigger`
 
-    if (builderStore.trigger.type === 'message') {
-        const keywords = (builderStore.trigger.config?.keywords as unknown[]) ?? []
-        const phrases = (builderStore.trigger.config?.phrases as unknown[]) ?? []
+    if (trigger.type === 'message') {
+        const keywords = (trigger.config?.keywords as unknown[]) ?? []
+        const phrases = (trigger.config?.phrases as unknown[]) ?? []
         const total = keywords.length + phrases.length
 
         return {
@@ -310,18 +304,36 @@ const triggerLabel = computed(() => {
         }
     }
 
-    if (builderStore.trigger.type === 'event') {
+    if (trigger.type === 'event') {
         return {
             label,
-            sub: builderStore.trigger.config?.event_name ?? 'No event selected',
+            sub: (trigger.config?.event_name as string) || 'No event selected',
         }
     }
 
     return {
         label,
-        sub: builderStore.trigger.is_active ? 'Active' : 'Inactive',
+        sub: trigger.is_active ? 'Active' : 'Inactive',
     }
-})
+}
+
+const triggerCards = computed(() =>
+    builderStore.triggers.map((trigger) => ({ id: trigger.id, ...describeTrigger(trigger) })),
+)
+
+function addTrigger() {
+    const id = builderStore.addTrigger()
+    if (id !== '') {
+        selectionStore.select(`__trigger__:${id}`)
+    }
+}
+
+function removeTrigger(id: string) {
+    if (selectionStore.selectedTriggerId === id) {
+        selectionStore.clear()
+    }
+    builderStore.deleteTrigger(id)
+}
 
 const hoveredSlot = ref<string | null>(null)
 
@@ -401,15 +413,41 @@ const trailingInsertContext = computed(() => {
             </div>
 
             <div class="sequence-card-body">
-                <!-- Trigger card (only at root) -->
+                <!-- Trigger cards (only at root) -->
                 <template v-if="isAtRoot && !builderStore.isTemplate">
-                    <div class="trigger-card" @click="selectionStore.selectTrigger()">
+                    <div v-if="triggerCards.length === 0" class="trigger-card" @click="addTrigger()">
                         <div class="trigger-icon">⚡</div>
                         <div>
-                            <div class="trigger-label">{{ triggerLabel.label }}</div>
-                            <div v-if="triggerLabel.sub" class="trigger-sub">{{ triggerLabel.sub }}</div>
+                            <div class="trigger-label">No trigger configured</div>
+                            <div class="trigger-sub">Click to add a trigger</div>
                         </div>
                     </div>
+                    <div
+                        v-for="card in triggerCards"
+                        :key="card.id"
+                        class="trigger-card"
+                        :class="{ 'trigger-card--selected': selectionStore.selectedTriggerId === card.id }"
+                        @click="selectionStore.selectTrigger(card.id)"
+                    >
+                        <div class="trigger-icon">⚡</div>
+                        <div class="trigger-body">
+                            <div class="trigger-label">{{ card.label }}</div>
+                            <div v-if="card.sub" class="trigger-sub">{{ card.sub }}</div>
+                        </div>
+                        <button
+                            v-if="!builderStore.readOnly"
+                            type="button"
+                            class="trigger-remove"
+                            title="Delete trigger"
+                            @click.stop="removeTrigger(card.id)"
+                        >×</button>
+                    </div>
+                    <button
+                        v-if="triggerCards.length > 0 && !builderStore.readOnly"
+                        type="button"
+                        class="trigger-add"
+                        @click="addTrigger()"
+                    >+ Add trigger</button>
                 </template>
 
                 <!-- Nodes -->

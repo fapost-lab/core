@@ -75,7 +75,7 @@ final readonly class FlowDraftService
     {
         return $this->scoped()
             ->where('flow_drafts.kind', $kind->value)
-            ->with('trigger')
+            ->with('triggerRows')
             ->addSelect([
                 'published_version' => FlowDefinition::query()
                     ->selectRaw('MAX(version)')

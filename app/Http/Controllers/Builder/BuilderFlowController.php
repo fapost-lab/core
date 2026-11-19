@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Builder;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowValidationResultDto;
 use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
+use App\Domains\Flow\Services\FlowTriggerSet;
 use App\Domains\Flow\Services\LoadBuilderFlowService;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Services\SaveDraftService;
@@ -42,7 +43,7 @@ final class BuilderFlowController extends Controller
                 'draftVersion'        => $dto->draftVersion,
                 'publishedVersion'    => $dto->publishedVersion,
                 'definition'          => $dto->definition,
-                'trigger'             => $dto->trigger,
+                'triggers'            => $dto->triggers,
                 'availableEvents'     => $dto->availableEvents,
                 'publishedAt'         => $dto->publishedAt?->toIso8601String(),
                 'contentBaseLanguage' => $dto->contentBaseLanguage,
@@ -66,7 +67,8 @@ final class BuilderFlowController extends Controller
      * publish ({@see PublishFlowService}).
      *
      * The only failure modes here are structural: optimistic-lock conflict
-     * (handled by SaveDraftService → 409) and unparseable trigger payload.
+     * (handled by SaveDraftService → 409) and an unparseable trigger list.
+     * Saving never makes a trigger live: publishing does.
      * This lets authors create an empty flow and immediately attach it as
      * `default_flow_id` on an assistant before fleshing out the graph.
      */
@@ -78,14 +80,14 @@ final class BuilderFlowController extends Controller
         $definition      = $request->validated('definition');
         $definitionNodes = $this->extractDefinitionNodes($definition);
         $definitionEdges = $this->extractDefinitionEdges($definition);
-        $triggerPayload  = $this->normalizeTriggerPayload($request->validated('trigger'));
+        $validated       = $request->validated();
 
         try {
             $newDraftVersion = $service->execute(
                 flowId: $flow,
                 nodes: $definitionNodes,
                 edges: $definitionEdges,
-                trigger: $triggerPayload,
+                triggers: array_key_exists('triggers', $validated) ? $validated['triggers'] : null,
                 expectedDraftVersion: $request->validated('draft_version'),
             );
         } catch (InvalidTriggerPayloadException $exception) {
@@ -93,7 +95,7 @@ final class BuilderFlowController extends Controller
                 'message' => $exception->getMessage(),
                 'errors'  => [
                     [
-                        'path'    => 'trigger.config',
+                        'path'    => 'triggers',
                         'message' => $exception->getMessage(),
                     ],
                 ],
@@ -109,16 +111,22 @@ final class BuilderFlowController extends Controller
         ValidateFlowService $service,
         FlowDraftRepositoryInterface $drafts,
         TemplateExpander $templates,
+        FlowTriggerSet $triggerSet,
     ): JsonResponse {
+        $validated       = $request->validated();
         $definition      = $request->validated('definition');
         $definitionNodes = $this->extractDefinitionNodes($definition);
         $definitionEdges = $this->extractDefinitionEdges($definition);
-        $triggerPayload  = $this->normalizeTriggerPayload($request->validated('trigger'));
         $draft           = $drafts->findByFlowId($flow);
+
+        // The list is checked as the builder sent it, item by item; only an absent one falls back to the draft's.
+        $triggers = array_key_exists('triggers', $validated) && is_array($validated['triggers'])
+            ? array_values($validated['triggers'])
+            : $triggerSet->ofDraft($draft);
 
         $result = $service->execute(
             nodes: $definitionNodes,
-            trigger: $triggerPayload,
+            triggers: $triggers,
             flowId: $flow,
             edges: $definitionEdges,
             assistantId: $draft->assistant_id,
@@ -181,23 +189,5 @@ final class BuilderFlowController extends Controller
         $edges = $definition['edges'] ?? [];
 
         return is_array($edges) ? $edges : [];
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $trigger
-     *
-     * @return array<string, mixed>|null
-     */
-    private function normalizeTriggerPayload(?array $trigger): ?array
-    {
-        if (null === $trigger || [] === $trigger) {
-            return null;
-        }
-
-        if (true === ($trigger['_delete'] ?? false)) {
-            return $trigger;
-        }
-
-        return isset($trigger['type']) ? $trigger : null;
     }
 }

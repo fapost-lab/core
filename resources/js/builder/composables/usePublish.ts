@@ -28,7 +28,7 @@ export function usePublish() {
             const { draft_version: draftVersion } = await saveDraft(
                 store.flowId!,
                 store.definition,
-                store.trigger,
+                store.triggers,
                 store.draftVersion,
             );
 

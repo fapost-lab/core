@@ -1,4 +1,5 @@
 import {defineStore} from 'pinia'
+import {newUlidAsUuid} from '@builder/utils/ulid'
 import {computed, nextTick, ref, watch} from 'vue'
 import {nanoid} from 'nanoid'
 import {buildTree} from '@builder/utils/buildTree'
@@ -16,7 +17,7 @@ import type {
   TemplateParameterDeclaration,
   FlowKind,
   BuilderFlowPayload,
-  BuilderTriggerPayload,
+  BuilderTrigger,
   FlowDefinition,
   FlowEdge,
   FlowNode,
@@ -26,15 +27,6 @@ import type {
   TriggerType,
   ValidationResult,
 } from '@builder/dto/types'
-
-/** Internal full trigger shape (no delete marker). */
-interface ActiveTrigger {
-    _delete?: false
-    type: TriggerType
-    is_active: boolean
-    priority: number
-    config: Record<string, unknown>
-}
 
 function normalizeDefinition(raw: unknown): FlowDefinition {
     if (raw == null) {
@@ -56,38 +48,40 @@ function normalizeDefinition(raw: unknown): FlowDefinition {
     return { nodes: [], edges: [] }
 }
 
-function normalizeTrigger(raw: unknown): BuilderTriggerPayload | null {
-    if (!raw || typeof raw !== 'object') {
-        return null
+function normalizeTriggers(raw: unknown): BuilderTrigger[] {
+    if (!Array.isArray(raw)) {
+        return []
     }
 
-    const trigger = raw as { _delete?: unknown; type?: unknown; is_active?: unknown; priority?: unknown; config?: unknown }
+    const triggers: BuilderTrigger[] = []
 
-    if (trigger._delete === true) {
-        return { _delete: true }
+    for (const item of raw) {
+        if (!item || typeof item !== 'object') {
+            continue
+        }
+
+        const trigger = item as { id?: unknown; type?: unknown; is_active?: unknown; priority?: unknown; config?: unknown }
+
+        if (typeof trigger.id !== 'string' || trigger.id === '' || typeof trigger.type !== 'string') {
+            continue
+        }
+
+        triggers.push({
+            id: trigger.id,
+            type: trigger.type as TriggerType,
+            is_active: typeof trigger.is_active === 'boolean' ? trigger.is_active : true,
+            priority: Number.isInteger(trigger.priority) ? (trigger.priority as number) : 100,
+            config: typeof trigger.config === 'object' && trigger.config !== null
+                ? (trigger.config as Record<string, unknown>)
+                : {},
+        })
     }
 
-    if (typeof trigger.type !== 'string') {
-        return null
-    }
-
-    return {
-        type: trigger.type as TriggerType,
-        is_active: typeof trigger.is_active === 'boolean' ? trigger.is_active : true,
-        priority: Number.isInteger(trigger.priority) ? (trigger.priority as number) : 100,
-        config: typeof trigger.config === 'object' && trigger.config !== null
-            ? (trigger.config as Record<string, unknown>)
-            : {},
-    }
+    return triggers
 }
 
-function defaultTrigger(): ActiveTrigger {
-    return {
-        type: 'message',
-        is_active: true,
-        priority: 100,
-        config: { keywords: [], phrases: [] },
-    }
+function defaultTriggerConfig(type: TriggerType): Record<string, unknown> {
+    return type === 'message' ? { keywords: [], phrases: [] } : {}
 }
 
 export const useBuilderStore = defineStore('builder', () => {
@@ -96,7 +90,7 @@ export const useBuilderStore = defineStore('builder', () => {
     const draftVersion = ref<number | null>(null)
     const publishedVersion = ref<number | null>(null)
     const definition = ref<FlowDefinition>({ nodes: [], edges: [] })
-    const trigger = ref<BuilderTriggerPayload | null>(null)
+    const triggers = ref<BuilderTrigger[]>([])
   /**
    * Tenant-wide event registry as loaded from the server when the flow
    * opened. `availableEvents` (below) merges this with locally declared
@@ -330,7 +324,7 @@ export const useBuilderStore = defineStore('builder', () => {
         const refreshedTemplates = refreshTemplateSnapshots(definition.value.nodes, availableTemplates.value)
         const healedLoops = healLoopConstructs(definition.value)
         const healedEnd   = healTerminalEnd(definition.value)
-        trigger.value = normalizeTrigger(flow.trigger)
+        triggers.value = normalizeTriggers(flow.triggers)
       tenantEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
         availableLanguages.value = Array.isArray(flow.availableLanguages) ? flow.availableLanguages : []
@@ -363,27 +357,41 @@ export const useBuilderStore = defineStore('builder', () => {
         publishedVersion.value = version
     }
 
-    function setTrigger(nextTrigger: BuilderTriggerPayload | null) {
-        if (readOnly.value) return
-        trigger.value = normalizeTrigger(nextTrigger)
+    /** Appends a new trigger with a fresh id and returns that id ('' in read-only mode). */
+    function addTrigger(type: TriggerType = 'message'): string {
+        if (readOnly.value) return ''
+        // The id becomes the trigger's flow_triggers primary key on publish, so it is a ULID (ADR-03).
+        const id = newUlidAsUuid()
+        triggers.value = [
+            ...triggers.value,
+            { id, type, is_active: true, priority: 100, config: defaultTriggerConfig(type) },
+        ]
+
+        return id
     }
 
-    function updateTrigger(patch: Record<string, unknown>) {
+    function updateTrigger(id: string, patch: Record<string, unknown>) {
         if (readOnly.value) return
-        const current = (trigger.value as ActiveTrigger | null) ?? defaultTrigger()
-        trigger.value = {
+        const index = triggers.value.findIndex((item) => item.id === id)
+        if (index === -1) return
+        const current = triggers.value[index]
+        // Switching the type starts from the patch's own config; otherwise the config is merged.
+        const typeChanged = typeof patch.type === 'string' && patch.type !== current.type
+        const next = {
             ...current,
             ...patch,
+            id: current.id,
             config: {
-                ...(current.config ?? defaultTrigger().config),
+                ...(typeChanged ? {} : current.config),
                 ...((patch.config as Record<string, unknown>) ?? {}),
             },
-        } as BuilderTriggerPayload
+        } as BuilderTrigger
+        triggers.value = triggers.value.map((item, i) => (i === index ? next : item))
     }
 
-    function deleteTrigger() {
+    function deleteTrigger(id: string) {
         if (readOnly.value) return
-        trigger.value = { _delete: true }
+        triggers.value = triggers.value.filter((item) => item.id !== id)
     }
 
     function setSaveStatus(status: SaveStatus) {
@@ -1160,7 +1168,7 @@ export const useBuilderStore = defineStore('builder', () => {
     // Mark the flow dirty on any post-hydration mutation of definition or
     // trigger. Cleared again by `setSaveStatus('saved')` and by `init()`.
     watch(
-        [definition, trigger],
+        [definition, triggers],
         () => {
             if (hydrated) {
                 isDirty.value = true
@@ -1175,7 +1183,7 @@ export const useBuilderStore = defineStore('builder', () => {
         draftVersion,
         publishedVersion,
         definition,
-        trigger,
+        triggers,
         availableEvents,
         contentBaseLanguage,
         availableLanguages,
@@ -1201,7 +1209,7 @@ export const useBuilderStore = defineStore('builder', () => {
         enterReadOnly,
         setDraftVersion,
         setPublishedVersion,
-        setTrigger,
+        addTrigger,
         updateTrigger,
         deleteTrigger,
         setSaveStatus,

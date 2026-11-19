@@ -24,7 +24,8 @@ final class ValidateFlowRequest extends FormRequest
     {
         return [
             'definition' => ['required', 'array'],
-            'trigger'    => ['nullable', 'array'],
+            // Absent: the draft's triggers are checked (the live ones while it carries none).
+            'triggers' => ['sometimes', 'array'],
         ];
     }
 }

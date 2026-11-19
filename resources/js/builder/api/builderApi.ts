@@ -1,4 +1,4 @@
-import type {BuilderTriggerPayload, FlowDefinition, NodeGroup, NodeTypePayload, ReadOnlyNotice, StateNamespaceEntry, ValidationResult,} from '@builder/dto/types'
+import type {BuilderTrigger, FlowDefinition, NodeGroup, NodeTypePayload, ReadOnlyNotice, StateNamespaceEntry, ValidationResult,} from '@builder/dto/types'
 import {xsrfHeaders} from '@shared/http'
 
 const BASE = '/builder'
@@ -90,17 +90,17 @@ export const fetchAssistantOptions = (): Promise<SelectOption[]> =>
 export const saveDraft = (
     flowId: string,
     definition: FlowDefinition,
-    trigger: BuilderTriggerPayload | null,
+    triggers: BuilderTrigger[],
     draftVersion: number | null,
 ): Promise<{ draft_version: number }> =>
-    request('PUT', `/flows/${flowId}/draft`, { definition, trigger, draft_version: draftVersion })
+    request('PUT', `/flows/${flowId}/draft`, { definition, triggers, draft_version: draftVersion })
 
 export const validateFlow = (
     flowId: string,
     definition: FlowDefinition,
-    trigger: BuilderTriggerPayload | null,
+    triggers: BuilderTrigger[],
 ): Promise<ValidationResult> =>
-    request('POST', `/flows/${flowId}/validate`, { definition, trigger })
+    request('POST', `/flows/${flowId}/validate`, { definition, triggers })
 
 export const publishFlow = (flowId: string): Promise<{ version: number }> =>
     request('POST', `/flows/${flowId}/publish`)

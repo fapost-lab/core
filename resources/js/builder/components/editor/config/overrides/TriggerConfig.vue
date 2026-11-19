@@ -18,9 +18,7 @@ const triggerTypes = [
 ]
 
 const currentTrigger = computed(() =>
-    !props.trigger || props.trigger._delete === true
-        ? createDefaultTrigger('message')
-        : props.trigger
+    props.trigger ?? createDefaultTrigger('message')
 )
 
 const triggerCfg = computed((): Record<string, unknown> =>
@@ -64,7 +62,7 @@ function update(patch: Record<string, unknown>) {
 }
 
 function updateType(type: string) {
-    emit('update:trigger', createDefaultTrigger(type))
+    emit('update:trigger', { ...createDefaultTrigger(type), id: currentTrigger.value.id })
 }
 
 function updateArray(key: string, index: number, value: string) {
