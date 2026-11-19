@@ -220,10 +220,15 @@ broken.
   `nodes.<id>`. Declare `any` only for a handler checked never to use `NodeExecutionContext::$contactId`,
   `$platform` (both `null` there) or the contact writer without a contact, and hands them on only where the
   receiver takes `null` — `call` is `any` because `CallContext::$contactId` is nullable; `subflow` stays `contact`
-  until its target is followed. Known gap: a trigger
+  until its target is followed. A Core handler that needs a contact by type may name its recipient in a node's
+  config instead (`App\Domains\Flow\Contracts\NamesOwnRecipientInterface`, Core-only): `send_message` with an
+  `addressee` is then not refused for its type, though the rest of its config still is for contact reads; such a node
+  never waits for an answer (`addressee_cannot_wait`) and never falls back to the run's contact when the addressee
+  gives no id (`error`, `addressee_unresolved`). Known gap: a trigger
   changed on draft save goes live before any publish runs this check.
   Why: a contactless run reaches a contact through an empty id or dies on a typed error nobody watches
-  (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`.
+  (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`,
+  `ContactlessFlowSessionTest` (the addressee), `BuiltInNodeHandlersTest`.
 - **A definition's expression engine is the flow's choice, written explicitly at publish and checked with.** The draft
   holds it (`flow_drafts.expression_engine`); `PublishFlowService` passes the engine on to `ValidateFlowService` and
   `TemplateExpander` and writes it onto the definition — the draft's on a publish, the active definition's on a
