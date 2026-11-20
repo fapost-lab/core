@@ -16,6 +16,7 @@ final readonly class EgressPolicy
      * @param  list<Cidr>  $allowedNetworks
      * @param  list<string>  $allowedHosts  lower-case host names
      * @param  list<string>  $invalidEntries  allowlist entries that were neither a network nor a host name
+     * @param  list<string>  $ownHosts  lower-case hosts this installation serves; their subdomains are its too
      */
     public function __construct(
         public array $allowedNetworks = [],
@@ -23,13 +24,15 @@ final readonly class EgressPolicy
         public int $maxRedirects = 5,
         public ?string $proxy = null,
         public array $invalidEntries = [],
+        public array $ownHosts = [],
     ) {
     }
 
     /**
      * @param  string|null  $allow  comma-separated CIDR ranges, addresses and host names
+     * @param  list<string|null>  $ownHosts  the installation's own hosts (the `APP_URL` host, the tenancy base domain)
      */
-    public static function fromConfig(?string $allow, int $maxRedirects, ?string $proxy): self
+    public static function fromConfig(?string $allow, int $maxRedirects, ?string $proxy, array $ownHosts = []): self
     {
         $networks = [];
         $hosts    = [];
@@ -61,7 +64,34 @@ final readonly class EgressPolicy
             maxRedirects: max(0, $maxRedirects),
             proxy: '' === $proxy ? null : $proxy,
             invalidEntries: $invalid,
+            ownHosts: array_values(array_unique(array_filter(
+                array_map(static fn (?string $host): string => mb_rtrim(mb_strtolower(mb_trim((string) $host)), '.'), $ownHosts),
+                static fn (string $host): bool => '' !== $host,
+            ))),
         );
+    }
+
+    /**
+     * Whether a URL is a flow webhook trigger of this installation (`/hooks/flow/…` on its own host or a subdomain of
+     * it): a call node posting there would start a flow whose call node may post back — a loop of runs with no event in
+     * it to count. A guard against the plain loop, not a boundary: a DNS alias or an outside relay gets past it.
+     */
+    public function isOwnFlowWebhook(string $host, string $path): bool
+    {
+        // The router matches the decoded path, and a front controller in front of it (`/index.php/hooks/flow/…`) too.
+        if (1 !== preg_match('#(^|/)hooks/+flow/#i', rawurldecode($path))) {
+            return false;
+        }
+
+        $host = mb_rtrim(mb_strtolower($host), '.');
+
+        foreach ($this->ownHosts as $own) {
+            if ($host === $own || str_ends_with($host, '.' . $own)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function allowsHost(string $host): bool

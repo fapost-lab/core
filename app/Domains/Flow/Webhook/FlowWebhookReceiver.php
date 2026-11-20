@@ -29,7 +29,7 @@ use Throwable;
 /**
  * Receives one request to a webhook trigger's URL in the current tenant and queues the run it starts.
  *
- * In order: a stopped tenant (503), the body size (413), the per-address limit on unknown tokens (429), the endpoint
+ * In order: a stopped tenant (503), a multipart body (415), the body size (413), the per-address limit on unknown tokens (429), the endpoint
  * behind the token and its live webhook trigger of a published flow whose draft and assistant still exist (404, one answer for every reason), the
  * per-token limit (429), the signature or secret header through Foundation's {@see IngressSpecExecutor} (401), the
  * delivery id and the fire key it makes, the dedup claim (200 duplicate), and finally {@see StartAutomationRunJob} with
@@ -83,6 +83,14 @@ final readonly class FlowWebhookReceiver
             $this->logger->info('flow.webhook.tenant_stopped', ['tenant_id' => $tenantId]);
 
             return WebhookOutcome::tenantStopped(self::STOPPED_RETRY_AFTER_SECONDS);
+        }
+
+        // PHP parses a multipart body itself and leaves php://input empty: the flow would get no body, the size check
+        // nothing to measure, and a signature nothing to cover.
+        if ($request->isMultipart()) {
+            $this->logger->info('flow.webhook.unsupported_media_type', ['tenant_id' => $tenantId]);
+
+            return WebhookOutcome::of(WebhookOutcomeStatus::UnsupportedMediaType);
         }
 
         if (mb_strlen($request->rawBody, '8bit') > self::MAX_BODY_BYTES) {

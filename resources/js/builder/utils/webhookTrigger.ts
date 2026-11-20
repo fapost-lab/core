@@ -71,9 +71,21 @@ export function webhookResponseMode(config: WebhookConfig | null | undefined): '
     return config?.response_mode === 'sync' ? 'sync' : 'async'
 }
 
-/** Sets or clears one key; an empty value is omitted rather than sent as ''. Keeps the response mode, `async` when unset. */
+/** The signed string a timestamp header is given until the author writes their own: `{header.<name>}.{raw}`. */
+function defaultSignedPayload(timestampHeader: unknown): string | undefined {
+    return typeof timestampHeader === 'string' && timestampHeader !== '' ? `{header.${timestampHeader}}.{raw}` : undefined
+}
+
+/**
+ * Sets or clears one key; an empty value is omitted rather than sent as ''. Keeps the response mode, `async` when unset.
+ *
+ * The timestamp header carries its signed string along while that string is still the one filled in for the previous
+ * header (it is typed a character at a time): an unset string, or `{header.<previous>}.{raw}`, follows the new name and
+ * goes with the header when it is cleared. A string the author wrote is never touched.
+ */
 export function withWebhookField(config: WebhookConfig, key: string, value: string | number | null): WebhookConfig {
     const next: WebhookConfig = { ...config, response_mode: webhookResponseMode(config) }
+    const previousDefault = defaultSignedPayload(config.timestamp_header)
 
     if (value === null || value === '' || (typeof value === 'number' && Number.isNaN(value))) {
         delete next[key]
@@ -82,10 +94,20 @@ export function withWebhookField(config: WebhookConfig, key: string, value: stri
     }
 
     if (key === 'timestamp_header') {
+        const followsHeader = next.signed_payload === undefined || next.signed_payload === previousDefault
+
         if (next.timestamp_header === undefined) {
             delete next.timestamp_tolerance
-        } else if (next.signed_payload === undefined) {
-            next.signed_payload = `{header.${String(next.timestamp_header)}}.{raw}`
+        }
+
+        if (followsHeader) {
+            const signed = defaultSignedPayload(next.timestamp_header)
+
+            if (signed === undefined) {
+                delete next.signed_payload
+            } else {
+                next.signed_payload = signed
+            }
         }
     }
 

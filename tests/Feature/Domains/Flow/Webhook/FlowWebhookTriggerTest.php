@@ -77,6 +77,7 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
             'X-GitHub-Delivery' => 'delivery-1',
             'Authorization'     => 'Bearer leaked',
             'Cookie'            => 'session=leaked',
+            'X-Hub-Signature'   => 'sha1=leaked',
             'X-Custom'          => 'kept',
         ], query: '?source=crm')
             ->assertStatus(202)
@@ -98,7 +99,7 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
             $this->assertNotEmpty($webhook['received_at']);
             $this->assertSame('kept', $webhook['headers']['x-custom']);
 
-            foreach (['authorization', 'cookie', 'x-hub-signature-256', 'x-timestamp'] as $stripped) {
+            foreach (['authorization', 'cookie', 'x-hub-signature-256', 'x-hub-signature', 'x-timestamp'] as $stripped) {
                 $this->assertArrayNotHasKey($stripped, $webhook['headers']);
             }
 
@@ -264,6 +265,17 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_a_multipart_post_is_refused_415_before_anything_is_checked(): void
+    {
+        [, , $token] = $this->liveWebhook();
+
+        // PHP keeps a multipart body from php://input: the flow would get no body and the size check nothing to measure.
+        $this->deliver($token, '', ['X-GitHub-Delivery' => 'multi', 'Content-Type' => 'multipart/form-data; boundary=x'])->assertStatus(415);
+        $this->deliver(str_repeat('D', 43), '', ['Content-Type' => 'Multipart/Form-Data; boundary=x'])->assertStatus(415);
+
+        Queue::assertNothingPushed();
+    }
+
     public function test_a_token_over_its_limit_is_answered_429_with_retry_after(): void
     {
         config(['flow.webhook.per_token_per_minute' => 2]);
@@ -284,7 +296,7 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
             $this->deliver($token, '{}', ['X-GitHub-Delivery' => "known-{$i}"]);
         }
 
-        $this->assertSame(0, $this->app->make(\Illuminate\Cache\RateLimiter::class)->attempts('flow-webhook:miss:127.0.0.1'));
+        $this->assertSame(0, $this->app->make(\Illuminate\Cache\RateLimiter::class)->attempts('flow-webhook:miss:' . $this->tenantId . ':127.0.0.1'));
 
         for ($i = 0; $i < FlowWebhookReceiver::UNKNOWN_TOKENS_PER_MINUTE; ++$i) {
             $this->deliver(mb_str_pad((string) $i, 43, 'B'), '{}', [])->assertNotFound();

@@ -43,8 +43,9 @@ A request whose Unix time is further than the **tolerance** (300 seconds by defa
 because the timestamp is part of the signature, an old request cannot be resent with a fresh one. A timestamp
 header without a signed string that contains it is refused at publish.
 
-A secret in the query string is never accepted. The signature, timestamp, `Authorization` and `Cookie` headers are
-not passed on to the flow.
+A secret in the query string is never accepted. The signature, timestamp, `Authorization` and `Cookie` headers, and
+any header with `signature` in its name (such as GitHub's `X-Hub-Signature` next to `X-Hub-Signature-256`), are not
+passed on to the flow.
 
 ## Delivery id: no request runs twice
 
@@ -54,6 +55,10 @@ id** to where the sender puts a unique id of each delivery, as one placeholder:
 - `{header.X-GitHub-Delivery}` — a request header;
 - `{body.id}` or `{body.event.id}` — a field of a JSON body;
 - `{header.X-Delivery-Id|body.id}` — the first of several that is present.
+
+The delivery id cannot be one of the headers the flow never sees — the signature or secret header, the timestamp,
+`Authorization`, `Cookie`: the id is shown in the answer, the history and the run, and the secret would go with it.
+Such a setting is refused at publish.
 
 A request whose delivery id was already seen starts nothing and is answered `200` with `"status": "duplicate"`.
 Repeats are recognised for a day by a quick check, and for as long as the earlier run is kept in the history.
@@ -86,6 +91,7 @@ The flow has no contact, so blocks that need one cannot be published in it; see
 | `404` | No published, active webhook trigger behind this URL |
 | `405` | A method other than `POST` |
 | `413` | The body is larger than 256 KB |
+| `415` | A `multipart/form-data` body: send JSON, a form (`application/x-www-form-urlencoded`) or text |
 | `429` | Too many requests for this URL (see `flow.webhook.per_token_per_minute` in [Platform settings](/self-hosting/platform-settings)), or too many requests to unknown URLs from one address; wait for `Retry-After` |
 | `503` | The workspace is stopped; retry after `Retry-After` seconds |
 

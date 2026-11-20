@@ -289,7 +289,7 @@ final readonly class FlowDraftService
             $this->templateIndex->forgetHost($flow->flow_id);
 
             // The flow's live trigger rows stay (adr-20261119-flow-triggers-in-definition-live-on-publish), but a webhook
-            // URL is a credential held by an outside system: with the draft gone nobody could rotate or revoke it.
+            // URL is a secret held by an outside system: with the draft gone nobody could rotate or revoke it.
             $this->webhookEndpoints->deleteForFlow($flow->flow_id);
 
             $this->audit->record(new AuditRecord(

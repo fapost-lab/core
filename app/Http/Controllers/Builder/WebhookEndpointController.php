@@ -17,7 +17,7 @@ use InvalidArgumentException;
  * The URL and the secret of a flow's webhook trigger, from the builder.
  *
  * Making the URL is an edit of the flow (`update`: ManageFlowDefinitions and the assistant); setting the secret hands a
- * credential to an outside system, so it takes what making the trigger live takes (`manageAutomations`: PublishFlow and
+ * secret to an outside system, so it takes what making the trigger live takes (`manageAutomations`: PublishFlow and
  * ManageAutomations). The
  * secret is in the answer only when the server generated it, and only that once.
  */
@@ -54,11 +54,13 @@ final class WebhookEndpointController extends Controller
             $data = $endpoints->present($endpoints->ensure($draft, $trigger));
         } catch (WebhookEndpointUnavailableException) {
             return $this->unavailable();
-        } catch (InvalidArgumentException $exception) {
-            return response()->json([
-                'message' => $exception->getMessage(),
-                'errors'  => ['secret' => [$exception->getMessage()]],
-            ], 422);
+        } catch (InvalidArgumentException) {
+            $message = __('builder.webhook_trigger.secret_invalid', [
+                'min' => FlowWebhookEndpointService::MIN_SECRET_LENGTH,
+                'max' => FlowWebhookEndpointService::MAX_SECRET_LENGTH,
+            ]);
+
+            return response()->json(['message' => $message, 'errors' => ['secret' => [$message]]], 422);
         }
 
         return response()->json(['data' => [...$data, 'secret' => $shown]]);
@@ -66,6 +68,6 @@ final class WebhookEndpointController extends Controller
 
     private function unavailable(): JsonResponse
     {
-        return response()->json(['message' => 'This flow has no webhook trigger with this id. Save the flow and try again.'], 404);
+        return response()->json(['message' => __('builder.webhook_trigger.not_found')], 404);
     }
 }
