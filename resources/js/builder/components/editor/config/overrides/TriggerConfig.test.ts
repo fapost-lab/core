@@ -8,7 +8,10 @@ vi.mock('@builder/api/builderApi', async (importOriginal) => ({
 }))
 
 
-const {pageProps} = vi.hoisted(() => ({pageProps: {auth: {permissions: [] as string[]}}}))
+const {pageProps} = vi.hoisted(() => ({pageProps: {
+    auth:         {permissions: [] as string[]},
+    translations: {builder: {webhook_trigger: {get_url: 'Get URL', response_async: 'Accept at once (202)'}}},
+}}))
 
 vi.mock('@inertiajs/vue3', () => ({usePage: () => ({props: pageProps})}))
 
@@ -105,6 +108,13 @@ describe('TriggerConfig webhook response mode', () => {
     it('shows the mode the trigger has, async by default', () => {
         expect((mountWebhookTrigger(hmac).find('[data-testid=webhook-response-mode]').element as HTMLSelectElement).value).toBe('async')
         expect((mountWebhookTrigger({...hmac, response_mode: 'sync'}).find('[data-testid=webhook-response-mode]').element as HTMLSelectElement).value).toBe('sync')
+    })
+
+    it('reads the webhook texts from the builder translations', () => {
+        const text = mountWebhookTrigger(hmac).text()
+
+        expect(text).toContain('Get URL')
+        expect(text).toContain('Accept at once (202)')
     })
 
     it('switches to waiting for the flow\'s answer without touching the verification', async () => {

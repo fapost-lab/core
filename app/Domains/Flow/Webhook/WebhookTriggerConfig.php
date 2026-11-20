@@ -113,10 +113,6 @@ final readonly class WebhookTriggerConfig
 
         $deliveryId = self::optionalString($config, 'delivery_id', 512) ?? '';
 
-        if ('' !== $deliveryId) {
-            self::assertDeliveryIdTemplate($deliveryId);
-        }
-
         $responseMode = $config['response_mode'] ?? self::RESPONSE_ASYNC;
 
         if (self::RESPONSE_ASYNC !== $responseMode && self::RESPONSE_SYNC !== $responseMode) {
@@ -133,6 +129,10 @@ final readonly class WebhookTriggerConfig
             deliveryIdTemplate: $deliveryId,
             responseMode: $responseMode,
         );
+
+        if ('' !== $deliveryId) {
+            $parsed->assertDeliveryIdTemplate($deliveryId);
+        }
 
         // Foundation refuses the combinations it cannot run (a signed template without exactly one {raw}); refuse
         // them here, at publish, rather than with a 500 when a request arrives.
@@ -166,20 +166,22 @@ final readonly class WebhookTriggerConfig
     }
 
     /**
-     * Lower-cased names of the headers kept from the flow: the request's own credentials, the signature (or the
-     * secret itself, for `header_equals`) and the signed timestamp.
+     * Whether a header is kept from the flow: the request's own credentials, the configured signature header (or the
+     * secret itself, for `header_equals`), the signed timestamp, and any header whose name says it is a signature —
+     * a sender may sign twice (GitHub's `X-Hub-Signature` next to `X-Hub-Signature-256`).
      *
-     * @return list<string>
+     * The one list for both the headers the flow gets ({@see WebhookPayload}) and the headers a `delivery_id` may not
+     * name: an id ends up in the log, the run's state, the fire key and the answer to the sender.
      */
-    public function strippedHeaders(): array
+    public function isStrippedHeader(string $name): bool
     {
-        $names = [...self::ALWAYS_STRIPPED_HEADERS, mb_strtolower($this->signatureHeader)];
+        $name = mb_strtolower($name);
 
-        if (null !== $this->timestampHeader) {
-            $names[] = mb_strtolower($this->timestampHeader);
+        if (in_array($name, self::ALWAYS_STRIPPED_HEADERS, true) || $name === mb_strtolower($this->signatureHeader) || str_contains($name, 'signature')) {
+            return true;
         }
 
-        return array_values(array_unique($names));
+        return null !== $this->timestampHeader && $name === mb_strtolower($this->timestampHeader);
     }
 
     private static function headerName(mixed $value, string $key): string
@@ -212,8 +214,10 @@ final readonly class WebhookTriggerConfig
     /**
      * Exactly one placeholder and no literal text: an unresolved placeholder becomes an empty string, and literal
      * text around it would turn every request without an id into the same constant id — one run, then duplicates.
+     * A header alternative may not name a header kept from the flow ({@see isStrippedHeader()}): the secret or the
+     * signature would become the delivery id, shown in the log, the run's state and the answer.
      */
-    private static function assertDeliveryIdTemplate(string $template): void
+    private function assertDeliveryIdTemplate(string $template): void
     {
         if (1 !== preg_match('/^\{([^{}]+)\}$/D', $template, $matches)) {
             throw new InvalidArgumentException('Invalid webhook trigger config: delivery_id must be one placeholder such as {header.X-Delivery-Id} or {body.id}.');
@@ -222,6 +226,10 @@ final readonly class WebhookTriggerConfig
         foreach (explode('|', $matches[1]) as $alternative) {
             if (1 !== preg_match(self::PLACEHOLDER_ALTERNATIVE, $alternative)) {
                 throw new InvalidArgumentException('Invalid webhook trigger config: delivery_id must be one placeholder such as {header.X-Delivery-Id} or {body.id}.');
+            }
+
+            if (str_starts_with($alternative, 'header.') && $this->isStrippedHeader(mb_substr($alternative, mb_strlen('header.')))) {
+                throw new InvalidArgumentException("Invalid webhook trigger config: delivery_id may not name {{$alternative}}: the credentials, signature and timestamp headers never leave the check.");
             }
         }
     }

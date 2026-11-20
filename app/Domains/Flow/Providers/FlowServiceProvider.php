@@ -621,6 +621,10 @@ final class FlowServiceProvider extends ServiceProvider
                 is_string($config->get('flow.egress.allow')) ? $config->get('flow.egress.allow') : null,
                 (int) $config->get('flow.egress.max_redirects', 5),
                 is_string($config->get('flow.egress.proxy')) ? $config->get('flow.egress.proxy') : null,
+                [
+                    parse_url((string) $config->get('app.url'), PHP_URL_HOST) ?: null,
+                    is_string($config->get('tenancy.base_domain')) ? $config->get('tenancy.base_domain') : null,
+                ],
             );
             $logger = $app->make(LoggerInterface::class);
 

@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Webhook\WebhookTriggerConfig;
 use Illuminate\Support\Str;
 
 /**
@@ -70,9 +71,9 @@ final class FlowTriggerHint
     private static function webhookText(array $config): ?string
     {
         return match ($config['verification'] ?? null) {
-            'hmac_sha256'   => 'POST, HMAC-SHA256',
-            'header_equals' => 'POST, secret header',
-            default         => null,
+            WebhookTriggerConfig::VERIFICATION_HMAC_SHA256   => 'POST, HMAC-SHA256',
+            WebhookTriggerConfig::VERIFICATION_HEADER_EQUALS => 'POST, secret header',
+            default                                          => null,
         };
     }
 

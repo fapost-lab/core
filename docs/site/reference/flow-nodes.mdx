@@ -58,11 +58,16 @@ differently the second time, or at the end of a redirect.
 - Address forms that other software would read as an IPv4 address without being a
   canonical one (`2130706433`, `0x7f.1`, `127.1`, `0177.0.0.1`) are refused.
 - Any port is allowed on a public address.
+- A [webhook trigger](/using/webhook-trigger) URL of this installation (`/hooks/flow/…` on its own host or any
+  workspace host under it, another workspace's included) is refused with the reason `own_flow_webhook`, even for an
+  allowed host: two flows whose `call` nodes post to each other's webhook would start runs without end. To start
+  another flow of the same workspace, use a subflow or an event; flows of two workspaces on one installation cannot
+  start each other through their webhooks.
 
 A refused call takes the `error` handle with `error_code = egress_denied`. The node
 metadata and the builder test call carry the host and a reason (`private`, `loopback`,
-`link_local`, `reserved`, `multicast`, `unspecified`, `metadata`, `invalid_host` or
-`scheme_not_allowed`), never the resolved address. A name that does not resolve is
+`link_local`, `reserved`, `multicast`, `unspecified`, `metadata`, `invalid_host`,
+`own_flow_webhook` or `scheme_not_allowed`), never the resolved address. A name that does not resolve is
 still `transport_failure`. A refused call still counts as one call execution.
 
 An operator can allow trusted internal targets with `FLOW_EGRESS_ALLOW`; see
