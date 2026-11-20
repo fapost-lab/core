@@ -36,7 +36,7 @@ final readonly class RedisWebhookReplyStore implements WebhookReplyStoreInterfac
         return self::key($tenantId, $triggerId, $fireKey) . ':wake';
     }
 
-    public function deliver(string $tenantId, string $triggerId, string $fireKey, WebhookReply $reply): bool
+    public function keep(string $tenantId, string $triggerId, string $fireKey, WebhookReply $reply): bool
     {
         try {
             $connection = $this->redis->connection();
@@ -51,7 +51,7 @@ final readonly class RedisWebhookReplyStore implements WebhookReplyStoreInterfac
 
             return $kept;
         } catch (Throwable $exception) {
-            $this->unavailable('deliver', $tenantId, $triggerId, $exception);
+            $this->unavailable('keep', $tenantId, $triggerId, $exception);
 
             return false;
         }

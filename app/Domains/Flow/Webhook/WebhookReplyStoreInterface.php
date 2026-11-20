@@ -23,7 +23,7 @@ interface WebhookReplyStoreInterface
      *
      * @return bool true when this answer is the one kept
      */
-    public function deliver(string $tenantId, string $triggerId, string $fireKey, WebhookReply $reply): bool;
+    public function keep(string $tenantId, string $triggerId, string $fireKey, WebhookReply $reply): bool;
 
     /**
      * Waits up to `$seconds` for the run's answer; null when none came in time or the store failed.

@@ -573,7 +573,7 @@ final class InMemoryWebhookReplyStore implements WebhookReplyStoreInterface
     /** @var list<string> */
     public array $found = [];
 
-    public function deliver(string $tenantId, string $triggerId, string $fireKey, WebhookReply $reply): bool
+    public function keep(string $tenantId, string $triggerId, string $fireKey, WebhookReply $reply): bool
     {
         if (isset($this->prepared[$fireKey])) {
             return false;

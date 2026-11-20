@@ -68,7 +68,11 @@ final class WebhookRunReplyTest extends FeatureTestCase
         $this->assertNotNull($reply);
         $this->assertSame(201, $reply->status);
         $this->assertSame(WebhookReply::TYPE_JSON, $reply->type);
-        $this->assertSame(['hello' => 'Ann "the" <b>', 'n' => 1], json_decode($reply->body, true, 4, JSON_THROW_ON_ERROR));
+        // jsonb on PostgreSQL reorders a definition's keys, so the body is compared without its key order.
+        $body = json_decode($reply->body, true, 4, JSON_THROW_ON_ERROR);
+        $this->assertIsArray($body);
+        ksort($body);
+        $this->assertSame(['hello' => 'Ann "the" <b>', 'n' => 1], $body);
     }
 
     public function test_a_text_answer_is_rendered_as_text(): void

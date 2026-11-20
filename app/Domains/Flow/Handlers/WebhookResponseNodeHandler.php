@@ -177,7 +177,7 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
             return $done;
         }
 
-        $this->replies->deliver((string) $root->tenant_id, $triggerId, $fireKey, $reply);
+        $this->replies->keep((string) $root->tenant_id, $triggerId, $fireKey, $reply);
 
         return $done;
     }

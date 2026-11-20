@@ -46,8 +46,8 @@ final class RedisWebhookReplyStoreRedisTest extends FeatureTestCase
         $store = $this->app->make(WebhookReplyStoreInterface::class);
         $this->assertInstanceOf(RedisWebhookReplyStore::class, $store);
 
-        $this->assertTrue($store->deliver($this->tenant, 'TRIGGER-A', 'wh:1', new WebhookReply(201, '{"a":1}', WebhookReply::TYPE_JSON)));
-        $this->assertFalse($store->deliver($this->tenant, 'trigger-a', 'wh:1', WebhookReply::forRunEnd(WebhookRunEnd::Completed)));
+        $this->assertTrue($store->keep($this->tenant, 'TRIGGER-A', 'wh:1', new WebhookReply(201, '{"a":1}', WebhookReply::TYPE_JSON)));
+        $this->assertFalse($store->keep($this->tenant, 'trigger-a', 'wh:1', WebhookReply::forRunEnd(WebhookRunEnd::Completed)));
 
         $started = microtime(true);
         $reply   = $store->await($this->tenant, 'trigger-a', 'wh:1', 5);

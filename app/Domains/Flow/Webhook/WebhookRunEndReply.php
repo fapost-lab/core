@@ -52,7 +52,7 @@ final readonly class WebhookRunEndReply
                 return;
             }
 
-            $this->replies->deliver((string) $session->tenant_id, $triggerId, $fireKey, WebhookReply::forRunEnd($end));
+            $this->replies->keep((string) $session->tenant_id, $triggerId, $fireKey, WebhookReply::forRunEnd($end));
         } catch (Throwable $exception) {
             $this->logger->warning('flow.webhook.run_end_reply_failed', [
                 'session_id' => (string) $session->getKey(),
