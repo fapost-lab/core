@@ -5,6 +5,7 @@ import {useBuilderStore} from '@builder/store/builderStore'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useNavigationStore} from '@builder/store/navigationStore'
 import {useConfirm} from '@builder/composables/useConfirm'
+import {usePermissions} from '@builder/composables/usePermissions'
 import FlowNodeCard from './FlowNodeCard.vue'
 import FlowInsertPoint from './FlowInsertPoint.vue'
 import FlowConditionCard from './FlowConditionCard.vue'
@@ -328,6 +329,15 @@ function addTrigger() {
     }
 }
 
+const { can } = usePermissions()
+
+/** Removing an automatic trigger (anything but a message) needs the Manage automations permission. */
+function canRemoveTrigger(id: string): boolean {
+    const trigger = builderStore.triggers.find((t) => t.id === id)
+
+    return trigger?.type === 'message' || can('manage_automations')
+}
+
 function removeTrigger(id: string) {
     if (selectionStore.selectedTriggerId === id) {
         selectionStore.clear()
@@ -435,7 +445,7 @@ const trailingInsertContext = computed(() => {
                             <div v-if="card.sub" class="trigger-sub">{{ card.sub }}</div>
                         </div>
                         <button
-                            v-if="!builderStore.readOnly"
+                            v-if="!builderStore.readOnly && canRemoveTrigger(card.id)"
                             type="button"
                             class="trigger-remove"
                             title="Delete trigger"

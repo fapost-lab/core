@@ -28,6 +28,7 @@ use App\Domains\Flow\State\Variables\VariableType;
 use App\Domains\Flow\Subflow\CallGraphRepository;
 use App\Domains\Flow\Templates\TemplateExpander;
 use App\Domains\Flow\Templates\TemplateUsageRepository;
+use Closure;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -51,16 +52,26 @@ final readonly class PublishFlowService
     ) {
     }
 
-    public function execute(string $flowId): FlowDefinition
+    /**
+     * @param  (Closure(FlowDraft): void)|null  $authorize  asked with the draft once it is locked, before anything is
+     *                                                       written: a check of what the draft changes sees exactly what
+     *                                                       is published, never a draft saved after the check. It refuses
+     *                                                       by throwing, which rolls the publish back.
+     */
+    public function execute(string $flowId, ?Closure $authorize = null): FlowDefinition
     {
         /** @var FlowDefinition $definition */
-        $definition = DB::transaction(function () use ($flowId): FlowDefinition {
+        $definition = DB::transaction(function () use ($flowId, $authorize): FlowDefinition {
             $this->lockAssistantTemplatesBeforeOwnDraft($flowId);
 
             $draft = FlowDraft::query()
                 ->where('flow_id', $flowId)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            if (null !== $authorize) {
+                $authorize($draft);
+            }
 
             $nodes = is_array($draft->nodes) ? $draft->nodes : [];
             $edges = is_array($draft->edges) ? $draft->edges : [];

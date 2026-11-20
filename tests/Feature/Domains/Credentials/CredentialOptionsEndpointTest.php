@@ -44,10 +44,20 @@ final class CredentialOptionsEndpointTest extends CredentialsTestCase
 
         $this->actingAs(User::factory()->create())->getJson('/builder/credentials')->assertForbidden();
 
-        // ManageSettings alone (the console screen's right) does not open the builder's list.
-        $settings = User::factory()->create();
-        $settings->givePermissionTo(Permission::ManageSettings->value);
-        $this->actingAs($settings)->getJson('/builder/credentials')->assertForbidden();
+        // ManageCredentials alone (the console screen's right) does not open the builder's list.
+        $manager = User::factory()->create();
+        $manager->givePermissionTo(Permission::ManageCredentials->value);
+        $this->actingAs($manager)->getJson('/builder/credentials')->assertForbidden();
+    }
+
+    public function test_it_is_forbidden_to_a_flow_editor_without_the_right_to_use_credentials(): void
+    {
+        $this->credential();
+
+        $editor = User::factory()->create();
+        $editor->givePermissionTo(Permission::ManageFlowDefinitions->value);
+
+        $this->actingAs($editor)->getJson('/builder/credentials')->assertForbidden();
     }
 
     private function idOf(string $name): string
@@ -58,7 +68,7 @@ final class CredentialOptionsEndpointTest extends CredentialsTestCase
     private function flowEditor(): User
     {
         $user = User::factory()->create();
-        $user->givePermissionTo(Permission::ManageFlowDefinitions->value);
+        $user->givePermissionTo(Permission::ManageFlowDefinitions->value, Permission::UseCredentials->value);
 
         return $user;
     }

@@ -14,11 +14,15 @@ use Illuminate\Foundation\Http\FormRequest;
 final class UpdateFlowActivityRequest extends FormRequest
 {
     /**
-     * Needs `update` on the flow in the route (a flow of another assistant is a 404).
+     * Needs `update` on the flow in the route (a flow of another assistant is a 404); turning it on needs `activate`,
+     * which also asks for the right to manage automations when the flow has an automatic trigger.
      */
     public function authorize(FlowDraftService $drafts): bool
     {
-        return $this->user()?->can('update', $drafts->findForAssistant((string) $this->route('record'))) ?? false;
+        return $this->user()?->can(
+            $this->boolean('active') ? 'activate' : 'update',
+            $drafts->findForAssistant((string) $this->route('record')),
+        ) ?? false;
     }
 
     /**

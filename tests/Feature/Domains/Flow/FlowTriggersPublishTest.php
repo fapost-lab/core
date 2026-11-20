@@ -539,7 +539,7 @@ final class FlowTriggersPublishTest extends FeatureTestCase
         $this->seed(TenantAclSeeder::class);
 
         $user = User::factory()->createOne();
-        $user->givePermissionTo(Permission::ManageFlowDefinitions->value, Permission::PublishFlow->value);
+        $user->givePermissionTo(Permission::ManageFlowDefinitions->value, Permission::PublishFlow->value, Permission::ManageAutomations->value);
         $user->assistants()->attach((string) $this->assistant->getKey());
 
         return $user;

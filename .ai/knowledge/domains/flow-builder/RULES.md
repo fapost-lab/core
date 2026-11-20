@@ -19,7 +19,7 @@ paths:
   - app/Domains/Flow/Services/ValidateFlowService.php
   - app/Domains/Flow/Services/LoadBuilderFlowService.php
   - "app/Domains/Flow/Validation/**"
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-20
 ---
 # Flow builder rules
 
@@ -49,8 +49,11 @@ broken.
 
 - **Every builder route authorizes through `FlowDraftPolicy`:** a flow's own endpoints check
   `view`, `update` or `publish` on its draft (which includes access to the draft's assistant);
-  option lists and the `call` test check the flow-draft permission. The builder has no panel
-  tenant to lean on. Enforced: `BuilderAuthorizationTest`.
+  option lists and the `call` test check the flow-draft permission. The credential list, and a `call` test that names a
+  credential, also ask `CredentialPolicy::use` (`UseCredentials`); publishing also asks `publishChanges`, and a
+  webhook secret `manageAutomations`. Controls the server would refuse are disabled from the shared
+  `auth.permissions` (`usePermissions`), never trusted: the server stays the arbiter. The builder has no panel
+  tenant to lean on. Enforced: `BuilderAuthorizationTest`, `FlowAutomationPermissionsTest`.
 
 - **A new node's UI starts as `configSchema()` on its handler.** Add a core override only when
   the schema renderer cannot express the UI, by adding a key to the map in `ConfigPanel.vue`.

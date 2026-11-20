@@ -16,7 +16,7 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-20
 ---
 # Staff rules
 
@@ -128,14 +128,15 @@ broken.
 
 - **Check authorization through policies against the `Permission` enum.** This is the pattern in
   every domain; tenant API token surfaces are the exception (see the token rule below). Review only.
-  The enum has 25 cases in seven groups (assistants, content, users, contacts, conversations,
-  analytics, system), the deprecated `ManageFlow` included; the policies are `AssistantPolicy`, `ChannelPolicy`, `ContactPolicy`,
+  The enum has 29 cases in eight groups (assistants, content, users, contacts, conversations,
+  analytics, system, automations), the deprecated `ManageFlow` included; the policies are `AssistantPolicy`, `ChannelPolicy`, `ContactPolicy`,
   `ContactGroupPolicy`, `ConversationPolicy`, `CredentialPolicy`, the Flow policies (`FlowDraftPolicy`,
   `FlowGroupPolicy`, `FlowLogPolicy`, `FlowSessionPolicy`), `MediaFilePolicy`, `MediaFolderPolicy`,
   `RolePolicy` and `UserPolicy`.
 - **The sensitive permission set lives in `Permission::isSensitive()`** (`RotateChannelToken`,
   `PublishFlow`, `ManageRoles`, `ViewConversations`, `ReplyConversations`, `ViewOperatorScreens`,
-  `ViewActivityLog`); the Roles UI badges
+  `ViewActivityLog`, and the whole automations group: `ManageAutomations`, `ManageCredentials`,
+  `UseCredentials`, `ViewRunPayloads`); the Roles UI badges
   those. A new permission with elevated risk is added to that `match`, not flagged elsewhere.
 - **A machine credential of a tenant is a tenant API token, one model for every surface.** The API
   trigger, MCP and any later machine surface use the tenant's `api_tokens` (Staff), the `api-token`
@@ -154,6 +155,8 @@ broken.
   runs only at provisioning and through the manual `ops:tenants-seed-acl`, never on deploy, so
   existing tenants keep the old set. The migration hard-codes the `web` guard (migrations may not
   read config) and leaves custom roles alone; see
-  `2026_09_22_000001_grant_manage_channels_to_content_manager.php`. The tenant's permission cache is
+  `2026_09_22_000001_grant_manage_channels_to_content_manager.php` (one role) and
+  `2026_11_20_000001_grant_automation_and_credential_permissions.php` (several permissions, two roles, each role
+  guarded on its own). The tenant's permission cache is
   forgotten when the migrations end (`TenantDatabaseManager::runMigrations()`), so the migration does not touch
   it. Review only.

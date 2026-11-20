@@ -13,8 +13,10 @@ use Illuminate\Foundation\Auth\User as AuthUser;
 /**
  * Authorization policy for {@see Credential}.
  *
- * Every ability, listing included, needs {@see Permission::ManageSettings}: a credential is a tenant-level setting
- * that lets flows call outside systems, so only those who manage the tenant's settings see or change it.
+ * The console screen's abilities, listing included, need {@see Permission::ManageCredentials}: a credential decides
+ * which outside systems the tenant's flows may call with a secret. {@see self::use()} is the builder's: picking a
+ * saved credential for a `call` node and testing a call with it, without ever seeing the value, needs
+ * {@see Permission::UseCredentials}.
  */
 final class CredentialPolicy
 {
@@ -45,9 +47,19 @@ final class CredentialPolicy
         return $this->canManage($authUser);
     }
 
+    /**
+     * Whether the user may bind a saved credential to a `call` node, list the credentials to pick from, and test a
+     * call with one. The value is never shown.
+     */
+    public function use(AuthUser $authUser): bool
+    {
+        return $authUser instanceof User
+               && $authUser->can(Permission::UseCredentials->value);
+    }
+
     private function canManage(AuthUser $authUser): bool
     {
         return $authUser instanceof User
-               && $authUser->can(Permission::ManageSettings->value);
+               && $authUser->can(Permission::ManageCredentials->value);
     }
 }

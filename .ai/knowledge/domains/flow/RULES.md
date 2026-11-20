@@ -293,6 +293,18 @@ broken.
   alone. Nothing writes `flow_triggers` outside this sync. Why: a draft edit must not change what runs, and a live
   trigger must survive the release that introduced the list (`adr-20261119-flow-triggers-in-definition-live-on-publish`).
   Enforced: `FlowTriggersPublishTest`, `SaveDraftServiceTest`, `FlowTemplatePublishTest`, `FlowTriggerSetTest`.
+- **An automatic trigger or a new credential reference goes live only with its own right.** Publishing a draft that
+  adds, removes or changes (type, config, `is_active`, `priority`) a trigger other than `message` against the live
+  rows needs `ManageAutomations`; publishing a `call` node bound to a saved credential the published definition does
+  not reference needs `UseCredentials` (dropping one needs nothing). `FlowPublishChanges` computes both,
+  `FlowDraftPolicy::publishChanges()` refuses with a translated reason, asked by the builder's publish after
+  `publish`; the draft is compared before template expansion, so a credential a template brings is checked when the
+  template is published. Turning on a flow with a live automatic trigger needs `ManageAutomations`
+  (`FlowDraftPolicy::activate()`), turning it off does not; the builder's credential list and a call test with a
+  credential need `UseCredentials` (`CredentialPolicy::use()`). Saving a draft checks neither: nothing saved runs.
+  Why: `PublishFlow` alone would let an author start runs nobody asked for or spend a secret an administrator
+  created for someone else. Enforced: `FlowAutomationPermissionsTest`, `BuilderAuthorizationTest`,
+  `CredentialOptionsEndpointTest`.
 - **A webhook trigger's secret never enters its config, and its URL starts a run only while someone can revoke it.**
   The secret lives encrypted in `flow_webhook_endpoints` (one row per trigger id, bound to its `flow_id`), is shown only
   in the answer that generated it, and never reaches the draft, a definition or a template: `WebhookTriggerConfig`

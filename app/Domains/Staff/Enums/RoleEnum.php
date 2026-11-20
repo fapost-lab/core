@@ -73,6 +73,10 @@ enum RoleEnum: string
                 Permission::ReplyConversations,
                 // Analytics
                 Permission::ViewAnalytics,
+                // Automations — builds automations on credentials an admin created, never manages the credentials.
+                Permission::ManageAutomations,
+                Permission::UseCredentials,
+                Permission::ViewRunPayloads,
             ],
 
             self::Analyst => [

@@ -10,7 +10,7 @@ paths:
   - app/Domains/Flow/Call/Transports/HttpTransport.php
   - app/Http/Controllers/Admin/CredentialController.php
 summary: Why a tenant's saved credentials live in their own Credentials domain, are bound to a mandatory list of allowed hosts, reach a call only as a masked, never-redirected, Foundation-contract secret
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-20
 ---
 # Saved credentials are a Credentials domain; a call applies one only to an allowed host and masks it on the way out
 
@@ -36,6 +36,8 @@ The owner approved the design at the human gate on 2026-11-19.
   ability); the builder's picker endpoint (id, name, type only) needs what `FlowDraftPolicy::viewAny` needs,
   that is `ManageFlowDefinitions`. They are replaced by `ManageCredentials` / `UseCredentials` when the
   permissions roadmap item is done.
+  *Superseded by the task `flow-automation-permissions`:* the screen needs `ManageCredentials`; the picker, a
+  call test with a credential, and publishing a new credential reference need `UseCredentials`.
 - **D-4. Audit.** `CredentialWriter` records `credential.created`, `credential.updated` and
   `credential.deleted` through `AuditTrailInterface` in the write's transaction. An entry names the credential,
   its type and hosts and whether the secret was replaced, never a value.
@@ -98,6 +100,6 @@ How the secret is kept and applied:
 - Monitoring outside Core is not covered: Telescope's client-request watcher and Sentry's HTTP breadcrumbs can
   record the URI with a query key (`api_key_query`) and custom key headers. A follow-up in `fapost/monitoring`
   must keep requests that carry a credential out of them.
-- Until the permissions item, any holder of `ManageSettings` can create, replace and delete credentials, and
-  any `ManageFlowDefinitions` holder can bind one to a node.
+- Until the permissions item, any holder of `ManageSettings` could create, replace and delete credentials, and
+  any `ManageFlowDefinitions` holder could bind one to a node (closed by `flow-automation-permissions`, see D-3).
 - Rotating `APP_KEY` without `APP_PREVIOUS_KEYS` makes every credential unreadable.

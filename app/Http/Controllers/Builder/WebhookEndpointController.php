@@ -17,7 +17,8 @@ use InvalidArgumentException;
  * The URL and the secret of a flow's webhook trigger, from the builder.
  *
  * Making the URL is an edit of the flow (`update`: ManageFlowDefinitions and the assistant); setting the secret hands a
- * credential to an outside system, so it takes what making the trigger live takes (`publish`: PublishFlow). The
+ * credential to an outside system, so it takes what making the trigger live takes (`manageAutomations`: PublishFlow and
+ * ManageAutomations). The
  * secret is in the answer only when the server generated it, and only that once.
  */
 final class WebhookEndpointController extends Controller
@@ -37,7 +38,7 @@ final class WebhookEndpointController extends Controller
     public function secret(Request $request, string $flow, string $trigger, FlowDraftRepositoryInterface $drafts, FlowWebhookEndpointService $endpoints): JsonResponse
     {
         $draft = $drafts->findByFlowId($flow);
-        Gate::authorize('publish', $draft);
+        Gate::authorize('manageAutomations', $draft);
 
         $validated = $request->validate(['secret' => ['sometimes', 'nullable', 'string']]);
         $provided  = $validated['secret'] ?? null;

@@ -20,8 +20,8 @@ under `flow.webhook`.
 5. [Publish](/using/publishing) the flow. Until the flow is published with the trigger active, the URL answers
    `404`, so you can set up the sender first.
 
-Getting the URL needs the permission to edit the flow; generating or replacing the secret needs the permission to
-publish it, because the secret is what lets an outside system start the flow. Replacing the secret is recorded in the
+Getting the URL needs the permission to edit the flow; generating or replacing the secret needs the permissions to
+publish it and to **Manage automations**, because the secret is what lets an outside system start the flow. Replacing the secret is recorded in the
 [activity log](/using/activity-log); the old secret stops working at once.
 
 The secret never appears in the trigger's settings, the draft, a published version or a template: it is stored

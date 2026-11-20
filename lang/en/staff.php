@@ -60,6 +60,7 @@ return [
         'conversations' => 'Conversations',
         'analytics'     => 'Analytics',
         'system'        => 'System',
+        'automations'   => 'Automations',
     ],
 
     'permissions' => [
@@ -89,6 +90,10 @@ return [
             'manage_settings'           => 'Manage settings',
             'view_operator_screens'     => 'View operator screens',
             'view_activity_log'         => 'View the activity log',
+            'manage_automations'        => 'Manage automations',
+            'manage_credentials'        => 'Manage credentials',
+            'use_credentials'           => 'Use credentials',
+            'view_run_payloads'         => 'View run payloads',
         ],
         'descriptions' => [
             'rotate_channel_token'  => 'Reissues the webhook URL hash. Existing webhook configurations become invalid until re-configured on the platform side.',
@@ -99,6 +104,10 @@ return [
             'reply_conversations'   => 'Sends messages to a contact from the operator inbox under the assistant identity.',
             'view_operator_screens' => 'Opens the queue dashboard and the other operator screens of the whole installation: job payloads, logs and load figures.',
             'view_activity_log'     => 'Opens the audit log of the workspace: who did what in the console and when, including platform support inside the workspace.',
+            'manage_automations'    => 'Makes schedule, webhook, API and event triggers live, changes or removes them on publish, and turns on flows that have them.',
+            'manage_credentials'    => 'Opens the credentials screen: lists, creates, replaces and deletes the secrets flows use to call outside systems.',
+            'use_credentials'       => 'Picks a saved credential in a call node and tests a call with it. The value is never shown.',
+            'view_run_payloads'     => 'Shows the full input and output of each node in a run\'s trace, including answers from outside services.',
         ],
         'sensitive_warning' => 'Sensitive — review carefully before assigning.',
     ],
