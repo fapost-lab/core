@@ -7,11 +7,15 @@ import {describe, expect, it} from 'vitest'
 /**
  * The builder follows the console's light/dark theme, which only works while every colour is a variable defined in
  * builder.css (light in :root, dark in .dark). A literal colour anywhere else would stay the same in both themes.
- * The one place literals belong is a `--name: value;` definition inside the :root and .dark blocks of builder.css.
+ * The one place literals belong is a `--name: value;` definition inside the :root and .dark blocks of builder.css or
+ * of node-palette.css, which it imports.
  */
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url))
 const builderDir = fileURLToPath(new URL('.', import.meta.url))
 const builderCss = join(repoRoot, 'resources/css/builder.css')
+/** The node palette builder.css imports; the console's run graph loads it too. */
+const nodePaletteCss = join(repoRoot, 'resources/css/node-palette.css')
+const stylesheets = [builderCss, nodePaletteCss]
 
 const COLOUR_LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(|(?<![\w-])(?:white|black)(?![\w-])/
 
@@ -78,8 +82,8 @@ describe('the guard itself', () => {
 })
 
 describe('builder colours', () => {
-    it('keeps colour literals out of builder.css outside the :root and .dark definitions', () => {
-        expect(cssOffenders(readFileSync(builderCss, 'utf8'))).toEqual([])
+    it.each(stylesheets)('keeps colour literals out of %s outside the :root and .dark definitions', (file) => {
+        expect(cssOffenders(readFileSync(file, 'utf8'))).toEqual([])
     })
 
     it('keeps colour literals out of every builder component and script', () => {
@@ -90,8 +94,8 @@ describe('builder colours', () => {
         expect(offenders).toEqual([])
     })
 
-    it('defines a dark override for every colour that builder.css defines as a literal', () => {
-        const css = readFileSync(builderCss, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    it.each(stylesheets)('defines a dark override for every colour that %s defines as a literal', (file) => {
+        const css = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
         const block = (selector: string): string => {
             const start = css.indexOf(`${selector} {`)
             expect(start, `${selector} block`).toBeGreaterThanOrEqual(0)

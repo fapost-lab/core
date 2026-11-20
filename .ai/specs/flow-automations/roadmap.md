@@ -63,7 +63,7 @@ buttons open further flows and subflows is shown on one screen with the taken pa
 data a click away, and a loop of 1000 iterations stays readable.
 
 - [x] Node trace with full data — `NodeEntered`, `NodeFailed` and "node completed" in `flow_session_history`, outcome, duration, error, iteration, full input and output, secrets masked, 1 MB per node, erased with the contact
-- [ ] Run graph page — the executed definition drawn with the builder's cards on `@vue-flow/core` and `elkjs`, branches and subflows as nested frames, loops as "×N" with an iteration switcher and small loops expanded, `ViewRunPayloads` for node data, live over Reverb or polling (after: Node trace with full data — the page draws what the trace recorded)
+- [x] `flow-run-graph-page` — Run graph page — the executed definition drawn with the builder's cards on `@vue-flow/core` and `elkjs`, branches and subflows as nested frames, loops as "×N" with an iteration switcher and small loops expanded, `ViewRunPayloads` for node data, live over Reverb or polling (after: Node trace with full data — the page draws what the trace recorded)
 
 ## Phase 7 — Webhook and API
 

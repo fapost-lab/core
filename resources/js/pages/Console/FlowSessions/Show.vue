@@ -7,7 +7,7 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
-import { ArrowLeft, FileText } from '@lucide/vue'
+import { ArrowLeft, FileText, Workflow } from '@lucide/vue'
 import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fapost/ui/components/card'
@@ -25,7 +25,7 @@ const props = defineProps<{
   state: KeyValue[]
   history: HistoryEntry[] | null
   live: LiveChannel | null
-  urls: { index: string; parent?: string; logs?: string }
+  urls: { index: string; graph: string; parent?: string; logs?: string }
 }>()
 
 const POLL_MS = 30_000
@@ -66,6 +66,12 @@ function when(value: string | null): string | null {
         </h1>
         <div class="flex flex-wrap items-center gap-3">
           <LiveHint v-if="session.isLive" :transport="transport" :poll-ms="POLL_MS" :labels="t.live" />
+          <Button as-child variant="outline" size="sm">
+            <Link :href="urls.graph">
+              <Workflow aria-hidden="true" />
+              {{ t.view.graph }}
+            </Link>
+          </Button>
           <Button v-if="urls.logs" as-child variant="outline" size="sm">
             <Link :href="urls.logs">
               <FileText aria-hidden="true" />

@@ -178,7 +178,7 @@ broken.
   `AutomationRunDeadlineSweeperRedisTest`, `SweepOverdueAutomationRunsCommandTest`, `AutomationRunTest`.
 
 - **The node trace is always written, masked and limited before it is written, never inside a step's transaction,
-  and read by no screen yet.** `FlowEngine` calls `NodeTraceRecorder` for every node of every session: `node_entered`,
+  and read by screens for statuses only.** `FlowEngine` calls `NodeTraceRecorder` for every node of every session: `node_entered`,
   then `node_completed` or `node_failed`, into `flow_session_history`, whatever `logging_enabled` (which still gates
   `state_change` and `subflow_*`). Only an automation run's rows carry `input`/`output`, and only while
   `flow.trace.payloads` is on: nothing deletes a conversation's history, so a conversation's trace keeps no payloads
@@ -188,9 +188,13 @@ broken.
   under an innocent key in a response body stays visible — accepted risk, compensated by literal secrets once
   credentials pass them. A trace write failure is the warning `flow.trace.write_failed`, in a savepoint of its own,
   and never fails the step: the node's side effects have already happened. `FlowSessionInspector` filters
-  `NodeTraceRecorder::EVENT_TYPES` out until a page gated by its own permission reads the trace. A handler's
+  `NodeTraceRecorder::EVENT_TYPES` out of the session's history. The run graph (`RunGraphReader`, behind
+  `ViewFlowSessions`) reads the trace through a whitelist of envelope fields selected by JSON path — type, status,
+  handle, next node, duration, loop iterations, error class — so `input`, `output` and the error message never leave
+  the database; they wait for a screen gated by `ViewRunPayloads` (spec `flow-automations`: `ViewFlowSessions` shows
+  the graph and statuses only). Code that reads the trace for another screen keeps the same whitelist. A handler's
   `NodeExecutionResult::$trace` goes to the trace only. Enforced: `NodeTraceRecordingTest`, `CallNodeTraceTest`,
-  `TracePayloadMaskerTest`, `TracePayloadLimiterTest`, `FlowSessionsConsoleTest`
+  `TracePayloadMaskerTest`, `TracePayloadLimiterTest`, `FlowSessionsConsoleTest`, `FlowRunGraphConsoleTest`
   (`adr-20261119-node-trace-in-session-history`).
 
 - **A Core event starts each listening trigger's run once, and no chain of events is longer than five.** Core's events

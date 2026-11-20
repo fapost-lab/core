@@ -196,6 +196,7 @@ final class FlowSessionsConsoleTest extends FeatureTestCase
                 ->where('history', null)
                 ->where('urls', [
                     'index'  => "/assistant/{$this->assistant->getKey()}/flow-sessions",
+                    'graph'  => "/assistant/{$this->assistant->getKey()}/flow-sessions/{$session->getKey()}/graph",
                     'parent' => "/assistant/{$this->assistant->getKey()}/flow-sessions/{$parent->getKey()}",
                     'logs'   => "/assistant/{$this->assistant->getKey()}/flow-logs?filter%5Bsession%5D={$session->getKey()}&filter%5Bperiod%5D=30d",
                 ])

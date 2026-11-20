@@ -1,0 +1,48 @@
+/*
+ * The node palette: the colour pair of each node type (resources/js/builder/utils/nodeColors.ts), light in :root and
+ * dark in .dark. Shared by the builder (builder.css imports it) and the console's run graph, which draws the same node
+ * cards; a literal colour belongs in a definition here or in builder.css, nowhere else (builder/colors.test.ts).
+ */
+:root {
+  --sage:       #8fa897;
+  --sage-bg:    var(--success);
+  --rose:       #b07070;
+  --rose-bg:    #f5eaea; /* paler than the --danger badge token on purpose */
+  --amber:      #b08040;
+  --amber-bg:   #f5f0e6; /* paler than the --warning badge token on purpose */
+  --sky:        #6888a8;
+  --sky-bg:     var(--info);
+  --plum:       #7060a8;
+  --plum-bg:    #f0edf8;
+  --orange:     #c2570c;
+  --orange-bg:  #fff4e6;
+  --indigo:     #4f46e5;
+  --indigo-bg:  #eef2ff;
+  --blue:       #3538cd;
+  --blue-bg:    #eef4ff;
+  --note:       #a06a08;
+  --note-bg:    #fdf6dd;
+  --extension:    #0f766e;
+  --extension-bg: #e4f3f0;
+}
+
+.dark {
+  --sage:       #9db8a5;
+  --rose:       #d98e8e;
+  --rose-bg:    var(--danger);
+  --amber:      #dba761;
+  --amber-bg:   var(--warning);
+  --sky:        #86a9ca;
+  --plum:       #b6a9e3;
+  --plum-bg:    #2a2540;
+  --orange:     #f2a46a;
+  --orange-bg:  #3a2512;
+  --indigo:     #a9a4f7;
+  --indigo-bg:  #23244a;
+  --blue:       #93a0f2;
+  --blue-bg:    #1f2547;
+  --note:       #e6b552;
+  --note-bg:    #35290f;
+  --extension:    #5fc5b5;
+  --extension-bg: #12312c;
+}

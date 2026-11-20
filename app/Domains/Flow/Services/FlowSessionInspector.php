@@ -194,8 +194,8 @@ final readonly class FlowSessionInspector
 
     /**
      * Whether the session has an audit trail to show: its flow logs history, or rows were written anyway (the flag can
-     * change while a session runs). The node trace does not count: it is written for every session, and no screen
-     * shows it until it is gated by its own permission.
+     * change while a session runs). The node trace does not count: it is written for every session, and the session's
+     * run graph shows it, statuses only ({@see \App\Domains\Flow\Trace\RunGraphReader}).
      */
     public function hasHistory(FlowSession $session): bool
     {

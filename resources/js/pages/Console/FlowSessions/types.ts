@@ -1,4 +1,5 @@
 import type { ShellPageProps } from '@console/shell'
+import type { RunGraphTranslations } from '@console/run-graph/runGraph'
 import type { TemplateNodeOrigin } from './templateNode'
 
 export type FlowSessionStatus =
@@ -58,9 +59,12 @@ export interface FlowSessionsTranslations {
     history_note: string
     history_empty: string
     logs: string
+    graph: string
     empty_value: string
   }
+  graph: RunGraphTranslations
 }
+
 
 export type FlowSessionsPageProps = ShellPageProps & {
   translations: ShellPageProps['translations'] & {
