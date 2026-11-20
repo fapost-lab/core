@@ -94,7 +94,8 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   `lang/{en,ru,uk}/console.php`; the kit never reads page props. Why: the kit is released apart from
   Core and rendered by Solutions too, so it cannot know Core's props or lang files.
 - **The kit follows the approved mockups, not stock shadcn-vue** (the design canvas linked from the
-  `ui-foundation` spec): a page adds no colours or type of its own. A state (active, inactive)
+  `ui-foundation` spec): a page adds no colours or type of its own. The one exception is the run graph's node
+  cards, which take the builder's node palette (`resources/css/node-palette.css`) so a node reads the same in both. A state (active, inactive)
   is a `StatusDot`; a category or count is a soft `Badge` chosen by meaning (`info`, `neutral`,
   `success`, `warning`, `danger`); a form is a stack of `FormSection`s (title and description
   left, fields right); an empty list is `EmptyState`; a bulk delete is the `outline-danger`

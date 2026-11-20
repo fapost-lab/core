@@ -186,7 +186,10 @@ Credentials' store) for a call's secret and uses Credentials' type registry, `Se
   `resources/css/ui.css`; `adr-20261015-ui-kit-package-shape`) builds on it, and the builder's
   own variables point at it in both themes. The console shell and live updates are Core's own code
   (`resources/js/console/shell`, `resources/js/console/lib`, alias `@console`), not the kit; the
-  theme helpers the console and the builder share are in `resources/js/shared/theme`. The public site (`resources/css/app.css`) keeps its own
+  theme helpers the console and the builder share are in `resources/js/shared/theme`. The console's run graph
+  (`resources/js/console/run-graph`, a lazy chunk with `@vue-flow/core` and `elkjs`) is the one console code that
+  imports builder source — its presentational pieces `NodeIcon.vue`, `nodeColors.ts`, `nodeAvailability.ts` — and the
+  node palette `resources/css/node-palette.css`, so a run is drawn with the builder's node cards. The public site (`resources/css/app.css`) keeps its own
   palette by decision (D5, spec `ui-foundation`). The front-end build needs nothing from Composer's
   `vendor/`, so the image's `assets` stage and CI's front-end job build from `package.json` alone, with the kit
   from the public npm registry.

@@ -1,5 +1,6 @@
 @import '@fapost/ui/fonts.css';
 @import '@fapost/ui/tokens.css';
+@import './node-palette.css';
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -27,37 +28,15 @@
   --text-3:     var(--subtle-foreground);
   --builder-accent:   #7c6f5e;
   --builder-accent-2: #a8967e;
-  --sage:       #8fa897;
-  --sage-bg:    var(--success);
   --sage-bg-2:  #e3ebe5;
   --sage-border: #cdddd4;
-  --rose:       #b07070;
-  --rose-bg:    #f5eaea; /* paler than the --danger badge token on purpose */
   --rose-border: #e8c8c8;
-  --amber:      #b08040;
-  --amber-bg:   #f5f0e6; /* paler than the --warning badge token on purpose */
   --amber-border: #e8d8b8;
-  --sky:        #6888a8;
-  --sky-bg:     var(--info);
   --primary-bg: var(--accent); /* the kit's accent token: pale green in light, deep green in dark */
   --primary-hover: #4a5c48;
   --error:      #e53e3e;
   --radius:     8px;
   --radius-lg:  12px;
-
-  /* Node-type palettes that have no kit counterpart (nodeColors.ts). */
-  --plum:       #7060a8;
-  --plum-bg:    #f0edf8;
-  --orange:     #c2570c;
-  --orange-bg:  #fff4e6;
-  --indigo:     #4f46e5;
-  --indigo-bg:  #eef2ff;
-  --blue:       #3538cd;
-  --blue-bg:    #eef4ff;
-  --note:       #a06a08;
-  --note-bg:    #fdf6dd;
-  --extension:    #0f766e;
-  --extension-bg: #e4f3f0;
 
   /* JSON tree syntax colours. */
   --json-string:  #7a8c52;
@@ -107,31 +86,12 @@
   --surface-3:  #3a3530;
   --builder-accent:   #b8a68e;
   --builder-accent-2: #8f7f6a;
-  --sage:       #9db8a5;
   --sage-bg-2:  #2a3a2f;
   --sage-border: #3b5142;
-  --rose:       #d98e8e;
-  --rose-bg:    var(--danger);
   --rose-border: #5a3434;
-  --amber:      #dba761;
-  --amber-bg:   var(--warning);
   --amber-border: #5c4a22;
-  --sky:        #86a9ca;
   --primary-hover: #a3b8a0;
   --error:      #f07a6a;
-
-  --plum:       #b6a9e3;
-  --plum-bg:    #2a2540;
-  --orange:     #f2a46a;
-  --orange-bg:  #3a2512;
-  --indigo:     #a9a4f7;
-  --indigo-bg:  #23244a;
-  --blue:       #93a0f2;
-  --blue-bg:    #1f2547;
-  --note:       #e6b552;
-  --note-bg:    #35290f;
-  --extension:    #5fc5b5;
-  --extension-bg: #12312c;
 
   --json-string:  #a8ba74;
   --json-number:  #dc9d6a;

@@ -23,8 +23,10 @@ use Throwable;
  * ({@see TracePayloadLimiter}), and written nowhere else.
  *
  * Nothing here may break a step: every failure, from building the envelope to the insert, ends in the warning
- * `flow.trace.write_failed`. Rows are written outside the step's transaction, like `flow_logs`. No screen reads them
- * yet: {@see \App\Domains\Flow\Services\FlowSessionInspector} filters out {@see self::EVENT_TYPES}.
+ * `flow.trace.write_failed`. Rows are written outside the step's transaction, like `flow_logs`. One screen reads them,
+ * statuses only: the run graph ({@see RunGraphReader}) selects a whitelist of envelope fields and never `input`,
+ * `output` or the error message, which wait for `ViewRunPayloads`. The session page's history
+ * ({@see \App\Domains\Flow\Services\FlowSessionInspector}) filters out {@see self::EVENT_TYPES}.
  */
 final readonly class NodeTraceRecorder
 {

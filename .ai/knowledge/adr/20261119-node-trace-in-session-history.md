@@ -66,3 +66,16 @@ data by nature: headers, tokens in URLs, response bodies, a contact's messages.
   cascade). A contactless run's trace is bounded only by automation retention (R-4).
 - Code that reads `flow_session_history` must decide whether it may see the trace; today only the session page does,
   and it filters it out.
+
+## Amendment 2026-11-20: the run graph reads statuses
+
+Recorded by the agent of task `flow-run-graph-page` on an unattended run, from the `flow-automations` spec the owner
+approved ("`ViewRunPayloads` (full node data in a trace; `ViewFlowSessions` shows the graph and statuses only)"); it
+awaits the owner's review in that task's pull request. The text above is kept as accepted; read its "no screen reads the
+trace" bullet and its last consequence as narrowed here.
+
+- The run graph of a session (`RunGraphReader`, behind `ViewFlowSessions`) reads the trace for statuses only: it
+  selects a whitelist of envelope fields by JSON path — type, status, handle, next node, duration, loop iterations,
+  error class — and never `input`, `output` or the error message.
+- Those stay unread by any screen until a page gated by `ViewRunPayloads` exists. The session page's history still
+  filters the trace out.

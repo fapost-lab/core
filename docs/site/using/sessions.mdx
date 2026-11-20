@@ -45,6 +45,25 @@ what they want to say.
   usually mean the step before it never completed.
 </Note>
 
+## Run graph
+
+**Run graph** on a session's page draws the flow version the session ran as a
+graph: the path it took is lit, nodes it never reached are dimmed, and each
+card shows what happened there — done, waiting, failed or still running.
+
+- **Branches** — what a condition's rule or a message's button leads to sits in a
+  frame of that branch.
+- **Subflows** — the run a subflow node started is drawn in a frame of its own
+  next to that node; when the node started several, the latest is shown.
+- **Loops** — a loop is drawn once, marked with how many passes it ran. Pick a
+  pass above the graph to colour the path by that pass; by default the last one
+  is shown.
+
+Click a card to see the node's latest visits: when it ran, which exit it took,
+how long it took and, for a failure, the error's type. The graph shows statuses
+only — a node's input, output and error text are not shown here. A live session's
+graph keeps itself current the same way the list does.
+
 ## Status and outcome
 
 **Status** is about now: is this session still live.
@@ -67,7 +86,7 @@ right one saves time:
 |---|---|
 | Where is this person stuck right now? | **Sessions** |
 | What did they actually say? | [Conversations](/using/conversations) |
-| What did the flow do, step by step? | [Flow logs](/using/flow-logs) |
+| What did the flow do, step by step? | [Flow logs](/using/flow-logs), or the session's **Run graph** |
 
 A session points at a node. A log explains what that node did. A conversation
 shows whether the person got what they came for.

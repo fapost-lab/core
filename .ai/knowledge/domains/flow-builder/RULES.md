@@ -39,9 +39,10 @@ broken.
 ## Rules
 
 - **The builder's colours and fonts come from the kit's `tokens.css` (`@fapost/ui/tokens.css`, from the npm package),** through its own
-  variables, defined only in the `:root` and `.dark` blocks of `builder.css`; every variable with
-  a literal value there has a `.dark` override, and no builder component or script carries a
-  literal colour. The builder's own brown is `--builder-accent`, so the token `--accent` stays
+  variables, defined only in the `:root` and `.dark` blocks of `builder.css` and of
+  `node-palette.css` (the node-type colours of `nodeColors.ts`, which builder.css imports and the
+  console's run graph loads too); every variable with a literal value there has a `.dark` override,
+  and no builder component or script carries a literal colour. The builder's own brown is `--builder-accent`, so the token `--accent` stays
   reachable. Why: the builder follows the console's light/dark choice (the shared pre-paint script
   in `resources/views/partials/theme-script.blade.php`), and a literal stays light in the dark
   theme. Enforced: `resources/js/builder/colors.test.ts`.

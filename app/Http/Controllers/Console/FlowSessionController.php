@@ -14,10 +14,13 @@ use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowSessionInspector;
 use App\Domains\Flow\Templates\TemplateNodeOrigins;
+use App\Domains\Flow\Trace\RunGraphReader;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -37,6 +40,7 @@ final class FlowSessionController extends Controller
         private readonly CurrentAssistantInterface $assistant,
         private readonly FlowActivityWatchers $watchers,
         private readonly TemplateNodeOrigins $origins,
+        private readonly RunGraphReader $graphs,
     ) {
     }
 
@@ -121,6 +125,7 @@ final class FlowSessionController extends Controller
             'live'    => $this->live($assistant),
             'urls'    => [
                 'index' => $this->url('flow-sessions.index', $assistant),
+                'graph' => $this->url('flow-sessions.graph', $assistant, ['record' => $key]),
                 ...(null !== $parentId ? ['parent' => $this->url('flow-sessions.show', $assistant, ['record' => $parentId])] : []),
                 // The session's own log, over the longest period a log is kept.
                 ...(Gate::allows('viewAny', FlowLog::class) ? ['logs' => $this->url('flow-logs.index', $assistant, [
@@ -128,6 +133,62 @@ final class FlowSessionController extends Controller
                 ])] : []),
             ],
         ]);
+    }
+
+    /**
+     * The run graph of a session: the definition it executed with what each node did, its loops and its subflow
+     * children. Statuses only ({@see RunGraphReader}); a node's visits load as JSON from {@see visits()}.
+     */
+    public function graph(string $assistantKey, string $record): Response
+    {
+        $assistant = $this->assistant->get();
+        $session   = $this->sessions->findFor($assistant, $record);
+
+        Gate::authorize('view', $session);
+
+        $key = (string) $session->getKey();
+
+        return Inertia::render('Console/FlowSessions/Graph', [
+            'session' => [
+                'id'       => $key,
+                'status'   => $session->status->value,
+                'flowName' => $this->text($session->flowDefinition?->name),
+                'isLive'   => in_array($session->status, FlowSessionStatus::live(), true),
+            ],
+            'graph' => $this->graphs->graph($session),
+            'live'  => $this->live($assistant),
+            'urls'  => [
+                'session' => $this->url('flow-sessions.show', $assistant, ['record' => $key]),
+                'visits'  => $this->url('flow-sessions.visits', $assistant, ['record' => $key]),
+            ],
+        ]);
+    }
+
+    /**
+     * The newest visits of one node of the run graph, statuses only. `session` is the run's own session or one of its
+     * subflow children (a frame of the graph); any other session is not found.
+     */
+    public function visits(string $assistantKey, string $record, Request $request): JsonResponse
+    {
+        $assistant = $this->assistant->get();
+        $root      = $this->sessions->findFor($assistant, $record);
+
+        Gate::authorize('view', $root);
+
+        $sessionId = $request->query('session');
+        $nodeId    = $request->query('node');
+
+        if (! is_string($sessionId) || ! is_string($nodeId) || '' === $nodeId) {
+            throw (new ModelNotFoundException())->setModel(FlowSession::class);
+        }
+
+        $session = $sessionId === (string) $root->getKey() ? $root : $this->sessions->findFor($assistant, $sessionId);
+
+        if (! $this->graphs->belongsTo($root, $session)) {
+            throw (new ModelNotFoundException())->setModel(FlowSession::class, [$sessionId]);
+        }
+
+        return response()->json(['visits' => $this->graphs->visits($session, $nodeId)]);
     }
 
     /**
