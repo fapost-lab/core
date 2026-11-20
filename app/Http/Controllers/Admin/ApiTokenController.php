@@ -36,6 +36,8 @@ final class ApiTokenController extends Controller
 
     public function index(Request $request): Response
     {
+        Gate::authorize(Permission::ManageApiTokens->value);
+
         $user = $this->actor($request);
 
         $table = new DataTable(
@@ -100,6 +102,8 @@ final class ApiTokenController extends Controller
      */
     public function destroy(Request $request, string $record): RedirectResponse
     {
+        Gate::authorize(Permission::ManageApiTokens->value);
+
         $user = $this->actor($request);
 
         $this->tokens->revoke($user, $this->tokens->find($record));
