@@ -47,11 +47,16 @@ export function defaultWebhookConfig(): WebhookConfig {
     return webhookConfigFromPreset('hmac')
 }
 
-/** A preset replaces the whole config, so keys of an old format do not survive. */
-export function webhookConfigFromPreset(value: string): WebhookConfig {
+/** A preset replaces the whole config, so keys of an old format do not survive; the response mode is kept when given. */
+export function webhookConfigFromPreset(value: string, responseMode: 'async' | 'sync' = 'async'): WebhookConfig {
     const preset = WEBHOOK_PRESETS.find((item) => item.value === value) ?? WEBHOOK_PRESETS[0]
 
-    return { ...preset.config }
+    return { ...preset.config, response_mode: responseMode }
+}
+
+/** Switching the response mode touches nothing else. */
+export function withWebhookResponseMode(config: WebhookConfig, mode: string): WebhookConfig {
+    return { ...config, response_mode: mode === 'sync' ? 'sync' : 'async' }
 }
 
 /** A trigger saved before the verification model: it has `method`/`path`/`secret` or no `verification`. */
@@ -61,9 +66,14 @@ export function isLegacyWebhookConfig(config: WebhookConfig | null | undefined):
     return 'method' in cfg || 'path' in cfg || 'secret' in cfg || typeof cfg.verification !== 'string'
 }
 
-/** Sets or clears one key; an empty value is omitted rather than sent as ''. Always keeps `response_mode: 'async'`. */
+/** The response mode a config has: `sync` (the sender waits for the flow's answer) or `async`, the default. */
+export function webhookResponseMode(config: WebhookConfig | null | undefined): 'async' | 'sync' {
+    return config?.response_mode === 'sync' ? 'sync' : 'async'
+}
+
+/** Sets or clears one key; an empty value is omitted rather than sent as ''. Keeps the response mode, `async` when unset. */
 export function withWebhookField(config: WebhookConfig, key: string, value: string | number | null): WebhookConfig {
-    const next: WebhookConfig = { ...config, response_mode: 'async' }
+    const next: WebhookConfig = { ...config, response_mode: webhookResponseMode(config) }
 
     if (value === null || value === '' || (typeof value === 'number' && Number.isNaN(value))) {
         delete next[key]
@@ -84,7 +94,7 @@ export function withWebhookField(config: WebhookConfig, key: string, value: stri
 
 /** Switching the verification type drops the keys that only make sense for HMAC. */
 export function withWebhookVerification(config: WebhookConfig, verification: string): WebhookConfig {
-    const next: WebhookConfig = { ...config, verification, response_mode: 'async' }
+    const next: WebhookConfig = { ...config, verification, response_mode: webhookResponseMode(config) }
 
     if (verification !== 'hmac_sha256') {
         delete next.signature_prefix

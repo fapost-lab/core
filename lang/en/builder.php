@@ -90,6 +90,19 @@ return [
             ],
         ],
 
+        'webhook_response' => [
+            'label'            => 'Respond to webhook',
+            'section_response' => 'Response',
+            'status'           => 'Status code',
+            'status_help'      => 'HTTP status sent to the webhook sender, 200 to 499.',
+            'body_type'        => 'Body type',
+            'body_types'       => [
+                'json' => 'JSON',
+                'text' => 'Text',
+            ],
+            'body' => 'Body',
+            'text' => 'Text',
+        ],
         'notify' => [
             'section_mode' => 'Mode',
             'mode'         => 'Notify',

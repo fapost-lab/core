@@ -12,6 +12,9 @@ enum WebhookOutcomeStatus: string
     /** A run was queued (202). */
     case Accepted = 'accepted';
 
+    /** A `sync` trigger's flow answered while the request waited, or a repeat found that answer kept: the flow's answer. */
+    case Replied = 'replied';
+
     /** The delivery id was seen within the dedup window; nothing was queued (200). */
     case Duplicate = 'duplicate';
 

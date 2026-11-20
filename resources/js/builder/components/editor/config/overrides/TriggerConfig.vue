@@ -10,7 +10,9 @@ import {
     defaultWebhookConfig,
     isLegacyWebhookConfig,
     webhookConfigFromPreset,
+    webhookResponseMode,
     withWebhookField,
+    withWebhookResponseMode,
     withWebhookVerification,
 } from '@builder/utils/webhookTrigger'
 
@@ -128,7 +130,7 @@ function applyWebhookPreset(value: string): void {
         return
     }
 
-    setWebhookConfig(webhookConfigFromPreset(value))
+    setWebhookConfig(webhookConfigFromPreset(value, webhookResponseMode(triggerCfg.value)))
     webhookPresetValue.value = ''
 }
 
@@ -554,6 +556,27 @@ function defaultConfig(type: string): Record<string, unknown> {
                     </div>
                     <div v-if="webhookText('delivery_id') === ''" class="field-hint webhook-status-warn">
                         Without a delivery id, a resent request starts the flow again.
+                    </div>
+                </div>
+
+                <div class="config-field">
+                    <div class="field-label">Response</div>
+                    <select
+                        class="field-input"
+                        data-testid="webhook-response-mode"
+                        :value="webhookResponseMode(triggerCfg)"
+                        @change="setWebhookConfig(withWebhookResponseMode(triggerCfg, ($event.target as HTMLSelectElement).value))"
+                    >
+                        <option value="async">Accept at once (202)</option>
+                        <option value="sync">Wait for the flow's answer</option>
+                    </select>
+                    <div class="field-hint">
+                        <template v-if="webhookResponseMode(triggerCfg) === 'sync'">
+                            The sender waits up to 30 seconds for a "Respond to webhook" node or the end of the run; without an answer by then, or when too many requests already wait, it gets 202.
+                        </template>
+                        <template v-else>
+                            The sender gets 202 as soon as the run is queued.
+                        </template>
                     </div>
                 </div>
             </template>

@@ -13,6 +13,9 @@ use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Webhook\FlowWebhookEndpointService;
 use App\Domains\Flow\Webhook\FlowWebhookReceiver;
 use App\Domains\Flow\Webhook\WebhookDeliveryDedupInterface;
+use App\Domains\Flow\Webhook\WebhookReply;
+use App\Domains\Flow\Webhook\WebhookReplyStoreInterface;
+use App\Domains\Flow\Webhook\WebhookWaitSlotsInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Services\CurrentAccessState;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
@@ -39,6 +42,10 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
 
     private InMemoryWebhookDeliveryDedup $dedup;
 
+    private InMemoryWebhookReplyStore $replies;
+
+    private InMemoryWebhookWaitSlots $slots;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -51,6 +58,12 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
 
         $this->dedup = new InMemoryWebhookDeliveryDedup();
         $this->app->instance(WebhookDeliveryDedupInterface::class, $this->dedup);
+
+        $this->replies = new InMemoryWebhookReplyStore();
+        $this->app->instance(WebhookReplyStoreInterface::class, $this->replies);
+
+        $this->slots = new InMemoryWebhookWaitSlots();
+        $this->app->instance(WebhookWaitSlotsInterface::class, $this->slots);
 
         Queue::fake();
     }
@@ -313,6 +326,112 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
         $this->assertSame([], $this->dedup->claimed);
     }
 
+    public function test_a_sync_trigger_answers_with_the_flows_reply_while_holding_a_wait_slot(): void
+    {
+        [, $triggerId, $token]                = $this->liveWebhook(config: $this->syncConfig());
+        $this->replies->prepared['wh:sync-1'] = new WebhookReply(201, '{"order":"created"}', WebhookReply::TYPE_JSON);
+
+        $response = $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'sync-1'])
+            ->assertStatus(201)
+            ->assertHeader('Content-Type', 'application/json');
+
+        $this->assertSame('{"order":"created"}', $response->getContent());
+        Queue::assertPushed(StartAutomationRunJob::class, 1);
+        $this->assertSame([[$this->tenantId, $triggerId, 'wh:sync-1', 30]], $this->replies->awaited);
+        $this->assertSame([[5, 2, 35]], $this->slots->acquired, 'The installation and tenant ceilings, and the wait plus its grace.');
+        $this->assertSame([], $this->slots->held, 'The slot is given back.');
+    }
+
+    public function test_a_text_reply_is_sent_as_plain_text_and_carries_no_header_of_the_flow(): void
+    {
+        [, , $token]                             = $this->liveWebhook(config: $this->syncConfig());
+        $this->replies->prepared['wh:sync-text'] = new WebhookReply(200, 'ok', WebhookReply::TYPE_TEXT);
+
+        $response = $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'sync-text'])->assertOk();
+
+        $this->assertSame('ok', $response->getContent());
+        $this->assertStringStartsWith('text/plain', (string) $response->headers->get('Content-Type'));
+        $this->assertFalse($response->headers->has('Set-Cookie'));
+    }
+
+    public function test_a_sync_request_without_a_free_slot_gets_202_at_once_and_does_not_wait(): void
+    {
+        [, , $token]                        = $this->liveWebhook(config: $this->syncConfig());
+        $this->slots->full                  = true;
+        $this->replies->prepared['wh:busy'] = new WebhookReply(200, '{}', WebhookReply::TYPE_JSON);
+
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'busy'])
+            ->assertStatus(202)
+            ->assertExactJson(['status' => 'accepted', 'delivery_id' => 'busy']);
+
+        $this->assertSame([], $this->replies->awaited);
+        Queue::assertPushed(StartAutomationRunJob::class, 1);
+    }
+
+    public function test_a_sync_request_whose_flow_does_not_answer_in_time_gets_202_and_gives_its_slot_back(): void
+    {
+        [, , $token] = $this->liveWebhook(config: $this->syncConfig());
+        config(['flow.webhook.sync_wait_seconds' => 3]);
+
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'slow'])
+            ->assertStatus(202)
+            ->assertExactJson(['status' => 'accepted', 'delivery_id' => 'slow']);
+
+        $this->assertSame(3, $this->replies->awaited[0][3]);
+        $this->assertSame([], $this->slots->held);
+    }
+
+    public function test_a_repeated_sync_delivery_gets_the_kept_answer_or_duplicate_and_never_waits(): void
+    {
+        [, , $token] = $this->liveWebhook(config: $this->syncConfig());
+
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'again'])->assertStatus(202);
+        $this->assertCount(1, $this->replies->awaited);
+
+        // No answer kept (yet): the plain duplicate answer.
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'again'])
+            ->assertOk()
+            ->assertExactJson(['status' => 'duplicate', 'delivery_id' => 'again']);
+
+        // The flow answered meanwhile: a repeat gets that answer while it is kept.
+        $this->replies->prepared['wh:again'] = new WebhookReply(202, '{"queued":true}', WebhookReply::TYPE_JSON);
+        $this->assertSame('{"queued":true}', $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'again'])->assertStatus(202)->getContent());
+
+        $this->assertCount(1, $this->replies->awaited, 'A duplicate never waits: it would take the first request\'s wake-up.');
+        Queue::assertPushed(StartAutomationRunJob::class, 1);
+    }
+
+    public function test_an_async_trigger_never_waits_or_reads_a_kept_answer(): void
+    {
+        [, , $token]                         = $this->liveWebhook();
+        $this->replies->prepared['wh:async'] = new WebhookReply(200, '{"ignored":true}', WebhookReply::TYPE_JSON);
+
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'async'])->assertStatus(202);
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'async'])->assertExactJson(['status' => 'duplicate', 'delivery_id' => 'async']);
+
+        $this->assertSame([], $this->replies->awaited);
+        $this->assertSame([], $this->replies->found);
+        $this->assertSame([], $this->slots->acquired);
+    }
+
+    /**
+     * The default GitHub-like trigger, waiting for the flow's answer.
+     *
+     * @return array<string, mixed>
+     */
+    private function syncConfig(): array
+    {
+        return [
+            'verification'     => 'hmac_sha256',
+            'signature_header' => 'X-Hub-Signature-256',
+            'signature_prefix' => 'sha256=',
+            'timestamp_header' => 'X-Timestamp',
+            'signed_payload'   => '{header.X-Timestamp}.{raw}',
+            'delivery_id'      => '{header.X-GitHub-Delivery}',
+            'response_mode'    => 'sync',
+        ];
+    }
+
     /**
      * A published flow with one webhook trigger (GitHub-like: HMAC-SHA256 with a timestamp) and a secret.
      *
@@ -436,5 +555,79 @@ final class InMemoryWebhookDeliveryDedup implements WebhookDeliveryDedupInterfac
     public function release(string $tenantId, string $triggerId, string $fireKey): void
     {
         unset($this->claimed["{$tenantId}:{$triggerId}:{$fireKey}"]);
+    }
+}
+
+/**
+ * {@see WebhookReplyStoreInterface} in memory: an answer prepared for a fire key is "delivered" before the request
+ * waits; the Redis one has its own test against a real Redis.
+ */
+final class InMemoryWebhookReplyStore implements WebhookReplyStoreInterface
+{
+    /** @var array<string, WebhookReply> by fire key */
+    public array $prepared = [];
+
+    /** @var list<array{string, string, string, int}> */
+    public array $awaited = [];
+
+    /** @var list<string> */
+    public array $found = [];
+
+    public function deliver(string $tenantId, string $triggerId, string $fireKey, WebhookReply $reply): bool
+    {
+        if (isset($this->prepared[$fireKey])) {
+            return false;
+        }
+
+        $this->prepared[$fireKey] = $reply;
+
+        return true;
+    }
+
+    public function await(string $tenantId, string $triggerId, string $fireKey, int $seconds): ?WebhookReply
+    {
+        $this->awaited[] = [$tenantId, mb_strtolower($triggerId), $fireKey, $seconds];
+
+        return $this->prepared[$fireKey] ?? null;
+    }
+
+    public function find(string $tenantId, string $triggerId, string $fireKey): ?WebhookReply
+    {
+        $this->found[] = $fireKey;
+
+        return $this->prepared[$fireKey] ?? null;
+    }
+}
+
+/**
+ * {@see WebhookWaitSlotsInterface} in memory: records what was asked and what is still held.
+ */
+final class InMemoryWebhookWaitSlots implements WebhookWaitSlotsInterface
+{
+    public bool $full = false;
+
+    /** @var list<array{int, int, int}> */
+    public array $acquired = [];
+
+    /** @var array<string, string> slot => tenant */
+    public array $held = [];
+
+    public function acquire(string $tenantId, int $installationMax, int $tenantMax, int $holdSeconds): ?string
+    {
+        $this->acquired[] = [$installationMax, $tenantMax, $holdSeconds];
+
+        if ($this->full) {
+            return null;
+        }
+
+        $slot              = 'slot-' . count($this->acquired);
+        $this->held[$slot] = $tenantId;
+
+        return $slot;
+    }
+
+    public function release(string $tenantId, string $slot): void
+    {
+        unset($this->held[$slot]);
     }
 }

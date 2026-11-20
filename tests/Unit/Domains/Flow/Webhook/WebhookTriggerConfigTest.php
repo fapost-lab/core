@@ -39,7 +39,7 @@ final class WebhookTriggerConfigTest extends TestCase
         yield 'two placeholders' => [[...$hmac, 'delivery_id' => '{header.A}{header.B}']];
         yield 'the colon syntax' => [[...$hmac, 'delivery_id' => '{header:X-Delivery}']];
         yield 'the raw body as an id' => [[...$hmac, 'delivery_id' => '{raw}']];
-        yield 'the synchronous mode' => [[...$hmac, 'response_mode' => 'sync']];
+        yield 'an unknown response mode' => [[...$hmac, 'response_mode' => 'wait']];
     }
     public function test_a_github_like_config_becomes_an_hmac_spec_with_its_timestamp_and_delivery_template(): void
     {
@@ -59,6 +59,15 @@ final class WebhookTriggerConfigTest extends TestCase
         $this->assertSame('sha256=', $spec->prefix);
         $this->assertSame('{header.X-GitHub-Delivery|body.id}', $spec->idempotencyTemplate);
         $this->assertSame(120, $spec->timestamp?->toleranceSeconds);
+    }
+
+    public function test_the_response_mode_is_async_unless_sync_is_asked_for(): void
+    {
+        $base = ['verification' => 'header_equals', 'signature_header' => 'X-Webhook-Secret'];
+
+        $this->assertFalse(WebhookTriggerConfig::fromConfig($base)->isSync());
+        $this->assertFalse(WebhookTriggerConfig::fromConfig([...$base, 'response_mode' => 'async'])->isSync());
+        $this->assertTrue(WebhookTriggerConfig::fromConfig([...$base, 'response_mode' => 'sync'])->isSync());
     }
 
     public function test_a_secret_header_config_strips_the_secret_header_from_what_the_flow_sees(): void

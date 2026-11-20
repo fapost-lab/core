@@ -3,7 +3,9 @@ import {
     defaultWebhookConfig,
     isLegacyWebhookConfig,
     webhookConfigFromPreset,
+    webhookResponseMode,
     withWebhookField,
+    withWebhookResponseMode,
     withWebhookVerification,
 } from './webhookTrigger'
 
@@ -88,5 +90,29 @@ describe('field editing', () => {
 
     it('maps the timestamp preset with a signed string covering the header', () => {
         expect(webhookConfigFromPreset('hmac_timestamp').signed_payload).toBe('{header.X-Timestamp}.{raw}')
+    })
+})
+
+describe('response mode', () => {
+    it('is async unless the config asks for sync', () => {
+        expect(webhookResponseMode(defaultWebhookConfig())).toBe('async')
+        expect(webhookResponseMode({})).toBe('async')
+        expect(webhookResponseMode({ response_mode: 'sync' })).toBe('sync')
+        expect(webhookResponseMode({ response_mode: 'later' })).toBe('async')
+    })
+
+    it('switches the mode and touches nothing else', () => {
+        const config = withWebhookResponseMode(webhookConfigFromPreset('github'), 'sync')
+
+        expect(config).toEqual({ ...webhookConfigFromPreset('github'), response_mode: 'sync' })
+        expect(withWebhookResponseMode(config, 'nonsense').response_mode).toBe('async')
+    })
+
+    it('survives editing a field, switching the verification and applying a preset', () => {
+        const sync = withWebhookResponseMode(defaultWebhookConfig(), 'sync')
+
+        expect(withWebhookField(sync, 'signature_header', 'X-Sig').response_mode).toBe('sync')
+        expect(withWebhookVerification(sync, 'header_equals').response_mode).toBe('sync')
+        expect(webhookConfigFromPreset('github', webhookResponseMode(sync)).response_mode).toBe('sync')
     })
 })

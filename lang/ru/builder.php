@@ -90,6 +90,19 @@ return [
             ],
         ],
 
+        'webhook_response' => [
+            'label'            => 'Ответ на вебхук',
+            'section_response' => 'Ответ',
+            'status'           => 'Код статуса',
+            'status_help'      => 'HTTP-статус, который получит отправитель вебхука, от 200 до 499.',
+            'body_type'        => 'Тип тела',
+            'body_types'       => [
+                'json' => 'JSON',
+                'text' => 'Текст',
+            ],
+            'body' => 'Тело',
+            'text' => 'Текст',
+        ],
         'notify' => [
             'section_mode' => 'Режим',
             'mode'         => 'Уведомить',

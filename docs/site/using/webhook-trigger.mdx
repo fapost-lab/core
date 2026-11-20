@@ -80,7 +80,8 @@ The flow has no contact, so blocks that need one cannot be published in it; see
 | Code | Meaning |
 |---|---|
 | `202` | Accepted: the run is queued. The body is `{"status": "accepted", "delivery_id": "…"}` |
-| `200` | A repeat of a delivery already accepted; nothing new runs |
+| `200` | A repeat of a delivery already accepted; nothing new runs. In *Wait for the flow's answer* mode, a repeat that arrives while the answer is kept (a minute) gets that answer instead |
+| any | In *Wait for the flow's answer* mode: the status and body the flow answered (see below) |
 | `401` | The signature, the secret or the timestamp did not check out, or no secret is set yet |
 | `404` | No published, active webhook trigger behind this URL |
 | `405` | A method other than `POST` |
@@ -88,4 +89,30 @@ The flow has no contact, so blocks that need one cannot be published in it; see
 | `429` | Too many requests for this URL (see `flow.webhook.per_token_per_minute` in [Platform settings](/self-hosting/platform-settings)), or too many requests to unknown URLs from one address; wait for `Retry-After` |
 | `503` | The workspace is stopped; retry after `Retry-After` seconds |
 
-The trigger always answers `202` as soon as the run is queued; it does not wait for the flow to finish.
+## Response mode
+
+**Response** in the trigger's settings chooses what the sender gets once the request is accepted:
+
+- **Accept at once (202)** — the default. The sender gets `202` as soon as the run is queued; it does not wait
+  for the flow.
+- **Wait for the flow's answer** — the request is held open while the flow runs, for up to 30 seconds, and the
+  sender gets what the flow answers:
+  - the first **Respond to webhook** block the run reaches: its status (200–499) and its body, JSON or text, built
+    from the run's variables — for example `{"order": "{{flow.webhook.body.id}}", "status": "received"}`. The
+    block works inside a subflow too. The run goes on after it; a later block or the end of the
+    run changes nothing;
+  - otherwise, the end of the run: `200` with `{"status": "completed"}` (or `"cancelled"`, when an **End** block
+    says so), or `500` with `{"status": "failed"}` when the run fails.
+
+  If the flow does not answer in time, or more requests are already waiting than the platform allows, the sender
+  gets the usual `202` and the run continues. Only the content type of an answer is set (`application/json` or
+  `text/plain`); no other header comes from the flow.
+
+Waiting holds a server worker for each request, so few may wait at once: by default 5 on the whole installation and
+2 per workspace (`flow.webhook.sync_waiters_max`, `flow.webhook.sync_waiters_per_tenant`), for at most
+`flow.webhook.sync_wait_seconds` seconds — see [Platform settings](/self-hosting/platform-settings). A burst of
+deliveries, or runs of the same trigger queued behind each other, therefore gets `202` rather than the flow's
+answer: a sender that needs the outcome of every delivery should not rely on it.
+
+Outside this mode the **Respond to webhook** block does nothing; the builder warns when a flow has the block but no
+trigger that waits for the answer.

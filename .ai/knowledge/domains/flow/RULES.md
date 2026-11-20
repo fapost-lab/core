@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-20
 ---
 # Flow rules
 
@@ -300,6 +300,15 @@ broken.
   the config is copied into every version and template, and a URL held by an outside system must stop working when its
   flow cannot be managed (`adr-20261119-flow-webhook-trigger`). Enforced: `FlowWebhookTriggerTest`,
   `FlowWebhookEndpointTest`, `FlowWebhookHostModeTest`, `WebhookTriggerConfigTest`, `RedisWebhookDeliveryDedupRedisTest`.
+- **A webhook request waits for its flow only while it holds a wait slot, and never past 30 seconds.** A trigger in
+  `response_mode: sync` holds the request through `WebhookSyncWait`, which first takes a slot of
+  `WebhookWaitSlotsInterface` (`flow.webhook.sync_waiters_max` on the installation, `flow.webhook.sync_waiters_per_tenant`
+  per tenant, both at once or neither) and gives it back in `finally`; no slot, no answer in time or a Redis failure
+  answers 202. A repeated delivery never waits. The answer is the first one stored for the run (`SET NX`): a
+  `webhook_response` node, else the run's end through `WebhookRunEndReply`, which never fails the engine's caller.
+  Why: every waiting request holds a PHP-FPM worker, and an unbounded wait would take the console of every tenant
+  down with it (`adr-20261119-flow-webhook-trigger`). Enforced: `FlowWebhookTriggerTest`, `WebhookRunReplyTest`,
+  `RedisWebhookWaitSlotsRedisTest`, `RedisWebhookReplyStoreRedisTest`, `PlatformSettingsTest` (the 30-second ceiling).
 - **A definition's expression engine is the flow's choice, written explicitly at publish and checked with.** The draft
   holds it (`flow_drafts.expression_engine`); `PublishFlowService` passes the engine on to `ValidateFlowService` and
   `TemplateExpander` and writes it onto the definition — the draft's on a publish, the active definition's on a

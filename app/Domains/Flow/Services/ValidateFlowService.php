@@ -20,6 +20,7 @@ use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\LoopNodeHandler;
+use App\Domains\Flow\Handlers\WebhookResponseNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
@@ -34,6 +35,7 @@ use App\Domains\Flow\Validation\FlowGraphStructureValidator;
 use App\Domains\Flow\Validation\ListSizeChecker;
 use App\Domains\Flow\Validation\LoopConfigChecker;
 use App\Domains\Flow\Validation\VariablePathConflictChecker;
+use App\Domains\Flow\Webhook\WebhookTriggerConfig;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -118,6 +120,7 @@ final readonly class ValidateFlowService
         }
 
         $this->warnSolutionNodesWithoutErrorExit($nodeMap, $edges, $warnings);
+        $this->warnWebhookResponseWithoutSyncTrigger($nodeMap, $triggers, $warnings);
 
         $this->validateEndNodeOutgoingEdges($nodeMap, $edges, $errors);
         $this->validateSubflowTargetsAreNotTemplates($nodeMap, $errors);
@@ -361,6 +364,44 @@ final readonly class ValidateFlowService
                 path: "nodes.{$nodeId}",
                 code: 'solution_node_error_unhandled',
                 message: "Node {$nodeId} ({$type}) has no connection on its error exit: if its Solution is switched off for the tenant or the node fails, the flow ends there.",
+            );
+        }
+    }
+
+    /**
+     * A `webhook_response` node answers only a sender that waits, which only a webhook trigger in `sync` mode makes.
+     * Without one the node does nothing — unless the flow runs as a subflow of a flow that has one — so the author is
+     * told. Skipped when the triggers are not given.
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  list<mixed>|null                     $triggers
+     * @param  list<FlowValidationErrorDto>         $warnings
+     */
+    private function warnWebhookResponseWithoutSyncTrigger(array $nodeMap, ?array $triggers, array &$warnings): void
+    {
+        if (null === $triggers) {
+            return;
+        }
+
+        foreach ($triggers as $trigger) {
+            $config = is_array($trigger) && is_array($trigger['config'] ?? null) ? $trigger['config'] : [];
+
+            if (is_array($trigger)
+                && FlowTriggerType::Webhook->value === ($trigger['type'] ?? null)
+                && WebhookTriggerConfig::RESPONSE_SYNC === ($config['response_mode'] ?? null)) {
+                return;
+            }
+        }
+
+        foreach ($nodeMap as $nodeId => $node) {
+            if (WebhookResponseNodeHandler::TYPE !== ($node['type'] ?? null)) {
+                continue;
+            }
+
+            $warnings[] = new FlowValidationErrorDto(
+                path: "nodes.{$nodeId}",
+                code: 'webhook_response_without_sync_trigger',
+                message: "Node {$nodeId} answers a webhook sender, but the flow has no webhook trigger that waits for the answer (response mode sync): unless the flow runs as a subflow of one that has, the node does nothing.",
             );
         }
     }

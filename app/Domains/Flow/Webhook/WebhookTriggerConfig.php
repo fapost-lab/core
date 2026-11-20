@@ -18,7 +18,8 @@ use ValueError;
  * (e.g. `sha256=`), `signed_payload` (the signed string, `{raw}` once) and `timestamp_header` with
  * `timestamp_tolerance` (seconds, default 300) — a timestamp only together with a `signed_payload` that includes
  * `{header.<timestamp_header>}`, so the signature covers it; `delivery_id` (one placeholder `{header.Name}` or `{body.path}`, alternatives joined
- * by `|`, or empty); `response_mode` (`async` only, for now). Any other key is refused — `secret` above all.
+ * by `|`, or empty); `response_mode` — `async` (202 once the run is queued, the default) or `sync` (the request waits
+ * for the flow's answer, {@see WebhookSyncWait}). Any other key is refused — `secret` above all.
  *
  * The check itself is Foundation's {@see IngressSpec}, the same one channel webhooks run.
  */
@@ -29,6 +30,8 @@ final readonly class WebhookTriggerConfig
     public const string VERIFICATION_HEADER_EQUALS = 'header_equals';
 
     public const string RESPONSE_ASYNC = 'async';
+
+    public const string RESPONSE_SYNC = 'sync';
 
     public const int DEFAULT_TIMESTAMP_TOLERANCE = 300;
 
@@ -116,9 +119,8 @@ final readonly class WebhookTriggerConfig
 
         $responseMode = $config['response_mode'] ?? self::RESPONSE_ASYNC;
 
-        // The synchronous "respond to webhook" mode is built by a separate task; until then only async is accepted.
-        if (self::RESPONSE_ASYNC !== $responseMode) {
-            throw new InvalidArgumentException('Invalid webhook trigger config: response_mode must be async.');
+        if (self::RESPONSE_ASYNC !== $responseMode && self::RESPONSE_SYNC !== $responseMode) {
+            throw new InvalidArgumentException('Invalid webhook trigger config: response_mode must be async or sync.');
         }
 
         $parsed = new self(
@@ -141,6 +143,12 @@ final readonly class WebhookTriggerConfig
         }
 
         return $parsed;
+    }
+
+    /** Whether a request waits for the flow's answer instead of getting 202 at once. */
+    public function isSync(): bool
+    {
+        return self::RESPONSE_SYNC === $this->responseMode;
     }
 
     public function ingressSpec(): IngressSpec

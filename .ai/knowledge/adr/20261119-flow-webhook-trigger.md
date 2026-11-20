@@ -13,8 +13,9 @@ paths:
   - routes/flow-webhook.php
   - app/Domains/Flow/Models/FlowWebhookEndpoint.php
   - "database/migrations/tenant/*webhook_endpoints*"
-summary: Why a flow's webhook trigger is POST /hooks/flow/{token} on the tenant's host, keeps its secret encrypted in flow_webhook_endpoints outside the definition, checks it with Foundation's IngressSpec, runs once per delivery id, and answers 202 (sync mode is a later task)
-reviewed_at: 2026-11-19
+  - app/Domains/Flow/Handlers/WebhookResponseNodeHandler.php
+summary: Why a flow's webhook trigger is POST /hooks/flow/{token} on the tenant's host, keeps its secret encrypted in flow_webhook_endpoints outside the definition, checks it with Foundation's IngressSpec, runs once per delivery id, and answers 202 or, in sync mode, the flow's answer within a capped wait
+reviewed_at: 2026-11-20
 ---
 # A flow's webhook trigger is served by Laravel on the tenant's host, its secret lives encrypted outside the definition, and a delivery runs once
 
@@ -55,9 +56,19 @@ or the tenant context. The URL handed to outside systems is the costliest thing 
 - **Limits.** Unknown or dead tokens count against the tenant and address (60 a minute) before the lookup; a known token
   has the platform setting `flow.webhook.per_token_per_minute` (120). Body at most 256 KB. A stopped tenant answers 503
   with `Retry-After`.
-- **Answer.** Asynchronous only: 202 once the run is queued (`StartAutomationRunJob`). The synchronous "respond to
-  webhook" mode is a separate task and plugs in at `FlowWebhookController::accepted()`; until then the validator refuses
-  `response_mode` other than `async`.
+- **Answer.** `response_mode: async` (the default): 202 once the run is queued (`StartAutomationRunJob`).
+  `response_mode: sync`: after the dispatch, `FlowWebhookReceiver` holds the request for the flow's answer through
+  `WebhookSyncWait` — only while it holds a slot of `WebhookWaitSlotsInterface` (Redis sorted sets scored by expiry,
+  one Lua script for both levels: `flow.webhook.sync_waiters_max`, 5 on the installation, a quarter of the 20 PHP-FPM
+  workers, and `flow.webhook.sync_waiters_per_tenant`, 2), for at most `flow.webhook.sync_wait_seconds` (1–30, 30).
+  The answer travels through `WebhookReplyStoreInterface`: `SET NX EX 60` on
+  `flow:webhook:reply:{tenant}:{trigger}:{sha256(fire key)}`, so the first answer of a run wins, and only the winning
+  write pushes the wake-up the request `BLPOP`s on. It comes from the `webhook_response@1` node (status 200–499, JSON
+  rendered leaf by leaf or text, at most 64 KB, keyed by the run root's `(trigger_id, fire_key)`, a no-op outside a
+  webhook run) or, failing that, from `WebhookRunEndReply`, which `FlowEngine` calls wherever it stops running a
+  session: a root automation run with a `wh:` fire key that has ended answers 200 completed / cancelled or 500 failed.
+  No slot, no answer in time, or any Redis failure: 202. A repeated delivery gets the kept answer and never waits. No
+  header of the answer comes from the flow.
 
 ## Alternatives
 
@@ -69,6 +80,11 @@ or the tenant context. The URL handed to outside systems is the costliest thing 
 - **A hash of the secret.** HMAC needs the secret itself.
 - **The body hash as delivery id.** Silently merges legitimate identical events.
 - **A plain per-IP throttle.** Would cap a busy legitimate sender at the unknown-token rate.
+- **Waiting without a ceiling, or a counter with a TTL as the ceiling.** Twenty waiting senders would take the whole
+  PHP-FPM pool, the console of every tenant with it; a counter whose TTL every new slot refreshes never lets a slot
+  leaked by a crashed request lapse under steady traffic.
+- **Running the first segment inside the request, or polling the database for the run's end.** The first ties a web
+  worker to a flow's `call`s; the second loads the database for every waiting second.
 
 ## Consequences
 
@@ -77,3 +93,5 @@ or the tenant context. The URL handed to outside systems is the costliest thing 
 - The `down()` of the migration drops the table with the secrets.
 - Old webhook trigger configs (`method`/`path`/`secret`) never worked and no longer publish until re-set in the builder.
 - Endpoints made for triggers never published stay as rows; they are never served.
+- A `sync` answer is best effort: a burst, a queue backlog or the serialization of one trigger's runs turns it into
+  202, and a run's later answer is lost after its minute in Redis.

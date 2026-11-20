@@ -10,7 +10,14 @@ final readonly class WebhookOutcome
         public WebhookOutcomeStatus $status,
         public ?string $deliveryId = null,
         public ?int $retryAfterSeconds = null,
+        public ?WebhookReply $reply = null,
     ) {
+    }
+
+    /** The flow answered a sender that waited for it (`response_mode: sync`). */
+    public static function replied(string $deliveryId, WebhookReply $reply): self
+    {
+        return new self(WebhookOutcomeStatus::Replied, $deliveryId, null, $reply);
     }
 
     public static function accepted(string $deliveryId): self

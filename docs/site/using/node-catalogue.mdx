@@ -239,6 +239,15 @@ It does not wait: the event goes out and this flow carries on. Use it to set
 something else in motion — a notification pipeline, a follow-up sequence —
 without coupling the two flows together.
 
+### Respond to webhook
+
+Answers the system whose request started the flow, while it waits.
+
+Only a [webhook trigger](/using/webhook-trigger#response-mode) set to **Wait for the flow's answer** makes the
+sender wait. The block sets the status (200–499) and a JSON or text body built from the run's variables; the
+first answer of a run is the one sent, and the flow carries on after it. Anywhere else — no such trigger, or the
+sender already gave up — it does nothing.
+
 ### End
 
 Finishes the flow explicitly.
