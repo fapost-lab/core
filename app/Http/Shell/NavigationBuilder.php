@@ -149,6 +149,7 @@ final readonly class NavigationBuilder
             ),
             $this->entry($system, 'console.admin.usage.index', __('console.usage.navigation'), 'gauge', 90, $user->can(Permission::ManageSettings->value)),
             $this->entry($system, 'console.admin.credentials.index', __('console.credentials.navigation'), 'key-round', 96, $this->canViewAny($user, Credential::class)),
+            $this->entry($system, 'console.admin.api-tokens.index', __('console.api_tokens.navigation'), 'key-square', 97, Gate::forUser($user)->allows(Permission::ManageApiTokens->value)),
             $this->entry($system, 'console.admin.solutions.index', __('console.solutions.navigation'), 'puzzle', 95, $user->can(Permission::ManageSettings->value)),
             $this->entry(
                 $system,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Http\Controllers\Admin\ApiTokenController as AdminApiTokenController;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\CredentialController as AdminCredentialController;
@@ -214,6 +215,10 @@ final class ConsoleRouteInterceptionTest extends FeatureTestCase
             'admin credentials store'   => ['console.admin.credentials.store', AdminCredentialController::class, 'store', 'POST', 'admin/credentials'],
             'admin credentials update'  => ['console.admin.credentials.update', AdminCredentialController::class, 'update', 'PUT', 'admin/credentials/{record}'],
             'admin credentials destroy' => ['console.admin.credentials.destroy', AdminCredentialController::class, 'destroy', 'DELETE', 'admin/credentials/{record}'],
+            'admin api tokens'          => ['console.admin.api-tokens.index', AdminApiTokenController::class, 'index', 'GET', 'admin/api-tokens'],
+            'admin api tokens store'    => ['console.admin.api-tokens.store', AdminApiTokenController::class, 'store', 'POST', 'admin/api-tokens'],
+            'admin api tokens rotate'   => ['console.admin.api-tokens.rotate', AdminApiTokenController::class, 'rotate', 'POST', 'admin/api-tokens/{record}/rotate'],
+            'admin api tokens destroy'  => ['console.admin.api-tokens.destroy', AdminApiTokenController::class, 'destroy', 'DELETE', 'admin/api-tokens/{record}'],
             // Usage and limits: a new screen, never a Filament one.
             'admin usage' => ['console.admin.usage.index', AdminUsageController::class, 'index', 'GET', 'admin/usage'],
             // Solutions: a new screen, never a Filament one.

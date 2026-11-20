@@ -50,7 +50,7 @@ broken.
   previous user's `password_hash_*`, which `AuthenticateSession` compares with the invitee's and signs
   them out on the next request, and their state (intended URL, support session). `ActivateUserService`
   only sets the password and status; signing in is the controller's. Enforced: `ActivationSingleModeTest`.
-- **Admins bypass every policy** through `Gate::before` in `StaffServiceProvider`. A policy that
+- **Admins bypass every policy** through the Staff `Gate::before` (`StaffGate`, registered by `StaffServiceProvider`). A policy that
   returns `false` does not stop an admin — write policies with that in mind.
 - **Nobody changes or removes the platform support user, admins included.** The Gate refuses
   update, delete, deactivate, activate and role changes on `is_platform_support` users in
@@ -128,14 +128,14 @@ broken.
 
 - **Check authorization through policies against the `Permission` enum.** This is the pattern in
   every domain; tenant API token surfaces are the exception (see the token rule below). Review only.
-  The enum has 29 cases in eight groups (assistants, content, users, contacts, conversations,
+  The enum has 31 cases in eight groups (assistants, content, users, contacts, conversations,
   analytics, system, automations), the deprecated `ManageFlow` included; the policies are `AssistantPolicy`, `ChannelPolicy`, `ContactPolicy`,
   `ContactGroupPolicy`, `ConversationPolicy`, `CredentialPolicy`, the Flow policies (`FlowDraftPolicy`,
   `FlowGroupPolicy`, `FlowLogPolicy`, `FlowSessionPolicy`), `MediaFilePolicy`, `MediaFolderPolicy`,
   `RolePolicy` and `UserPolicy`.
 - **The sensitive permission set lives in `Permission::isSensitive()`** (`RotateChannelToken`,
   `PublishFlow`, `ManageRoles`, `ViewConversations`, `ReplyConversations`, `ViewOperatorScreens`,
-  `ViewActivityLog`, and the whole automations group: `ManageAutomations`, `ManageCredentials`,
+  `ViewActivityLog`, `ManageApiTokens`, and the whole automations group, `StartFlowRuns` included: `ManageAutomations`, `ManageCredentials`,
   `UseCredentials`, `ViewRunPayloads`); the Roles UI badges
   those. A new permission with elevated risk is added to that `match`, not flagged elsewhere.
 - **A machine credential of a tenant is a tenant API token, one model for every surface.** The API
@@ -144,8 +144,34 @@ broken.
   scope vocabulary of their own. A token surface is the one exception to "check authorization
   through policies" above: it asks `Gate` by `Permission` value only (`Gate::allows(Permission::X->value)`)
   and never a policy ability such as `Gate::authorize('view', $model)`, which the token's fail-closed
-  branch denies. Shape, storage, issuing, rotation, lifetime, limits and audit:
-  `adr-20261119-tenant-api-tokens` (proposed). Review only (nothing is built yet).
+  branch denies. Model: `adr-20261119-tenant-api-tokens` (proposed). Review only.
+- **The Staff `Gate::before` runs ahead of every other before-callback** (`StaffGate`, registered from
+  `StaffServiceProvider::register()` through `callAfterResolving(Gate)`): in order the support user's protection as a
+  target, the support user refused `manage_api_tokens` and every ability on `ApiToken` as an actor, the `ApiToken`
+  branch (held ability `true`, anything else `false`, never `null`; `Permission::isForbiddenToTokens()` always
+  `false`; an expired or revoked token holds nothing), the operator screens (`null`), the admin bypass. It must stay
+  ahead of the permission package's own before-callback, which answers `true` for any permission a role holds — the
+  support user's admin role included. Enforced: `ApiTokenGateTest`, `PlatformSupportProtectionTest`.
+- **A tenant API token is issued, rotated and revoked only by `ApiTokenService`.** Only the SHA-256 of the 40-character
+  base62 secret is stored; the plain `fpt_<ULID>_<secret>` exists once, in the issue or rotate response (an Inertia
+  flash). Abilities are `Permission` values the actor holds; never one `isForbiddenToTokens()`; for a non-admin never
+  one `Permission::isNarrowedByRecordPolicy()` (every permission but the tenant-wide `ViewSystem`, `ManageSettings`,
+  `ViewActivityLog`, `ManageCredentials` — `StartFlowRuns` included). Rotation takes a subset of the predecessor's
+  abilities, refuses an expired or revoked token, cuts the predecessor to `min(expires_at, now + grace)` and marks it
+  `expiry_notified_at`. Every token has an expiry within the `api_tokens.*` platform settings (90 by default, at most
+  365). The support user is refused by the service too. Enforced: `ApiTokenLifecycleTest`, `ApiTokensConsoleTest`.
+- **`HashedApiTokenAuthenticator` checks the shape before any query** (`ApiToken::PATTERN`), looks the row up by primary
+  key in the tenant of the host, compares with `hash_equals`, and answers every failure with the same bare 401 JSON
+  (`bootstrap/app.php` renders `AuthenticationException` of the `api-token` guard, whatever the client accepts); the
+  reason goes only to the log (`api_token.auth_failed`). 20 failures a minute per tenant and IP are refused with 429
+  before any lookup; `last_used_at` is written at most once a minute (cache `add`). `AuditActorResolver` asks the
+  token guard only `hasUser()`, so a console write never runs the authenticator. Enforced:
+  `ApiTokenAuthenticationTest`.
+- **The installation operator only revokes a tenant's token, and only with the token itself**
+  (`tenants:api-token:revoke {tenant} --operator=`, the token read from a hidden prompt or standard input, never
+  argv): audited as `support` with the operator's name, `revoked_by` empty. Admins are warned once per token 14 days
+  before expiry (`api-tokens:notify-expiring`, daily; the conditional update of `expiry_notified_at` is the guard).
+  Enforced: `ApiTokenLifecycleTest`.
 - **`Permission::ManageFlow` is `@deprecated`** and kept for backward compatibility; use the granular
   flow permissions (`ManageFlowDefinitions`, `PublishFlow`, `ViewFlowSessions`, `ManageFlowGroups`,
   `ManageTranslations`) for new checks.

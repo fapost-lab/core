@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domains\Staff\Contracts\ApiTokenAuthenticatorInterface;
 use App\Domains\Staff\Listeners\AnnounceStaffNotification;
 use App\Domains\Staff\Listeners\CloseSupportAccessEntry;
 use App\Domains\Staff\Listeners\NotifyAdminsOfLimit;
 use App\Domains\Staff\Listeners\NotifyAdminsOfWorkspaceDeletion;
 use App\Domains\Staff\Listeners\RememberUserLocale;
+use App\Domains\Staff\Models\ApiToken;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\SupportAccessEntry;
 use App\Domains\Staff\Models\User;
@@ -16,22 +18,28 @@ use App\Domains\Staff\Notifications\Notifiers\EmailStaffNotifier;
 use App\Domains\Staff\Notifications\Notifiers\InAppStaffNotifier;
 use App\Domains\Staff\Notifications\StaffNotifierRegistry;
 use App\Domains\Staff\Notifications\StaffRecipientResolver;
-use App\Domains\Staff\Policies\PlatformSupportProtection;
 use App\Domains\Staff\Policies\RolePolicy;
+use App\Domains\Staff\Policies\StaffGate;
 use App\Domains\Staff\Policies\SupportAccessEntryPolicy;
 use App\Domains\Staff\Policies\UserPolicy;
 use App\Domains\Staff\Services\AclBootstrapService;
+use App\Domains\Staff\Services\ApiTokenService;
 use App\Domains\Staff\Services\CoreOperatorAccess;
+use App\Domains\Staff\Services\HashedApiTokenAuthenticator;
 use App\Domains\Staff\Services\RoleFormDataMapper;
 use App\Domains\Staff\Services\RoleWriterService;
 use App\Domains\Staff\Services\TenantAdminDirectory;
 use App\Domains\Staff\Services\UserService;
+use App\Domains\Staff\Support\ApiTokenGuard;
+use App\Domains\Staff\Support\ApiTokenSettings;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantAdminDirectoryInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Events\LimitApproaching;
 use App\Domains\Tenancy\Events\LimitReached;
 use App\Domains\Tenancy\Events\WorkspaceDeletionCancelled;
 use App\Domains\Tenancy\Events\WorkspaceDeletionScheduled;
+use App\Domains\Tenancy\Services\PlatformSettingRegistry;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
 use App\Domains\Tenancy\Support\TenantHost;
 use Fapost\Foundation\Operator\Contracts\OperatorAccessInterface;
@@ -40,9 +48,14 @@ use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Auth\Access\Gate as GateContract;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\Events\NotificationSent;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -68,6 +81,19 @@ final class StaffServiceProvider extends ServiceProvider
         // Not a singleton: it reads the current tenant's schema.
         $this->app->bind(TenantAdminDirectoryInterface::class, TenantAdminDirectory::class);
 
+        // The Staff `Gate::before` (StaffGate): the support user's protections, tenant API tokens (fail-closed), the
+        // operator screens and the administrators' bypass. Registered the moment the Gate is resolved, from register(),
+        // so it runs ahead of every other before-callback, the permission package's included: that one answers `true`
+        // for any permission a role holds, the support user's admin role among them.
+        $this->callAfterResolving(GateContract::class, static function (GateContract $gate): void {
+            $gate->before(static fn (mixed $user, string $ability, array $arguments): ?bool => StaffGate::before($user, $ability, $arguments, CoreOperatorAccess::GATE_ABILITIES));
+        });
+
+        // Tenant API tokens: the authenticator reads the tenant of the request.
+        $this->app->scoped(ApiTokenAuthenticatorInterface::class, HashedApiTokenAuthenticator::class);
+        // Not a singleton: it records to the audit trail, which is scoped.
+        $this->app->bind(ApiTokenService::class);
+
         // Who may open the operator screens. bindIf: an operator layer that already bound its own answer keeps it.
         $this->app->bindIf(OperatorAccessInterface::class, CoreOperatorAccess::class);
 
@@ -91,24 +117,18 @@ final class StaffServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Admin role bypasses all permission checks — no need to re-seed when new permissions are added.
-        // Users of other guards (e.g. an operator package's own accounts) reach the Gate too:
-        // only Core's staff admins short-circuit it; everyone else goes through their policies.
-        //
-        // The one exception runs first: nobody, an admin included, changes or removes the tenant's
-        // platform support user. A policy cannot say this, because the bypass would override it.
-        Gate::before(static function (mixed $user, string $ability, array $arguments): ?bool {
-            if (PlatformSupportProtection::forbids($ability, $arguments)) {
-                return false;
-            }
+        // The `api-token` guard: a stateless guard whose principal is an ApiToken, found by the authenticator.
+        Auth::viaRequest(ApiTokenGuard::DRIVER, static fn (Request $request): ?ApiToken => app(ApiTokenAuthenticatorInterface::class)->authenticate($request));
 
-            // Operator screens are decided by the operator access contract alone, administrators included.
-            if (in_array($ability, CoreOperatorAccess::GATE_ABILITIES, true)) {
-                return null;
-            }
+        // Requests of one token in a minute (`api_tokens.per_minute`), per tenant and token. Reached only after `auth`.
+        RateLimiter::for(ApiTokenGuard::LIMITER, static function (Request $request): Limit {
+            $token = $request->user(ApiTokenGuard::NAME);
 
-            return $user instanceof User && $user->isAdmin() ? true : null;
+            return Limit::perMinute(max(1, app(PlatformSettingsReaderInterface::class)->integer(ApiTokenSettings::PER_MINUTE)))
+                ->by(app(TenantContextInterface::class)->get()->getId() . ':' . ($token instanceof ApiToken ? (string) $token->getKey() : (string) $request->ip()));
         });
+
+        ApiTokenSettings::register($this->app->make(PlatformSettingRegistry::class));
 
         Event::listen(Logout::class, CloseSupportAccessEntry::class);
         // The bell hears of every in-app notification on the user's own channel.

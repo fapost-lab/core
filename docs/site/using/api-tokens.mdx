@@ -1,0 +1,98 @@
+---
+title: "API tokens"
+description: "Issue, rotate and revoke the tokens that let outside systems call this workspace's API."
+---
+
+An API token lets an outside system call this workspace's API without a person signing
+in. A token belongs to the workspace, not to the person who issued it: it keeps working
+when that person leaves the team or loses access, and it stops only when it expires or
+someone revokes it.
+
+<Note>
+  The first API that accepts tokens is the API trigger of flows, which comes in a later
+  release. Until then you can issue and manage tokens here, but no endpoint accepts them
+  yet.
+</Note>
+
+The screen is **System** → **API tokens** in the admin panel.
+
+## Who can manage tokens
+
+The screen needs the **Manage API tokens** permission. Administrators have it; to give it
+to a custom role, see [Roles and permissions](/using/roles-and-permissions). It is
+marked sensitive: a token reaches the whole workspace and outlives its issuer.
+
+The platform support user, which an operator signs in as during a support visit, cannot
+open this screen and cannot issue, rotate or revoke a token.
+
+## Issuing a token
+
+Choose **New token**, name it, choose its permissions and an expiry in days.
+
+- **Permissions.** You can give a token only permissions you hold yourself. If you are
+  not an administrator, you can give only the permissions that apply to the whole
+  workspace, such as **Manage settings** or **View the activity log**. A
+  permission that is limited to the assistants you are assigned to cannot be given to a
+  token, because a token is not limited that way.
+- **Never given to a token.** **Manage API tokens**, **Manage roles**, **Manage users**
+  and the operator screens cannot be given to a token, whoever issues it.
+- **Expiry.** Every token expires. The default is 90 days and the longest is 365 days;
+  both are platform settings.
+
+After you issue a token, the full token is shown once, with a button to copy it. FaPost
+keeps only a hash of it, so it cannot be shown again. If it is lost, rotate the token or
+issue a new one.
+
+## Using a token
+
+A token is sent in the `Authorization` header:
+
+```http
+Authorization: Bearer fpt_<token>
+```
+
+This is the only way a token is accepted. A token in a URL or in the body of a request is
+not read. Each token may make 60 requests a minute by default (a platform setting);
+beyond that the API answers `429`.
+
+<Warning>
+  The API address of an integration depends on the workspace address (its slug). If you
+  rename the workspace, the address changes and every integration that uses the old
+  address stops working, even though its token is still valid. Update the integrations
+  after a rename.
+</Warning>
+
+## The list
+
+Each row shows the token's name, the last four characters of its secret (`…abcd`), its
+permissions, who issued it, when it expires, when it was last used and its status:
+**Active**, **Expired** or **Revoked**. A permission marked sensitive is highlighted. The
+issuer is shown as no longer having access when that person was deactivated, and as a
+deleted user when the account is gone; the token keeps working either way.
+
+## Rotating a token
+
+Rotate a token before it expires, or when you suspect its secret has been seen. Rotation
+issues a new token with the same name and shows it once, and it shortens the old token's
+life: the old one keeps working for 24 hours (a platform setting) so the integration can
+switch over, and then stops.
+
+A rotation can keep the token's permissions or drop some of them, but it never adds one,
+and you cannot give the new token anything you do not hold yourself. An expired or
+revoked token cannot be rotated; issue a new one instead.
+
+Fourteen days before a token expires, the workspace's administrators are notified.
+
+## Revoking a token
+
+Revoking is immediate: the token is refused on its next request. A revoked token stays in
+the list for the record. The platform operator can also revoke a leaked token, when it is
+reported to them with the token itself; the operator can only revoke, never issue, rotate
+or read a token.
+
+## In the activity log
+
+Issuing, rotating and revoking are written to the [Activity log](/using/activity-log)
+with the token's name and last four characters, never its secret. What an integration
+does through a token is recorded as **API token** with the label `API · <token name>`, so
+you can tell it from what a person did.

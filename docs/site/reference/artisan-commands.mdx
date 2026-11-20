@@ -21,6 +21,7 @@ Commands FaPost Core registers, beyond Laravel's own.
 | `ops:tenants-migrate` | Run `database/migrations/tenant` for all active tenants |
 | `ops:tenants-seed-acl` | Run `TenantAclSeeder` — domain permissions and default roles — for selected active tenants |
 | `tenants:onboarding:restart {tenant} [--force]` | Put an active tenant (slug or id) back into the first-run setup wizard. Steps its data satisfies stay done, the language confirmation is asked again. Holds the tenant's console until the required steps are done, so it asks first; `--force` skips the question. See [Tenancy operations](/self-hosting/tenancy#the-first-run-setup-wizard) |
+| `tenants:api-token:revoke {tenant} --operator=<name>` | Revoke a leaked [API token](/using/api-tokens) of a tenant (slug or id). The token itself is read from a hidden prompt, or from standard input without a terminal, never from an argument; it is revoked only if it is a token of that tenant and its secret matches. Recorded in the tenant's activity log as platform support with the operator's name. The operator cannot list, issue or rotate tokens |
 
 ## Platform update
 
@@ -137,6 +138,12 @@ media are kept. See [Conversation retention](/self-hosting/observability#convers
 
 `audit:prune` accepts `--dry-run`, which only counts. The package command
 `activitylog:clean` is not used: it does not walk the tenants.
+
+## API tokens
+
+| Command | Does |
+|---|---|
+| `api-tokens:notify-expiring` | Warn each active tenant's administrators about [API tokens](/using/api-tokens) that expire within 14 days, in the bell and by email, once per token. Scheduled daily at 09:00 |
 
 ## Limit refusals
 

@@ -111,4 +111,6 @@ and an action taken through a token is recorded with that actor (the token is no
 token's row). Issuing, rotating and revoking a token are recorded as staff actions, with the token's name and
 `last_four`, never its secret or hash. An installation operator's incident revoke is recorded as a `support`
 actor with the operator's name Core is given and no `support_entry_id`. Decided at the `tenant-api-token-adr`
-gate, the operator's revoke in its review (owner, 2026-11-19); built by the first task that ships the token.
+gate, the operator's revoke in its review (owner, 2026-11-19); built by `tenant-api-tokens` (2026-11-20):
+`AuditActorKind::ApiToken`, `AuditAction::ApiToken{Issued,Rotated,Revoked}` (area `settings`), and the resolver asks
+the token guard only `hasUser()`, so a console write never runs the token authenticator.
