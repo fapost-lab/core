@@ -29,7 +29,9 @@ use Illuminate\Support\Facades\Log;
  * A flow's own event (`emit_event`) fans out one {@see StartFlowFromEventJob} per resolved trigger for isolation
  * and independent retry. The started flow runs for the emitting contact
  * (`source.contact_id`); events without a contact are skipped (a flow start
- * requires a contact), and so are triggers without an assistant.
+ * requires a contact), and so are triggers without an assistant and triggers whose `assistant_filter` leaves out the
+ * emitting session's assistant ({@see ResolveEventTriggersService::forFlowEvent()}). A Core event has no source
+ * assistant: validation keeps the filter off its triggers.
  *
  * Every started run carries the event's chain depth. Jobs queued before the id and the depth existed unserialize
  * without them, so both are read with a fallback.
@@ -99,7 +101,9 @@ final class DispatchFlowTriggerEventJob implements ShouldQueue, TenantAccessGate
                 return;
             }
 
-            foreach ($resolver->execute($this->tenantId, $this->eventName) as $trigger) {
+            $sessionId = is_string($this->source['session_id'] ?? null) ? $this->source['session_id'] : null;
+
+            foreach ($resolver->forFlowEvent($this->tenantId, $this->eventName, $sessionId) as $trigger) {
                 $assistantId = is_string($trigger->metadata['assistant_id'] ?? null)
                     ? $trigger->metadata['assistant_id']
                     : '';

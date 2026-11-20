@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import {computed, ref, watch} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
-import {createWebhookEndpoint, generateWebhookSecret, setWebhookSecret} from '@builder/api/builderApi'
-import type {ApiError} from '@builder/api/builderApi'
+import SearchSelect from '../SearchSelect.vue'
+import {createWebhookEndpoint, fetchAssistantOptions, generateWebhookSecret, setWebhookSecret} from '@builder/api/builderApi'
+import type {ApiError, SelectOption} from '@builder/api/builderApi'
 import type {WebhookEndpointInfo} from '@builder/dto/types'
 import {useConfirm} from '@builder/composables/useConfirm'
 import {usePermissions} from '@builder/composables/usePermissions'
@@ -83,7 +84,58 @@ const flowEvents = computed<string[]>(() => filteredEvents.value.filter((name) =
 const isCoreEvent = computed<boolean>(() => currentEventName.value.startsWith(CORE_EVENT_PREFIX))
 
 function setEventName(name: string): void {
+    if (name.startsWith(CORE_EVENT_PREFIX) && ASSISTANT_FILTER_KEY in triggerCfg.value) {
+        // A Core event has no source assistant: its trigger keeps no assistant filter.
+        const { [ASSISTANT_FILTER_KEY]: _dropped, ...rest } = triggerCfg.value
+        emit('update:trigger', { ...currentTrigger.value, config: { ...rest, event_name: name } })
+
+        return
+    }
+
     update({ config: { event_name: name } })
+}
+
+/**
+ * Assistant filter of a flow event's trigger: only events emitted by flows of these assistants start it.
+ * Empty means any assistant; the key is left out of the config then.
+ */
+const ASSISTANT_FILTER_KEY = 'assistant_filter'
+
+const assistantOptions = ref<SelectOption[]>([])
+const assistantsLoaded = ref(false)
+
+const showsAssistantFilter = computed<boolean>(() => currentTrigger.value.type === 'event' && !isCoreEvent.value)
+
+watch(showsAssistantFilter, async (shown) => {
+    if (!shown || assistantsLoaded.value) {
+        return
+    }
+
+    assistantsLoaded.value = true
+    assistantOptions.value = await fetchAssistantOptions().catch(() => [])
+}, { immediate: true })
+
+const assistantFilter = computed<string[]>(() => {
+    const value = triggerCfg.value[ASSISTANT_FILTER_KEY]
+
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : []
+})
+
+/** The tenant's assistants, plus a "deleted" entry for an id in the filter that is no longer one of them. */
+const assistantFilterOptions = computed<SelectOption[]>(() => {
+    const known = new Set(assistantOptions.value.map((option) => option.value))
+    const missing = assistantFilter.value
+        .filter((id) => !known.has(id))
+        .map((id) => ({ value: id, label: 'Deleted assistant' }))
+
+    return [...assistantOptions.value, ...missing]
+})
+
+function setAssistantFilter(ids: string[]): void {
+    const { [ASSISTANT_FILTER_KEY]: _previous, ...rest } = triggerCfg.value
+    const config = ids.length > 0 ? { ...rest, [ASSISTANT_FILTER_KEY]: ids } : rest
+
+    emit('update:trigger', { ...currentTrigger.value, config })
 }
 
 function selectEvent(name: string): void {
@@ -679,6 +731,20 @@ function defaultConfig(type: string): Record<string, unknown> {
                 </div>
                 <div v-else class="field-hint">
                     Lists Core events and events from all assistants in this tenant. Pick one or type a new name.
+                </div>
+            </div>
+            <div v-if="showsAssistantFilter" class="config-field" data-test="assistant-filter">
+                <div class="field-label">Only from assistants</div>
+                <SearchSelect
+                    :model-value="assistantFilter"
+                    :options="assistantFilterOptions"
+                    multiple
+                    placeholder="Any assistant"
+                    empty-text="No assistants"
+                    @update:model-value="setAssistantFilter"
+                />
+                <div class="field-hint">
+                    Start the flow only on events emitted by flows of these assistants. Leave empty for any assistant.
                 </div>
             </div>
         </AccordionSection>

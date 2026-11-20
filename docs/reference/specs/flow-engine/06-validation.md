@@ -106,8 +106,10 @@ Trigger checks, per trigger of the list, at `triggers.<id>.…` (`triggers.<inde
 `invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`), `duplicate_exact_trigger_keyword` (against other
 flows' live triggers), `missing_event_trigger_selection`, `unknown_event_trigger_selection`; the id — it becomes the
 `flow_triggers` primary key — `invalid_trigger_id` (not UUID-shaped), `duplicate_trigger_id` (twice in the list),
-`trigger_id_taken` (a live trigger of another flow); and `duplicate_event_trigger` for two event triggers on one event
-(`adr-20261119-flow-triggers-in-definition-live-on-publish`).
+`trigger_id_taken` (a live trigger of another flow); `duplicate_event_trigger` for two event triggers on one event
+(`adr-20261119-flow-triggers-in-definition-live-on-publish`); and for an event trigger's `assistant_filter`,
+`assistant_filter_on_core_event` (a Core event has no source assistant) and `unknown_assistant_filter` (an id that is
+not an assistant of the tenant), at `triggers.<id>.config.assistant_filter`.
 
 Expression engine: the flow is checked with the engine it uses — the draft's (`flow_drafts.expression_engine`) on
 validate and publish, the active definition's snapshot on a republish by a template. An id `ExpressionEngineRegistry`

@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Validation;
 
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
+use App\Domains\Flow\Events\EventTriggerAssistantFilter;
 use App\Domains\Flow\Webhook\WebhookTriggerConfig;
 use InvalidArgumentException;
 
@@ -106,6 +107,22 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
         // a dotted emitted name like `order.created` could never match a trigger.
         if (! is_string($eventName) || 1 !== preg_match('/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/', $eventName)) {
             throw new InvalidArgumentException('Invalid event trigger config.');
+        }
+
+        $assistantFilter = $config[EventTriggerAssistantFilter::CONFIG_KEY] ?? null;
+
+        if (null === $assistantFilter) {
+            return;
+        }
+
+        if (! is_array($assistantFilter) || ! array_is_list($assistantFilter)) {
+            throw new InvalidArgumentException('Invalid event trigger assistant filter.');
+        }
+
+        foreach ($assistantFilter as $assistantId) {
+            if (! is_string($assistantId) || '' === mb_trim($assistantId)) {
+                throw new InvalidArgumentException('Invalid event trigger assistant filter.');
+            }
         }
     }
 }
