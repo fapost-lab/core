@@ -41,6 +41,7 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     // External / network
     call:          { bg: 'var(--sky-bg)',    color: 'var(--sky)',    icon: '🌐' },
     emit_event:    { bg: 'var(--sky-bg)',    color: 'var(--sky)',    icon: '📡' },
+    webhook_response: { bg: 'var(--sky-bg)', color: 'var(--sky)',    icon: '↩️' },
 
     // Knowledge / RAG
     rag_query:     { bg: 'var(--orange-bg)',          color: 'var(--orange)',       icon: '🧠' },

@@ -45,6 +45,7 @@ final class V1WiringSmokeTest extends FeatureTestCase
             ['set_tag', 1],
             ['notify', 1],
             ['auth_request', 1],
+            ['webhook_response', 1],
         ];
 
         foreach ($expected as [$type, $version]) {

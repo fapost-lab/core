@@ -24,7 +24,7 @@ paths:
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
   - "app/Domains/Flow/Templates/**"
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-20
 ---
 # Flow
 
@@ -122,7 +122,9 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   exposes, in the copy (`adr-20261111-flow-template-parameters`).
 - Webhook triggers: `POST /hooks/flow/{token}` on the tenant's host (`routes/flow-webhook.php`, no `web` group) →
   `Http/Controllers/Flow/FlowWebhookController` → `Webhook/FlowWebhookReceiver` (endpoint by token, live trigger,
-  limits, Foundation `IngressSpecExecutor`, dedup) → `StartAutomationRunJob` with the request under `flow.webhook`, 202.
+  limits, Foundation `IngressSpecExecutor`, dedup) → `StartAutomationRunJob` with the request under `flow.webhook`, 202;
+  in `response_mode: sync` the receiver then waits through `Webhook/WebhookSyncWait` (wait slots, `BLPOP` on the reply
+  store) for the `webhook_response` node's answer or the run's end (`Webhook/WebhookRunEndReply`, called by `FlowEngine`).
   The builder makes the URL and the secret through `Webhook/FlowWebhookEndpointService`
   (`adr-20261119-flow-webhook-trigger`).
 - Events and schedules: `StartFlowFromEventJob` (queue `scheduled.triggers`) and

@@ -74,6 +74,12 @@ const SHAPES: Record<string, string> = {
         <path d="M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14" />
     `,
 
+    // ── webhook_response — answer arrow returning to the sender ──
+    webhook_response: `
+        <path d="M20 5v6a4 4 0 0 1-4 4H5" />
+        <path d="M9 11l-4 4 4 4" />
+    `,
+
     // ── rag_query — book with search ──
     rag_query: `
         <path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" />

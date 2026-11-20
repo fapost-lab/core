@@ -89,6 +89,7 @@ use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Handlers\Support\TemplateResolver;
 use App\Domains\Flow\Handlers\TemplateNodeHandler;
 use App\Domains\Flow\Handlers\TemplateOutputNodeHandler;
+use App\Domains\Flow\Handlers\WebhookResponseNodeHandler;
 use App\Domains\Flow\History\DefaultHistoryWriter;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\History\NoOpHistoryWriter;
@@ -167,7 +168,13 @@ use App\Domains\Flow\Validation\VariablePathConflictChecker;
 use App\Domains\Flow\Webhook\FlowWebhookEndpointService;
 use App\Domains\Flow\Webhook\FlowWebhookReceiver;
 use App\Domains\Flow\Webhook\RedisWebhookDeliveryDedup;
+use App\Domains\Flow\Webhook\RedisWebhookReplyStore;
+use App\Domains\Flow\Webhook\RedisWebhookWaitSlots;
 use App\Domains\Flow\Webhook\WebhookDeliveryDedupInterface;
+use App\Domains\Flow\Webhook\WebhookReplyStoreInterface;
+use App\Domains\Flow\Webhook\WebhookRunEndReply;
+use App\Domains\Flow\Webhook\WebhookSyncWait;
+use App\Domains\Flow\Webhook\WebhookWaitSlotsInterface;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
@@ -374,6 +381,45 @@ final class FlowServiceProvider extends ServiceProvider
             unit: 'requests',
             min: 1,
             max: 6000,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: WebhookSyncWait::WAIT_SECONDS_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.webhook.sync_wait_seconds',
+            fallback: WebhookSyncWait::MAX_WAIT_SECONDS,
+            label: 'Webhook trigger answer wait',
+            description: 'How long a request to a webhook trigger in "wait for the flow\'s answer" mode is held open for the flow to answer. Without an answer by then the sender gets 202 Accepted and the run goes on.',
+            group: 'Flow',
+            unit: 'seconds',
+            min: 1,
+            max: WebhookSyncWait::MAX_WAIT_SECONDS,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: WebhookSyncWait::INSTALLATION_WAITERS_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.webhook.sync_waiters_max',
+            fallback: 5,
+            label: 'Webhook requests waiting for an answer',
+            description: 'How many webhook requests, across all tenants, may be held open at once waiting for their flow\'s answer. Each holds a PHP worker; a request over the limit gets 202 Accepted at once. Keep it well below the number of PHP-FPM workers.',
+            group: 'Flow',
+            unit: 'requests',
+            min: 1,
+            max: 100,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: WebhookSyncWait::TENANT_WAITERS_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.webhook.sync_waiters_per_tenant',
+            fallback: 2,
+            label: 'Webhook requests waiting for an answer per tenant',
+            description: 'How many webhook requests of one tenant may be held open at once waiting for their flow\'s answer; a request over the limit gets 202 Accepted at once.',
+            group: 'Flow',
+            unit: 'requests',
+            min: 1,
+            max: 100,
         ));
 
         // Seed Core's system translation keys. Features and Solutions register
@@ -635,6 +681,10 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(WebhookDeliveryDedupInterface::class, RedisWebhookDeliveryDedup::class);
         $this->app->scoped(FlowWebhookEndpointService::class);
         $this->app->scoped(FlowWebhookReceiver::class);
+        $this->app->scoped(WebhookReplyStoreInterface::class, RedisWebhookReplyStore::class);
+        $this->app->scoped(WebhookWaitSlotsInterface::class, RedisWebhookWaitSlots::class);
+        $this->app->scoped(WebhookSyncWait::class);
+        $this->app->scoped(WebhookRunEndReply::class);
         $this->app->scoped(MessageTriggerResolver::class);
         $this->app->scoped(ScheduleTriggerResolver::class);
         $this->app->scoped(WebhookTriggerResolver::class);
@@ -696,6 +746,7 @@ final class FlowServiceProvider extends ServiceProvider
             RequestOperatorNodeHandler::class,
             TemplateNodeHandler::class,
             TemplateOutputNodeHandler::class,
+            WebhookResponseNodeHandler::class,
         ];
 
         foreach ($handlers as $handlerClass) {

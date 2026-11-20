@@ -38,6 +38,7 @@ use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\Trace\LoopIterations;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
+use App\Domains\Flow\Webhook\WebhookRunEndReply;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use DateTimeImmutable;
 use Fapost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
@@ -90,6 +91,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private AutomationRunDeadline $runDeadline,
         private NodeTraceRecorder $trace,
         private EventChainContext $eventChain,
+        private WebhookRunEndReply $webhookRunEndReply,
     ) {
     }
 
@@ -270,6 +272,9 @@ final readonly class FlowEngine implements FlowEngineInterface
             // No edge for that handle: the parent just ran off its graph. When it is itself a child, its own
             // parent must not keep waiting for it (a plain finish, as for any session that runs off its graph).
             $this->subflowResumer->resumeIfChild($parent, EndStatus::Success->value);
+
+            // Ended without running a step, so not through executeLoop(): a root still answers its webhook sender.
+            $this->webhookRunEndReply->afterRun($parent);
         }
 
         $parent->refresh();
@@ -353,10 +358,16 @@ final readonly class FlowEngine implements FlowEngineInterface
             // The job fails and is retried from the saved position; no continuation is queued.
             $this->segment->leave();
 
+            // A run that failed before rethrowing still answers the webhook sender waiting for it.
+            $this->webhookRunEndReply->afterRun($session);
+
             throw $exception;
         } finally {
             $this->eventChain->leave();
         }
+
+        // The one place every engine call of a session ends: a webhook run that has ended answers its waiting sender.
+        $this->webhookRunEndReply->afterRun($session);
 
         $stopped = $this->segment->leave();
 

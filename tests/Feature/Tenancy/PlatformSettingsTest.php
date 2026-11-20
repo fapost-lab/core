@@ -11,6 +11,7 @@ use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\Retention\AutomationRunRetention;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Flow\Webhook\FlowWebhookReceiver;
+use App\Domains\Flow\Webhook\WebhookSyncWait;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
 use App\Domains\Tenancy\Models\PlatformSetting;
@@ -106,6 +107,9 @@ final class PlatformSettingsTest extends FeatureTestCase
             FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING,
             NodeTraceRecorder::PAYLOADS_SETTING,
             FlowWebhookReceiver::PER_TOKEN_SETTING,
+            WebhookSyncWait::WAIT_SECONDS_SETTING,
+            WebhookSyncWait::INSTALLATION_WAITERS_SETTING,
+            WebhookSyncWait::TENANT_WAITERS_SETTING,
             self::REDIRECT,
         ], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
         $byKey = array_combine($keys, $definitions);
@@ -116,6 +120,10 @@ final class PlatformSettingsTest extends FeatureTestCase
         $this->assertSame(192, $byKey[RedisCallExecutionLedger::TTL_SETTING]->default);
         $this->assertSame(168, $byKey[RedisCallExecutionLedger::TTL_SETTING]->min, 'The call dedup window may not drop below the failed-job retention.');
         $this->assertSame(1000, $byKey[FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING]->default);
+        $this->assertSame(30, $byKey[WebhookSyncWait::WAIT_SECONDS_SETTING]->default);
+        $this->assertSame(30, $byKey[WebhookSyncWait::WAIT_SECONDS_SETTING]->max, 'A webhook request is never held longer than 30 seconds.');
+        $this->assertSame(5, $byKey[WebhookSyncWait::INSTALLATION_WAITERS_SETTING]->default);
+        $this->assertSame(2, $byKey[WebhookSyncWait::TENANT_WAITERS_SETTING]->default);
         $this->assertFalse($byKey[NodeTraceRecorder::PAYLOADS_SETTING]->hostModeOnly);
         $this->assertTrue($byKey[NodeTraceRecorder::PAYLOADS_SETTING]->default);
         $this->assertTrue($byKey[self::REDIRECT]->hostModeOnly);

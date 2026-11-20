@@ -12,6 +12,7 @@ use App\Domains\Flow\Handlers\InputNodeHandler;
 use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
+use App\Domains\Flow\Handlers\WebhookResponseNodeHandler;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -30,14 +31,15 @@ final class NodeHandlerSchemaSectionsTest extends TestCase
     public static function handlerProvider(): array
     {
         return [
-            'assign'     => [AssignNodeHandler::class],
-            'branch'     => [BranchNodeHandler::class],
-            'call'       => [CallNodeHandler::class],
-            'rag_query'  => [RagQueryNodeHandler::class],
-            'emit_event' => [EmitEventNodeHandler::class],
-            'input'      => [InputNodeHandler::class],
-            'send'       => [SendMessageNodeHandler::class],
-            'subflow'    => [SubflowNodeHandler::class],
+            'assign'           => [AssignNodeHandler::class],
+            'branch'           => [BranchNodeHandler::class],
+            'call'             => [CallNodeHandler::class],
+            'rag_query'        => [RagQueryNodeHandler::class],
+            'emit_event'       => [EmitEventNodeHandler::class],
+            'input'            => [InputNodeHandler::class],
+            'send'             => [SendMessageNodeHandler::class],
+            'subflow'          => [SubflowNodeHandler::class],
+            'webhook_response' => [WebhookResponseNodeHandler::class],
         ];
     }
 

@@ -35,10 +35,14 @@ return [
         'max_run_hours'   => (int) env('FLOW_AUTOMATION_MAX_RUN_HOURS', 24),
     ],
 
-    // Only the default of the platform setting `flow.webhook.per_token_per_minute`: how many requests one webhook
-    // trigger URL accepts in a minute before it answers 429.
+    // Only the defaults of the platform settings `flow.webhook.*`: how many requests one webhook trigger URL accepts in
+    // a minute before it answers 429, and for a trigger in `sync` mode how long a request waits for the flow's answer
+    // (at most 30 s) and how many requests may wait at once, on the installation and per tenant.
     'webhook' => [
-        'per_token_per_minute' => (int) env('FLOW_WEBHOOK_PER_TOKEN_PER_MINUTE', 120),
+        'per_token_per_minute'    => (int) env('FLOW_WEBHOOK_PER_TOKEN_PER_MINUTE', 120),
+        'sync_wait_seconds'       => (int) env('FLOW_WEBHOOK_SYNC_WAIT_SECONDS', 30),
+        'sync_waiters_max'        => (int) env('FLOW_WEBHOOK_SYNC_WAITERS_MAX', 5),
+        'sync_waiters_per_tenant' => (int) env('FLOW_WEBHOOK_SYNC_WAITERS_PER_TENANT', 2),
     ],
 
     // Only the defaults of the platform settings `flow.automation_runs.succeeded_retention_days` and

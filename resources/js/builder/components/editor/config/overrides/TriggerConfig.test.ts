@@ -28,3 +28,30 @@ describe('TriggerConfig event picker', () => {
         expect(mountEventTrigger('orders.paid').find('[data-test=core-event-hint]').exists()).toBe(false)
     })
 })
+
+describe('TriggerConfig webhook response mode', () => {
+    function mountWebhookTrigger(config: Record<string, unknown>) {
+        return mount(TriggerConfig, {
+            props: {
+                trigger: {id: 'trigger-1', type: 'webhook', is_active: true, priority: 0, config},
+            },
+        })
+    }
+
+    const hmac = {verification: 'hmac_sha256', signature_header: 'X-Signature', signature_prefix: 'sha256='}
+
+    it('shows the mode the trigger has, async by default', () => {
+        expect((mountWebhookTrigger(hmac).find('[data-testid=webhook-response-mode]').element as HTMLSelectElement).value).toBe('async')
+        expect((mountWebhookTrigger({...hmac, response_mode: 'sync'}).find('[data-testid=webhook-response-mode]').element as HTMLSelectElement).value).toBe('sync')
+    })
+
+    it('switches to waiting for the flow\'s answer without touching the verification', async () => {
+        const wrapper = mountWebhookTrigger({...hmac, response_mode: 'async'})
+
+        await wrapper.find('[data-testid=webhook-response-mode]').setValue('sync')
+
+        const emitted = wrapper.emitted('update:trigger')
+        expect(emitted).toBeTruthy()
+        expect((emitted?.at(-1)?.[0] as {config: Record<string, unknown>}).config).toEqual({...hmac, response_mode: 'sync'})
+    })
+})

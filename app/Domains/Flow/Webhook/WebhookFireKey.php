@@ -25,6 +25,12 @@ final class WebhookFireKey
         return self::PREFIX . 'sha256:' . hash('sha256', $deliveryId);
     }
 
+    /** Whether a run's fire key is a webhook delivery's: only such a run has a sender that may be waiting for it. */
+    public static function isWebhookFireKey(string $fireKey): bool
+    {
+        return str_starts_with($fireKey, self::PREFIX);
+    }
+
     /** The delivery id as the sender is told it: the fire key without its prefix. */
     public static function shownId(string $fireKey): string
     {

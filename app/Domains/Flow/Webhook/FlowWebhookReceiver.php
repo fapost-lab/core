@@ -35,6 +35,10 @@ use Throwable;
  * delivery id and the fire key it makes, the dedup claim (200 duplicate), and finally {@see StartAutomationRunJob} with
  * the request under `flow.webhook` (202). Only an accepted request reaches the queue.
  *
+ * A trigger in `response_mode: sync` then holds the request for the flow's answer through {@see WebhookSyncWait} (the
+ * answer, or 202 when there is no wait slot or no answer in time); a repeated delivery of such a trigger is answered
+ * with the kept answer while it lives, and never waits itself.
+ *
  * Every answer except 202 and 200 says nothing beyond its code; the reason goes to the log (`flow.webhook.*`), never
  * with the body, the secret or the signature.
  *
@@ -63,6 +67,8 @@ final readonly class FlowWebhookReceiver
         private PlatformSettingsReaderInterface $settings,
         private IngressSpecExecutor $specExecutor,
         private WebhookDeliveryDedupInterface $dedup,
+        private WebhookSyncWait $syncWait,
+        private WebhookReplyStoreInterface $replies,
         private RateLimiter $limiter,
         private Dispatcher $dispatcher,
         private LoggerInterface $logger,
@@ -150,7 +156,10 @@ final readonly class FlowWebhookReceiver
         if ($deduped && ! $this->dedup->claim($tenantId, $trigger->id, $fireKey)) {
             $this->logger->info('flow.webhook.duplicate', [...$context, 'delivery_id' => $shownId]);
 
-            return WebhookOutcome::duplicate($shownId);
+            // Never a second wait: it would take the wake-up the first request is waiting for.
+            $kept = $config->isSync() ? $this->replies->find($tenantId, $trigger->id, $fireKey) : null;
+
+            return null === $kept ? WebhookOutcome::duplicate($shownId) : WebhookOutcome::replied($shownId, $kept);
         }
 
         try {
@@ -172,7 +181,13 @@ final readonly class FlowWebhookReceiver
 
         $this->logger->info('flow.webhook.accepted', [...$context, 'delivery_id' => $shownId]);
 
-        return WebhookOutcome::accepted($shownId);
+        if (! $config->isSync()) {
+            return WebhookOutcome::accepted($shownId);
+        }
+
+        $reply = $this->syncWait->await($tenantId, $trigger->id, $fireKey, [...$context, 'delivery_id' => $shownId]);
+
+        return null === $reply ? WebhookOutcome::accepted($shownId) : WebhookOutcome::replied($shownId, $reply);
     }
 
     /**
