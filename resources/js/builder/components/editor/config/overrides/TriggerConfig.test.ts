@@ -1,6 +1,11 @@
 // @vitest-environment happy-dom
 import {beforeEach, describe, expect, it, vi} from 'vitest'
-import {mount} from '@vue/test-utils'
+import {flushPromises, mount} from '@vue/test-utils'
+
+vi.mock('@builder/api/builderApi', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@builder/api/builderApi')>()),
+    fetchAssistantOptions: vi.fn(async () => [{value: 'a-sales', label: 'Sales'}, {value: 'a-support', label: 'Support'}]),
+}))
 
 
 const {pageProps} = vi.hoisted(() => ({pageProps: {auth: {permissions: [] as string[]}}}))
@@ -12,11 +17,12 @@ function grant(permissions: string[]): void {
 }
 
 import TriggerConfig from './TriggerConfig.vue'
+import SearchSelect from '../SearchSelect.vue'
 
-function mountEventTrigger(eventName: string) {
+function mountEventTrigger(eventName: string, extra: Record<string, unknown> = {}) {
     return mount(TriggerConfig, {
         props: {
-            trigger:         {type: 'event', is_active: true, priority: 0, config: {event_name: eventName}},
+            trigger:         {type: 'event', is_active: true, priority: 0, config: {event_name: eventName, ...extra}},
             availableEvents: ['core.contact.created', 'core.contact.tag_added', 'orders.paid'],
         },
     })
@@ -37,6 +43,49 @@ describe('TriggerConfig event picker', () => {
     it('says a Core event starts the flow without a contact', () => {
         expect(mountEventTrigger('core.contact.created').find('[data-test=core-event-hint]').exists()).toBe(true)
         expect(mountEventTrigger('orders.paid').find('[data-test=core-event-hint]').exists()).toBe(false)
+    })
+})
+
+describe('TriggerConfig assistant filter', () => {
+    beforeEach(() => grant(['manage_automations']))
+
+    function lastConfig(wrapper: ReturnType<typeof mountEventTrigger>): Record<string, unknown> {
+        return (wrapper.emitted('update:trigger')?.at(-1)?.[0] as {config: Record<string, unknown>}).config
+    }
+
+    it('is offered for a flow event and not for a Core event', () => {
+        expect(mountEventTrigger('orders.paid').find('[data-test=assistant-filter]').exists()).toBe(true)
+        expect(mountEventTrigger('core.contact.created').find('[data-test=assistant-filter]').exists()).toBe(false)
+    })
+
+    it('shows the chosen assistants by name, and an id no longer among them as deleted', async () => {
+        const wrapper = mountEventTrigger('orders.paid', {assistant_filter: ['a-sales', 'a-gone']})
+        await flushPromises()
+
+        const chips = wrapper.find('[data-test=assistant-filter]').text()
+        expect(chips).toContain('Sales')
+        expect(chips).toContain('Deleted assistant')
+    })
+
+    it('writes the chosen assistants and leaves the key out when none is chosen', () => {
+        const wrapper = mountEventTrigger('orders.paid')
+        const select = wrapper.findComponent(SearchSelect)
+
+        select.vm.$emit('update:modelValue', ['a-sales'])
+        expect(lastConfig(wrapper)).toEqual({event_name: 'orders.paid', assistant_filter: ['a-sales']})
+
+        select.vm.$emit('update:modelValue', [])
+        expect(lastConfig(wrapper)).toEqual({event_name: 'orders.paid'})
+    })
+
+    it('drops the filter when a Core event is picked', async () => {
+        const wrapper = mountEventTrigger('', {assistant_filter: ['a-sales']})
+
+        await wrapper.find('.event-combo input').trigger('focus')
+        const core = wrapper.findAll('.event-option').find((node) => node.text() === 'core.contact.created')
+        await core?.trigger('mousedown')
+
+        expect(lastConfig(wrapper)).toEqual({event_name: 'core.contact.created'})
     })
 })
 

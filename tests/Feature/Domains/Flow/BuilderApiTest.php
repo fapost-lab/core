@@ -465,6 +465,74 @@ final class BuilderApiTest extends FeatureTestCase
         $this->assertContains('node_needs_contact', $codes, 'An input waits for the contact a Core event does not give.');
     }
 
+    public function test_an_assistant_filter_must_name_assistants_of_the_tenant(): void
+    {
+        $draft = $this->draft();
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        TenantEvent::query()->create(['tenant_id' => $draft->tenant_id, 'event_name' => 'orders.paid']);
+        $otherTenantsAssistant = Assistant::factory()->create(['tenant_id' => (string) Str::uuid()]);
+
+        $codesFor = fn (mixed $filter): array => array_column($this->actingAs($user)
+            ->postJson("/builder/flows/{$draft->flow_id}/validate", [
+                'definition' => [[
+                    'id'      => 'input_1',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => ['variable' => ['name' => 'answer', 'type' => 'text', 'storage' => 'session', 'group' => null]],
+                ]],
+                'triggers' => [[
+                    'id'        => (string) Str::uuid(),
+                    'type'      => 'event',
+                    'is_active' => true,
+                    'priority'  => 100,
+                    'config'    => ['event_name' => 'orders.paid', 'assistant_filter' => $filter],
+                ]],
+            ])
+            ->assertOk()
+            ->json('errors'), 'code');
+
+        $this->assertNotContains('unknown_assistant_filter', $codesFor([(string) $draft->assistant_id]));
+        $this->assertNotContains('invalid_trigger_config', $codesFor([(string) $draft->assistant_id]));
+        $this->assertContains('unknown_assistant_filter', $codesFor([(string) $otherTenantsAssistant->getKey()]));
+        $this->assertContains('unknown_assistant_filter', $codesFor(['not-an-id']));
+        $this->assertContains('invalid_trigger_config', $codesFor('sales'));
+        $this->assertContains('invalid_trigger_config', $codesFor([42]));
+    }
+
+    public function test_a_core_event_trigger_refuses_an_assistant_filter(): void
+    {
+        $draft     = $this->draft();
+        $user      = $this->staffUser();
+        $triggerId = (string) Str::uuid();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $response = $this->actingAs($user)
+            ->postJson("/builder/flows/{$draft->flow_id}/validate", [
+                'definition' => [[
+                    'id'      => 'input_1',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => ['variable' => ['name' => 'answer', 'type' => 'text', 'storage' => 'session', 'group' => null]],
+                ]],
+                'triggers' => [[
+                    'id'        => $triggerId,
+                    'type'      => 'event',
+                    'is_active' => true,
+                    'priority'  => 100,
+                    'config'    => [
+                        'event_name'       => CoreEventCatalog::CONTACT_CREATED,
+                        'assistant_filter' => [(string) $draft->assistant_id],
+                    ],
+                ]],
+            ])
+            ->assertOk();
+
+        $this->assertContains('assistant_filter_on_core_event', array_column($response->json('errors'), 'code'));
+        $this->assertContains("triggers.{$triggerId}.config.assistant_filter", array_column($response->json('errors'), 'path'));
+    }
+
     public function test_validate_returns_duplicate_keyword_error_for_exact_message_trigger_conflict(): void
     {
         $draft       = $this->draft();

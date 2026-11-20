@@ -54,7 +54,8 @@ FlowTriggerEventPublisherInterface
        dispatches DispatchFlowTriggerEventJob on queue `scheduled.triggers` after commit
   -> DispatchFlowTriggerEventJob            (app/Jobs/Flow/)
        switches to the tenant, registers the event name in the tenant registry (best effort),
-       resolves subscribed event triggers (ResolveEventTriggersService) and fans out one job per trigger
+       resolves subscribed event triggers (ResolveEventTriggersService, applying each trigger's assistant_filter)
+       and fans out one job per trigger
   -> StartFlowFromEventJob                  (app/Jobs/Flow/), queue `scheduled.triggers`
        starts the subscribed flow through FlowEngine::start under the contact's session lock,
        recording the event's chain depth on the session
@@ -76,8 +77,22 @@ Details of the fan-out:
 
 ## Event scope
 
-Events are scoped to the **tenant**. Every trigger subscribed to `event_type` receives it regardless
-of the source assistant. The source assistant is not part of the event source and is not a filter.
+Events are scoped to the **tenant**. Every trigger subscribed to `event_type` receives it, whatever the
+source assistant, unless the trigger has an `assistant_filter`:
+
+```json
+{ "event_name": "sales.order.created", "assistant_filter": ["<assistant id>", "<assistant id>"] }
+```
+
+The filter names the assistants whose flows' events start the trigger. It is matched against the **source** of
+the event — the assistant of the session that ran `emit_event` (`flow_sessions.assistant_id`; a subflow child
+carries its parent's) — not against the trigger's own assistant, which only says on whose behalf the started flow
+runs. `ResolveEventTriggersService::forFlowEvent()` reads the session's assistant once per event, and only when a
+resolved trigger has a filter; a session that is gone or has no assistant passes only triggers without one. A
+filtered-out trigger logs `flow.event.trigger_filtered` at debug level. Empty or absent means any assistant.
+
+A Core event has no source assistant: validation refuses a filter on its trigger
+(`assistant_filter_on_core_event`), and every id must be an assistant of the tenant (`unknown_assistant_filter`).
 
 Recommended naming, not enforced:
 
@@ -86,8 +101,6 @@ sales.order.created
 support.ticket.opened
 hr.employee.onboarded
 ```
-
-Not built: an `assistant_filter` on the trigger config.
 
 ## Validation
 

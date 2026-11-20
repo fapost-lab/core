@@ -209,6 +209,15 @@ broken.
   fake a Core fact, and flows that set each other off must stop (`adr-20261119-core-events-start-contactless-runs`).
   Enforced: `CoreEventTriggersTest`, `QueuedFlowTriggerEventPublisherTest`, `PublishCoreEventsTest`,
   `ContactTagEventsTest`, `ValidateFlowServiceTest`, `BuiltInNodeHandlersTest`, `ConversationBoundariesTest`.
+- **An event trigger's `assistant_filter` matches the assistant that emitted the event, never the trigger's own, and a
+  Core event takes none.** `config.assistant_filter` is a list of assistant ids; empty or absent is any assistant. A
+  flow event passes when the assistant of its emitting session (`flow_sessions.assistant_id`, read by
+  `ResolveEventTriggersService::forFlowEvent()` only when a trigger has a filter) is in the list; an unknown source
+  passes only unfiltered triggers. Validation refuses a filter on a Core-event trigger
+  (`assistant_filter_on_core_event`) and an id that is not an assistant of the tenant (`unknown_assistant_filter`).
+  Why: two bots' events of one name must be separable without a naming convention, and a filter on an event that has
+  no assistant would silently never fire (`adr-20261120-flow-event-trigger-assistant-filter`). Enforced:
+  `DispatchFlowTriggerEventJobTest`, `BuilderApiTest`, `TriggerConfig.test.ts`.
 
 ## Rules
 
