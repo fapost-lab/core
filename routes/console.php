@@ -14,6 +14,7 @@ Schedule::command('flow:sweep-overdue-automation-runs')->everyMinute()->withoutO
 Schedule::command('support-access:prune')->dailyAt('03:45');
 Schedule::command('limit-refusals:prune')->dailyAt('04:00');
 Schedule::command('audit:prune')->dailyAt('04:15');
+Schedule::command('api-tokens:notify-expiring')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('flow:prune-automation-runs')->dailyAt('04:30')->withoutOverlapping();
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
 Schedule::command('tenants:start-deletions')->everyMinute()->withoutOverlapping();

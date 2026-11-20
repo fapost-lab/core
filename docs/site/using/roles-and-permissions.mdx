@@ -11,7 +11,7 @@ role for it.
 
 | Role | Permissions | For |
 |---|---|---|
-| `admin` | 29 | Full access, including roles and settings |
+| `admin` | 31 | Full access, including roles and settings |
 | `content_manager` | 19 | Building and running assistants and automations, without platform administration or managing credentials |
 | `analyst` | 3 | Reading — analytics and reports |
 
@@ -34,8 +34,8 @@ granted or withheld at once.
 | **Contacts** | Reading and editing the contact base |
 | **Conversations** | Reading transcripts, and replying to contacts |
 | **Analytics** | Reports |
-| **System** | Installation settings |
-| **Automations** | Automatic triggers, saved credentials, and the full data of runs |
+| **System** | Installation settings, and API tokens |
+| **Automations** | Automatic triggers, saved credentials, the full data of runs, and starting runs through the API |
 
 Two distinctions recur across the groups and are worth noticing, because they are
 what makes a useful role possible:
@@ -92,6 +92,16 @@ what they do is not obvious from the name.
   with it. The secret is never shown, but the holder can send it to the hosts the
   credential allows. Publishing a flow that uses a credential the live version did
   not use needs it too.
+
+  **Manage API tokens** opens [API tokens](/using/api-tokens): issuing, rotating
+  and revoking the tokens outside systems use to reach the workspace. A token
+  belongs to the workspace and outlives the person who issued it, so its holder
+  can leave a working integration behind. A token can never be given this
+  permission, nor **Manage roles** or **Manage users**.
+
+  **Start flow runs through the API** lets a token start runs of published flows
+  through their API trigger. A token reaches every assistant, so only
+  administrators can put this permission on a token.
 
   **View run payloads** shows the full input and output of each step of a run,
   including what outside services answered. No screen shows them yet.

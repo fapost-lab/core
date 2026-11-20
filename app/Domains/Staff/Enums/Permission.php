@@ -64,6 +64,12 @@ enum Permission: string
      */
     case ViewActivityLog = 'view_activity_log';
 
+    /**
+     * Opens the tenant's API tokens screen: issue, rotate and revoke the tokens outside systems authenticate with.
+     * A token never holds it ({@see self::isForbiddenToTokens()}).
+     */
+    case ManageApiTokens = 'manage_api_tokens';
+
     // ── Automations group ─────────────────────────────────────────────────────
     /**
      * Makes live, changes or removes a trigger other than `message` (schedule, webhook, api, event) on publish, and
@@ -85,6 +91,12 @@ enum Permission: string
      * Reads the full input and output of every node in a run's trace, outside services' answers included.
      */
     case ViewRunPayloads = 'view_run_payloads';
+
+    /**
+     * Starts a run of a published flow through its API trigger. Meant for a tenant API token; only an administrator may
+     * put it on one ({@see self::isNarrowedByRecordPolicy()}).
+     */
+    case StartFlowRuns = 'start_flow_runs';
 
     /**
      * Enum cases grouped by their logical UI group.
@@ -171,8 +183,12 @@ enum Permission: string
             // Spends a secret against an outside system.
             self::UseCredentials,
             // Whatever outside services answered, contact data included.
-            self::ViewRunPayloads => true,
-            default               => false,
+            self::ViewRunPayloads,
+            // Mints credentials that outlive their issuer and reach the whole tenant.
+            self::ManageApiTokens,
+            // Lets an outside system start runs.
+            self::StartFlowRuns => true,
+            default             => false,
         };
     }
 
@@ -212,12 +228,49 @@ enum Permission: string
             self::ViewSystem,
             self::ViewOperatorScreens,
             self::ViewActivityLog,
+            self::ManageApiTokens,
             self::ManageSettings => 'system',
 
             self::ManageAutomations,
             self::ManageCredentials,
             self::UseCredentials,
-            self::ViewRunPayloads => 'automations',
+            self::ViewRunPayloads,
+            self::StartFlowRuns => 'automations',
+        };
+    }
+
+    /**
+     * Whether a tenant API token may never hold this permission (`adr-20261119-tenant-api-tokens` §7): a token that
+     * manages tokens renews itself through rotation, and staff, roles and the operator screens stay with people.
+     * Issuing refuses these, and the Gate refuses them to a token even when its row holds one.
+     */
+    public function isForbiddenToTokens(): bool
+    {
+        return match ($this) {
+            self::ManageApiTokens,
+            self::ManageRoles,
+            self::ManageUsers,
+            self::ViewOperatorScreens => true,
+            default                   => false,
+        };
+    }
+
+    /**
+     * Whether a record-level policy narrows this permission for a staff user who is not an administrator — by the
+     * assistants they are assigned to, for instance. A token reaches the whole tenant, so a non-admin may not grant
+     * such a permission to a token (`adr-20261119-tenant-api-tokens` §7).
+     *
+     * Cautious by default: only the permissions whose screens and policies are tenant-wide and never look at the
+     * assignment are not narrowed. {@see self::StartFlowRuns} is narrowed: a token would start flows of any assistant.
+     */
+    public function isNarrowedByRecordPolicy(): bool
+    {
+        return match ($this) {
+            self::ViewSystem,
+            self::ManageSettings,
+            self::ViewActivityLog,
+            self::ManageCredentials => false,
+            default                 => true,
         };
     }
 }

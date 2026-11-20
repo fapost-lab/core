@@ -36,6 +36,12 @@ which role.
 
 The `Permission` enum that policies check across all domains.
 
+## Tenant API token
+
+A tenant's machine credential (`ApiToken`, `fpt_<ULID>_<secret>`): it belongs to the tenant, not to
+the staff user who issued it, holds `Permission` values as abilities, always expires, and is stored as
+the SHA-256 of its secret. Shown in plain once. See `adr-20261119-tenant-api-tokens`.
+
 ## Activation token
 
 A one-time token for setting the first password: stored as SHA-256, valid for 72 hours.

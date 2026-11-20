@@ -12,6 +12,7 @@ use App\Domains\Flow\Retention\AutomationRunRetention;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Flow\Webhook\FlowWebhookReceiver;
 use App\Domains\Flow\Webhook\WebhookSyncWait;
+use App\Domains\Staff\Support\ApiTokenSettings;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
 use App\Domains\Tenancy\Models\PlatformSetting;
@@ -95,6 +96,10 @@ final class PlatformSettingsTest extends FeatureTestCase
         $keys        = array_map(static fn (PlatformSettingDefinition $d): string => $d->key, $definitions);
 
         $this->assertSame([
+            ApiTokenSettings::DEFAULT_TTL_DAYS,
+            ApiTokenSettings::MAX_TTL_DAYS,
+            ApiTokenSettings::PER_MINUTE,
+            ApiTokenSettings::ROTATION_GRACE_HOURS,
             'audit.retention_days',
             PartitionRetention::SETTING,
             AutomationRunDeadline::SETTING,
@@ -111,7 +116,7 @@ final class PlatformSettingsTest extends FeatureTestCase
             WebhookSyncWait::INSTALLATION_WAITERS_SETTING,
             WebhookSyncWait::TENANT_WAITERS_SETTING,
             self::REDIRECT,
-        ], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
+        ], $keys, 'API tokens, then Audit, then Conversations, then Flow, then Tenants.');
         $byKey = array_combine($keys, $definitions);
         $this->assertSame(300, $byKey[self::ITERATIONS]->default);
         $this->assertSame(10, $byKey[self::ITERATIONS]->min);
