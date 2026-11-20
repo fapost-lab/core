@@ -42,6 +42,8 @@ or the tenant context. The URL handed to outside systems is the costliest thing 
   sender (the draft's `publish` policy: who makes a trigger live hands out its secret), shown only in the answer
   that generated it, and never in the trigger's config: the validator refuses unknown keys, and a draft save drops a
   `secret` key. Making the URL and replacing the secret are audited.
+  *Amended by the task `flow-automation-permissions`:* the secret now takes the draft's `manageAutomations` policy
+  (`PublishFlow` and `ManageAutomations`), what making an automatic trigger live takes since that task.
 - **Verification.** The trigger config holds only the scheme — `hmac_sha256` (header, prefix, optional signed string with
   `{raw}`, optional timestamp header and tolerance, the timestamp always inside the signed string) or `header_equals` —
   and becomes Foundation's `IngressSpec`, run by `IngressSpecExecutor`, the same code as channel webhooks. The query string

@@ -91,14 +91,17 @@ final class FlowWebhookEndpointTest extends FeatureTestCase
         $this->assertSame([$otherId], FlowWebhookEndpoint::query()->pluck('trigger_id')->map(static fn ($id): string => mb_strtolower((string) $id))->all());
     }
 
-    public function test_the_secret_needs_the_publish_permission_and_is_shown_only_when_generated(): void
+    public function test_the_secret_needs_the_publish_and_automation_permissions_and_is_shown_only_when_generated(): void
     {
         [$draft, $triggerId] = $this->webhookDraft();
         $url                 = $this->endpointUrl($draft, $triggerId) . '/secret';
 
         $this->actingAs($this->user(Permission::ManageFlowDefinitions))->postJson($url)->assertForbidden();
+        // Publishing alone does not hand an outside system the means to start the flow.
+        $this->actingAs($this->user(Permission::ManageFlowDefinitions, Permission::PublishFlow))->postJson($url)->assertForbidden();
+        $this->assertSame(0, FlowWebhookEndpoint::query()->whereNotNull('secret')->count());
 
-        $publisher = $this->user(Permission::ManageFlowDefinitions, Permission::PublishFlow);
+        $publisher = $this->user(Permission::ManageFlowDefinitions, Permission::PublishFlow, Permission::ManageAutomations);
         $generated = $this->actingAs($publisher)->postJson($url)->assertOk()->json('data');
 
         $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $generated['secret']);
@@ -122,7 +125,7 @@ final class FlowWebhookEndpointTest extends FeatureTestCase
     public function test_the_builder_shows_the_url_and_whether_there_is_a_secret_but_never_the_secret(): void
     {
         [$draft, $triggerId] = $this->webhookDraft();
-        $publisher           = $this->user(Permission::ManageFlowDefinitions, Permission::PublishFlow);
+        $publisher           = $this->user(Permission::ManageFlowDefinitions, Permission::PublishFlow, Permission::ManageAutomations);
         $secret              = $this->actingAs($publisher)->postJson($this->endpointUrl($draft, $triggerId) . '/secret')->json('data.secret');
 
         $response = $this->actingAs($publisher)->get("/builder/flows/{$draft->flow_id}")->assertOk();
@@ -139,7 +142,7 @@ final class FlowWebhookEndpointTest extends FeatureTestCase
     {
         [$draft, $triggerId] = $this->webhookDraft();
         [$other, $otherId]   = $this->webhookDraft();
-        $publisher           = $this->user(Permission::ManageFlowDefinitions, Permission::PublishFlow);
+        $publisher           = $this->user(Permission::ManageFlowDefinitions, Permission::PublishFlow, Permission::ManageAutomations);
         $this->actingAs($publisher)->postJson($this->endpointUrl($other, $otherId))->assertOk();
 
         // The other flow's trigger id, asked for through this flow: not found, and its endpoint untouched.
@@ -187,7 +190,7 @@ final class FlowWebhookEndpointTest extends FeatureTestCase
         // A trigger only in the draft, its URL made in advance.
         $draft->forceFill(['triggers' => [...$draft->fresh()->triggers, $this->trigger($pending)]])->save();
 
-        $publisher = $this->user(Permission::ManageFlowDefinitions, Permission::PublishFlow);
+        $publisher = $this->user(Permission::ManageFlowDefinitions, Permission::PublishFlow, Permission::ManageAutomations);
 
         foreach ([$kept, $removed, $retyped, $pending] as $id) {
             $this->actingAs($publisher)->postJson($this->endpointUrl($draft, $id))->assertOk();

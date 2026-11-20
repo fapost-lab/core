@@ -64,6 +64,28 @@ enum Permission: string
      */
     case ViewActivityLog = 'view_activity_log';
 
+    // ── Automations group ─────────────────────────────────────────────────────
+    /**
+     * Makes live, changes or removes a trigger other than `message` (schedule, webhook, api, event) on publish, and
+     * turns on a flow that has one.
+     */
+    case ManageAutomations = 'manage_automations';
+
+    /**
+     * Opens the tenant's credentials screen: list, create, replace and delete saved credentials.
+     */
+    case ManageCredentials = 'manage_credentials';
+
+    /**
+     * Picks a saved credential for a `call` node and tests a call with it, never seeing its value.
+     */
+    case UseCredentials = 'use_credentials';
+
+    /**
+     * Reads the full input and output of every node in a run's trace, outside services' answers included.
+     */
+    case ViewRunPayloads = 'view_run_payloads';
+
     /**
      * Enum cases grouped by their logical UI group.
      *
@@ -141,7 +163,15 @@ enum Permission: string
             // Queue payloads and logs of the whole installation.
             self::ViewOperatorScreens,
             // Shows what every colleague did, and when.
-            self::ViewActivityLog => true,
+            self::ViewActivityLog,
+            // Starts runs nobody asked for, on a schedule or from outside systems.
+            self::ManageAutomations,
+            // Decides which outside systems the tenant's secrets open.
+            self::ManageCredentials,
+            // Spends a secret against an outside system.
+            self::UseCredentials,
+            // Whatever outside services answered, contact data included.
+            self::ViewRunPayloads => true,
             default               => false,
         };
     }
@@ -183,6 +213,11 @@ enum Permission: string
             self::ViewOperatorScreens,
             self::ViewActivityLog,
             self::ManageSettings => 'system',
+
+            self::ManageAutomations,
+            self::ManageCredentials,
+            self::UseCredentials,
+            self::ViewRunPayloads => 'automations',
         };
     }
 }

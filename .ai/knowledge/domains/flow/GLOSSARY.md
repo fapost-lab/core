@@ -16,7 +16,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-20
 ---
 # Flow glossary
 
@@ -120,6 +120,11 @@ the message resumes the child (`ResumeWaiting`).
 
 What starts a flow: `message`, `schedule`, `webhook`, `api`, `event`. A flow may have several; each has a stable id,
 the primary key of its live `flow_triggers` row, and goes live when the flow is published, not when the draft is saved.
+
+## Automatic trigger
+
+A trigger of any type but `message` (`schedule`, `webhook`, `api`, `event`): it starts runs without anyone writing to
+the assistant. Making one live, changing or removing it, and turning on a flow that has one need `ManageAutomations`.
 
 ## Subflow
 

@@ -11,8 +11,8 @@ role for it.
 
 | Role | Permissions | For |
 |---|---|---|
-| `admin` | 25 | Full access, including roles and settings |
-| `content_manager` | 16 | Building and running assistants, without platform administration |
+| `admin` | 29 | Full access, including roles and settings |
+| `content_manager` | 19 | Building and running assistants and automations, without platform administration or managing credentials |
 | `analyst` | 3 | Reading — analytics and reports |
 
 All three are marked **System**. They exist on every tenant and are the sensible
@@ -22,7 +22,7 @@ starting point: assign one of them before inventing your own.
 
 ## How permissions are grouped
 
-The role editor arranges permissions into seven groups, each with a **Select all**
+The role editor arranges permissions into eight groups, each with a **Select all**
 button (**Clear all** once the whole group is ticked) so a whole area can be
 granted or withheld at once.
 
@@ -35,6 +35,7 @@ granted or withheld at once.
 | **Conversations** | Reading transcripts, and replying to contacts |
 | **Analytics** | Reports |
 | **System** | Installation settings |
+| **Automations** | Automatic triggers, saved credentials, and the full data of runs |
 
 Two distinctions recur across the groups and are worth noticing, because they are
 what makes a useful role possible:
@@ -76,9 +77,27 @@ what they do is not obvious from the name.
 
   **View the activity log** shows what every colleague did in the panels, and
   when. Only administrators have it unless it is given.
+
+  **Manage automations** makes schedule, webhook, API and event triggers live,
+  changes or removes them when a flow is published, and turns on a flow that has
+  one. Such a flow starts runs on its own, with nobody writing to the assistant.
+  Without it, **Publish flow to live** still publishes a flow, as long as its
+  automatic triggers stay as they are live.
+
+  **Manage credentials** opens [Credentials](/using/credentials): creating,
+  replacing and deleting the secrets flows use, and choosing which hosts each may
+  reach.
+
+  **Use credentials** picks a saved credential in a Call block and tests a call
+  with it. The secret is never shown, but the holder can send it to the hosts the
+  credential allows. Publishing a flow that uses a credential the live version did
+  not use needs it too.
+
+  **View run payloads** shows the full input and output of each step of a run,
+  including what outside services answered. No screen shows them yet.
 </Warning>
 
-The last two are the ones most often handed out without thinking, because
+**View conversations** and **Reply in conversations** are the ones most often handed out without thinking, because
 "answer customer questions" sounds routine. It means reading everything anyone
 ever told the bot, and speaking as the company.
 
@@ -110,8 +129,8 @@ any of the assistant's screens shows nothing.
 | **Conversations** | **View conversations**, plus an assignment to the conversation's assistant. **Reply to conversations** on top of that to take over, accept, reply, finish and transfer — and only the operator holding a conversation replies in it. A conversation is transferred only to someone with both permissions and an assignment to its assistant |
 | **Broadcasts** | **Manage broadcasts**, plus an assignment to the broadcast's assistant. Sending and cancelling follow the same rule |
 | **Segments** | **View contacts**, **Manage contacts** or **Manage broadcasts** to see them; **Manage contacts** or **Manage broadcasts** to create, edit and delete them. Segments are the audiences of broadcasts, so a broadcast manager can build them without access to the contact base |
-| **Flow builder** | **Create / edit flow drafts**, plus an assignment to the flow's assistant. **Publish flow to live** is needed on top of that to publish |
-| **Testing a `call` node** | **Create / edit flow drafts**. The test sends a real request, so it is not open to every signed-in user |
+| **Flow builder** | **Create / edit flow drafts**, plus an assignment to the flow's assistant. **Publish flow to live** is needed on top of that to publish; a publish that changes a schedule, webhook, API or event trigger also needs **Manage automations**, and one that adds a saved credential **Use credentials** (see [Publishing](/using/publishing)) |
+| **Testing a `call` node** | **Create / edit flow drafts**, and **Use credentials** when the call uses a saved credential. The test sends a real request, so it is not open to every signed-in user |
 
 ## Choosing a set
 

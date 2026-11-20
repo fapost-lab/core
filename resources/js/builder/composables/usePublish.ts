@@ -60,6 +60,22 @@ export function usePublish() {
                 return { success: false };
             }
 
+            // A permission refusal carries the server's reason (e.g. a credential or an automatic trigger
+            // the user may not change); show it like a validation failure instead of losing it.
+            if (error.status === 403) {
+                const message = typeof error.body === 'object' && error.body !== null
+                    ? (error.body as { message?: unknown }).message
+                    : undefined;
+                const reason = typeof message === 'string' && message !== '' ? message : error.message;
+
+                if (typeof reason === 'string' && reason !== '') {
+                    store.setValidationResult({ valid: false, errors: [{ path: '', message: reason }] }, true);
+                    store.setSaveStatus('error');
+
+                    return { success: false };
+                }
+            }
+
             store.setSaveStatus('error');
             throw e;
         }

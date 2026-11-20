@@ -3,6 +3,18 @@
 declare(strict_types=1);
 
 return [
+    'permission_hints' => [
+        'automations'       => 'Changing automatic triggers needs the Manage automations permission.',
+        'credential_locked' => 'Saved credential (you cannot change it)',
+        'credential_change' => 'Changing the saved credential needs the Use credentials permission.',
+        'credential_test'   => 'Testing a call that uses a saved credential needs the Use credentials permission.',
+    ],
+
+    'publish_denied' => [
+        'credentials' => 'This version uses a saved credential that the published one does not. Publishing it needs the Use credentials permission.',
+        'automations' => 'This version adds, changes or removes a schedule, webhook, API or event trigger. Publishing it needs the Manage automations permission.',
+    ],
+
     'read_only' => [
         'banner' => 'This workspace is stopped, so the flow is open for viewing only. Changes are not saved.',
         'node'   => 'The workspace is stopped: this configuration can be viewed but not edited.',

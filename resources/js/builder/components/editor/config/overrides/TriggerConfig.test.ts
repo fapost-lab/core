@@ -1,6 +1,15 @@
 // @vitest-environment happy-dom
-import {describe, expect, it} from 'vitest'
+import {beforeEach, describe, expect, it, vi} from 'vitest'
 import {mount} from '@vue/test-utils'
+
+
+const {pageProps} = vi.hoisted(() => ({pageProps: {auth: {permissions: [] as string[]}}}))
+
+vi.mock('@inertiajs/vue3', () => ({usePage: () => ({props: pageProps})}))
+
+function grant(permissions: string[]): void {
+    pageProps.auth.permissions = permissions
+}
 
 import TriggerConfig from './TriggerConfig.vue'
 
@@ -14,6 +23,8 @@ function mountEventTrigger(eventName: string) {
 }
 
 describe('TriggerConfig event picker', () => {
+    beforeEach(() => grant(['manage_automations']))
+
     it('lists Core events in a group of their own, before the flows\' events', async () => {
         const wrapper = mountEventTrigger('')
 
@@ -30,6 +41,8 @@ describe('TriggerConfig event picker', () => {
 })
 
 describe('TriggerConfig webhook response mode', () => {
+    beforeEach(() => grant(['manage_automations']))
+
     function mountWebhookTrigger(config: Record<string, unknown>) {
         return mount(TriggerConfig, {
             props: {
@@ -53,5 +66,36 @@ describe('TriggerConfig webhook response mode', () => {
         const emitted = wrapper.emitted('update:trigger')
         expect(emitted).toBeTruthy()
         expect((emitted?.at(-1)?.[0] as {config: Record<string, unknown>}).config).toEqual({...hmac, response_mode: 'sync'})
+    })
+})
+
+describe('TriggerConfig automation permission', () => {
+    beforeEach(() => grant([]))
+
+    it('keeps a message trigger fully editable but offers no automatic types', () => {
+        const wrapper = mount(TriggerConfig, {
+            props: {trigger: {type: 'message', is_active: true, priority: 0, config: {keywords: [], phrases: []}}},
+        })
+
+        expect(wrapper.get('[data-testid="automation-lock"]').attributes('inert')).toBeUndefined()
+        expect(wrapper.find('[data-testid="automation-lock-hint"]').exists()).toBe(false)
+
+        const disabled = wrapper.findAll('select option').filter((o) => o.attributes('disabled') !== undefined).map((o) => o.text())
+        expect(disabled).toEqual(['Schedule', 'Webhook', 'API', 'Event'])
+    })
+
+    it('shows an existing automatic trigger read-only with a hint', () => {
+        const wrapper = mountEventTrigger('orders.paid')
+
+        expect(wrapper.get('[data-testid="automation-lock"]').attributes('inert')).toBeDefined()
+        expect(wrapper.get('[data-testid="automation-lock-hint"]').text()).toContain('permission_hints.automations')
+    })
+
+    it('changes nothing with the permission', () => {
+        grant(['manage_automations'])
+        const wrapper = mountEventTrigger('orders.paid')
+
+        expect(wrapper.get('[data-testid="automation-lock"]').attributes('inert')).toBeUndefined()
+        expect(wrapper.findAll('select option').some((o) => o.attributes('disabled') !== undefined)).toBe(false)
     })
 })

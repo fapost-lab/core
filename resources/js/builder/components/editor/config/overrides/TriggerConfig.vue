@@ -5,6 +5,8 @@ import {createWebhookEndpoint, generateWebhookSecret, setWebhookSecret} from '@b
 import type {ApiError} from '@builder/api/builderApi'
 import type {WebhookEndpointInfo} from '@builder/dto/types'
 import {useConfirm} from '@builder/composables/useConfirm'
+import {usePermissions} from '@builder/composables/usePermissions'
+import {useTranslations} from '@builder/composables/useTranslations'
 import {
     WEBHOOK_PRESETS,
     defaultWebhookConfig,
@@ -30,6 +32,10 @@ const emit = defineEmits(['update:trigger', 'delete:trigger', 'webhook-endpoint'
 
 const { confirm } = useConfirm()
 
+const { can } = usePermissions()
+const { t } = useTranslations()
+const canManageAutomations = computed(() => can('manage_automations'))
+
 const triggerTypes = [
     { value: 'message', label: 'Message' },
     { value: 'schedule', label: 'Schedule' },
@@ -40,6 +46,11 @@ const triggerTypes = [
 
 const currentTrigger = computed(() =>
     props.trigger ?? createDefaultTrigger('message')
+)
+
+/** An automatic trigger (anything but a message) is read-only for a user without the Manage automations permission. */
+const automationLocked = computed(() =>
+    !canManageAutomations.value && currentTrigger.value.type !== 'message'
 )
 
 const triggerCfg = computed((): Record<string, unknown> =>
@@ -309,6 +320,10 @@ function defaultConfig(type: string): Record<string, unknown> {
 
 <template>
     <div class="accordion">
+        <p v-if="automationLocked" class="field-help automation-lock-hint" data-testid="automation-lock-hint">
+            {{ t('permission_hints.automations') }}
+        </p>
+        <div class="automation-lock" :inert="automationLocked" data-testid="automation-lock">
         <AccordionSection title="General" default-open>
             <div class="config-field">
                 <div class="field-label">Trigger type</div>
@@ -321,6 +336,7 @@ function defaultConfig(type: string): Record<string, unknown> {
                         v-for="option in triggerTypes"
                         :key="option.value"
                         :value="option.value"
+                        :disabled="option.value !== 'message' && !canManageAutomations"
                     >{{ option.label }}</option>
                 </select>
             </div>
@@ -670,10 +686,14 @@ function defaultConfig(type: string): Record<string, unknown> {
         <AccordionSection title="Danger zone">
             <button type="button" class="delete-trigger-btn" @click="removeTrigger">Delete trigger</button>
         </AccordionSection>
+        </div>
     </div>
 </template>
 
 <style scoped>
+.automation-lock {
+    display: contents;
+}
 .webhook-row {
     display: flex;
     gap: 6px;

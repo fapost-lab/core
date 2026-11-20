@@ -27,13 +27,17 @@ final class PermissionEnumTest extends TestCase
         sort($values);
         $this->assertSame(
             [
+                'manage_automations',
+                'manage_credentials',
                 'manage_roles',
                 'publish_flow',
                 'reply_conversations',
                 'rotate_channel_token',
+                'use_credentials',
                 'view_activity_log',
                 'view_conversations',
                 'view_operator_screens',
+                'view_run_payloads',
             ],
             $values,
         );
@@ -41,7 +45,7 @@ final class PermissionEnumTest extends TestCase
 
     public function test_every_permission_belongs_to_a_group(): void
     {
-        $allowedGroups = ['assistants', 'users', 'content', 'contacts', 'conversations', 'analytics', 'system'];
+        $allowedGroups = ['assistants', 'users', 'content', 'contacts', 'conversations', 'analytics', 'system', 'automations'];
 
         foreach (Permission::cases() as $permission) {
             $this->assertContains(
@@ -56,7 +60,7 @@ final class PermissionEnumTest extends TestCase
     {
         $groups = Permission::groupedByGroup();
 
-        $this->assertCount(7, $groups);
+        $this->assertCount(8, $groups);
         $this->assertArrayHasKey('assistants', $groups);
         $this->assertArrayHasKey('users', $groups);
         $this->assertArrayHasKey('content', $groups);
@@ -64,6 +68,44 @@ final class PermissionEnumTest extends TestCase
         $this->assertArrayHasKey('conversations', $groups);
         $this->assertArrayHasKey('analytics', $groups);
         $this->assertArrayHasKey('system', $groups);
+        $this->assertArrayHasKey('automations', $groups);
+        $this->assertSame(
+            [Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads],
+            $groups['automations'],
+        );
+    }
+
+    public function test_every_group_and_new_permission_has_a_description_in_each_language(): void
+    {
+        foreach (['en', 'ru', 'uk'] as $locale) {
+            foreach (array_keys(Permission::groupedByGroup()) as $group) {
+                $this->assertNotSame("staff.permission_groups.{$group}", __("staff.permission_groups.{$group}", [], $locale));
+            }
+
+            foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads] as $permission) {
+                $this->assertNotSame("staff.permissions.labels.{$permission->value}", __("staff.permissions.labels.{$permission->value}", [], $locale));
+                $this->assertNotSame("staff.permissions.descriptions.{$permission->value}", __("staff.permissions.descriptions.{$permission->value}", [], $locale));
+            }
+        }
+    }
+
+    public function test_content_manager_builds_automations_but_does_not_manage_credentials(): void
+    {
+        $perms = RoleEnum::ContentManager->permissions();
+
+        $this->assertContains(Permission::ManageAutomations, $perms);
+        $this->assertContains(Permission::UseCredentials, $perms);
+        $this->assertContains(Permission::ViewRunPayloads, $perms);
+        $this->assertNotContains(Permission::ManageCredentials, $perms);
+    }
+
+    public function test_analyst_gets_no_automation_or_credential_permission(): void
+    {
+        $perms = RoleEnum::Analyst->permissions();
+
+        foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads] as $permission) {
+            $this->assertNotContains($permission, $perms);
+        }
     }
 
     public function test_values_covers_every_declared_case(): void

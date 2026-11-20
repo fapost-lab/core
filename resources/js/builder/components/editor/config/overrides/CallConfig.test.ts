@@ -3,6 +3,15 @@ import {beforeEach, describe, expect, it, vi} from 'vitest'
 import {flushPromises, mount} from '@vue/test-utils'
 import {createPinia, setActivePinia} from 'pinia'
 
+
+const {pageProps} = vi.hoisted(() => ({pageProps: {auth: {permissions: [] as string[]}}}))
+
+vi.mock('@inertiajs/vue3', () => ({usePage: () => ({props: pageProps})}))
+
+function grant(permissions: string[]): void {
+    pageProps.auth.permissions = permissions
+}
+
 const {fetchCredentialOptions} = vi.hoisted(() => ({fetchCredentialOptions: vi.fn()}))
 
 vi.mock('@builder/api/builderApi', async (importOriginal) => ({
@@ -36,6 +45,7 @@ function lastPatch(wrapper: Awaited<ReturnType<typeof mountConfig>>): Record<str
 describe('CallConfig authorization', () => {
     beforeEach(() => {
         setActivePinia(createPinia())
+        grant(['use_credentials'])
         fetchCredentialOptions.mockReset()
         fetchCredentialOptions.mockResolvedValue(credentials)
     })
@@ -85,5 +95,41 @@ describe('CallConfig authorization', () => {
 
         expect(wrapper.text()).toContain('Unavailable credential')
         expect(wrapper.text()).toContain('No saved credentials yet')
+    })
+})
+
+describe('CallConfig without the Use credentials permission', () => {
+    const http = {transport: 'http', target: 'GET https://api.example.com/x', parameters: {}}
+
+    beforeEach(() => {
+        setActivePinia(createPinia())
+        fetchCredentialOptions.mockReset()
+        fetchCredentialOptions.mockResolvedValue(credentials)
+        grant([])
+    })
+
+    it('does not list the credentials and offers no saved-credential mode', async () => {
+        const wrapper = await mountConfig(http)
+
+        expect(fetchCredentialOptions).not.toHaveBeenCalled()
+        expect(wrapper.get('[data-testid="auth-mode"] option[value="credential"]').attributes('disabled')).toBeDefined()
+    })
+
+    it('keeps a stored credential visible and read-only', async () => {
+        const wrapper = await mountConfig({...http, credential_id: 'c-1'})
+
+        expect(wrapper.get('[data-testid="auth-mode"]').attributes('disabled')).toBeDefined()
+        expect(wrapper.get('[data-testid="credential-select"]').attributes('disabled')).toBeDefined()
+        expect(wrapper.get('[data-testid="credential-select"]').text()).toContain('permission_hints.credential_locked')
+        expect(wrapper.get('[data-testid="credential-permission-hint"]').text()).toContain('permission_hints.credential_change')
+    })
+
+    it('disables the test button for a call that carries a credential', async () => {
+        const blocked = await mountConfig({...http, credential_id: 'c-1'})
+        expect(blocked.get('[data-testid="test-btn"]').attributes('disabled')).toBeDefined()
+        expect(blocked.find('[data-testid="test-permission-hint"]').exists()).toBe(true)
+
+        const free = await mountConfig(http)
+        expect(free.get('[data-testid="test-btn"]').attributes('disabled')).toBeUndefined()
     })
 })

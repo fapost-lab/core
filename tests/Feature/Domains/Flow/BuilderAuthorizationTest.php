@@ -142,7 +142,10 @@ final class BuilderAuthorizationTest extends FeatureTestCase
     {
         Http::fake();
 
-        $this->actingAs($this->userWithFlowPermissions())
+        $user = $this->userWithFlowPermissions();
+        $user->givePermissionTo(Permission::UseCredentials->value);
+
+        $this->actingAs($user)
             ->postJson('/builder/call/test', ['config' => [
                 'transport'     => 'http',
                 'target'        => 'GET https://api.example.com/me',
@@ -153,6 +156,30 @@ final class BuilderAuthorizationTest extends FeatureTestCase
             ->assertJsonPath('data.error_code', 'credential_not_found');
 
         Http::assertNothingSent();
+    }
+
+    public function test_call_test_with_a_credential_is_forbidden_without_the_right_to_use_credentials(): void
+    {
+        Http::fake();
+
+        $this->actingAs($this->userWithFlowPermissions())
+            ->postJson('/builder/call/test', ['config' => [
+                'transport'     => 'http',
+                'target'        => 'GET https://api.example.com/me',
+                'credential_id' => (string) Str::uuid(),
+            ]])
+            ->assertForbidden();
+
+        // Without a credential the same user tests calls as before.
+        $this->actingAs($this->userWithFlowPermissions())
+            ->postJson('/builder/call/test', ['config' => [
+                'transport'     => 'http',
+                'target'        => 'GET https://api.example.com/me',
+                'credential_id' => '',
+            ]])
+            ->assertOk();
+
+        Http::assertSentCount(1);
     }
 
     private function assertFlowEndpointsForbidden(User $user, FlowDraft $draft): void

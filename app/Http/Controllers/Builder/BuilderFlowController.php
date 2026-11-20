@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Builder;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowValidationResultDto;
 use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Services\FlowTriggerSet;
 use App\Domains\Flow\Services\LoadBuilderFlowService;
 use App\Domains\Flow\Services\PublishFlowService;
@@ -160,7 +161,12 @@ final class BuilderFlowController extends Controller
     ): JsonResponse {
         Gate::authorize('publish', $drafts->findByFlowId($flow));
 
-        $definition = $service->execute(flowId: $flow);
+        // What the publish changes is checked on the locked draft, so a draft saved after a check never goes live
+        // unchecked.
+        $definition = $service->execute(
+            flowId: $flow,
+            authorize: static fn (FlowDraft $draft) => Gate::authorize('publishChanges', $draft),
+        );
 
         return response()->json([
             'version'      => $definition->version,

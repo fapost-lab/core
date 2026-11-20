@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Domains\Credentials\Models\Credential;
 use App\Domains\Flow\Models\FlowDraft;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -13,11 +14,20 @@ use Illuminate\Foundation\Http\FormRequest;
 final class CallTestRequest extends FormRequest
 {
     /**
-     * Testing a `call` node is part of authoring flows, so it needs the flow-draft permission.
+     * Testing a `call` node is part of authoring flows, so it needs the flow-draft permission. A test that names a saved
+     * credential spends its secret against the target, so it also needs the right to use credentials.
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('create', FlowDraft::class) ?? false;
+        $user = $this->user();
+
+        if (null === $user || ! $user->can('create', FlowDraft::class)) {
+            return false;
+        }
+
+        $credentialId = $this->input('config.credential_id');
+
+        return null === $credentialId || '' === $credentialId || $user->can('use', Credential::class);
     }
 
     /** @return array<string, array<int, string>> */

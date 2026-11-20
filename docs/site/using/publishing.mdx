@@ -32,6 +32,11 @@ refuses broken variable settings (for example an assign step with no variable na
 storage) and malformed branch rules. It checks each trigger's settings too — an event trigger needs an event
 that exists (a [Core event](/reference/events#core-events) always does). A flow with no steps cannot be published either.
 
+Some changes need a permission beyond publishing. Adding, changing or removing a schedule, webhook, API or event
+trigger needs **Manage automations**; a Call block that uses a saved credential the live version does not use needs
+**Use credentials**. Without the permission the publish is refused with the reason, and nothing changes. Editing
+steps, message triggers, or leaving those triggers and credentials as they are needs neither.
+
 ## The version badge
 
 The builder shows the flow's published version — `Published v1` — and the
@@ -70,6 +75,9 @@ Two independent switches, and the combination is what confuses people:
 
 Deactivating stops new sessions starting. It does not unpublish, and it does not
 stop sessions already under way.
+
+Turning on a flow that has a schedule, webhook, API or event trigger needs **Manage automations**, because it then
+starts runs on its own. Turning any flow off needs only the permission to edit it.
 
 ## Publishing again
 

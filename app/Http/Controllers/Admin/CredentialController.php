@@ -21,7 +21,7 @@ use Inertia\Response;
 
 /**
  * The tenant's saved credentials in the admin panel: the secrets and settings a flow's call node uses to authorize an
- * HTTP request, and the hosts each may be sent to. A tenant-level screen behind `ManageSettings` (`CredentialPolicy`).
+ * HTTP request, and the hosts each may be sent to. A tenant-level screen behind `ManageCredentials` (`CredentialPolicy`).
  *
  * The controller orchestrates: it authorizes, hands the work to {@see CredentialWriter} (which validates what the
  * credential's type demands and writes the audit entry) and answers with a page or a redirect carrying a flash for the

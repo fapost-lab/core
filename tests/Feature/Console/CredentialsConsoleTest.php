@@ -292,16 +292,17 @@ final class CredentialsConsoleTest extends CredentialsTestCase
         $this->assertSame('Foreign', Credential::query()->findOrFail($foreign->id)->name);
     }
 
-    public function test_only_the_right_to_manage_settings_opens_the_screen(): void
+    public function test_only_the_right_to_manage_credentials_opens_the_screen(): void
     {
         $credential = $this->credential();
 
         $allowed = User::factory()->create();
-        $allowed->givePermissionTo(Permission::ManageSettings->value);
+        $allowed->givePermissionTo(Permission::ManageCredentials->value);
         $this->actingAs($allowed)->get($this->url())->assertOk();
 
+        // Managing the tenant's settings, or using credentials in flows, is not managing them.
         $denied = User::factory()->create();
-        $denied->givePermissionTo(Permission::ManageUsers->value, Permission::ViewSystem->value);
+        $denied->givePermissionTo(Permission::ManageSettings->value, Permission::UseCredentials->value, Permission::ViewSystem->value);
         $this->actingAs($denied);
 
         $this->get($this->url())->assertForbidden();
@@ -317,7 +318,7 @@ final class CredentialsConsoleTest extends CredentialsTestCase
     public function test_the_admin_menu_lists_the_screen_only_with_the_right(): void
     {
         $allowed = User::factory()->create();
-        $allowed->givePermissionTo(Permission::ManageSettings->value);
+        $allowed->givePermissionTo(Permission::ManageCredentials->value);
 
         $this->actingAs($allowed)
             ->get($this->url())
@@ -327,8 +328,9 @@ final class CredentialsConsoleTest extends CredentialsTestCase
                     ->contains(static fn (array $item): bool => 'console.admin.credentials.index' === $item['key']))
                 ->etc());
 
+        // Managing settings (which shows the System group) is not managing credentials.
         $other = User::factory()->create();
-        $other->givePermissionTo(Permission::ManageUsers->value);
+        $other->givePermissionTo(Permission::ManageUsers->value, Permission::ManageSettings->value, Permission::UseCredentials->value);
 
         $this->actingAs($other)
             ->get('/admin/users')

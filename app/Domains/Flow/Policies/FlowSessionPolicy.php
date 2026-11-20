@@ -14,7 +14,8 @@ use Illuminate\Foundation\Auth\User as AuthUser;
  * Authorization policy for {@see FlowSession}.
  *
  * Sessions are engine-owned and read-only in the UI — only
- * {@see Permission::ViewFlowSessions} is required; mutations are denied.
+ * {@see Permission::ViewFlowSessions} is required; mutations are denied. The full node input and output of a run's
+ * trace ({@see self::viewPayloads()}) needs {@see Permission::ViewRunPayloads} as well.
  */
 final class FlowSessionPolicy
 {
@@ -28,6 +29,16 @@ final class FlowSessionPolicy
     public function view(AuthUser $authUser, FlowSession $session): bool
     {
         return $this->canView($authUser);
+    }
+
+    /**
+     * Whether the user may read the full input and output of the nodes in the session's trace: what outside services
+     * answered, contact data included. No screen shows them yet: the run graph page draws statuses only.
+     */
+    public function viewPayloads(AuthUser $authUser, FlowSession $session): bool
+    {
+        return $this->canView($authUser)
+               && $authUser->can(Permission::ViewRunPayloads->value);
     }
 
     public function create(AuthUser $authUser): bool

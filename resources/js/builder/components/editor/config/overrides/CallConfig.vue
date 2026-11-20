@@ -20,6 +20,8 @@ import JsonTree from '../JsonTree.vue'
 import VariableStorageEditor from '@builder/components/editor/variables/VariableStorageEditor.vue'
 import {useKnownGroups} from '@builder/composables/useKnownGroups'
 import {useBuilderStore} from '@builder/store/builderStore'
+import {usePermissions} from '@builder/composables/usePermissions'
+import {useTranslations} from '@builder/composables/useTranslations'
 import {type CallTestResult, fetchCredentialOptions, type CredentialOption, testCall} from '@builder/api/builderApi'
 import type {Variable} from '@builder/dto/types'
 
@@ -56,8 +58,15 @@ interface MapRow { from: string; to: Variable | null }
 const credentialOptions = ref<CredentialOption[]>([])
 const credentialsLoaded = ref(false)
 
+// Without the Use credentials permission the list is not requested (the server answers 403).
+const { can } = usePermissions()
+const { t } = useTranslations()
+const canUseCredentials = computed(() => can('use_credentials'))
+
 onMounted(async () => {
-    credentialOptions.value = await fetchCredentialOptions().catch(() => [])
+    if (canUseCredentials.value) {
+        credentialOptions.value = await fetchCredentialOptions().catch(() => [])
+    }
     credentialsLoaded.value = true
 })
 
@@ -365,7 +374,25 @@ function rememberStructure() {
     emit('update:config', { response_paths: structurePaths.value })
 }
 
+// A test call with a saved credential needs the permission; the button says so instead of letting the server refuse.
+const testBlockedByCredential = computed(() => {
+    const cfg = (props.node.config ?? {}) as Record<string, unknown>
+
+    return !canUseCredentials.value
+        && cfg.transport === 'http'
+        && typeof cfg.credential_id === 'string'
+        && cfg.credential_id !== ''
+})
+
+// A stored credential cannot be swapped or removed by a user who may not use credentials.
+const credentialLocked = computed(() =>
+    !canUseCredentials.value && form.authMode === 'credential' && form.credentialId !== '',
+)
+
 async function runTest() {
+    if (testBlockedByCredential.value) {
+        return
+    }
     const cfg = (props.node.config ?? {}) as Record<string, unknown>
     testLoading.value = true
     testError.value   = null
@@ -460,24 +487,29 @@ async function runTest() {
 
             <AccordionSection title="Authorization" default-open>
                 <div class="config-field">
-                    <select class="field-input" data-testid="auth-mode" :value="form.authMode" @change="form.authMode = ($event.target as HTMLSelectElement).value as 'none'|'credential'|'bearer'|'basic'; commit()">
+                    <select class="field-input" data-testid="auth-mode" :disabled="credentialLocked" :value="form.authMode" @change="form.authMode = ($event.target as HTMLSelectElement).value as 'none'|'credential'|'bearer'|'basic'; commit()">
                         <option value="none">None</option>
-                        <option value="credential">Saved credential</option>
+                        <option value="credential" :disabled="!canUseCredentials && !credentialLocked">
+                            {{ credentialLocked ? t('permission_hints.credential_locked') : 'Saved credential' }}
+                        </option>
                         <option value="bearer">Bearer token (stored in the flow definition)</option>
                         <option value="basic">Basic auth (stored in the flow definition)</option>
                     </select>
                 </div>
                 <div v-if="form.authMode === 'credential'" class="config-field">
                     <div class="field-label">Credential</div>
-                    <select class="field-input" data-testid="credential-select" :value="form.credentialId" @change="form.credentialId = ($event.target as HTMLSelectElement).value; commit()">
+                    <select class="field-input" data-testid="credential-select" :disabled="credentialLocked" :value="form.credentialId" @change="form.credentialId = ($event.target as HTMLSelectElement).value; commit()">
                         <option value="">—</option>
                         <option v-for="c in credentialOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
                         <!-- A saved id the list does not have (deleted, or not listed to this user) stays visible rather than silently cleared. -->
                         <option v-if="form.credentialId !== '' && !credentialOptions.some(c => c.id === form.credentialId)" :value="form.credentialId">
-                            {{ credentialsLoaded ? 'Unavailable credential' : '…' }}
+                            {{ credentialLocked ? t('permission_hints.credential_locked') : (credentialsLoaded ? 'Unavailable credential' : '…') }}
                         </option>
                     </select>
-                    <p v-if="credentialsLoaded && credentialOptions.length === 0" class="field-help">
+                    <p v-if="!canUseCredentials" class="field-help" data-testid="credential-permission-hint">
+                        {{ t('permission_hints.credential_change') }}
+                    </p>
+                    <p v-else-if="credentialsLoaded && credentialOptions.length === 0" class="field-help">
                         No saved credentials yet. Add one in Administration → System → Credentials.
                     </p>
                     <p v-else class="field-help">
@@ -603,7 +635,10 @@ async function runTest() {
                 ⚠ This sends a <strong>real</strong> {{ form.transport === 'handler' ? 'action invocation' : form.method + ' request' }} — it may create or modify data.
             </div>
 
-            <button class="test-btn" :disabled="testLoading" @click="runTest">
+            <p v-if="testBlockedByCredential" class="field-help" data-testid="test-permission-hint">
+                {{ t('permission_hints.credential_test') }}
+            </p>
+            <button class="test-btn" data-testid="test-btn" :disabled="testLoading || testBlockedByCredential" @click="runTest">
                 {{ testLoading ? 'Sending…' : (needsWarning ? 'Send real request' : 'Send test request') }}
             </button>
 
