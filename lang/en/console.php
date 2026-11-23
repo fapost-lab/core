@@ -337,6 +337,7 @@ return [
             'event'    => 'Event',
             'api'      => 'API',
         ],
+        'more_triggers'   => 'Other live triggers: :count',
         'builder'         => 'Builder',
         'builder_named'   => 'Open the builder for :name',
         'actions_for'     => 'Actions for :name',

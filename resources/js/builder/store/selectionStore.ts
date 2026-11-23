@@ -20,9 +20,15 @@ export const useSelectionStore = defineStore('selection', () => {
         selectedNodeId.value = null
     }
 
+    /** Select the trigger, or deselect it when it is already the active one. */
     function selectTrigger(id: string) {
         const key = `${TRIGGER_PREFIX}${id}`
         selectedNodeId.value = selectedNodeId.value === key ? null : key
+    }
+
+    /** Select the trigger and keep it selected when it already is (never toggles it off). */
+    function selectTriggerById(id: string) {
+        selectedNodeId.value = `${TRIGGER_PREFIX}${id}`
     }
 
     /** The id of the selected trigger, or null when a node (or nothing) is selected. */
@@ -44,6 +50,7 @@ export const useSelectionStore = defineStore('selection', () => {
         select,
         toggle,
         selectTrigger,
+        selectTriggerById,
         selectedTriggerId,
         clear,
         setActiveBranch,

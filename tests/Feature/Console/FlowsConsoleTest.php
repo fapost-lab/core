@@ -141,6 +141,7 @@ final class FlowsConsoleTest extends FeatureTestCase
                 ->where('table.rows.0.trigger.type', 'message')
                 ->where('table.rows.0.trigger.text', 'first')
                 ->where('table.rows.0.moreTriggers', 2)
+                ->where('translations.console.flows.more_triggers', 'Other live triggers: :count')
                 ->etc());
     }
 
@@ -525,31 +526,7 @@ final class FlowsConsoleTest extends FeatureTestCase
 
     public function test_the_expression_engine_changes_only_when_sent_and_only_to_an_installed_one(): void
     {
-        $this->app->make(ExpressionEngineRegistry::class)->register(new class () implements ExpressionEngineInterface {
-            public function id(): string
-            {
-                return 'second_test';
-            }
-
-            public function version(): int
-            {
-                return 1;
-            }
-
-            public function evaluate(string $source, ExpressionContext $context): mixed
-            {
-                return $source;
-            }
-
-            public function validate(string $source): void
-            {
-            }
-
-            public function extractReferences(string $source): array
-            {
-                return [];
-            }
-        });
+        $this->registerSecondEngine();
 
         $flow    = $this->flow('Help');
         $payload = ['name' => 'Help', 'flow_group_id' => null, 'is_public' => true, 'logging_enabled' => false];
@@ -561,10 +538,32 @@ final class FlowsConsoleTest extends FeatureTestCase
 
         $this->put($this->listUrl("/{$flow->getKey()}"), [...$payload, 'expression_engine' => 'second_test'])->assertRedirect($this->listUrl());
         $this->assertSame('second_test', $flow->fresh()->expression_engine);
+        $this->assertSameJson(
+            ['attributes' => ['expression_engine' => 'second_test'], 'old' => ['expression_engine' => 'template']],
+            ActivityEntry::query()->where('description', 'flow.updated')->latest('id')->firstOrFail()->attribute_changes?->toArray(),
+        );
 
         // The form sends no engine while it shows no choice: the flow keeps the one it has.
         $this->put($this->listUrl("/{$flow->getKey()}"), $payload)->assertRedirect($this->listUrl());
         $this->assertSame('second_test', $flow->fresh()->expression_engine);
+    }
+
+    public function test_a_flow_is_created_with_the_chosen_installed_expression_engine_or_the_default(): void
+    {
+        $this->registerSecondEngine();
+        $payload = ['is_public' => true, 'logging_enabled' => false];
+        $this->actingAs($this->admin());
+
+        $this->post($this->listUrl(), [...$payload, 'name' => 'Refused', 'expression_engine' => 'not_installed'])
+            ->assertSessionHasErrors('expression_engine');
+        $this->assertFalse(FlowDraft::query()->where('name', 'Refused')->exists());
+
+        $this->post($this->listUrl(), [...$payload, 'name' => 'Chosen', 'expression_engine' => 'second_test'])->assertRedirect();
+        $this->assertSame('second_test', FlowDraft::query()->where('name', 'Chosen')->sole()->expression_engine);
+
+        // The form sends no engine while it shows no choice: the flow gets the default one.
+        $this->post($this->listUrl(), [...$payload, 'name' => 'Default'])->assertRedirect();
+        $this->assertSame('template', FlowDraft::query()->where('name', 'Default')->sole()->expression_engine);
     }
 
     public function test_every_flow_write_is_in_the_audit_log_and_the_graph_never_is(): void
@@ -920,5 +919,35 @@ final class FlowsConsoleTest extends FeatureTestCase
         $user->assistants()->attach($this->assistant);
 
         return $user;
+    }
+
+    /** Installs a second expression engine, `second_test`, so the form has a choice to make. */
+    private function registerSecondEngine(): void
+    {
+        $this->app->make(ExpressionEngineRegistry::class)->register(new class () implements ExpressionEngineInterface {
+            public function id(): string
+            {
+                return 'second_test';
+            }
+
+            public function version(): int
+            {
+                return 1;
+            }
+
+            public function evaluate(string $source, ExpressionContext $context): mixed
+            {
+                return $source;
+            }
+
+            public function validate(string $source): void
+            {
+            }
+
+            public function extractReferences(string $source): array
+            {
+                return [];
+            }
+        });
     }
 }

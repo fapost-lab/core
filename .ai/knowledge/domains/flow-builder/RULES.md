@@ -55,6 +55,12 @@ broken.
   `auth.permissions` (`usePermissions`), never trusted: the server stays the arbiter. The builder has no panel
   tenant to lean on. Enforced: `BuilderAuthorizationTest`, `FlowAutomationPermissionsTest`, `BuilderPreferenceTest`, `TriggerResumeEndpointTest`.
 
+- **Whether a trigger is automatic is asked of `isAutomaticTrigger()`** (`utils/automaticTrigger.ts`), never decided
+  by a literal `type !== 'message'` in a component: the server keeps the same rule in one place
+  (`FlowPublishChanges::automatic()`). Review only.
+- **A registered trigger type's form and a node's schema form read a `config_schema` through one helper**
+  (`components/editor/config/schemaSections.ts`), so declared sections and the required list mean the same in both.
+  Review only.
 - **A new node's UI starts as `configSchema()` on its handler.** Add a core override only when
   the schema renderer cannot express the UI, by adding a key to the map in `ConfigPanel.vue`.
   Review only.

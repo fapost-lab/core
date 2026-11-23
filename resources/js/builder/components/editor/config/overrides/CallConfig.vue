@@ -585,13 +585,13 @@ async function runTest() {
         <!-- ───────────────── RETRY (shared) ───────────────── -->
         <AccordionSection title="Retry">
             <label class="field-help" style="display:flex;gap:6px;align-items:center">
-                <input type="checkbox" :checked="form.retryEnabled" @change="form.retryEnabled = ($event.target as HTMLInputElement).checked; commit()">
+                <input type="checkbox" data-testid="retry-enabled" :checked="form.retryEnabled" @change="form.retryEnabled = ($event.target as HTMLInputElement).checked; commit()">
                 Retry failed calls
             </label>
             <template v-if="form.retryEnabled">
                 <div class="config-field">
                     <div class="field-label">Attempts (first send included)</div>
-                    <input class="field-input" style="width:100px" type="number" min="1" max="5" :value="form.retryAttempts" @change="form.retryAttempts = clampInt(($event.target as HTMLInputElement).value, 1, 5, 3); ($event.target as HTMLInputElement).value = String(form.retryAttempts); commit()">
+                    <input class="field-input" data-testid="retry-attempts" style="width:100px" type="number" min="1" max="5" :value="form.retryAttempts" @change="form.retryAttempts = clampInt(($event.target as HTMLInputElement).value, 1, 5, 3); ($event.target as HTMLInputElement).value = String(form.retryAttempts); commit()">
                 </div>
                 <div class="config-field">
                     <div class="field-label">Delay (ms)</div>
@@ -607,7 +607,7 @@ async function runTest() {
                 <div class="config-field">
                     <div class="field-label">Retry on</div>
                     <label v-for="o in RETRY_ON" :key="o.value" class="field-help" style="display:flex;gap:6px;align-items:center">
-                        <input type="checkbox" :checked="form.retryOn.includes(o.value)" @change="onRetryOn(o.value, ($event.target as HTMLInputElement))">
+                        <input type="checkbox" :data-testid="`retry-on-${o.value}`" :checked="form.retryOn.includes(o.value)" @change="onRetryOn(o.value, ($event.target as HTMLInputElement))">
                         {{ o.label }}
                     </label>
                 </div>
@@ -769,7 +769,7 @@ async function runTest() {
 .kv-key { flex: 0 0 38%; }
 .field-help { margin: 5px 0 0; font-size: 11.5px; color: var(--text-3); line-height: 1.5; }
 .field-help code { font-family: var(--font-mono); }
-.auth-warn { color: var(--warning, var(--text-3)); }
+.auth-warn { color: var(--amber); }
 .mode-toggle { display: flex; gap: 4px; }
 .mode-pill {
     flex: 1; padding: 5px; border: 1px solid var(--border); border-radius: 6px;

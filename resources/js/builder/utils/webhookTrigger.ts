@@ -2,19 +2,20 @@ export type WebhookConfig = Record<string, unknown>
 
 export interface WebhookPreset {
     value: string
-    label: string
+    /** The builder translation key of the preset's name (`builder.webhook_trigger.*`). */
+    labelKey: string
     config: WebhookConfig
 }
 
 export const WEBHOOK_PRESETS: WebhookPreset[] = [
     {
         value: 'hmac',
-        label: 'HMAC-SHA256 (generic)',
+        labelKey: 'webhook_trigger.preset_hmac',
         config: { verification: 'hmac_sha256', signature_header: 'X-Signature', signature_prefix: 'sha256=', response_mode: 'async' },
     },
     {
         value: 'hmac_timestamp',
-        label: 'HMAC with timestamp',
+        labelKey: 'webhook_trigger.preset_hmac_timestamp',
         config: {
             verification: 'hmac_sha256',
             signature_header: 'X-Signature',
@@ -26,7 +27,7 @@ export const WEBHOOK_PRESETS: WebhookPreset[] = [
     },
     {
         value: 'github',
-        label: 'GitHub',
+        labelKey: 'webhook_trigger.preset_github',
         config: {
             verification: 'hmac_sha256',
             signature_header: 'X-Hub-Signature-256',
@@ -37,7 +38,7 @@ export const WEBHOOK_PRESETS: WebhookPreset[] = [
     },
     {
         value: 'header',
-        label: 'Secret in a header',
+        labelKey: 'webhook_trigger.preset_header',
         config: { verification: 'header_equals', signature_header: 'X-Webhook-Secret', response_mode: 'async' },
     },
 ]

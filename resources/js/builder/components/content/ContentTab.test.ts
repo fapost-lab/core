@@ -115,6 +115,21 @@ describe('ContentTab saving', () => {
         ])
     })
 
+    it('lists the answer buttons of a question to a person and writes a label back', async () => {
+        const {wrapper, builder} = setup([
+            {id: 'q1', type: 'ask_person', config: {text: {en: 'Approve?'}, buttons: [{id: 'b1', label: {en: 'Approve'}, value: 'ok'}, {id: 'b2', label: {en: 'Reject'}, value: 'no'}]}},
+        ])
+
+        expect(keys(wrapper)).toEqual(expect.arrayContaining(['Approve', 'Reject']))
+
+        await edit(wrapper, keys(wrapper).indexOf('Reject'), {en: 'Reject', uk: 'Відхилити'})
+
+        expect((builder.definition.nodes[0].config as {buttons: unknown[]}).buttons).toEqual([
+            {id: 'b1', label: {en: 'Approve'}, value: 'ok'},
+            {id: 'b2', label: {en: 'Reject', uk: 'Відхилити'}, value: 'no'},
+        ])
+    })
+
     it('writes a template parameter into parameter_values by its key and leaves the other keys', async () => {
         const {wrapper, builder} = setup([reference({parameter_values: {greeting: {en: 'Hello'}, delay: 'PT1H'}})])
 

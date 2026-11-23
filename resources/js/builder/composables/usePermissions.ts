@@ -1,5 +1,6 @@
 import { computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
+import { isAutomaticTrigger } from '@builder/utils/automaticTrigger'
 
 /**
  * The signed-in user's permission names, shared by the server on every Inertia page as `auth.permissions`
@@ -25,7 +26,7 @@ export function usePermissions() {
      * (anything else) only with the Manage automations permission. The tree and the graph both ask here.
      */
     function canRemoveTrigger(type: string): boolean {
-        return type === 'message' || can('manage_automations')
+        return !isAutomaticTrigger(type) || can('manage_automations')
     }
 
     return { can, canRemoveTrigger }

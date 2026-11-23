@@ -337,6 +337,7 @@ return [
             'event'    => 'Подія',
             'api'      => 'API',
         ],
+        'more_triggers'   => 'Інші діючі тригери: :count',
         'builder'         => 'Конструктор',
         'builder_named'   => 'Відкрити конструктор: :name',
         'actions_for'     => 'Дії: :name',
