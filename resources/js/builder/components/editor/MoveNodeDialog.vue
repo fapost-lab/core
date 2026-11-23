@@ -299,6 +299,9 @@ function contentSnippet(node: FlowNodeLike): string | null {
     if (node.type === 'call') {
         return typeof config.url === 'string' ? truncate(config.url) : null
     }
+    if (node.type === 'ask_person') {
+        return typeof config.timeout_seconds === 'number' ? `${config.timeout_seconds}s` : null
+    }
     if (node.type === 'start_flow') {
         const addressee = config.addressee as Record<string, unknown> | undefined
         return addressee && typeof addressee.contact === 'string' && addressee.contact !== '' ? truncate(addressee.contact) : null

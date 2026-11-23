@@ -73,6 +73,7 @@ use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\Events\QueuedFlowTriggerEventPublisher;
 use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
+use App\Domains\Flow\Handlers\AskPersonNodeHandler;
 use App\Domains\Flow\Handlers\AssignNodeHandler;
 use App\Domains\Flow\Handlers\AuthRequestNodeHandler;
 use App\Domains\Flow\Handlers\AuthRequestV2NodeHandler;
@@ -572,6 +573,14 @@ final class FlowServiceProvider extends ServiceProvider
             \App\Infrastructure\Flow\QueuedContactFlowStartDispatcher::class,
         );
         $this->app->bind(OperatorRequestTimeoutSchedulerInterface::class, QueuedOperatorRequestTimeoutScheduler::class);
+        $this->app->bind(
+            \App\Domains\Flow\Contracts\FlowQuestionsInterface::class,
+            \App\Domains\Flow\Services\FlowQuestions::class,
+        );
+        $this->app->bind(
+            \App\Domains\Flow\Contracts\FlowQuestionContinuationSchedulerInterface::class,
+            \App\Infrastructure\Flow\QueuedFlowQuestionContinuationScheduler::class,
+        );
         $this->app->bind(NodeUsageStatisticsInterface::class, NodeUsageStatisticsService::class);
         $this->app->bind(
             SubflowResumerInterface::class,
@@ -778,6 +787,7 @@ final class FlowServiceProvider extends ServiceProvider
         // Scoped, not singleton: the guard reads the per-request lock registry.
         $this->app->scoped(FlowExecutionGuardInterface::class, FlowExecutionGuard::class);
         $this->app->scoped(DelayedSessionResumer::class);
+        $this->app->scoped(\App\Domains\Flow\Orchestration\FlowQuestionResumer::class);
     }
 
     /**
@@ -809,6 +819,7 @@ final class FlowServiceProvider extends ServiceProvider
             LoopNodeHandler::class,
             LoopEndNodeHandler::class,
             RequestOperatorNodeHandler::class,
+            AskPersonNodeHandler::class,
             TemplateNodeHandler::class,
             TemplateOutputNodeHandler::class,
             WebhookResponseNodeHandler::class,

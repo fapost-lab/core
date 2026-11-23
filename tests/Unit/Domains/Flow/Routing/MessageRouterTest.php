@@ -23,7 +23,9 @@ use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
+use App\Domains\Flow\Contracts\FlowQuestionsInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
+use App\Domains\Flow\Enums\FlowQuestionPressOutcome;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\SessionLockLostException;
 use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
@@ -34,6 +36,7 @@ use App\Domains\Flow\Routing\MessageRouter;
 use App\Domains\Flow\Routing\SessionStateRouter;
 use App\Domains\Flow\Services\SegmentHandOff;
 use App\Domains\Flow\Support\CallbackDataCodec;
+use App\Domains\Flow\Support\FlowQuestionButton;
 use App\Domains\Flow\Support\OperatorRequestCancelButton;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
@@ -472,6 +475,70 @@ final class MessageRouterTest extends TestCase
         $this->assertSame('staff_handled', $outcome->reason);
     }
 
+    public function test_a_press_of_a_question_button_is_swallowed_before_the_operator_check_and_never_reaches_the_flow(): void
+    {
+        $token = str_repeat('ab', 16);
+
+        $questions = Mockery::mock(FlowQuestionsInterface::class);
+        $questions->shouldReceive('receivePress')
+            ->once()
+            ->with('contact-1', 'assistant-1', $token, 2, 'upd-1')
+            ->andReturn(FlowQuestionPressOutcome::NotOurs);
+
+        $ownership = Mockery::mock(ConversationOwnershipInterface::class);
+        $ownership->shouldNotReceive('isHandledByStaff');
+
+        $sessions = Mockery::mock(FlowSessionRepositoryInterface::class);
+        $sessions->shouldNotReceive('findActiveForContact');
+
+        $orchestrator = Mockery::mock(FlowOrchestratorInterface::class);
+        $orchestrator->shouldNotReceive('handle');
+
+        $router = $this->router(ownership: $ownership, sessions: $sessions, orchestrator: $orchestrator, questions: $questions);
+
+        $outcome = $router->route(
+            contact: $this->contact(),
+            message: $this->press(FlowQuestionButton::encode($token, 2)),
+            assistant: $this->assistant(),
+            channel: $this->channel(),
+        );
+
+        $this->assertTrue($outcome->wasDropped());
+        $this->assertSame('flow_question_answer', $outcome->reason);
+    }
+
+    public function test_typed_text_in_the_question_format_is_not_taken_for_a_press(): void
+    {
+        $questions = Mockery::mock(FlowQuestionsInterface::class);
+        $questions->shouldNotReceive('receivePress');
+
+        $ownership = Mockery::mock(ConversationOwnershipInterface::class);
+        $ownership->shouldReceive('isHandledByStaff')->once()->andReturn(true);
+
+        $router = $this->router(ownership: $ownership, questions: $questions);
+
+        $outcome = $router->route(
+            contact: $this->contact(),
+            message: $this->message(FlowQuestionButton::encode(str_repeat('ab', 16), 0)),
+            assistant: $this->assistant(),
+            channel: $this->channel(),
+        );
+
+        $this->assertSame('staff_handled', $outcome->reason);
+    }
+
+    private function press(string $payload): IncomingMessage
+    {
+        return new IncomingMessage(
+            updateId: 'upd-1',
+            externalUserId: 'ext-user',
+            externalChatId: 'ext-chat',
+            text: $payload,
+            type: IncomingMessageType::CallbackQuery,
+            platform: 'telegram',
+        );
+    }
+
     private function router(
         ?GlobalCommandExecutorInterface $commandExecutor = null,
         ?TypingIndicatorService $typing = null,
@@ -486,6 +553,7 @@ final class MessageRouterTest extends TestCase
         ?ConversationOwnershipInterface $ownership = null,
         ?DelayedSessionResumer $delayedResumer = null,
         ?OperatorRequestsInterface $operatorRequests = null,
+        ?FlowQuestionsInterface $questions = null,
     ): MessageRouter {
         // Use real CommandMatcher (final class). Built-ins include /reset and
         // /cancel — assistant.commands stays empty so no tenant overrides apply.
@@ -509,6 +577,7 @@ final class MessageRouterTest extends TestCase
             typingHeartbeat: new TypingHeartbeatRegistry(),
             delayedResumer: $delayedResumer ?? $this->noOpDelayedResumer(),
             operatorRequests: $operatorRequests ?? Mockery::mock(OperatorRequestsInterface::class)->shouldIgnoreMissing(),
+            questions: $questions ?? Mockery::mock(FlowQuestionsInterface::class),
         );
     }
 

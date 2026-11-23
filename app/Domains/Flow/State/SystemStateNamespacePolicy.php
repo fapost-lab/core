@@ -28,7 +28,7 @@ final class SystemStateNamespacePolicy
      * Node types allowed to write `system.*` keys (engine-owned markers:
      * sent-message ids, delay schedules, notify dispatch markers, input retry
      * counters, set_tag idempotency markers, the operator request a
-     * request_operator node waits for, the attempt and send counters of an
+     * request_operator node waits for, the question an ask_person node waits for, the attempt and send counters of an
      * auth_request challenge).
      */
     private const array SYSTEM_WRITERS = [
@@ -38,6 +38,7 @@ final class SystemStateNamespacePolicy
         'notify',
         'set_tag',
         'request_operator',
+        'ask_person',
         'auth_request',
     ];
 

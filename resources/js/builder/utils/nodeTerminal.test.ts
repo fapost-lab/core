@@ -17,3 +17,10 @@ describe('nodeMustBeLast', () => {
         expect(nodeMustBeLast({type: 'notify'})).toBe(false)
     })
 })
+
+describe('nodeMustBeLast ask_person', () => {
+    it('treats ask_person as always terminal', () => {
+        expect(nodeMustBeLast({type: 'ask_person'})).toBe(true)
+        expect(nodeMustBeLast({type: 'ask_person', config: {buttons: []}})).toBe(true)
+    })
+})

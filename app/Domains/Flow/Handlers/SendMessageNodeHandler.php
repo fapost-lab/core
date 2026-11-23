@@ -606,10 +606,14 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
             throw new InvalidNodeConfigException("send_message {$contentType->value} requires media_file_id.");
         }
 
-        foreach ($buttons as $button) {
+        foreach ($buttons as $index => $button) {
             if (! is_array($button) || ! Uuid::isValid((string)($button['id'] ?? ''))) {
                 throw new InvalidNodeConfigException('send_message buttons must contain stable UUID ids.');
             }
+
+            // A button's own payload is the sender's seam for `ask_person`; an author's config never sets it, so every
+            // send_message button keeps the session-and-button payload its press is routed by.
+            unset($buttons[$index]['callback_payload']);
         }
 
         $saveTo = is_string($config['save_to'] ?? null) && '' !== $config['save_to']
@@ -644,8 +648,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
     }
 
     /**
-     * The contact id the addressee's expression gives, rendered with the flow's engine; null when it gives none.
-     * Never the contact of the run: a missing id must not message somebody else.
+     * The contact id the addressee's expression gives ({@see AddresseeResolver::resolve()}); never the run's contact.
      *
      * @param  array{kind: string|null, contact: string, tags: list<string>, segment_id: string}  $addressee
      * @param  array<string, mixed>                                                               $state

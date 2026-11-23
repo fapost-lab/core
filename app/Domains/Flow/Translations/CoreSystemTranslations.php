@@ -147,6 +147,22 @@ final class CoreSystemTranslations
                 ],
             ),
 
+            // ── ask_person questions ─────────────────────────────────────────
+            new SystemTranslationEntry(
+                key: 'flow.ask_person.already_decided',
+                group: 'errors',
+                description: [
+                    'en' => 'Sent to a person who presses a button of an "Ask a person" question after it was decided, timed out or its flow ended, unless the node sets its own text.',
+                    'ru' => 'Отправляется человеку, который нажал кнопку вопроса узла «Спросить человека» после того, как решение принято, время вышло или поток завершился, если у узла нет своего текста.',
+                    'uk' => 'Надсилається людині, яка натиснула кнопку питання вузла «Запитати людину» після того, як рішення ухвалено, час вийшов або потік завершився, якщо вузол не має власного тексту.',
+                ],
+                defaults: [
+                    'en' => 'This has already been decided.',
+                    'ru' => 'Решение уже принято.',
+                    'uk' => 'Рішення вже ухвалено.',
+                ],
+            ),
+
             // ── Default service buttons ──────────────────────────────────────
             new SystemTranslationEntry(
                 key: 'buttons.yes',

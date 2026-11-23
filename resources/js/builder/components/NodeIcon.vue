@@ -127,6 +127,13 @@ const SHAPES: Record<string, string> = {
         <path d="M10 19a2 2 0 0 0 4 0" />
     `,
 
+    // ── ask_person — speech bubble with a question mark ──
+    ask_person: `
+        <path d="M5 5h14v10H11l-4 4v-4H5z" />
+        <path d="M10.2 9.2a1.8 1.8 0 1 1 2.4 1.7c-.4.2-.6.5-.6.9" />
+        <circle cx="12" cy="13.2" r=".6" fill="currentColor" stroke="none" />
+    `,
+
     // ── auth_request — shield with check ──
     auth_request: `
         <path d="M12 3.5l7 2.5v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9v-5z" />

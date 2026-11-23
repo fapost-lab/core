@@ -21,6 +21,7 @@ use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantAccessStates;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use App\Infrastructure\Solution\RunsSolutionJob;
+use App\Jobs\Flow\ContinueAfterFlowQuestionJob;
 use App\Jobs\Flow\ContinueAfterOperatorRequestJob;
 use App\Jobs\Flow\ContinueAutomationRunJob;
 use App\Jobs\Flow\DispatchFlowTriggerEventJob;
@@ -76,6 +77,7 @@ final class RuntimeJobAccessModeTest extends TestCase
         ResumeTimedOutSendMessageNodeJob::class,
         ExpireOperatorRequestJob::class,
         ContinueAfterOperatorRequestJob::class,
+        ContinueAfterFlowQuestionJob::class,
         NotifyOperatorRequestJob::class,
         RunBroadcastJob::class,
         SendBroadcastRecipientJob::class,

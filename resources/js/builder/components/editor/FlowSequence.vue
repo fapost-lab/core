@@ -12,6 +12,7 @@ import FlowConditionCard from './FlowConditionCard.vue'
 import FlowSendMessageCard from './FlowSendMessageCard.vue'
 import FlowSubflowCard from './FlowSubflowCard.vue'
 import FlowCallCard from './FlowCallCard.vue'
+import FlowAskPersonCard from './FlowAskPersonCard.vue'
 import FlowRequestOperatorCard from './FlowRequestOperatorCard.vue'
 import FlowStartFlowCard from './FlowStartFlowCard.vue'
 import FlowLoopCard from './FlowLoopCard.vue'
@@ -510,6 +511,12 @@ const trailingInsertContext = computed(() => {
                     />
                     <FlowCallCard
                         v-else-if="item.node.type === 'call'"
+                        :index="index + 1"
+                        :parent-branch="selectionStore.activeBranch"
+                        :tree-node="item"
+                    />
+                    <FlowAskPersonCard
+                        v-else-if="item.node.type === 'ask_person'"
                         :index="index + 1"
                         :parent-branch="selectionStore.activeBranch"
                         :tree-node="item"

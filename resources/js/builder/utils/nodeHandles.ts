@@ -71,6 +71,9 @@ export function nodeHandles(node: FlowNodeLike): NodeHandle[] {
     ]
   }
 
+  if (node.type === 'ask_person') {
+    return askPersonHandles(node)
+  }
   if (node.type === 'start_flow') {
     return [
       {handle: 'started',    label: 'Started'},
@@ -89,6 +92,18 @@ export function nodeHandles(node: FlowNodeLike): NodeHandle[] {
   }
 
   return [{handle: 'default', label: 'Next'}]
+}
+
+/** One exit per answer button (handle = button id), then the timeout and the error exits. */
+function askPersonHandles(node: FlowNodeLike): NodeHandle[] {
+  const config = (node.config ?? {}) as Record<string, unknown>
+  const buttons = Array.isArray(config.buttons) ? (config.buttons as Array<Record<string, unknown>>) : []
+  const answers = buttons.map((btn, idx) => ({
+    handle: String(btn.id ?? ''),
+    label: buttonLabel(btn) || `Button ${idx + 1}`,
+  })).filter((h) => h.handle !== '')
+
+  return [...answers, {handle: 'timeout', label: 'Timed out'}, {handle: 'error', label: 'Error'}]
 }
 
 function sendMessageHandles(node: FlowNodeLike): NodeHandle[] {

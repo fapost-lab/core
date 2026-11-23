@@ -392,6 +392,41 @@ final class ContactContextValidationTest extends FeatureTestCase
         }
     }
 
+    public function test_a_scheduled_flow_that_asks_a_person_is_published_and_a_broken_question_is_refused(): void
+    {
+        $approve = (string) Str::uuid();
+        $nodes   = [
+            ['id' => 'ask', 'type' => 'ask_person', 'version' => 1, 'config' => [
+                'addressee'       => ['kind' => 'contact', 'contact' => '{{flow.manager_id}}'],
+                'text'            => ['en' => 'Refund order {{flow.order_id}}?'],
+                'buttons'         => [['id' => $approve, 'label' => ['en' => 'Approve'], 'value' => 'approve']],
+                'timeout_seconds' => 3600,
+            ]],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [['id' => 'e1', 'from' => 'ask', 'to' => 'end', 'handle' => $approve]];
+
+        $scheduled = $this->draft($nodes, $edges);
+        $this->storeTrigger($scheduled, self::SCHEDULE);
+
+        $this->assertSame(1, $this->app->make(PublishFlowService::class)->execute($scheduled->flow_id)->version);
+
+        $broken = ['ask' => ['id' => 'ask', 'type' => 'ask_person', 'version' => 1, 'config' => [
+            'text'             => ['en' => 'Hi {{contact.name}}'],
+            'buttons'          => [],
+            'timeout_seconds'  => 10,
+            'save_to_variable' => ['name' => 'decision', 'type' => 'text', 'storage' => 'contact'],
+        ]]];
+
+        $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $broken, triggers: [self::SCHEDULE]);
+        $codes  = array_map(static fn ($error): string => "{$error->code}@{$error->path}", $result->errors);
+
+        $this->assertContains('addressee_required@nodes.ask.config.addressee.contact', $codes);
+        $this->assertContains('buttons_required@nodes.ask.config.buttons', $codes);
+        $this->assertContains('timeout_out_of_range@nodes.ask.config.timeout_seconds', $codes);
+        $this->assertNotEmpty(array_filter($codes, static fn (string $code): bool => str_starts_with($code, 'node_needs_contact@')));
+    }
+
     public function test_a_template_publish_that_puts_a_contact_node_into_a_scheduled_host_is_refused(): void
     {
         $template = FlowDraft::factory()->template()->create([

@@ -311,7 +311,8 @@ final readonly class FlowMessageSender implements MessageSenderInterface
 
     /**
      * The stored buttons of a node as a channel-neutral set, ordered by row, then by position in the row.
-     * An inline keyboard becomes callback buttons whose payload is the session and button ids; a reply keyboard
+     * An inline keyboard becomes callback buttons whose payload is the session and button ids — or the button's own
+     * `callback_payload` when the caller made one (an `ask_person` question's); a reply keyboard
      * becomes reply buttons, except those marked `special`, which ask the user to share a contact or a location.
      * A node without buttons gives no set: the message goes out as plain text.
      *
@@ -342,7 +343,9 @@ final readonly class FlowMessageSender implements MessageSenderInterface
                 KeyboardMode::Inline => new Button(
                     $label,
                     ButtonAction::Callback,
-                    CallbackDataCodec::encode($sessionId, (string)($button['id'] ?? '')),
+                    is_string($button['callback_payload'] ?? null) && '' !== $button['callback_payload']
+                        ? $button['callback_payload']
+                        : CallbackDataCodec::encode($sessionId, (string)($button['id'] ?? '')),
                 ),
                 KeyboardMode::Reply => new Button($label, match ($button['special'] ?? null) {
                     'request_contact'  => ButtonAction::ShareContact,

@@ -64,6 +64,9 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     // Human handoff — waits for an operator
     request_operator: { bg: 'var(--blue-bg)',       color: 'var(--blue)',       icon: '🙋' },
 
+    // Human in the loop — asks a person and waits for the pressed button
+    ask_person:    { bg: 'var(--blue-bg)',          color: 'var(--blue)',       icon: '🙋' },
+
     // Terminal
     end:           { bg: 'var(--rose-bg)',   color: 'var(--rose)',   icon: '🛑' },
 
