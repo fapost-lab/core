@@ -10,6 +10,7 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
+use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\SegmentHandOff;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -20,7 +21,9 @@ use Psr\Log\LoggerInterface;
  *
  * A start names the trigger and what fired it (the fire key: a schedule slot, an event id). Under the trigger's
  * lock it looks the run up by `(trigger_id, fire_key)`: a run already there is continued when it is still `active`
- * — the job that started it was killed or retried — and left alone otherwise; only a fire with no run starts one.
+ * — the job that started it was killed or retried — started when it is `pending` (a schedule creates its run when it
+ * claims the slot, {@see \App\Domains\Flow\Schedule\ScheduleTriggerFirer}), and left alone otherwise; only a fire
+ * with no run starts one.
  * The session row is committed before its first node runs, so a job killed at any point leaves a row its retry
  * continues rather than a second run.
  *
@@ -153,11 +156,16 @@ final readonly class AutomationRunner
     }
 
     /**
-     * A fire that already has a run: its `active` session is continued from its saved position; a run that is
-     * parked, ended or failed is not started again.
+     * A fire that already has a run: a `pending` run (created when the trigger claimed its fire, as a schedule does)
+     * becomes `active` and runs; an `active` session is continued from its saved position; a run that is parked, ended
+     * or failed is not started again.
      */
     private function continueFired(FlowSession $root): FlowSession
     {
+        if (FlowSessionStatus::Pending === $root->status) {
+            $this->engine->activate($root);
+        }
+
         $live = $this->handOff->liveSessionOf($root);
 
         if (null !== $live) {

@@ -22,7 +22,7 @@ Goal: a flow runs on a cron. Done when: reference automation 1 (a daily summary)
 and passes e2e, a tick is never run twice, and a trigger that overlaps itself is skipped visibly.
 
 - [x] Several triggers per flow, live on publish — stable trigger ids in the definition, sync by id, `UNIQUE(flow_id)` dropped, activation moved from draft save to publish for every trigger type
-- [ ] Schedule trigger — landlord registry of next fires, compare-and-set slot claim with the `pending` run in one transaction, skip-if-running on a `(tenant, trigger)` lock, no catch-up, jitter, DST semantics, one-minute floor (after: `flow-segmented-execution` — a scheduled run is a contactless run; after: Several triggers per flow, live on publish — `next_run_at` must survive a republish)
+- [x] Schedule trigger — landlord registry of next fires, compare-and-set slot claim with the `pending` run in one transaction, skip-if-running on a `(tenant, trigger)` lock, no catch-up, jitter, DST semantics, one-minute floor (after: `flow-segmented-execution` — a scheduled run is a contactless run; after: Several triggers per flow, live on publish — `next_run_at` must survive a republish)
 - [ ] Run rate breaker and quota seam — a Foundation "may this run start" contract and run counter for the SaaS shell, a Core breaker that pauses a trigger, a refusal counter and last reason on the trigger (after: Schedule trigger — the first trigger that fires on its own)
 
 ## Phase 3 — Credentials and permissions

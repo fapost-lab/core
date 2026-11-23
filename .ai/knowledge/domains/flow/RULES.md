@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-11-20
+reviewed_at: 2026-11-23
 ---
 # Flow rules
 
@@ -164,7 +164,8 @@ broken.
   step), and only the outermost call queues the continuation, after writing a new `segment_id` on the run's root
   session. A continuation runs only while the root carries its `segment_id`, and then runs the run's one `active`
   session (down the `paused_subflow` chain); a start runs only when `(trigger_id, fire_key)` has no run yet, and
-  otherwise continues the run's `active` session. Jobs on `flow.automations` keep their timeout below the connection's
+  otherwise continues the run's `active` session (a `pending` root, which a schedule creates when it claims its slot, is
+  activated first). Jobs on `flow.automations` keep their timeout below the connection's
   `retry_after`, and the seconds setting's maximum keeps a segment plus the slowest node under that timeout. Why: a
   second runner or a re-reserved job repeats `call` side effects in somebody else's system, silently
   (`adr-20261118-segmented-automation-runs`). Enforced: `AutomationRunTest`, `AutomationRunLockRedisTest`,
@@ -301,9 +302,11 @@ broken.
   means "not written yet", and the flow's live `flow_triggers` rows count (`FlowTriggerSet`), `[]` means none. A draft
   save writes only the list; `PublishFlowService` validates every trigger and syncs the rows by id
   (`FlowTriggerRepository::syncForFlow`), keeping `last_run_at`/`next_run_at` of a trigger whose type and config did
-  not change (compared ignoring key order: jsonb reorders keys) and resetting `next_run_at` when they did. A republish
-  by a template takes the list from the host's active definition, never its draft, and a `null` list leaves the rows
-  alone. Nothing writes `flow_triggers` outside this sync. Why: a draft edit must not change what runs, and a live
+  not change (compared ignoring key order: jsonb reorders keys) and resetting `next_run_at` when they did (an active
+  schedule then gets its first slot after now). A republish by a template takes the list from the host's active
+  definition, never its draft, and a `null` list leaves the rows alone. Nothing else writes a trigger's definition
+  columns; its run state (`next_run_at`, `last_run_at`) is written only by this sync, by `ScheduleTriggerFirer`'s slot
+  claim and by flow deletion, which clears a schedule's slot (`adr-20261123-flow-schedule-trigger`). Why: a draft edit must not change what runs, and a live
   trigger must survive the release that introduced the list (`adr-20261119-flow-triggers-in-definition-live-on-publish`).
   Enforced: `FlowTriggersPublishTest`, `SaveDraftServiceTest`, `FlowTemplatePublishTest`, `FlowTriggerSetTest`.
 - **An automatic trigger or a new credential reference goes live only with its own right.** Publishing a draft that
@@ -332,6 +335,20 @@ broken.
   the config is copied into every version and template, and a URL held by an outside system must stop working when its
   flow cannot be managed (`adr-20261119-flow-webhook-trigger`). Enforced: `FlowWebhookTriggerTest`,
   `FlowWebhookEndpointTest`, `FlowWebhookHostModeTest`, `WebhookTriggerConfigTest`, `RedisWebhookDeliveryDedupRedisTest`.
+- **A schedule claims its slot in the tenant, creates its run `pending` in the same transaction, and never catches
+  up.** `ScheduleTriggerFirer` moves `flow_triggers.next_run_at` from the slot it read to the next one by compare-and-set
+  and, in the same transaction, creates the run `pending` (`FlowEngineInterface::prepare()`, fire key
+  `schedule:<UTC minute>`, deadline written) or skips the slot: more than 5 minutes late (`flow.schedule.tick_missed`,
+  the next slot counted from now), the flow cannot run (`tick_skipped` `flow_not_live`), or a previous root run of the
+  trigger is `pending` or in flight (`tick_skipped` `previous_run_live`). The start job is queued after the commit and
+  `AutomationRunner` activates the `pending` run (`FlowEngineInterface::activate()`). `ScheduleClock` skips a local time a
+  daylight saving change removes and fires a repeated one once; a cron is five fields in an IANA zone
+  (`invalid_schedule_cron`, `invalid_schedule_timezone`). The landlord `flow_schedule_registry` is only an index of whom
+  to visit, written after the tenant's commit through `ScheduleRegistrySync` and rebuilt hourly
+  (`flow:rebuild-schedule-registry`); `flow:fire-scheduled-triggers` enters only the tenants it names, never a stopped
+  one. Why: no transaction spans landlord and a tenant schema, and a slot eaten without a run is a silent loss
+  (`adr-20261123-flow-schedule-trigger`). Enforced: `ScheduleTriggerFirerTest`, `ScheduleClockTest`,
+  `FireScheduledTriggersCommandTest`, `FlowTriggersPublishTest`.
 - **A webhook request waits for its flow only while it holds a wait slot, and never past 30 seconds.** A trigger in
   `response_mode: sync` holds the request through `WebhookSyncWait`, which first takes a slot of
   `WebhookWaitSlotsInterface` (`flow.webhook.sync_waiters_max` on the installation, `flow.webhook.sync_waiters_per_tenant`

@@ -126,6 +126,8 @@ use App\Domains\Flow\Routing\DropPolicy;
 use App\Domains\Flow\Routing\DropPolicyInterface;
 use App\Domains\Flow\Routing\MessageRouter;
 use App\Domains\Flow\Routing\SessionStateRouter;
+use App\Domains\Flow\Schedule\ScheduleRegistrySync;
+use App\Domains\Flow\Schedule\ScheduleTriggerFirer;
 use App\Domains\Flow\Services\AssistantTranslationService;
 use App\Domains\Flow\Services\FallbackMessageService;
 use App\Domains\Flow\Services\FlowEngine;
@@ -547,6 +549,8 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(SubflowTimeoutSweeper::class);
         $this->app->scoped(AutomationRunDeadline::class);
         $this->app->scoped(AutomationRunDeadlineSweeper::class);
+        $this->app->scoped(ScheduleTriggerFirer::class);
+        $this->app->scoped(ScheduleRegistrySync::class);
 
         $this->app->scoped(GlobalCommandExecutor::class);
         $this->app->scoped(

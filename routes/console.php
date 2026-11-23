@@ -11,6 +11,8 @@ Schedule::command('logs:create-partition')->monthlyOn(1, '00:00');
 Schedule::job(new CleanupSoftDeletedMediaJob())->dailyAt('03:30');
 Schedule::command('flow:sweep-subflow-timeouts')->everyMinute()->withoutOverlapping();
 Schedule::command('flow:sweep-overdue-automation-runs')->everyMinute()->withoutOverlapping();
+Schedule::command('flow:fire-scheduled-triggers')->everyMinute()->withoutOverlapping();
+Schedule::command('flow:rebuild-schedule-registry')->hourly()->withoutOverlapping();
 Schedule::command('support-access:prune')->dailyAt('03:45');
 Schedule::command('limit-refusals:prune')->dailyAt('04:00');
 Schedule::command('audit:prune')->dailyAt('04:15');

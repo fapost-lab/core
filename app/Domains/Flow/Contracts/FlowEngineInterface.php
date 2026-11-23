@@ -9,6 +9,7 @@ use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use Fapost\Foundation\DTO\IncomingMessage;
+use InvalidArgumentException;
 
 interface FlowEngineInterface
 {
@@ -68,7 +69,7 @@ interface FlowEngineInterface
      *
      * @param  array<string, mixed>  $initialState  Merged into session state after system bootstrap keys are set
      * @param  FlowRunOrigin|null  $origin  Run kind and trigger; defaults to a conversation with a contact and to an
-     *   automation without one. A conversation without a contact is refused with {@see \InvalidArgumentException}.
+     *   automation without one. A conversation without a contact is refused with {@see InvalidArgumentException}.
      */
     public function start(
         FlowDefinition $definition,
@@ -76,6 +77,28 @@ interface FlowEngineInterface
         array $initialState = [],
         ?FlowRunOrigin $origin = null,
     ): FlowSession;
+
+    /**
+     * Creates a contactless automation run at the definition's entry node without running it: the session is
+     * `pending`, with the run's deadline, trigger, fire key and state written as {@see start()} writes them, and no
+     * analytics event. It joins the caller's transaction, so a trigger can claim its fire and create the run
+     * atomically; the run starts later through {@see activate()}, and one whose start is lost stays visible to the
+     * deadline sweeper as `start_lost`.
+     *
+     * @param  array<string, mixed>  $initialState  Merged into session state after system bootstrap keys are set
+     *
+     * @throws InvalidArgumentException when {@code $origin} is not an automation run
+     */
+    public function prepare(FlowDefinition $definition, array $initialState, FlowRunOrigin $origin): FlowSession;
+
+    /**
+     * Moves a `pending` run to `active` (optimistic lock on its version) and records its `FlowStarted` event once, after
+     * commit; the caller then runs it with {@see runSession()}. A session that is no longer `pending` is left as it
+     * is.
+     *
+     * @return bool whether this call activated the session
+     */
+    public function activate(FlowSession $session): bool;
 
     /**
      * Loads the frozen graph via {@see FlowSession::$flow_definition_id} → {@see FlowDefinition::$id}

@@ -19,7 +19,7 @@ paths:
   - "tests/Feature/Domains/Tenancy/**"
   - tests/Unit/Architecture/WebhookArchitectureTest.php
   - app/Http/Middleware/ResolveTenantContext.php
-reviewed_at: 2026-10-15
+reviewed_at: 2026-11-23
 ---
 # Tenancy
 
@@ -27,7 +27,7 @@ reviewed_at: 2026-10-15
 
 Tenancy owns the tenant context: which tenant the current request or job runs for, and the
 switch of the PostgreSQL `search_path` to that tenant's schema. It owns the landlord data —
-the `tenants` table and the `webhook_registry` table on the `landlord` connection — provisions
+the `tenants` table, the `webhook_registry` table and the derived `flow_schedule_registry` (which tenants have a schedule due) on the `landlord` connection — provisions
 new tenants (schema, migrations, first admin), and keeps the Redis webhook cache consistent
 with the landlord table.
 
@@ -35,7 +35,7 @@ with the landlord table.
 
 - Every other domain depends on Tenancy. The intended surface is `app/Domains/Tenancy/Contracts`
   (`TenantContextInterface`, `TenantRepositoryInterface`, `WebhookRegistryReaderInterface`,
-  `WebhookRegistryWriterInterface`, …). Two concrete classes are also imported widely and act
+  `WebhookRegistryWriterInterface`, `FlowScheduleRegistryInterface`, …). Two concrete classes are also imported widely and act
   as de-facto API: `Services/TenantSwitcher` and `Settings/TenantSettings`.
 - Tenancy depends outward only through `Services/TenantProvisioningService`, which uses Staff
   (`User`, `UserStatus`, `AclBootstrapService`) and the Channels contract
@@ -52,7 +52,7 @@ with the landlord table.
 - Operator directory contract: `Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface` (public, read-only, in Foundation) is implemented by `Infrastructure/CoreTenantDirectory`: a paginated, searchable list of tenants plus `find`/`findMany`, exposing only id, slug, status, creation time and the tenant's URLs (never the schema name or `config`). This is how a package is given tenants to read; it takes ids as lowercase RFC 4122 ULIDs and treats any other form as naming no tenant.
 - Bindings: `app/Providers/DomainServiceProvider.php`. Tenant context, database manager,
   `CoreBootstrap` and `TenantSwitcher` are `scoped`; repository and resolver are `bind`; the
-  webhook registry reader and writer are `singleton`. The provider also installs the custom
+  webhook registry reader and writer and the schedule registry (`LandlordFlowScheduleRegistry`) are `singleton`. The provider also installs the custom
   pgsql connection resolver that makes schema switching possible.
 - HTTP: `tenancy.resolution` picks the mode. `single` (default): `Services/ConfigTenantResolver`
   serves the one tenant named by `tenancy.default_tenant_slug`. `host`:
