@@ -126,6 +126,7 @@ final readonly class ValidateFlowService
 
         $this->validateEndNodeOutgoingEdges($nodeMap, $edges, $errors);
         $this->validateSubflowTargetsAreNotTemplates($nodeMap, $errors);
+        $this->validateStartFlowTargets($nodeMap, $flowId, $assistantId, $errors);
         $this->validateSubflowPinnedVersionsExist($nodeMap, $errors);
         $this->validateSubflowCallGraph($flowId, $nodeMap, $errors);
         $this->validateNoNestedLoops($nodeMap, $edges, $errors);
@@ -839,6 +840,78 @@ final readonly class ValidateFlowService
                         message: "timeout '{$timeout}' is not a valid ISO 8601 duration.",
                     );
                 }
+            }
+        }
+    }
+
+    /**
+     * A `start_flow` node names its target literally, and the target is a flow (not a template) of the same assistant
+     * as this flow: its picker offers only those, so anything else is a hand-edited or stale id that would fail every
+     * run (`start_flow_target_unknown`). The assistant is the one given, else this flow's draft's; without either only
+     * the target's existence is checked. Skipped, like the subflow target checks, when the call-graph validator was not
+     * injected (legacy unit tests without a database).
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateStartFlowTargets(array $nodeMap, ?string $flowId, ?string $assistantId, array &$errors): void
+    {
+        $targets = [];
+
+        foreach ($nodeMap as $nodeId => $node) {
+            if (\App\Domains\Flow\Handlers\StartFlowNodeHandler::TYPE !== ($node['type'] ?? null)) {
+                continue;
+            }
+
+            $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+            $target = $config['flow_id'] ?? null;
+
+            if (! is_string($target) || '' === mb_trim($target)) {
+                continue; // the required-field check reports it
+            }
+
+            if (str_contains($target, '{{')) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "nodes.{$nodeId}.config.flow_id",
+                    code: 'start_flow_template_in_flow_id',
+                    message: 'flow_id must be a literal value, not a template expression.',
+                );
+
+                continue;
+            }
+
+            $targets[(string) $nodeId] = mb_trim($target);
+        }
+
+        if ([] === $targets || null === $this->callGraphValidator) {
+            return;
+        }
+
+        $owner = $assistantId;
+
+        if (null === $owner && null !== $flowId) {
+            $value = FlowDraft::query()->where('flow_id', $flowId)->value('assistant_id');
+            $owner = is_string($value) && '' !== $value ? $value : null;
+        }
+
+        $drafts = FlowDraft::query()
+            ->whereIn('flow_id', array_values(array_unique($targets)))
+            ->get(['flow_id', 'assistant_id', 'kind'])
+            ->keyBy('flow_id');
+
+        foreach ($targets as $nodeId => $target) {
+            $draft = $drafts->get($target);
+
+            $known = $draft instanceof FlowDraft
+                && FlowKind::Template !== $draft->kind
+                && (null === $owner || (string) $draft->assistant_id === $owner);
+
+            if (! $known) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "nodes.{$nodeId}.config.flow_id",
+                    code: 'start_flow_target_unknown',
+                    message: "start_flow target '{$target}' is not a flow of this flow's assistant.",
+                );
             }
         }
     }

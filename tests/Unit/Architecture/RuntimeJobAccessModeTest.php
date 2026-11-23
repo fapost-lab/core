@@ -29,6 +29,7 @@ use App\Jobs\Flow\ResumeDelayedFlowSessionJob;
 use App\Jobs\Flow\ResumeTimedOutSendMessageNodeJob;
 use App\Jobs\Flow\SendOneTimeCodeJob;
 use App\Jobs\Flow\StartAutomationRunJob;
+use App\Jobs\Flow\StartFlowForContactJob;
 use App\Jobs\Flow\StartFlowFromEventJob;
 use App\Jobs\Media\CleanupSoftDeletedMediaJob;
 use App\Jobs\Messaging\BroadcastSendJob;
@@ -65,6 +66,7 @@ final class RuntimeJobAccessModeTest extends TestCase
         IncomingMessageJob::class,
         DispatchFlowTriggerEventJob::class,
         StartFlowFromEventJob::class,
+        StartFlowForContactJob::class,
         StartAutomationRunJob::class,
         ContinueAutomationRunJob::class,
         SendContactNotificationJob::class,

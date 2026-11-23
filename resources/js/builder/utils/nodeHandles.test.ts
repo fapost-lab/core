@@ -46,3 +46,14 @@ describe('nodeHandles for auth_request', () => {
             .toEqual(['authenticated', 'failed'])
     })
 })
+
+describe('nodeHandles for start_flow', () => {
+    it('exposes started, busy, no_channel and error in order, and no default one', () => {
+        expect(nodeHandles({id: 's1', type: 'start_flow'})).toEqual([
+            {handle: 'started', label: 'Started'},
+            {handle: 'busy', label: 'Busy'},
+            {handle: 'no_channel', label: 'No channel'},
+            {handle: 'error', label: 'Error'},
+        ])
+    })
+})
