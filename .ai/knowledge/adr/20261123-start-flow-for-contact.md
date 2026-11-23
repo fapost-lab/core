@@ -52,7 +52,7 @@ repeated step would write to them twice — so the class was T4 and every rule b
   `FlowTriggerEventPublisherInterface::MAX_CHAIN_DEPTH` the node leaves by `error/chain_depth_exceeded`, so flows that
   start each other stop as event chains do.
 - **No new right**, as `send_message` with an addressee; the target's access policy is not applied, as for an event
-  start. Event starts are left as they are (follow-up task `flow-event-start-collisions`).
+  start. Event starts follow the same collision and once-only rules (amended 2026-11-23: `adr-20261123-event-start-collisions`; this line first said they were left as they were).
 
 ## Alternatives
 

@@ -6,6 +6,9 @@ namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
+use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
@@ -123,9 +126,13 @@ final class FlowSwitchGatesAutomaticStartsTest extends FeatureTestCase
     {
         [$draft, $triggerId] = $this->liveSchedule();
         $contact             = Contact::factory()->forTenant($this->tenantId)->create();
+        $this->reachable($contact);
         $this->switchOff($draft);
+        Log::spy();
 
         $this->runEventJob($draft, $triggerId, $contact, 'event-1');
+
+        Log::shouldHaveReceived('info')->with('flow.event.start_skipped_flow_off', Mockery::any())->once();
 
         $this->assertSame(0, FlowSession::query()->count());
         $this->assertSame([], $this->meter->units);
@@ -135,6 +142,26 @@ final class FlowSwitchGatesAutomaticStartsTest extends FeatureTestCase
         $this->runEventJob($draft, $triggerId, $contact, 'event-2');
 
         $this->assertSame(1, FlowSession::query()->count());
+    }
+
+    /**
+     * Gives the contact a channel on an active channel of the assistant, as an event start needs.
+     */
+    private function reachable(Contact $contact): void
+    {
+        $channel = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $this->assistant->getKey(),
+            'tenant_id'    => $this->tenantId,
+            'type'         => ChannelTypeEnum::Telegram,
+            'token'        => 'bot-token',
+            'is_active'    => true,
+        ]));
+
+        ChannelContact::query()->create([
+            'contact_id'          => $contact->getKey(),
+            'channel_id'          => $channel->getKey(),
+            'last_interaction_at' => now(),
+        ]);
     }
 
     private function switchOff(FlowDraft $draft): void

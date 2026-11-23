@@ -72,7 +72,7 @@ final class StartFlowNodeHandler extends AbstractVersionedHandler implements Dec
 
     public const string BUSY_WINDOW_FIELD = 'busy_window_minutes';
 
-    public const int DEFAULT_BUSY_WINDOW_MINUTES = 30;
+    public const int DEFAULT_BUSY_WINDOW_MINUTES = ContactFlowStartCollision::DEFAULT_BUSY_WINDOW_MINUTES;
 
     public const int MAX_BUSY_WINDOW_MINUTES = 1440;
 

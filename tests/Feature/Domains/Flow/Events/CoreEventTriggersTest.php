@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow\Events;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
+use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Enums\FlowRunKind;
@@ -134,6 +137,7 @@ final class CoreEventTriggersTest extends FeatureTestCase
             $this->end(),
         ]);
         $this->trigger($this->endFlow(), CoreEventCatalog::CONTACT_TAG_ADDED, null);
+        $this->reachable($assistant, $contact);
 
         $job = new StartFlowFromEventJob(self::TENANT_ID, $flowId, (string) $assistant->getKey(), (string) $contact->getKey(), [], 'orders.paid', 2);
         $this->app->call([$job, 'handle']);
@@ -151,6 +155,7 @@ final class CoreEventTriggersTest extends FeatureTestCase
         $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
         $contact   = Contact::factory()->forTenant(self::TENANT_ID)->create();
         $flowId    = $this->flow([$this->emit('emit-1', 'loop.ping'), $this->end()]);
+        $this->reachable($assistant, $contact);
 
         foreach ([3, FlowTriggerEventPublisherInterface::MAX_CHAIN_DEPTH] as $depth) {
             $job = new StartFlowFromEventJob(self::TENANT_ID, $flowId, (string) $assistant->getKey(), (string) $contact->getKey(), [], 'loop.ping', $depth);
@@ -238,6 +243,26 @@ final class CoreEventTriggersTest extends FeatureTestCase
         }
 
         return $job;
+    }
+
+    /**
+     * Gives the contact a channel on an active channel of the assistant: an event starts nothing for a contact without one.
+     */
+    private function reachable(Assistant $assistant, Contact $contact): void
+    {
+        $channel = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->getKey(),
+            'tenant_id'    => self::TENANT_ID,
+            'type'         => ChannelTypeEnum::Telegram,
+            'token'        => 'bot-token',
+            'is_active'    => true,
+        ]));
+
+        ChannelContact::query()->create([
+            'contact_id'          => $contact->getKey(),
+            'channel_id'          => $channel->getKey(),
+            'last_interaction_at' => now(),
+        ]);
     }
 
     private function trigger(string $flowId, string $eventName, ?string $assistantId): FlowTrigger
