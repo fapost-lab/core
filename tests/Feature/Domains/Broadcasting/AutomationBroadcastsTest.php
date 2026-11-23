@@ -73,7 +73,8 @@ final class AutomationBroadcastsTest extends FeatureTestCase
 
         foreach ([['status' => 'running', 'origin_key' => 'key-2'], ['status' => 'completed', 'origin_key' => 'key-1']] as $attributes) {
             try {
-                Broadcast::query()->create([...$row, ...$attributes, 'origin' => 'automation']);
+                // A savepoint: on Postgres a refused statement aborts the surrounding transaction.
+                Broadcast::query()->getConnection()->transaction(static fn () => Broadcast::query()->create([...$row, ...$attributes, 'origin' => 'automation']));
                 $this->fail('the insert should have been refused: ' . json_encode($attributes));
             } catch (UniqueConstraintViolationException) {
                 $this->addToAssertionCount(1);

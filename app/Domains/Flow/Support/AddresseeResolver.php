@@ -104,6 +104,24 @@ final readonly class AddresseeResolver
     }
 
     /**
+     * The contact id the addressee's expression gives, lower-cased; null when it gives none or the kind is unknown.
+     *
+     * @param  array{kind: string|null, contact: string}  $addressee
+     * @param  array<string, mixed>                       $state
+     */
+    public function resolve(array $addressee, NodeExecutionContext $context, array $state): ?string
+    {
+        if (self::KIND_CONTACT !== $addressee['kind']) {
+            return null;
+        }
+
+        $rendered = $this->templates->render($addressee['contact'], $context, $state);
+        $id       = is_scalar($rendered) ? mb_trim((string) $rendered) : '';
+
+        return Uuid::isValid($id) ? mb_strtolower($id) : null;
+    }
+
+    /**
      * The distinct, trimmed, non-empty tags, in order.
      *
      * @return list<string>
@@ -125,23 +143,5 @@ final readonly class AddresseeResolver
         }
 
         return $tags;
-    }
-
-    /**
-     * The contact id the addressee's expression gives, lower-cased; null when it gives none or the kind is unknown.
-     *
-     * @param  array{kind: string|null, contact: string}  $addressee
-     * @param  array<string, mixed>                       $state
-     */
-    public function resolve(array $addressee, NodeExecutionContext $context, array $state): ?string
-    {
-        if (self::KIND_CONTACT !== $addressee['kind']) {
-            return null;
-        }
-
-        $rendered = $this->templates->render($addressee['contact'], $context, $state);
-        $id       = is_scalar($rendered) ? mb_trim((string) $rendered) : '';
-
-        return Uuid::isValid($id) ? mb_strtolower($id) : null;
     }
 }
