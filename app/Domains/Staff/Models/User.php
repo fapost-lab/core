@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Staff\Models;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Staff\Enums\BuilderMode;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
 use Database\Factories\UserFactory;
@@ -71,6 +72,8 @@ use Spatie\Permission\Traits\HasRoles;
  *                   $pinned_applications
  * @property list<string>|null
  *                   $onboarding_checklist_hidden
+ * @property BuilderMode|null
+ *                   $builder_mode
  * @property bool
  *                   $is_active
  * @property bool
@@ -242,6 +245,8 @@ final class User extends Authenticatable implements HasLocalePreference
             'pinned_applications' => 'array',
             // The setup checklist the user hid: the step keys registered at that moment; `null` until they hide it.
             'onboarding_checklist_hidden' => 'array',
+            // The flow builder layout the user chose; `null` until the user switches.
+            'builder_mode' => BuilderMode::class,
         ];
     }
 }

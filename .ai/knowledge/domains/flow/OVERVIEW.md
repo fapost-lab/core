@@ -91,7 +91,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   (5) `FlowOrchestrator::handle()`; (6) cleanup. A lock miss sends the busy reply and returns
   `RoutingOutcome::dropped('lock_timeout')`; `engine_lock_timeout` and `lock_lost` come from the
   orchestrator. Entry points that bypass the router (`DelayedSessionResumer`,
-  `ResumeTimedOutSendMessageNodeJob`, `StartFlowFromEventJob`) take the same lock through
+  `ResumeTimedOutSendMessageNodeJob`, `StartFlowFromEventJob`, `StartFlowForContactJob`) take the same lock through
   `FlowExecutionGuard::run()` / `runInScope()`; a contactless automation run takes its trigger's lock
   (`LockScope::ofSession()`).
 - Automation runs: `AutomationRunner` starts a run once per `(trigger_id, fire_key)` under the trigger lock and runs
@@ -100,6 +100,13 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   `flow.automations`) (`adr-20261118-segmented-automation-runs`). A failed root run is re-run from the start by
   `Services/AutomationRunRerunService` from the sessions screen: the trigger payload kept on the row, the same start
   job, a `rerun:` fire key (`Orchestration/RerunFireKey`) (`adr-20261123-rerun-from-start-keeps-trigger-payload`).
+  `flow.automations`) (`adr-20261118-segmented-automation-runs`).
+- Starting a flow for a contact: the `start_flow` node (`Handlers/StartFlowNodeHandler`) checks the addressee, the
+  target's active definition, the contact's channel on the target's bot (`Services/ContactChannelProbe`), the chain
+  depth and the collision (`Services/ContactFlowStartCollision`), then queues `StartFlowForContactJob`
+  (`scheduled.triggers`) through `ContactFlowStartDispatcherInterface`; the job re-checks under the contact's lock,
+  ends stale conversations (`Services/FlowSessionTerminator`, shared with the global commands) and calls
+  `FlowEngine::start()` with a unique `start_key` (`adr-20261123-start-flow-for-contact`).
 - Engine navigation: `FlowSessionPersister::persist()` maps results to session columns (`Executed` →
   next node or completed, `Waiting` → `waiting_input`, `Delayed` → `paused` when it carries `resumeAt`, else `waiting_input`, `Failed`, `Finished`), `persistEnd()` closes
   the session with an `end_status`; all writes use the optimistic lock on `flow_sessions.version`.

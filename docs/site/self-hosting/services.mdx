@@ -30,7 +30,7 @@ supervisors by priority:
 | Supervisor | Queues                                                     | Priority |
 |------------|------------------------------------------------------------|----------|
 | `high`     | `flow.execution`, `messaging.transactional`                 | Inbound processing and live replies |
-| `medium`   | `sync.external`, `scheduled.triggers`                       | Integrations and scheduled fan-out |
+| `medium`   | `sync.external`, `scheduled.triggers`                       | Integrations, scheduled fan-out and flows started for a contact |
 | `automations` | `flow.automations`                                       | Flows started by a trigger, one execution segment per job |
 | `low`      | `messaging.broadcast`, `messaging.system`, `messaging.logging` | Bulk sends and bookkeeping, niced down |
 | `default`  | `default`                                                   | Anything unclassified |

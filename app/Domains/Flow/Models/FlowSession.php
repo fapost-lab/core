@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null         $trigger_id    the trigger that fired the run; no foreign key
  * @property string|null         $fire_key      what fired the trigger (a slot, an event id); unique with trigger_id
  * @property array<string, mixed>|null $trigger_payload the exact initial state a root automation run started with; null for conversations and subflow children
+ * @property string|null         $start_key     the start a `start_flow` node queued (its execution key and node id); unique
  * @property int                 $step_count    steps of an automation session outside loop bodies, over all its segments (capped by flow.execution.max_iterations)
  * @property int                 $loop_step_count steps of an automation session inside loop bodies, over all its segments (with step_count, capped by StepBudget::ceiling())
  * @property int                 $loop_iteration_step_count steps of an automation session in its current loop iteration, since the last loop_end, over all its segments (capped by flow.execution.max_iterations); 0 outside a loop body
@@ -83,6 +84,7 @@ final class FlowSession extends BaseModel
         'trigger_id',
         'fire_key',
         'trigger_payload',
+        'start_key',
         'step_count',
         'loop_step_count',
         'loop_iteration_step_count',

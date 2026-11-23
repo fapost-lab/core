@@ -20,6 +20,7 @@ use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use App\Jobs\Flow\DispatchFlowTriggerEventJob;
 use App\Jobs\Flow\ResumeDelayedFlowSessionJob;
 use App\Jobs\Flow\ResumeTimedOutSendMessageNodeJob;
+use App\Jobs\Flow\StartFlowForContactJob;
 use App\Jobs\Flow\StartFlowFromEventJob;
 use App\Jobs\Media\CleanupSoftDeletedMediaJob;
 use App\Jobs\Messaging\BroadcastSendJob;
@@ -66,12 +67,13 @@ final class StoppedTenantRuntimeTest extends FeatureTestCase
         $tenant = self::TENANT_ID;
 
         return [
-            'event dispatch'       => [DispatchFlowTriggerEventJob::class, static fn (): object => new DispatchFlowTriggerEventJob($tenant, 'employee_registered', [], [])],
-            'flow start by event'  => [StartFlowFromEventJob::class, static fn (): object => new StartFlowFromEventJob($tenant, 'flow-1', 'assistant-1', 'contact-1', [], 'employee_registered')],
-            'broadcast recipient'  => [SendBroadcastRecipientJob::class, static fn (): object => new SendBroadcastRecipientJob($tenant, 'recipient-1')],
-            'contact notification' => [SendContactNotificationJob::class, static fn (): object => new SendContactNotificationJob($tenant, 'assistant-1', 'tag', ['vip'], 'Hi', 'session-1', 'node-1')],
-            'staff notification'   => [SendStaffNotificationJob::class, static fn (): object => new SendStaffNotificationJob($tenant, 'session-1', 'node-1', [], ['email'], 'Hi')],
-            'contact message'      => [BroadcastSendJob::class, static fn (): object => new BroadcastSendJob(new OutboundMessage(
+            'event dispatch'         => [DispatchFlowTriggerEventJob::class, static fn (): object => new DispatchFlowTriggerEventJob($tenant, 'employee_registered', [], [])],
+            'flow start by event'    => [StartFlowFromEventJob::class, static fn (): object => new StartFlowFromEventJob($tenant, 'flow-1', 'assistant-1', 'contact-1', [], 'employee_registered')],
+            'flow start for contact' => [StartFlowForContactJob::class, static fn (): object => new StartFlowForContactJob($tenant, 'flow-1', 'contact-1', [], 'exec-1:node-1', 1, 30)],
+            'broadcast recipient'    => [SendBroadcastRecipientJob::class, static fn (): object => new SendBroadcastRecipientJob($tenant, 'recipient-1')],
+            'contact notification'   => [SendContactNotificationJob::class, static fn (): object => new SendContactNotificationJob($tenant, 'assistant-1', 'tag', ['vip'], 'Hi', 'session-1', 'node-1')],
+            'staff notification'     => [SendStaffNotificationJob::class, static fn (): object => new SendStaffNotificationJob($tenant, 'session-1', 'node-1', [], ['email'], 'Hi')],
+            'contact message'        => [BroadcastSendJob::class, static fn (): object => new BroadcastSendJob(new OutboundMessage(
                 idempotencyKey: 'idem-1',
                 tenantId: $tenant,
                 channelId: 'channel-1',

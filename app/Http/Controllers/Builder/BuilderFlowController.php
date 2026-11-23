@@ -14,6 +14,8 @@ use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Services\SaveDraftService;
 use App\Domains\Flow\Services\ValidateFlowService;
 use App\Domains\Flow\Templates\TemplateExpander;
+use App\Domains\Staff\Enums\BuilderMode;
+use App\Domains\Staff\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\RefuseWritesWhenTenantStopped;
 use App\Http\Requests\SaveDraftRequest;
@@ -37,6 +39,8 @@ final class BuilderFlowController extends Controller
 
         $dto = $service->execute(flowId: $flow);
 
+        $user = $request->user();
+
         return Inertia::render('FlowBuilder/FlowEditor', [
             'flow' => [
                 'flowId'              => $dto->flowId,
@@ -56,7 +60,8 @@ final class BuilderFlowController extends Controller
                 'availableTemplates'  => $dto->availableTemplates,
                 'usedBy'              => $dto->usedBy,
                 'webhookEndpoints'    => (object) $dto->webhookEndpoints,
-                'readOnly'            => $writeGuard->refusesWritesFor($request->user()),
+                'readOnly'            => $writeGuard->refusesWritesFor($user),
+                'builderMode'         => ($user instanceof User ? $user->builder_mode : null)?->value ?? BuilderMode::Tree->value,
             ],
             'backUrl' => route('template' === $dto->kind ? 'console.flow-templates.index' : 'console.flows.index', ['assistant' => $dto->assistantId]),
         ]);

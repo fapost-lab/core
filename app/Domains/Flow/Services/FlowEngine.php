@@ -139,6 +139,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             'trigger_payload'   => null !== $origin->fireKey ? $initialState : null,
             'deadline_at'       => $deadlineAt,
             'event_chain_depth' => $origin->chainDepth,
+            'start_key'         => $origin->startKey,
             'version'           => 1,
         ]));
 
