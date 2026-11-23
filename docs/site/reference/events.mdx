@@ -18,6 +18,19 @@ emits does not wait for whatever consumes the event. A flow started by such an
 event runs for the contact whose conversation emitted it; an event emitted by a
 flow without a contact starts nothing.
 
+Such a start never cuts into a conversation, and it happens once per event and
+trigger, however often its job is retried. It starts nothing when an operator
+handles the contact's thread or the thread waits for one, when the contact has no
+channel on an active channel of the trigger's assistant, when the contact's
+conversation with that assistant moved in the last 30 minutes or sleeps in a
+`delay`, or when that conversation is the one that emitted the event and is still
+going — to hand the contact over to the started flow, end the emitting flow after
+`emit_event`. A conversation with that assistant that has not moved for longer is
+ended first, as `/reset` ends one, so the contact never has two live conversations
+with one assistant. A skipped start is written to the log
+(`flow.event.start_skipped_busy`, `flow.event.start_skipped_no_channel`), and it
+is not counted against the plan's runs.
+
 An event trigger on a flow event can be limited to events from chosen assistants
 (**Only from assistants** in the builder, `assistant_filter` in the trigger's
 settings): the flow then starts only on events emitted by flows that ran for one of

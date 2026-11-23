@@ -359,8 +359,12 @@ broken.
   that conversation; an older live conversation is ended by `FlowSessionTerminator` before the start. The node's
   check is advisory, the job's under the lock holds. The started session is one event-chain level deeper than the run
   (`chain_depth_exceeded` past `MAX_CHAIN_DEPTH`). Why: the person did not ask for the message, a sent message cannot
-  be taken back, and a repeat would write to them twice (`adr-20261123-start-flow-for-contact`). Enforced:
-  `StartFlowForContactTest`, `ContactContextValidationTest`.
+  be taken back, and a repeat would write to them twice (`adr-20261123-start-flow-for-contact`). A flow event's start
+  (`StartFlowFromEventJob`) keeps the same rules on the trigger's assistant: its start key is `event:` + a hash of the
+  trigger id and the event id (else the queue job's uuid), the emitting session (`source.session_id`, passed by
+  `DispatchFlowTriggerEventJob`) is the asking one, and the window is fixed at
+  `ContactFlowStartCollision::DEFAULT_BUSY_WINDOW_MINUTES` (`adr-20261123-event-start-collisions`). Enforced:
+  `StartFlowForContactTest`, `ContactContextValidationTest`, `StartFlowFromEventJobTest`.
 - **A trigger goes live only on publish, and its id is its row's primary key.** A flow's triggers are a list
   `{id, type, is_active, priority, config}` in `flow_drafts.triggers` and `flow_definitions.triggers`; `null` there
   means "not written yet", and the flow's live `flow_triggers` rows count (`FlowTriggerSet`), `[]` means none. A draft
@@ -436,7 +440,9 @@ broken.
   `ScheduleTriggerFirer`'s claim before `prepare()` — asks `TriggerRunAdmission` in this order: a paused trigger
   (`trigger_paused`), the run rate breaker (`flow.automations.runs_per_trigger_per_minute` runs a minute per tenant and
   trigger; over it `rate_breaker` and the trigger is paused), the plan's `flow_runs` through `PeriodQuota`
-  (`plan_limit`). A retry or continuation of a fire that has a run is never asked; a message trigger never is. The
+  (`plan_limit`). A retry or continuation of a fire that has a run is never asked; a message trigger never is.
+  `StartFlowFromEventJob` asks under the contact's lock, after its start key, channel and collision checks, so a start
+  skipped for a busy or unreachable contact is never metered (`adr-20261123-event-start-collisions`). The
   meter's unit key is a hash of the trigger and what fired it, never the fire key. A refusal starts nothing and is
   counted on `flow_trigger_states`; the pause lives there too, written only through
   `FlowTriggerStateRepositoryInterface`, never on `flow_triggers`, and a publish never lifts it. A webhook to a paused

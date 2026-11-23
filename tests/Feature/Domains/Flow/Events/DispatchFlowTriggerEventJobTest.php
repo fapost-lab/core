@@ -49,7 +49,7 @@ final class DispatchFlowTriggerEventJobTest extends FeatureTestCase
         );
     }
 
-    public function test_each_start_carries_its_trigger_and_the_event_id_for_run_admission(): void
+    public function test_each_start_carries_its_trigger_the_event_id_and_the_emitting_session(): void
     {
         Bus::fake();
 
@@ -60,7 +60,9 @@ final class DispatchFlowTriggerEventJobTest extends FeatureTestCase
 
         Bus::assertDispatched(
             StartFlowFromEventJob::class,
-            static fn (StartFlowFromEventJob $start): bool => $start->triggerId === $trigger->id && 'event-42' === $start->eventId,
+            static fn (StartFlowFromEventJob $start): bool => $start->triggerId === $trigger->id
+                && 'event-42' === $start->eventId
+                && 'sess-1' === $start->sourceSessionId,
         );
     }
 

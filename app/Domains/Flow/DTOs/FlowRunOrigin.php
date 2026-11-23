@@ -21,15 +21,15 @@ use InvalidArgumentException;
  * The chain depth is how deep in a chain of events the run starts: 0 when no event started it, n when an event of depth
  * n did ({@see \App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface::MAX_CHAIN_DEPTH}).
  *
- * The start key exists only on a conversation a `start_flow` node started: `flow_sessions.start_key` is unique, so that
- * start happens once however often its step or job repeats.
+ * The start key exists only on a conversation a `start_flow` node or a flow event's trigger started:
+ * `flow_sessions.start_key` is unique, so that start happens once however often its step or job repeats.
  */
 final readonly class FlowRunOrigin
 {
     /** The length of `flow_sessions.fire_key`; a trigger hashes a longer id of its own before it starts a run. */
     public const int MAX_FIRE_KEY_LENGTH = 191;
 
-    /** The length of `flow_sessions.start_key`; a `start_flow` node hashes a longer key before it queues a start. */
+    /** The length of `flow_sessions.start_key`; a longer key is hashed before the start is queued. */
     public const int MAX_START_KEY_LENGTH = 191;
 
     public function __construct(

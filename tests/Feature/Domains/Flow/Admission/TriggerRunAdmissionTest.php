@@ -6,12 +6,17 @@ namespace Tests\Feature\Domains\Flow\Admission;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
+use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Admission\RefusalReason;
 use App\Domains\Flow\Admission\TriggerPauseService;
 use App\Domains\Flow\Admission\TriggerRateBreaker;
 use App\Domains\Flow\Admission\TriggerRunAdmission;
 use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
+use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
@@ -198,11 +203,13 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
         [$draft, $triggerId] = $this->liveSchedule();
         $contact             = Contact::factory()->forTenant($this->tenantId)->create();
 
+        $this->reachable($contact);
+
         $this->runEventJob($draft, $triggerId, $contact, 'event-1');
         $this->runEventJob($draft, $triggerId, $contact, 'event-1');
 
-        $this->assertCount(2, $meter->units);
-        $this->assertSame($meter->units[0]->unitKey, $meter->units[1]->unitKey, 'A retry of the same event is the same unit.');
+        $this->assertCount(1, $meter->units, 'A retry of a started event starts nothing and is not asked again.');
+        $this->assertSame(1, FlowSession::query()->where('contact_id', $contact->getKey())->count());
 
         $this->app->make(FlowTriggerStateRepositoryInterface::class)->pause($triggerId, RefusalReason::RateBreaker, CarbonImmutable::now());
         $before = FlowSession::query()->count();
@@ -211,6 +218,35 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
 
         $this->assertSame($before, FlowSession::query()->count(), 'A paused trigger starts nothing for a flow event.');
         $this->assertSame(RefusalReason::TriggerPaused, $this->state($triggerId)->last_refusal_reason);
+    }
+
+    public function test_a_flow_events_start_skipped_for_a_busy_contact_is_not_metered(): void
+    {
+        $meter               = $this->meter(FakeUsageMeter::allowing());
+        [$draft, $triggerId] = $this->liveSchedule();
+        $contact             = Contact::factory()->forTenant($this->tenantId)->create();
+        $this->reachable($contact);
+        $this->liveConversation($draft, $contact, Carbon::now()->subMinutes(5));
+
+        $this->runEventJob($draft, $triggerId, $contact, 'event-1');
+
+        $this->assertSame([], $meter->units);
+        $this->assertSame(1, FlowSession::query()->where('contact_id', $contact->getKey())->count());
+    }
+
+    public function test_a_flow_events_start_refused_by_admission_ends_no_conversation(): void
+    {
+        $this->meter(FakeUsageMeter::denying());
+        [$draft, $triggerId] = $this->liveSchedule();
+        $contact             = Contact::factory()->forTenant($this->tenantId)->create();
+        $this->reachable($contact);
+        $stale = $this->liveConversation($draft, $contact, Carbon::now()->subHours(2));
+
+        $this->runEventJob($draft, $triggerId, $contact, 'event-1');
+
+        $this->assertSame(FlowSessionStatus::WaitingInput, $stale->refresh()->status);
+        $this->assertSame(1, FlowSession::query()->where('contact_id', $contact->getKey())->count());
+        $this->assertSame(RefusalReason::PlanLimit, $this->state($triggerId)->last_refusal_reason);
     }
 
     public function test_a_schedule_slot_refused_by_admission_is_spent_without_a_run(): void
@@ -334,6 +370,44 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
      *
      * @return array{FlowDraft, string}
      */
+    private function reachable(Contact $contact): void
+    {
+        $channel = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $this->assistant->getKey(),
+            'tenant_id'    => $this->tenantId,
+            'type'         => ChannelTypeEnum::Telegram,
+            'token'        => 'bot-token',
+            'is_active'    => true,
+        ]));
+
+        ChannelContact::query()->create([
+            'contact_id'          => $contact->getKey(),
+            'channel_id'          => $channel->getKey(),
+            'last_interaction_at' => now(),
+        ]);
+    }
+
+    private function liveConversation(FlowDraft $draft, Contact $contact, Carbon $updatedAt): FlowSession
+    {
+        $definition = FlowDefinition::query()->where('flow_id', $draft->flow_id)->where('is_active', true)->sole();
+
+        $session = FlowSession::query()->create([
+            'tenant_id'          => $this->tenantId,
+            'assistant_id'       => $this->assistant->getKey(),
+            'contact_id'         => $contact->getKey(),
+            'flow_definition_id' => $definition->getKey(),
+            'flow_version'       => $definition->version,
+            'current_node_id'    => 'end',
+            'state'              => [],
+            'status'             => FlowSessionStatus::WaitingInput,
+            'version'            => 1,
+        ]);
+
+        FlowSession::query()->whereKey($session->getKey())->update(['updated_at' => $updatedAt]);
+
+        return $session->refresh();
+    }
+
     private function liveSchedule(string $cron = '0 9 * * *'): array
     {
         $triggerId = mb_strtolower(Str::ulid()->toRfc4122());

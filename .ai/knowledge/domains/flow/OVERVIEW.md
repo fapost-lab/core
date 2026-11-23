@@ -144,7 +144,9 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   store) for the `webhook_response` node's answer or the run's end (`Webhook/WebhookRunEndReply`, called by `FlowEngine`).
   The builder makes the URL and the secret through `Webhook/FlowWebhookEndpointService`
   (`adr-20261119-flow-webhook-trigger`).
-- Events: `StartFlowFromEventJob` (queue `scheduled.triggers`) and `DispatchFlowTriggerEventJob`. Schedules:
+- Events: `StartFlowFromEventJob` (queue `scheduled.triggers`) and `DispatchFlowTriggerEventJob`; a flow event's start
+  takes the `start_flow` collision and once-only rules (`event:` start key, the emitting session as the asking one,
+  `adr-20261123-event-start-collisions`). Schedules:
   `Schedule/ScheduleTriggerFirer` claims due slots (run by `flow:fire-scheduled-triggers`), `Schedule/ScheduleClock`
   computes slots, `Schedule/ScheduleRegistrySync` copies `next_run_at` to the landlord registry after commit; the runs
   start through `StartAutomationRunJob` on `flow.automations`. Timeouts: `ResumeTimedOutSendMessageNodeJob`.
