@@ -132,6 +132,7 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
                 'webhook_response_invalid_status',
                 'The response status must be a whole number from ' . WebhookReply::MIN_STATUS . ' to ' . WebhookReply::MAX_NODE_STATUS . '.',
                 'status',
+                ['min' => WebhookReply::MIN_STATUS, 'max' => WebhookReply::MAX_NODE_STATUS],
             );
         }
 

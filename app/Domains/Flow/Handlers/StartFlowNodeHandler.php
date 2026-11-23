@@ -213,6 +213,7 @@ final class StartFlowNodeHandler extends AbstractVersionedHandler implements Dec
                 'addressee_kind_unknown',
                 "The addressee kind '{$addressee['kind']}' is not supported; use 'contact'.",
                 'addressee.kind',
+                ['kind' => (string) $addressee['kind']],
             );
         }
 
@@ -221,6 +222,7 @@ final class StartFlowNodeHandler extends AbstractVersionedHandler implements Dec
                 'start_flow_invalid_busy_window',
                 sprintf('busy_window_minutes must be a whole number from 0 to %d.', self::MAX_BUSY_WINDOW_MINUTES),
                 self::BUSY_WINDOW_FIELD,
+                ['max' => self::MAX_BUSY_WINDOW_MINUTES],
             );
         }
 

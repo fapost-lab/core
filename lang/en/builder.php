@@ -204,6 +204,9 @@ return [
                 'email'  => 'Email',
                 'all'    => 'All available channels',
             ],
+            'empty_staff'      => 'No staff',
+            'empty_assistants' => 'No assistants',
+            'empty_tags'       => 'No tags yet',
         ],
 
         'request_operator' => [
@@ -463,6 +466,58 @@ return [
         'loop_end_invalid_loop_node_id'                 => 'loop_node_id \':id\' does not reference an existing loop node.',
         'loop_nested_not_allowed'                       => 'Loop body of node \':node_id\' contains a nested loop node \':nested_id\'. Nested loops are not supported.',
         'loop_missing_loop_end'                         => 'Loop node \':node_id\' has no reachable loop_end — the iteration would never complete.',
+    ],
+
+    'node_issues' => [
+        'types' => [
+            'ask_person' => [
+                'addressee_required'     => 'Name the contact to ask: an expression that gives a contact id.',
+                'addressee_kind_unknown' => 'The addressee kind \':kind\' is not supported; use \'contact\'.',
+                'text_required'          => 'The question has no text.',
+                'buttons_required'       => 'Add at least one answer button.',
+                'buttons_too_many'       => 'A question takes at most :max buttons.',
+                'button_id_invalid'      => 'A button has no stable uuid id.',
+                'button_id_duplicate'    => 'Two buttons share an id.',
+                'button_label_required'  => 'A button has no label.',
+                'timeout_out_of_range'   => 'The wait must be from :min seconds to 7 days.',
+            ],
+            'start_flow' => [
+                'addressee_required'     => 'Name the contact to start the flow for: the node never starts it for the contact of the run.',
+                'addressee_kind_unknown' => 'The addressee kind \':kind\' is not supported; use \'contact\'.',
+            ],
+            'send_message' => [
+                'addressee_kind_unknown' => 'The addressee kind \':kind\' is not supported; use \'contact\', \'tags\' or \'segment\'.',
+            ],
+        ],
+        'codes' => [
+            'auth_method_unknown'                    => 'Choose an authentication method.',
+            'auth_prompt_required'                   => 'Write the message that asks the contact to confirm.',
+            'auth_button_label_required'             => 'Name the button that shares the phone number.',
+            'auth_limit_out_of_range'                => ':field must be between :min and :max.',
+            'auth_destination_required'              => 'Set the email address the code is sent to.',
+            'auth_destination_from_flow'             => 'The code goes to an address taken from flow variables, which the contact may have typed: anyone can have codes sent to any address, up to the hourly limit per address.',
+            'call_invalid_strict_mapping'            => 'strict_mapping must be true or false.',
+            'call_invalid_credential'                => 'credential_id must be the id of a saved credential.',
+            'call_credential_unsupported'            => 'A saved credential can only be used with the http transport.',
+            'call_credential_not_found'              => 'The saved credential does not exist.',
+            'addressee_cannot_wait'                  => 'A message to an addressee cannot wait for an answer: remove \':field\' or the addressee.',
+            'start_flow_invalid_busy_window'         => 'busy_window_minutes must be a whole number from 0 to :max.',
+            'webhook_response_invalid_status'        => 'The response status must be a whole number from :min to :max.',
+            'webhook_response_invalid_body_type'     => 'The body type must be json or text.',
+            'webhook_response_invalid_body'          => 'A JSON body must be an object or a list.',
+            'webhook_response_invalid_text'          => 'A text body must be text.',
+            'addressee_tags_required'                => 'A message to tags needs at least one tag, each a non-empty text.',
+            'addressee_segment_unknown'              => 'A message to a segment needs a segment of this workspace.',
+            'addressee_broadcast_text_only'          => 'A message to tags or a segment is sent as a broadcast and can only be text: no media and no buttons.',
+            'addressee_broadcast_contact_expression' => 'A message to tags or a segment goes to many people and must not read a contact: remove the contact placeholders from \':field\'.',
+            'save_broadcast_to_invalid'              => '\'save_broadcast_to\' must name a flow variable, such as \'flow.broadcast\'.',
+            'subflow_invalid_input_mapping'          => 'input_mapping must map child variable names to expressions.',
+            'subflow_invalid_input_name'             => 'input_mapping: \':name\' is not a valid variable name for the child flow.',
+            'subflow_invalid_input_value'            => 'input_mapping: the value for \':name\' must be an expression or a literal text.',
+            'subflow_invalid_output_mapping'         => 'output_mapping must map parent variable names to child variable names.',
+            'subflow_invalid_output_name'            => 'output_mapping: \':name\' is not a valid variable name for this flow.',
+            'subflow_invalid_output_source'          => 'output_mapping: \':name\' is not a valid variable name of the child flow.',
+        ],
     ],
 
     'schedule_trigger' => [

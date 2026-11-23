@@ -276,6 +276,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
                 'addressee_kind_unknown',
                 "The addressee kind '{$addressee['kind']}' is not supported; use 'contact', 'tags' or 'segment'.",
                 'addressee.kind',
+                ['kind' => (string) $addressee['kind']],
             )];
         }
 
@@ -292,6 +293,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
                 'addressee_cannot_wait',
                 "A message to an addressee cannot wait for an answer: remove '{$field}' or the addressee.",
                 $field,
+                ['field' => $field],
             );
         }
 

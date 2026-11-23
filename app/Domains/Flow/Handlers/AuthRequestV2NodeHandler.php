@@ -243,7 +243,7 @@ final class AuthRequestV2NodeHandler extends AbstractVersionedHandler implements
             }
 
             if (! is_numeric($raw) || (int) $raw < $min || (int) $raw > $max) {
-                $issues[] = NodeConfigIssue::error('auth_limit_out_of_range', sprintf('%s must be between %d and %d.', $field, $min, $max), $field);
+                $issues[] = NodeConfigIssue::error('auth_limit_out_of_range', sprintf('%s must be between %d and %d.', $field, $min, $max), $field, ['field' => $field, 'min' => $min, 'max' => $max]);
             }
         }
 
