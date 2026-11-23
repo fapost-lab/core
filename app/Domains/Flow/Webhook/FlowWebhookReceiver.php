@@ -18,11 +18,9 @@ use DateTimeImmutable;
 use Fapost\Foundation\Channel\Ingress\IngressSpecExecutor;
 use Fapost\Foundation\Channel\Ingress\SignedRequest;
 use Illuminate\Cache\RateLimiter;
-use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
-use Throwable;
 
 /**
  * Receives one request to a webhook trigger's URL in the current tenant and queues the run it starts.
@@ -70,11 +68,8 @@ final readonly class FlowWebhookReceiver
         private FlowTriggerStateRepositoryInterface $triggerStates,
         private PlatformSettingsReaderInterface $settings,
         private IngressSpecExecutor $specExecutor,
-        private WebhookDeliveryDedupInterface $dedup,
-        private WebhookSyncWait $syncWait,
-        private WebhookReplyStoreInterface $replies,
+        private InboundRunStarter $starter,
         private RateLimiter $limiter,
-        private Dispatcher $dispatcher,
         private LoggerInterface $logger,
     ) {
     }
@@ -180,41 +175,22 @@ final readonly class FlowWebhookReceiver
         $fireKey = WebhookFireKey::fromDeliveryId($deliveryId);
         $shownId = WebhookFireKey::shownId($fireKey);
 
-        if ($deduped && ! $this->dedup->claim($tenantId, $trigger->id, $fireKey)) {
-            $this->logger->info('flow.webhook.duplicate', [...$context, 'delivery_id' => $shownId]);
+        $start = $this->starter->start(
+            tenantId: $tenantId,
+            trigger: $trigger,
+            fireKey: $fireKey,
+            deduped: $deduped,
+            initialState: WebhookPayload::initialState($request, $config, $shownId, new DateTimeImmutable()),
+            sync: $config->isSync(),
+            logPrefix: 'flow.webhook',
+            logContext: [...$context, 'delivery_id' => $shownId],
+        );
 
-            // Never a second wait: it would take the wake-up the first request is waiting for.
-            $kept = $config->isSync() ? $this->replies->find($tenantId, $trigger->id, $fireKey) : null;
-
-            return null === $kept ? WebhookOutcome::duplicate($shownId) : WebhookOutcome::replied($shownId, $kept);
-        }
-
-        try {
-            $this->dispatcher->dispatch(new StartAutomationRunJob(
-                tenantId: $tenantId,
-                flowId: $trigger->flow_id,
-                triggerId: $trigger->id,
-                fireKey: $fireKey,
-                initialState: WebhookPayload::initialState($request, $config, $shownId, new DateTimeImmutable()),
-                assistantId: $trigger->assistant_id,
-            ));
-        } catch (Throwable $exception) {
-            if ($deduped) {
-                $this->dedup->release($tenantId, $trigger->id, $fireKey);
-            }
-
-            throw $exception;
-        }
-
-        $this->logger->info('flow.webhook.accepted', [...$context, 'delivery_id' => $shownId]);
-
-        if (! $config->isSync()) {
-            return WebhookOutcome::accepted($shownId);
-        }
-
-        $reply = $this->syncWait->await($tenantId, $trigger->id, $fireKey, [...$context, 'delivery_id' => $shownId]);
-
-        return null === $reply ? WebhookOutcome::accepted($shownId) : WebhookOutcome::replied($shownId, $reply);
+        return match ($start->status) {
+            InboundRunStartStatus::Duplicate => WebhookOutcome::duplicate($shownId),
+            InboundRunStartStatus::Replied   => WebhookOutcome::replied($shownId, $start->reply),
+            InboundRunStartStatus::Accepted  => WebhookOutcome::accepted($shownId),
+        };
     }
 
     /**

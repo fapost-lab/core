@@ -11,14 +11,11 @@ use App\Domains\Flow\Admission\TriggerAdmissionRequest;
 use App\Domains\Flow\Admission\TriggerRunAdmission;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
-use App\Domains\Flow\Contracts\FlowEngineInterface;
-use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
-use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Enums\FlowTriggerType;
-use App\Domains\Flow\Services\ContactChannelProbe;
 use App\Domains\Flow\Services\ContactFlowStartCollision;
-use App\Domains\Flow\Services\FlowSessionTerminator;
+use App\Domains\Flow\Services\ContactFlowStarter;
+use App\Domains\Flow\Services\ContactFlowStartStatus;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Domains\Tenancy\Queue\StoppedTenantAction;
@@ -26,7 +23,6 @@ use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
@@ -48,11 +44,11 @@ use Throwable;
  * depth, so an event the flow raises in turn is one level deeper (read with a fallback: a job queued before the
  * depth existed unserializes without it).
  *
- * The start follows the rules of a `start_flow` start ({@see StartFlowForContactJob}), under the contact's session lock
- * with the trigger's assistant: it happens once per trigger and event (`start_key` = `event:` + a hash of the trigger id
- * and the event id, else of this job's own id), never for a contact without a channel on an active channel of that
- * assistant, and never over a busy contact ({@see ContactFlowStartCollision}, the fixed default window) — an operator
- * on the thread, a conversation with that assistant that moved within the window or sleeps in a `delay`, or the
+ * The start follows the rules of a `start_flow` start ({@see StartFlowForContactJob}), through the shared
+ * {@see ContactFlowStarter}, under the contact's session lock with the trigger's assistant: it happens once per
+ * trigger and event (`start_key` = `event:` + a hash of the trigger id and the event id, else of this job's own id),
+ * never for a contact without a channel on an active channel of that assistant, and never over a busy contact
+ * ({@see ContactFlowStartCollision}, the fixed default window) — an operator on the thread, a conversation with that assistant that moved within the window or sleeps in a `delay`, or the
  * conversation that emitted the event (`source.session_id`) still live. An older live conversation is ended first.
  * None of these outcomes is an exception: a retry would not change it.
  *
@@ -111,12 +107,8 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
         ContactServiceInterface $contacts,
         AssistantRepositoryInterface $assistants,
         CurrentAssistantInterface $currentAssistant,
-        FlowEngineInterface $engine,
-        FlowExecutionGuardInterface $guard,
         FlowSessionRepositoryInterface $sessions,
-        ContactChannelProbe $channels,
-        ContactFlowStartCollision $collision,
-        FlowSessionTerminator $terminator,
+        ContactFlowStarter $starter,
         TriggerRunAdmission $admission,
         LoggerInterface $logger,
     ): void {
@@ -138,12 +130,8 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
             $contacts,
             $assistants,
             $currentAssistant,
-            $engine,
-            $guard,
             $sessions,
-            $channels,
-            $collision,
-            $terminator,
+            $starter,
             $admission,
             $logger,
         ): void {
@@ -194,70 +182,33 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
 
             $currentAssistant->set($assistant);
 
-            // Outside the routing pipeline: claim the contact's session lock so the start cannot race an inbound
+            // Outside the routing pipeline: the start takes the contact's session lock, so it cannot race an inbound
             // message, the emitting conversation or a second job for the same contact and assistant.
-            $guard->run(
-                tenantId: (string) $contact->tenant_id,
-                contactId: (string) $contact->getKey(),
+            $outcome = $starter->start(
+                guardTenantId: (string) $contact->tenant_id,
+                contact: $contact,
                 assistantId: $this->assistantId,
-                callback: function () use ($fireIdentity, $startKey, $definition, $contact, $sessions, $channels, $collision, $terminator, $admission, $engine, $logger): void {
-                    if (null !== $sessions->findByStartKey($startKey)) {
-                        $logger->info('flow.event.start_duplicate', $this->logContext($startKey));
-
-                        return;
-                    }
-
-                    $thread = $channels->deliveryThread($this->tenantId, (string) $contact->getKey(), $this->assistantId);
-
-                    if (null === $thread) {
-                        $logger->info('flow.event.start_skipped_no_channel', $this->logContext($startKey));
-
-                        return;
-                    }
-
-                    $verdict = $collision->assess(
-                        $thread,
-                        ContactFlowStartCollision::DEFAULT_BUSY_WINDOW_MINUTES,
-                        $this->sourceSessionId ?? null,
-                    );
-
-                    if ($verdict->isBusy()) {
-                        $logger->info('flow.event.start_skipped_busy', [...$this->logContext($startKey), 'reason' => $verdict->busyReason]);
-
-                        return;
-                    }
-
-                    if (! $this->admitted($admission, $fireIdentity)) {
-                        return;
-                    }
-
-                    foreach ($verdict->stale as $stale) {
-                        $terminator->terminate($stale);
-                    }
-
-                    try {
-                        $session = $engine->start(
-                            $definition,
-                            $contact,
-                            ['flow' => ['event' => $this->payload]],
-                            FlowRunOrigin::conversation(chainDepth: $this->chainDepth ?? 1, startKey: $startKey),
-                        );
-                    } catch (UniqueConstraintViolationException $exception) {
-                        // A duplicate of this start won the race past the lock (its TTL lapsed): it started once.
-                        if (null !== $sessions->findByStartKey($startKey)) {
-                            return;
-                        }
-
-                        throw $exception;
-                    }
-
-                    $logger->info('flow.event.started', [
-                        ...$this->logContext($startKey),
-                        'session_id'  => (string) $session->getKey(),
-                        'ended_stale' => count($verdict->stale),
-                    ]);
-                },
+                definition: $definition,
+                initialState: ['flow' => ['event' => $this->payload]],
+                chainDepth: $this->chainDepth ?? 1,
+                startKey: $startKey,
+                busyWindowMinutes: ContactFlowStartCollision::DEFAULT_BUSY_WINDOW_MINUTES,
+                askingSessionId: $this->sourceSessionId ?? null,
+                admission: fn (): bool => $this->admitted($admission, $fireIdentity),
             );
+
+            match ($outcome->status) {
+                ContactFlowStartStatus::Duplicate => $logger->info('flow.event.start_duplicate', $this->logContext($startKey)),
+                ContactFlowStartStatus::NoChannel => $logger->info('flow.event.start_skipped_no_channel', $this->logContext($startKey)),
+                ContactFlowStartStatus::Busy      => $logger->info('flow.event.start_skipped_busy', [...$this->logContext($startKey), 'reason' => $outcome->busyReason]),
+                ContactFlowStartStatus::NotAdmitted,
+                ContactFlowStartStatus::RaceLost => null,
+                ContactFlowStartStatus::Started  => $logger->info('flow.event.started', [
+                    ...$this->logContext($startKey),
+                    'session_id'  => (string) $outcome->session?->getKey(),
+                    'ended_stale' => $outcome->endedStale,
+                ]),
+            };
         });
     }
 
