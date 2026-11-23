@@ -83,7 +83,8 @@ final class ScheduleTriggerFirerTest extends FeatureTestCase
         $this->assertSame((string) $this->assistant->getKey(), $run->assistant_id);
         $this->assertNull($run->contact_id);
         $this->assertNotNull($run->deadline_at, 'A pending run carries its deadline, so the sweeper can find a lost start.');
-        $this->assertSame([
+        // jsonb does not keep key order, so the state is compared by content.
+        $this->assertEquals([
             'slot'       => '2026-11-21T08:00:00+00:00',
             'local_time' => '2026-11-21T09:00:00+01:00',
             'timezone'   => 'Europe/Berlin',
