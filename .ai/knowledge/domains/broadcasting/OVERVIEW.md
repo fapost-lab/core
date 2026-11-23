@@ -37,6 +37,7 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
 - The console (`BroadcastController`, Inertia) drives it. The domain raises `Events/BroadcastCompleted` when a
   broadcast completes (only from the conditional update that wins); Flow listens and publishes it as the Core event
   `core.broadcast.completed`, so Flow now imports this event class (`adr-20261119-core-events-start-contactless-runs`).
+  The event carries the broadcast's `chain_depth`, which `PublishCoreEvents` publishes it with.
 - Tenant settings `broadcast_*` in `TenantSettings` control backpressure and batching.
 
 ## Entry points
@@ -48,5 +49,8 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
 - Console UI: `app/Http/Controllers/Console/BroadcastController.php` over
   `Services/BroadcastService.php` (the console's writes and the send guard), with the requests in
   `app/Http/Requests/Console/*Broadcast*` and the pages in `resources/js/pages/Console/Broadcasts`. The list shows a row's `stop_reason` under its status.
+- `Services/AutomationBroadcasts.php`: the automation's entry, called by Flow's `send_message` through
+  `App\Infrastructure\Flow\BroadcastingAudienceBroadcaster` (`AudienceBroadcasterInterface`); it creates the broadcast
+  as `origin = automation` and starts it at once. The console list marks such rows and names their flow.
 - `Support/BroadcastMessage.php` cleans the message and checks the base language, for the console's
   request and service.

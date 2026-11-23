@@ -191,6 +191,13 @@ function deleteOne(): void {
 
       <template #cell-name="{ row }">
         <span class="font-medium">{{ row.name }}</span>
+        <div v-if="row.origin === 'automation'" class="mt-1 flex items-center gap-2 text-xs text-muted-foreground" data-test="broadcast-origin">
+          <Badge variant="neutral">{{ t.origin.automation }}</Badge>
+          <template v-if="row.flowName">
+            <a v-if="row.flowUrl" :href="row.flowUrl" class="hover:underline">{{ row.flowName }}</a>
+            <span v-else>{{ row.flowName }}</span>
+          </template>
+        </div>
       </template>
 
       <template #cell-target="{ row }">

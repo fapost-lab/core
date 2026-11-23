@@ -34,6 +34,7 @@ use App\Domains\Flow\Contracts\ActionHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationServiceInterface;
+use App\Domains\Flow\Contracts\AudienceBroadcasterInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
@@ -182,6 +183,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Services\PlatformSettingRegistry;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
 use App\Domains\Tenancy\ValueObjects\PlatformSettingField;
+use App\Infrastructure\Flow\BroadcastingAudienceBroadcaster;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
@@ -514,6 +516,7 @@ final class FlowServiceProvider extends ServiceProvider
             \App\Infrastructure\Flow\QueuedAutomationContinuationScheduler::class,
         );
         $this->app->bind(SendMessageTimeoutSchedulerInterface::class, QueuedSendMessageTimeoutScheduler::class);
+        $this->app->bind(AudienceBroadcasterInterface::class, BroadcastingAudienceBroadcaster::class);
         $this->app->bind(OperatorRequestTimeoutSchedulerInterface::class, QueuedOperatorRequestTimeoutScheduler::class);
         $this->app->bind(NodeUsageStatisticsInterface::class, NodeUsageStatisticsService::class);
         $this->app->bind(

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Console;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Broadcasting\Enums\BroadcastOrigin;
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\BroadcastTarget;
 use App\Domains\Broadcasting\Exceptions\BroadcastAlreadyStartedException;
@@ -14,6 +15,7 @@ use App\Domains\Broadcasting\Exceptions\BroadcastNotSendableException;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Services\BroadcastRecipientResolver;
 use App\Domains\Broadcasting\Services\BroadcastService;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Console\BroadcastReachRequest;
@@ -40,6 +42,14 @@ use Inertia\Response;
  */
 final class BroadcastController extends Controller
 {
+    /**
+     * The flows that started the broadcasts on this page, by flow id (null when the flow is gone): one query per flow,
+     * not per row. The controller lives for one request.
+     *
+     * @var array<string, FlowDraft|null>
+     */
+    private array $flows = [];
+
     public function __construct(
         private readonly BroadcastService $broadcasts,
         private readonly BroadcastRecipientResolver $resolver,
@@ -233,6 +243,10 @@ final class BroadcastController extends Controller
             'name'   => $broadcast->name,
             'target' => $broadcast->target_type->value,
             'status' => $broadcast->status->value,
+            // A flow's node started it: the row says so and names the flow, linked to the builder while it exists.
+            'origin'   => $broadcast->origin->value,
+            'flowName' => $this->flow($broadcast)?->name,
+            'flowUrl'  => $this->flowUrl($broadcast),
             // Why a failed or stopped run ended; the row shows it next to the status.
             'stopReason' => $broadcast->stop_reason,
             'sent'       => $broadcast->sent_count,
@@ -252,6 +266,29 @@ final class BroadcastController extends Controller
             'cancelUrl'       => BroadcastStatus::Running === $broadcast->status && $can['cancel'] ? $this->url('cancel', ['record' => $id]) : null,
             'deleteUrl'       => BroadcastStatus::Running !== $broadcast->status && $can['delete'] ? $this->url('destroy', ['record' => $id]) : null,
         ];
+    }
+
+    private function flow(Broadcast $broadcast): ?FlowDraft
+    {
+        if (BroadcastOrigin::Automation !== $broadcast->origin || null === $broadcast->flow_id) {
+            return null;
+        }
+
+        if (! array_key_exists($broadcast->flow_id, $this->flows)) {
+            $this->flows[$broadcast->flow_id] = FlowDraft::query()->where('flow_id', $broadcast->flow_id)->first(['id', 'flow_id', 'name', 'assistant_id']);
+        }
+
+        return $this->flows[$broadcast->flow_id];
+    }
+
+    /**
+     * The builder's page of the flow that started the broadcast, for someone who may open it; null otherwise.
+     */
+    private function flowUrl(Broadcast $broadcast): ?string
+    {
+        $flow = $this->flow($broadcast);
+
+        return null !== $flow && Gate::allows('view', $flow) ? route('builder.flows.show', ['flow' => $flow->flow_id]) : null;
     }
 
     /**

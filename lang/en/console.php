@@ -632,6 +632,9 @@ return [
             'run_failed'    => 'The run was interrupted, so the remaining recipients were skipped.',
             'limit_reached' => 'Stopped: the sending limit was reached.',
         ],
+        'origin' => [
+            'automation' => 'From automation',
+        ],
         'targets' => [
             'all'     => 'All contacts',
             'tags'    => 'By tags',

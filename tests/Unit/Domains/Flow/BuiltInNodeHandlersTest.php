@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Call\CallTransportRegistry;
+use App\Domains\Flow\Contracts\AudienceBroadcasterInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
+use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
@@ -25,6 +28,7 @@ use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
+use App\Domains\Flow\Services\EventChainContext;
 use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\VariableResolver;
@@ -932,6 +936,10 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
             new NullLogger(),
+            Mockery::mock(AudienceBroadcasterInterface::class),
+            new EventChainContext(),
+            Mockery::mock(FlowDefinitionRepositoryInterface::class),
+            Mockery::mock(FlowDraftRepositoryInterface::class),
         );
 
         $context = new NodeExecutionContext(
@@ -991,6 +999,10 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
             new NullLogger(),
+            Mockery::mock(AudienceBroadcasterInterface::class),
+            new EventChainContext(),
+            Mockery::mock(FlowDefinitionRepositoryInterface::class),
+            Mockery::mock(FlowDraftRepositoryInterface::class),
         );
 
         $context = new NodeExecutionContext(
@@ -1488,7 +1500,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame([], $codes(['content_type' => 'text', 'addressee' => ['kind' => 'contact', 'contact' => '{{flow.id}}']]));
         $this->assertSame(
             ['addressee_kind_unknown@addressee.kind'],
-            $codes(['content_type' => 'text', 'addressee' => ['kind' => 'segment', 'contact' => '']]),
+            $codes(['content_type' => 'text', 'addressee' => ['kind' => 'everyone', 'contact' => '']]),
         );
         $this->assertSame(
             ['addressee_cannot_wait@content_type', 'addressee_cannot_wait@timeout_seconds', 'addressee_cannot_wait@save_to_variable'],
@@ -1503,8 +1515,59 @@ final class BuiltInNodeHandlersTest extends TestCase
 
         $this->assertTrue($handler->namesRecipient(['addressee' => ['kind' => 'contact', 'contact' => '{{flow.id}}']]));
         $this->assertFalse($handler->namesRecipient(['addressee' => ['kind' => 'contact', 'contact' => ' ']]));
-        $this->assertFalse($handler->namesRecipient(['addressee' => ['kind' => 'segment', 'contact' => '{{flow.id}}']]));
+        $this->assertTrue($handler->namesRecipient(['addressee' => ['kind' => 'segment', 'segment_id' => '01938f3e-7c1a-7d2b-8e4f-123456789abc']]));
+        $this->assertTrue($handler->namesRecipient(['addressee' => ['kind' => 'tags', 'tags' => ['vip']]]));
+        $this->assertFalse($handler->namesRecipient(['addressee' => ['kind' => 'everyone', 'contact' => '{{flow.id}}']]));
         $this->assertFalse($handler->namesRecipient([]));
+    }
+
+    public function test_send_message_validates_an_audience_addressee(): void
+    {
+        $segmentId   = '01938f3e-7c1a-7d2b-8e4f-123456789abc';
+        $broadcaster = Mockery::mock(AudienceBroadcasterInterface::class);
+        $broadcaster->shouldReceive('segmentExists')->andReturnUsing(static fn (string $id): bool => $segmentId === $id);
+
+        $handler = $this->makeHandler(
+            Mockery::mock(MessageSenderInterface::class),
+            Mockery::mock(ContentTranslatorInterface::class),
+            broadcaster: $broadcaster,
+        );
+        $codes = static fn (array $config): array => array_map(
+            static fn ($issue): string => "{$issue->code}@{$issue->field}",
+            $handler->validate(['id' => 'n', 'type' => 'send_message', 'config' => $config]),
+        );
+
+        $this->assertSame([], $codes(['content_type' => 'text', 'text' => ['en' => 'Hi {{flow.name}}'], 'addressee' => ['kind' => 'tags', 'tags' => ['vip']]]));
+        $this->assertSame([], $codes(['content_type' => 'text', 'text' => 'Hi', 'addressee' => ['kind' => 'segment', 'segment_id' => $segmentId], 'save_broadcast_to' => 'flow.sent']));
+
+        $this->assertSame(['addressee_tags_required@addressee.tags'], $codes(['content_type' => 'text', 'addressee' => ['kind' => 'tags', 'tags' => []]]));
+        $this->assertSame(['addressee_tags_required@addressee.tags'], $codes(['content_type' => 'text', 'addressee' => ['kind' => 'tags', 'tags' => ['vip', ' ']]]));
+        $this->assertSame(['addressee_segment_unknown@addressee.segment_id'], $codes(['content_type' => 'text', 'addressee' => ['kind' => 'segment', 'segment_id' => '']]));
+        $this->assertSame(
+            ['addressee_segment_unknown@addressee.segment_id'],
+            $codes(['content_type' => 'text', 'addressee' => ['kind' => 'segment', 'segment_id' => '01938f3e-7c1a-7d2b-8e4f-000000000000']]),
+        );
+        $this->assertSame(
+            ['addressee_broadcast_text_only@content_type'],
+            $codes(['content_type' => 'image', 'media_file_id' => 'm-1', 'addressee' => ['kind' => 'tags', 'tags' => ['vip']]]),
+        );
+        $this->assertSame(
+            ['addressee_broadcast_text_only@content_type', 'addressee_cannot_wait@timeout_seconds'],
+            $codes(['content_type' => 'text_with_keyboard', 'timeout_seconds' => 30, 'addressee' => ['kind' => 'tags', 'tags' => ['vip']]]),
+        );
+        $this->assertSame(
+            ['addressee_broadcast_contact_expression@text', 'addressee_broadcast_contact_expression@broadcast_name'],
+            $codes([
+                'content_type'   => 'text',
+                'text'           => ['en' => 'Hi', 'ru' => 'Привет, {{ contact.name }}'],
+                'broadcast_name' => '{{module.crm.plan}}',
+                'addressee'      => ['kind' => 'tags', 'tags' => ['vip']],
+            ]),
+        );
+        $this->assertSame(
+            ['save_broadcast_to_invalid@save_broadcast_to'],
+            $codes(['content_type' => 'text', 'addressee' => ['kind' => 'tags', 'tags' => ['vip']], 'save_broadcast_to' => 'contact.last_broadcast']),
+        );
     }
 
     public function test_send_message_hint_uses_catalog_key_when_user_types_during_button_wait(): void
@@ -1647,6 +1710,10 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
             new NullLogger(),
+            Mockery::mock(AudienceBroadcasterInterface::class),
+            new EventChainContext(),
+            Mockery::mock(FlowDefinitionRepositoryInterface::class),
+            Mockery::mock(FlowDraftRepositoryInterface::class),
         );
 
         $persistedButtons = [
@@ -1739,6 +1806,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         ContentTranslatorInterface $translator,
         ?SendMessageTimeoutSchedulerInterface $timeouts = null,
         ?LoggerInterface $logger = null,
+        ?AudienceBroadcasterInterface $broadcaster = null,
     ): SendMessageNodeHandler {
         return new SendMessageNodeHandler(
             $sender,
@@ -1749,6 +1817,10 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             $timeouts ?? Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
             $logger ?? new NullLogger(),
+            $broadcaster ?? Mockery::mock(AudienceBroadcasterInterface::class),
+            new EventChainContext(),
+            Mockery::mock(FlowDefinitionRepositoryInterface::class),
+            Mockery::mock(FlowDraftRepositoryInterface::class),
         );
     }
 

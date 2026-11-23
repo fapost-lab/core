@@ -3,6 +3,7 @@
 Sends content to the contact through the active channel, with optional inline/reply
 keyboards and dynamic keyboards built from state data. With an `addressee` it sends to the contact
 an expression names instead, which lets a flow without a contact (schedule, webhook, API trigger) message a person.
+With an audience addressee (tags or a segment) it starts a Broadcasting broadcast and goes on.
 
 **Type:** `send_message`
 **Version:** 1
@@ -44,12 +45,17 @@ an expression names instead, which lets a flow without a contact (schedule, webh
 | `save_to_variable` | object `{name, type, storage, group}` | no | Preferred target for a pressed static button's `value`; wins over `save_to`. |
 | `timeout_seconds` | int ≥ 1 | no | When set, schedules a timeout resume for inline keyboards. |
 | `remove_keyboard_after_press` | bool | no | Default `true`. |
-| `addressee` | object `{kind, contact}` | no | `kind` is `contact` (the only kind so far; tags and segments come as further kinds); `contact` is an expression of the flow's engine giving a contact id, e.g. `{{flow.customer_id}}`. Absent, empty, or `contact` blank (the builder's default) means the contact of the run. Validation (`validate()`, `NodeConfigValidatorInterface`): an unknown kind is `addressee_kind_unknown`; with an addressee the node cannot wait for an answer, so `content_type = text_with_keyboard`, `timeout_seconds`, `save_to` and `save_to_variable` are each `addressee_cannot_wait`, in every flow. In a flow whose trigger gives no contact it satisfies the contact-context check (see [06-validation](../06-validation.md)); `contact.*` reads elsewhere in the config are still refused there. |
+| `addressee` | object `{kind, contact}` | no | `kind` is `contact`, `tags` or `segment` (audiences, below); `contact` is an expression of the flow's engine giving a contact id, e.g. `{{flow.customer_id}}`. Absent, empty, or `contact` blank (the builder's default) means the contact of the run. Validation (`validate()`, `NodeConfigValidatorInterface`): an unknown kind is `addressee_kind_unknown`; with an addressee the node cannot wait for an answer, so `content_type = text_with_keyboard`, `timeout_seconds`, `save_to` and `save_to_variable` are each `addressee_cannot_wait`, in every flow. In a flow whose trigger gives no contact it satisfies the contact-context check (see [06-validation](../06-validation.md)); `contact.*` reads elsewhere in the config are still refused there. |
+| `addressee` (audience) | `{kind: "tags", tags: [..]}` or `{kind: "segment", segment_id}` | no | A static audience: tags "any of", or a segment of the tenant. Starts a broadcast of the **flow's** assistant (`flow_drafts.assistant_id`) through `AudienceBroadcasterInterface` (implemented by `App\Infrastructure\Flow\BroadcastingAudienceBroadcaster` over `Broadcasting\Services\AutomationBroadcasts`). Validation: `addressee_tags_required`, `addressee_segment_unknown`, `addressee_broadcast_text_only` (`content_type` must be `text`), `addressee_broadcast_contact_expression` (`{{contact.*}}` or `{{module.*}}` in `text` or `broadcast_name`, in every flow), `addressee_cannot_wait`. Publishing a draft that adds such a node or changes its audience, text or name needs `ManageBroadcast` (`FlowPublishChanges::changesAudienceMessages()`). |
+| `broadcast_name` | string | no | Audience only. The broadcast's name, rendered; default `<flow name> — <Y-m-d H:i>`. |
+| `save_broadcast_to` | string | no | Audience only. A flow path (`flow.x`) that receives `{broadcast_id, recipient_count}`; anything else is `save_broadcast_to_invalid`. |
 
 ## Output handles
 
 - `error` — `MessageSenderInterface::send()` threw; metadata carries `error` and `error_type: 'send_failure'`, the flow log entry carries `send_failure: <message>`, and the failure is logged as a warning (`flow.send_message_failed`).
 - `error` with `error_type: 'addressee_unresolved'` — the addressee's expression rendered to no valid contact id (empty or not a UUID); nothing is sent and no marker is written. The handler never falls back to the run's contact.
+- `default` with an audience addressee — the broadcast was started, or (`broadcast_outcome: replayed`) this node execution started it before; metadata `broadcast_id`, `recipient_count` (the reach counted at the node, an estimate). The key is `sha256(idempotencyKey:nodeId)` on `broadcasts.origin_key` (unique), not a `system.*` marker, so each pass of a loop is its own request. The node does not wait for the broadcast; `core.broadcast.completed` carries `broadcasts.chain_depth` = the run's depth + 1.
+- `error` with an audience addressee — `error_type` `broadcast_running` (a draft or running broadcast of the same flow node exists; a partial unique index holds it), `audience_missing` (segment gone, no tags), `message_empty` (no base-language text after rendering) or `broadcast_failure` (the flow's draft is gone, or an unexpected failure, logged as `flow.send_message_broadcast_failed`). Nothing is created.
 - `no_response` — an inline-keyboard prompt timed out without a button press.
 - The pressed button's handle when `content_type = text_with_keyboard` and `keyboard_mode = inline`:
   - static keyboard — the button's own UUID `id` string;

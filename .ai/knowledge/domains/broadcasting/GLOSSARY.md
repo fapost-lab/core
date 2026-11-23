@@ -23,6 +23,17 @@ A one-off message to an audience. Status: `Draft` → `Running` → `Completed`,
 
 The audience rule: `All`, `Tags` or `Segment`.
 
+## Origin
+
+Who started a broadcast: `console` (a person confirmed a revision on the broadcasts screen) or `automation` (a flow's
+`send_message` node to tags or a segment, through `AutomationBroadcasts`). An automation broadcast also carries
+`flow_id`, `flow_session_id`, `flow_node_id` and `origin_key`, the hash of the node execution that started it.
+
+## Chain depth
+
+`broadcasts.chain_depth`: the event chain depth its `core.broadcast.completed` is published with. 0 for the console;
+a flow's run depth + 1 for an automation broadcast.
+
 ## Recipient
 
 One contact's row in a broadcast. Status: `Pending` → `Sent`, `Failed` or `Skipped`.

@@ -13,6 +13,7 @@ return [
     'publish_denied' => [
         'credentials' => 'This version uses a saved credential that the published one does not. Publishing it needs the Use credentials permission.',
         'automations' => 'This version adds, changes or removes a schedule, webhook, API or event trigger. Publishing it needs the Manage automations permission.',
+        'broadcasts'  => 'This version adds or changes a message to tags or a segment, which is sent as a broadcast. Publishing it needs the Manage broadcasts permission.',
     ],
 
     'read_only' => [
@@ -190,10 +191,20 @@ return [
         ],
 
         'send_message' => [
-            'addressee_title' => 'Send to',
-            'addressee_label' => 'Contact id',
-            'addressee_hint'  => 'Leave empty to send to the contact of the conversation. A flow started by a schedule, a webhook or an API call has no contact and needs one here. A message sent this way cannot wait for an answer: no keyboard, timeout or saved answer.',
-            'addressee_badge' => 'addressee',
+            'addressee_title'          => 'Send to',
+            'addressee_label'          => 'Contact id',
+            'addressee_hint'           => 'Leave empty to send to the contact of the conversation. A flow started by a schedule, a webhook or an API call has no contact and needs one here. A message sent this way cannot wait for an answer: no keyboard, timeout or saved answer.',
+            'addressee_badge'          => 'addressee',
+            'addressee_kind_contact'   => 'Contact',
+            'addressee_kind_tags'      => 'Tags',
+            'addressee_kind_segment'   => 'Segment',
+            'addressee_tags_label'     => 'Contacts with any of these tags',
+            'addressee_tags_hint'      => 'Everyone who has at least one of the tags gets the message.',
+            'addressee_segment_label'  => 'Segment',
+            'broadcast_name_label'     => 'Broadcast name',
+            'save_broadcast_to_label'  => 'Save broadcast to',
+            'save_broadcast_to_hint'   => 'A flow variable that receives the id of the created broadcast, e.g. flow.broadcast.',
+            'addressee_broadcast_hint' => 'The message is sent as a broadcast: text only, no keyboard, timeout or saved answer, and no contact data ({{contact.*}}) in the text.',
         ],
 
         'template' => [
