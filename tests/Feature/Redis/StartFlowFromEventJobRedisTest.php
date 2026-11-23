@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Redis;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
+use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Concurrency\LockScope;
 use App\Domains\Flow\Concurrency\SessionLockManager;
@@ -108,6 +111,18 @@ final class StartFlowFromEventJobRedisTest extends FeatureTestCase
     {
         $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
         $contact   = Contact::factory()->forTenant(self::TENANT_ID)->create();
+        $channel   = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->getKey(),
+            'tenant_id'    => self::TENANT_ID,
+            'type'         => ChannelTypeEnum::Telegram,
+            'token'        => 'bot-token',
+            'is_active'    => true,
+        ]));
+        ChannelContact::query()->create([
+            'contact_id'          => $contact->getKey(),
+            'channel_id'          => $channel->getKey(),
+            'last_interaction_at' => now(),
+        ]);
 
         $flowId = (string) Str::uuid();
         FlowDefinition::query()->create([

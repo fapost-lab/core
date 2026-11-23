@@ -35,7 +35,8 @@ decision D1–D8); the schedule and event details below were settled by the agen
 - **One admission, once per new fire, after deduplication and before the run exists.** `TriggerRunAdmission::admit()`
   is asked by `AutomationRunner::start()` (every `StartAutomationRunJob`: webhook, Core event, registered trigger type,
   re-run) only when `(trigger_id, fire_key)` has no run (a retry or continuation is
-  never asked again), by `StartFlowFromEventJob` before its start, and by `ScheduleTriggerFirer` inside the slot claim
+  never asked again), by `StartFlowFromEventJob` before its start (since `adr-20261123-event-start-collisions`: under the
+  contact's lock, after its start key, channel and collision checks), and by `ScheduleTriggerFirer` inside the slot claim
   before `prepare()`. A message trigger is never asked: conversations are not runs of a trigger, and inbound volume has
   its own limit.
 - **Order: pause, breaker, plan.** A paused trigger refuses (`trigger_paused`). The breaker counts every run asking
