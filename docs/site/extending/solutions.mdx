@@ -76,6 +76,7 @@ package's `require`; neither is repeated in the manifest.
 | `extra.fapost.provider` | yes | The class name of your service provider; the class must exist and extend `Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider` |
 | `extra.fapost.actions` | no | The action ids you register, each starting with `<id>.`, no duplicates |
 | `extra.fapost.nodes` | no | The flow node types you register, each `<id>.` followed by a snake_case name (`feedback.collect`), no duplicates; from `fapost/foundation` 0.36 — see [Registering node types](#registering-node-types) |
+| `extra.fapost.triggers` | no | The flow trigger types you register, each `<id>.` followed by a snake_case name (`feedback.submitted`), at most 64 characters, no duplicates; from `fapost/foundation` 0.46, experimental — see [Registering trigger types](#registering-trigger-types) |
 | `extra.fapost.state` | no | `true` when your nodes keep state in a namespace of their own, named by your id; from `fapost/foundation` 0.36 — see [Your state namespace](#your-state-namespace) |
 | `extra.fapost.ui` | no | The path of your `fapost-ui.json` relative to the package root, ending in `.json`; from `fapost/foundation` 0.15, experimental — see [Console UI](/extending/console-ui) |
 | `extra.fapost.x-*` | no | Ignored, for your own tooling |
@@ -139,7 +140,7 @@ Prints every problem, not just the first, and exits with code 1:
 ```
 acme/fapost-feedback: extra.fapost.id: required
 acme/fapost-feedback: extra.fapost.actions[1]: "score" must start with "feedback."
-acme/fapost-feedback: extra.fapost.routes: unknown field (schema 1 allows: schema, id, name, description, provider, actions, nodes, state, ui, migrations); a newer fapost/foundation may be required
+acme/fapost-feedback: extra.fapost.routes: unknown field (schema 1 allows: schema, id, name, description, provider, actions, nodes, triggers, state, ui, migrations); a newer fapost/foundation may be required
 acme/one, acme/two: extra.fapost.id: "feedback" is declared by both packages
 ```
 
@@ -416,6 +417,54 @@ them greyed out with the reason, and keeps their settings. Publishing does not c
 `Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface`. Core calls `validate()` when it
 validates a flow for publishing and shows each `NodeConfigIssue`: an error blocks the publish, a
 warning does not. Keep it pure — no queries, no requests.
+
+## Registering trigger types
+
+<Warning>Experimental since `fapost/foundation` 0.46: the contract may still change in a minor release.</Warning>
+
+A Solution can also add its own kind of trigger next to Core's message, schedule, webhook, API and event triggers:
+"feedback submitted", "order paid". A trigger type implements
+`Fapost\Foundation\Flow\Contracts\TriggerTypeInterface`, its `type()` starts with your id and a dot, and you
+declare it in `extra.fapost.triggers` and register it from `registerExtensions()`:
+
+```php
+$registrar->registerTriggerType(FeedbackSubmittedTrigger::class);
+```
+
+| Method | What it does |
+|---|---|
+| `type()` | `feedback.submitted`; at most 64 characters, never changes once a flow uses it |
+| `label()` | What the flow author reads in the trigger list |
+| `configSchema()` | The trigger's form, in the same schema language as a node's `configSchema()`; the builder renders it |
+| `validateConfig($config)` | A list of `NodeConfigIssue`, checked when the flow is validated and published: an error blocks the publish |
+| `matches($config, $payload)` | Whether one fire starts the trigger configured with `$config`, such as `$payload['score'] >= $config['min_score']` |
+| `payloadFields()` | The payload keys, shown to the author with the trigger as `flow.trigger.<key>` |
+
+Every method must be pure — no queries, no requests — and the constructor cheap: Core builds the class whenever it
+asks it something.
+
+**Starting runs.** Your own code — an action, a node, a background job — starts the flows that listen to your type
+with `Fapost\Foundation\Flow\Contracts\TriggerFirerInterface`, taken as a constructor dependency:
+
+```php
+$this->triggers->fire($tenantId, 'feedback.submitted', $entry->id, ['score' => $entry->score, 'comment' => $entry->comment]);
+```
+
+Core queues the fan-out after your database transaction commits and returns at once. For every active trigger of
+the type in that tenant whose config `matches()` the payload, it starts one run, once per fire key: firing the same
+key again starts no second run while the first one is kept (run retention), so retrying your call is safe. The run has no contact, so the flow may hold no node that needs one; it reads the
+payload as `flow.trigger.*` and the type as `flow.trigger_type`. Nothing starts while your Solution is off for the
+tenant. The payload is JSON of at most 64 KB; an unregistered type, an empty fire key or a payload that does not fit
+throws `InvalidArgumentException` at your call. A fire raised while a flow runs — from your action or node in that run — counts towards
+the same chain limit as events (five links), past which nothing starts. A fire from your own queued job starts a new
+chain: if a flow on your trigger calls an action that leads your job to fire the same type again, breaking that loop
+is up to you.
+
+**In the builder and at publish.** The builder lists your types for tenants that have the Solution on and draws
+their form from `configSchema()`; a saved trigger of a Solution that is off or removed stays greyed out with its
+settings. Publishing a flow with your trigger needs the *Manage automations* permission, like every trigger but a
+message one. It is refused with `trigger_type_not_installed` when your Solution is not installed, and only warned
+about (`trigger_type_solution_inactive`) when it is installed but off for the tenant.
 
 ## Your state namespace
 

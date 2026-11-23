@@ -3,3 +3,15 @@ name: shell
 description: Shell scripts and libraries (shellcheck + tests/run.sh).
 detect: [scripts/**/*.sh, **/*.sh, scripts/jig]
 scope: [changed, map, explain, environment]
+# The checks of this profile by role, and the index of its check table
+# (schemas/profile.md, Check table). Another profile can take any one over by
+# name (`covers: [shell:lint]`).
+checks: [lint, tests]
+# lint: shellcheck. Every call checks one script, in a full run and in a scoped
+# one, so the check has no full row: each call is `narrowed`, with that script.
+checks.lint.command: shellcheck
+checks.lint.narrowed: -s bash -e SC1091 {selection}
+# tests: the project's tests/run.sh; a full run passes nothing, a narrowed run
+# passes one filter per call.
+checks.tests.command: tests/run.sh
+checks.tests.narrowed: {selection}

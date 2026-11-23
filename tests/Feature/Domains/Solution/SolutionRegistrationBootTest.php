@@ -8,7 +8,9 @@ use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Contracts\ActionHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\TriggerTypeFactoryInterface;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Solution\Providers\SolutionServiceProvider;
 use App\Domains\Solution\Services\InstalledPackagesReader;
@@ -18,6 +20,7 @@ use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
 use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
+use App\Infrastructure\Flow\ContainerTriggerTypeFactory;
 use ArrayObject;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
 use Illuminate\Config\Repository;
@@ -76,6 +79,17 @@ final class SolutionRegistrationBootTest extends TestCase
         $registry->register(FeedbackScoreAction::class, 'feedback');
     }
 
+    public function test_the_fixture_solution_registers_its_own_trigger_type_at_boot(): void
+    {
+        $app = $this->freshApplication(FakeVendor::solutionComposer(), new ArrayObject());
+
+        $app->boot();
+
+        $triggerTypes = $app->make(TriggerTypeRegistry::class);
+        $this->assertSame(['feedback.submitted'], $triggerTypes->types());
+        $this->assertSame('feedback', $triggerTypes->ownerOf('feedback.submitted'));
+    }
+
     public function test_scoped_services_of_the_boot_time_handlers_do_not_outlive_registration(): void
     {
         $created = 0;
@@ -128,6 +142,8 @@ final class SolutionRegistrationBootTest extends TestCase
         $app->singleton(NodeHandlerFactoryInterface::class, ContainerNodeHandlerFactory::class);
         $app->singleton(NodeHandlerRegistryInterface::class, NodeHandlerRegistry::class);
         $app->singleton(StateNamespaceRegistry::class);
+        $app->singleton(TriggerTypeFactoryInterface::class, ContainerTriggerTypeFactory::class);
+        $app->singleton(TriggerTypeRegistry::class);
         $app->register(SolutionServiceProvider::class);
 
         return $app;

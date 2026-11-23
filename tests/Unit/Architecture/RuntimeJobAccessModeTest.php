@@ -25,6 +25,7 @@ use App\Jobs\Flow\ContinueAfterOperatorRequestJob;
 use App\Jobs\Flow\ContinueAutomationRunJob;
 use App\Jobs\Flow\DispatchFlowTriggerEventJob;
 use App\Jobs\Flow\ExpireOperatorRequestJob;
+use App\Jobs\Flow\FireRegisteredTriggerJob;
 use App\Jobs\Flow\ResumeDelayedFlowSessionJob;
 use App\Jobs\Flow\ResumeTimedOutSendMessageNodeJob;
 use App\Jobs\Flow\StartAutomationRunJob;
@@ -63,6 +64,7 @@ final class RuntimeJobAccessModeTest extends TestCase
     private const array RUNTIME_JOBS = [
         IncomingMessageJob::class,
         DispatchFlowTriggerEventJob::class,
+        FireRegisteredTriggerJob::class,
         StartFlowFromEventJob::class,
         StartAutomationRunJob::class,
         ContinueAutomationRunJob::class,

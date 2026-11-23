@@ -63,6 +63,7 @@ use App\Domains\Flow\Contracts\SystemTranslationCatalogInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationServiceInterface;
+use App\Domains\Flow\Contracts\TriggerTypeFactoryInterface;
 use App\Domains\Flow\Contracts\VariableCoercerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
@@ -113,6 +114,7 @@ use App\Domains\Flow\Policies\FlowLogPolicy;
 use App\Domains\Flow\Policies\FlowSessionPolicy;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Flow\Repositories\AssistantTranslationRepository;
 use App\Domains\Flow\Repositories\FlowDefinitionRepository;
 use App\Domains\Flow\Repositories\FlowDraftRepository;
@@ -156,6 +158,7 @@ use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Flow\Translations\CoreSystemTranslations;
 use App\Domains\Flow\Translations\InMemorySystemTranslationCatalog;
+use App\Domains\Flow\TriggerTypes\QueuedTriggerFirer;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Flow\Validation\ButtonLimitChecker;
 use App\Domains\Flow\Validation\ChannelCapabilityChecker;
@@ -186,6 +189,7 @@ use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
 use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
+use App\Infrastructure\Flow\ContainerTriggerTypeFactory;
 use App\Infrastructure\Flow\DnsHostResolver;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use App\Infrastructure\Flow\QueuedDelayResumeScheduler;
@@ -193,6 +197,7 @@ use App\Infrastructure\Flow\QueuedOperatorRequestTimeoutScheduler;
 use App\Infrastructure\Flow\QueuedSendMessageTimeoutScheduler;
 use App\Infrastructure\Solution\ContainerSolutionAvailability;
 use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
+use Fapost\Foundation\Flow\Contracts\TriggerFirerInterface;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
@@ -438,6 +443,7 @@ final class FlowServiceProvider extends ServiceProvider
                 $this->app->make(ActionHandlerRegistry::class)->freeze();
                 $this->app->make(StateNamespaceRegistry::class)->freeze();
                 $this->app->make(RagAdapterRegistry::class)->freeze();
+                $this->app->make(TriggerTypeRegistry::class)->freeze();
             }
         });
     }
@@ -459,6 +465,9 @@ final class FlowServiceProvider extends ServiceProvider
             NodeHandlerRegistryInterface::class,
             fn ($app): NodeHandlerRegistry => $app->make(NodeHandlerRegistry::class)
         );
+        // Trigger types extensions register next to the built-in ones; Core registers none yet.
+        $this->app->singleton(TriggerTypeFactoryInterface::class, ContainerTriggerTypeFactory::class);
+        $this->app->singleton(TriggerTypeRegistry::class);
         $this->app->singleton(VariableCoercerInterface::class, VariableCoercer::class);
         $this->app->singleton(
             \App\Domains\Flow\Validation\InputValidatorInterface::class,
@@ -508,6 +517,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(AssistantTranslationRepositoryInterface::class, AssistantTranslationRepository::class);
         $this->app->bind(TenantEventRepositoryInterface::class, TenantEventRepository::class);
         $this->app->bind(FlowTriggerEventPublisherInterface::class, QueuedFlowTriggerEventPublisher::class);
+        $this->app->bind(TriggerFirerInterface::class, QueuedTriggerFirer::class);
         $this->app->bind(DelayResumeSchedulerInterface::class, QueuedDelayResumeScheduler::class);
         $this->app->bind(
             \App\Domains\Flow\Contracts\AutomationContinuationSchedulerInterface::class,

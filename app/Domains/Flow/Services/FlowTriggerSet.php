@@ -36,7 +36,7 @@ final readonly class FlowTriggerSet
     {
         return [
             'id'        => mb_strtolower($row->id),
-            'type'      => $row->type->value,
+            'type'      => $row->typeName(),
             'is_active' => $row->is_active,
             'priority'  => $row->priority,
             'config'    => is_array($row->config) ? $row->config : [],

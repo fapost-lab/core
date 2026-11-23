@@ -16,6 +16,7 @@ final readonly class InstalledSolution
      * @param  string  $id  stable key of the Solution; never changes
      * @param  list<string>  $actions  action ids the manifest declares
      * @param  list<string>  $nodes  flow node types the manifest declares (`extra.fapost.nodes`)
+     * @param  list<string>  $triggers  flow trigger types the manifest declares (`extra.fapost.triggers`)
      * @param  bool  $state  whether the manifest declares the Solution owns the flow state namespace named by its id (`extra.fapost.state`)
      * @param  string|null  $composerPath  composer.json the manifest was read from; the cache watches it
      * @param  string|null  $ui  `extra.fapost.ui`: the Solution's `fapost-ui.json` relative to the package root, or null
@@ -43,6 +44,7 @@ final readonly class InstalledSolution
         public ?string $migrations = null,
         public ?string $latestMigration = null,
         public ?string $migrationsDigest = null,
+        public array $triggers = [],
     ) {
     }
 
@@ -64,6 +66,7 @@ final readonly class InstalledSolution
             migrations: $manifest->migrations,
             latestMigration: $latestMigration,
             migrationsDigest: $migrationsDigest,
+            triggers: $manifest->triggers,
         );
     }
 
@@ -76,6 +79,10 @@ final readonly class InstalledSolution
         // exception makes SolutionCache ignore it as stale instead of reading them as "none".
         if (!array_key_exists('nodes', $data) || !array_key_exists('state', $data)) {
             throw new InvalidArgumentException('The cached Solution has no nodes or state; the cache predates them.');
+        }
+
+        if (!array_key_exists('triggers', $data)) {
+            throw new InvalidArgumentException('The cached Solution has no trigger types; the cache predates them.');
         }
 
         if (!array_key_exists('migrations', $data) || !array_key_exists('latestMigration', $data) || !array_key_exists('migrationsDigest', $data)) {
@@ -98,6 +105,7 @@ final readonly class InstalledSolution
             migrations: isset($data['migrations']) ? (string) $data['migrations'] : null,
             latestMigration: isset($data['latestMigration']) ? (string) $data['latestMigration'] : null,
             migrationsDigest: isset($data['migrationsDigest']) ? (string) $data['migrationsDigest'] : null,
+            triggers: array_values(array_map(strval(...), (array) $data['triggers'])),
         );
     }
 
@@ -174,6 +182,7 @@ final readonly class InstalledSolution
             'migrations'           => $this->migrations,
             'latestMigration'      => $this->latestMigration,
             'migrationsDigest'     => $this->migrationsDigest,
+            'triggers'             => $this->triggers,
         ];
     }
 }

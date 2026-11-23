@@ -42,7 +42,7 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
                 return new ResolvedTrigger(
                     triggerId: (string)$trigger->getKey(),
                     flowId: $trigger->flow_id,
-                    type: $trigger->type->value,
+                    type: $trigger->typeName(),
                     config: $trigger->config,
                     metadata: [
                         'tenant_id'    => $context->tenantId,
@@ -60,7 +60,7 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
             return new ResolvedTrigger(
                 triggerId: (string)$containsTrigger->getKey(),
                 flowId: $containsTrigger->flow_id,
-                type: $containsTrigger->type->value,
+                type: $containsTrigger->typeName(),
                 config: $containsTrigger->config,
                 metadata: [
                     'tenant_id'    => $context->tenantId,

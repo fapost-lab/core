@@ -35,7 +35,7 @@ final readonly class ResolveEventTriggersService
             $resolved[] = new ResolvedTrigger(
                 triggerId: (string)$trigger->getKey(),
                 flowId: $trigger->flow_id,
-                type: $trigger->type->value,
+                type: $trigger->typeName(),
                 config: $trigger->config,
                 metadata: [
                     'tenant_id'    => $tenantId,

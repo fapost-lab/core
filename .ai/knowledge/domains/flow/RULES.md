@@ -213,6 +213,21 @@ broken.
   fake a Core fact, and flows that set each other off must stop (`adr-20261119-core-events-start-contactless-runs`).
   Enforced: `CoreEventTriggersTest`, `QueuedFlowTriggerEventPublisherTest`, `PublishCoreEventsTest`,
   `ContactTagEventsTest`, `ValidateFlowServiceTest`, `BuiltInNodeHandlersTest`, `ConversationBoundariesTest`.
+- **A registered trigger type starts contactless runs once per fire, only while its Solution is active, and a row of an
+  unknown type never breaks a read.** Extensions add trigger types through Foundation's `TriggerTypeInterface`
+  (`TriggerTypeRegistry`: classes built per call, owner = Solution id or null for Core, a Solution's type starts with
+  `<id>.` and is declared in `extra.fapost.triggers`, a built-in name is never taken, frozen after boot). The five
+  built-in types stay `FlowTriggerType`; `FlowTrigger::type` reads a built-in type as the enum and any other as its
+  string, so code reads `typeName()`/`builtInType()`, never `->type->value`. `TriggerFirerInterface::fire()` refuses
+  an unregistered type, an empty key or a payload over 64 KB at the caller, adds one to `EventChainContext` (past
+  `MAX_CHAIN_DEPTH` nothing is queued, `flow.trigger.chain_depth_exceeded`) and queues `FireRegisteredTriggerJob`
+  after commit; the job starts nothing while the owner is inactive, and otherwise one `StartAutomationRunJob` per
+  active trigger whose config the type `matches()`, with fire key `tt:<key>` and state `flow.trigger.*` plus
+  `flow.trigger_type`. Publish refuses `trigger_type_not_installed` / `unknown_trigger_type` and only warns for an
+  inactive Solution; such a trigger gives no contact. Why: an extension's trigger must neither start a run twice nor
+  run for a tenant that switched the Solution off, and a removed Solution must not take the flow list down with it
+  (`adr-20261123-solution-trigger-types`). Enforced: `RegisteredTriggerTypesTest`, `RegisteredTriggerTypePublishTest`,
+  `TriggerTypeRegistryTest`, `SolutionCoreRegistrarTest`, `FlowsConsoleTest`. *(proposed)*
 - **An event trigger's `assistant_filter` matches the assistant that emitted the event, never the trigger's own, and a
   Core event takes none.** `config.assistant_filter` is a list of assistant ids; empty or absent is any assistant. A
   flow event passes when the assistant of its emitting session (`flow_sessions.assistant_id`, read by

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Verification for the node profile. Called by `jig verify` from the
 # repository root. Exit 0 = pass, 1 = fail, 2 = skip (no check could run).
-# Prints one line per check: "node: <check>: pass|fail|skip (<note>)".
+# Prints one line per check: "node: <check>: pass|fail|skip (<note>)". A check
+# is named by its role and the command inside it: `tests (npm test)`,
+# `lint (pnpm run lint)`, `typecheck (yarn run typecheck)`.
 #
 # The package manager is the stack toolchain (adr-20260918-profiles-narrow-per-check-with-project-tools): resolved from
 # $PATH, never from node_modules. It is chosen by package.json's own
@@ -12,10 +14,16 @@
 # `bun test` is Bun's own built-in test runner and ignores the package.json
 # script entirely, unlike every other manager's "test" shorthand.
 #
-# Checks: the "test", "lint" and "typecheck" scripts, each only when
-# package.json declares it (grep-based: SPEC requires no mandatory
-# dependency besides git, so a JSON parser such as jq cannot be assumed
-# present — see _node_has_script, unchanged from the original profile).
+# Checks by role (`checks:` in profile.yaml): tests, lint and typecheck, from
+# the "test", "lint" and "typecheck" scripts, each only when package.json
+# declares it (grep-based: SPEC requires no mandatory dependency besides git,
+# so a JSON parser such as jq cannot be assumed present — see
+# _node_has_script, unchanged from the original profile). Every command line
+# comes from the profile's check table through jp_check_cmd
+# (schemas/profile.md, Check table): the words below are the defaults the
+# table leaves to this script, because they depend on the package manager and
+# the runner found at run time. Every fallback to the full set is a `full`
+# command line.
 #
 # Narrowing (ADR-0041, adr-20260918-profiles-narrow-per-check-with-project-tools), per check:
 # - lint narrows to the changed js/jsx/ts/tsx/mjs/cjs/mts/cts files, but
@@ -209,31 +217,54 @@ if jp_have "$MGR"; then
   MGR_BIN="$MGR"
 fi
 
+# The label is the role and the command the check runs: `tests (npm test)`.
 case "$MGR" in
-  npm) TEST_LABEL="npm test"; LINT_LABEL="npm run lint"; TYPECHECK_LABEL="npm run typecheck" ;;
+  npm) TEST_CMD="npm test"; LINT_CMD="npm run lint"; TYPECHECK_CMD="npm run typecheck" ;;
   # bun reserves `bun test` for its own built-in test runner (see
-  # _node_full_test); the check line must name the command actually run.
-  bun) TEST_LABEL="bun run test"; LINT_LABEL="bun run lint"; TYPECHECK_LABEL="bun run typecheck" ;;
-  *) TEST_LABEL="$MGR test"; LINT_LABEL="$MGR run lint"; TYPECHECK_LABEL="$MGR run typecheck" ;;
+  # _node_test_cmd); the check line must name the command actually run.
+  bun) TEST_CMD="bun run test"; LINT_CMD="bun run lint"; TYPECHECK_CMD="bun run typecheck" ;;
+  *) TEST_CMD="$MGR test"; LINT_CMD="$MGR run lint"; TYPECHECK_CMD="$MGR run typecheck" ;;
 esac
+TEST_LABEL="tests ($TEST_CMD)"
+LINT_LABEL="lint ($LINT_CMD)"
+TYPECHECK_LABEL="typecheck ($TYPECHECK_CMD)"
 
-# _node_full_test <note> — run the project's own "test" script (never
-# narrowed here). bun reserves `bun test` for its own built-in test
-# runner, so bun alone needs `run`.
-_node_full_test() {
+# _node_test_cmd — JP_CMD for the full "test" script (never narrowed here).
+# bun reserves `bun test` for its own built-in test runner, so bun alone
+# needs `run`. Exit 1 when the check table cannot build it.
+_node_test_cmd() {
   if [ "$MGR" = bun ]; then
-    jp_run "$TEST_LABEL" "$1" "$MGR_BIN" run test
+    jp_check_cmd tests "$TEST_LABEL" full "$MGR_BIN" run test
   else
-    jp_run "$TEST_LABEL" "$1" "$MGR_BIN" test
+    jp_check_cmd tests "$TEST_LABEL" full "$MGR_BIN" test
   fi
 }
 
+# _node_full_test <note> — run the project's own "test" script.
+_node_full_test() {
+  if _node_test_cmd; then
+    jp_run "$TEST_LABEL" "$1" "${JP_CMD[@]}"
+  fi
+}
+
+_node_lint_cmd() {
+  jp_check_cmd lint "$LINT_LABEL" full "$MGR_BIN" run lint
+}
+
 _node_full_lint() {
-  jp_run "$LINT_LABEL" "$1" "$MGR_BIN" run lint
+  if _node_lint_cmd; then
+    jp_run "$LINT_LABEL" "$1" "${JP_CMD[@]}"
+  fi
+}
+
+_node_typecheck_cmd() {
+  jp_check_cmd typecheck "$TYPECHECK_LABEL" full "$MGR_BIN" run typecheck
 }
 
 _node_full_typecheck() {
-  jp_run "$TYPECHECK_LABEL" "$1" "$MGR_BIN" run typecheck
+  if _node_typecheck_cmd; then
+    jp_run "$TYPECHECK_LABEL" "$1" "${JP_CMD[@]}"
+  fi
 }
 
 # --- test ----------------------------------------------------------------
@@ -365,7 +396,9 @@ _node_test_via_jest() {
     jp_full_left_to_ci "$TEST_LABEL" "jest finds no related tests" \
       || _node_full_test "$mv, scope: jest finds no related tests, ran full set"
   else
-    jp_run "$TEST_LABEL" "$v, scope: jest related, $n files$JP_SELECTION_NOTE" "$jest" --findRelatedTests "$@"
+    if jp_check_cmd tests "$TEST_LABEL" narrowed "$jest" --findRelatedTests -- "$@"; then
+      jp_run "$TEST_LABEL" "$v, scope: jest related, $n files$JP_SELECTION_NOTE" "${JP_CMD[@]}"
+    fi
   fi
 }
 
@@ -397,7 +430,9 @@ _node_test_via_vitest() {
       || _node_full_test "$mv, scope: filter '$missing' selects no tests, ran full set"
     return 0
   fi
-  jp_run "$TEST_LABEL" "$v, scope: vitest related, $# files$JP_SELECTION_NOTE" "$vitest" run "$@"
+  if jp_check_cmd tests "$TEST_LABEL" narrowed "$vitest" run -- "$@"; then
+    jp_run "$TEST_LABEL" "$v, scope: vitest related, $# files$JP_SELECTION_NOTE" "${JP_CMD[@]}"
+  fi
 }
 
 if [ "${JIG_VERIFY_EXPLAIN:-}" = 1 ]; then
@@ -408,13 +443,17 @@ if [ "${JIG_VERIFY_EXPLAIN:-}" = 1 ]; then
   elif ! _node_has_script test || [ -z "$MGR_BIN" ]; then
     jp_plan "$TEST_LABEL" skip "no test script or $MGR not found"
   elif ! jp_scoped; then
-    jp_plan "$TEST_LABEL" full "full scope"
+    if _node_test_cmd; then
+      jp_plan "$TEST_LABEL" full "full scope"
+    fi
   else
     runner=$(_node_test_runner)
     runner_bin=""
     if [ -n "$runner" ]; then runner_bin=$(_node_local_bin "$runner"); fi
     if [ -z "$runner_bin" ]; then
-      jp_plan_full "$TEST_LABEL" "no local supported runner for narrowing"
+      if _node_test_cmd; then
+        jp_plan_full "$TEST_LABEL" "no local supported runner for narrowing"
+      fi
     elif [ "$runner" = jest ]; then
       jp_select _node_builtin_jest
       filters=$JP_SELECTION
@@ -430,10 +469,14 @@ EOF
         # Under `ci` a full set is never run here: the cases that would are skips.
         possible="; full set possible"
         if jp_ci_runs_full; then possible=""; fi
-        jp_plan "$TEST_LABEL" conditional "related tests for $(printf '%s\n' "$filters" | paste -sd, -) require jest --listTests$JP_SELECTION_NOTE$possible"
+        if jp_check_cmd tests "$TEST_LABEL" narrowed "$runner_bin" --findRelatedTests; then
+          jp_plan "$TEST_LABEL" conditional "related tests for $(printf '%s\n' "$filters" | paste -sd, -) require jest --listTests$JP_SELECTION_NOTE$possible"
+        fi
       elif [ "$filters" = ALL ]; then
-        jp_plan_select "$TEST_LABEL" "$filters" "test files" \
-          "$(_node_all_reason "$(jp_decide_cause _node_builtin_jest)")"
+        if _node_test_cmd; then
+          jp_plan_select "$TEST_LABEL" "$filters" "test files" \
+            "$(_node_all_reason "$(jp_decide_cause _node_builtin_jest)")"
+        fi
       else
         jp_plan_select "$TEST_LABEL" "$filters" "test files"
       fi
@@ -453,32 +496,48 @@ EOF
       else
         why=
       fi
-      jp_plan_select "$TEST_LABEL" "$filters" "test files" "$why"
+      if [ -z "$filters" ]; then
+        jp_plan_select "$TEST_LABEL" "$filters" "test files" "$why"
+      elif [ "$filters" = ALL ]; then
+        if _node_test_cmd; then
+          jp_plan_select "$TEST_LABEL" "$filters" "test files" "$why"
+        fi
+      elif jp_check_cmd tests "$TEST_LABEL" narrowed "$runner_bin" run; then
+        jp_plan_select "$TEST_LABEL" "$filters" "test files" "$why"
+      fi
     fi
   fi
 
-  if ! _node_has_script lint || [ -z "$MGR_BIN" ]; then
+  if jp_covered lint "$LINT_LABEL"; then
+    :
+  elif ! _node_has_script lint || [ -z "$MGR_BIN" ]; then
     jp_plan "$LINT_LABEL" skip "no lint script or $MGR not found"
   else
     eslint_bin=""
     if _node_lint_uses_eslint; then eslint_bin=$(_node_local_bin eslint); fi
     if [ -z "$eslint_bin" ] || ! jp_scoped || _node_all_glob_changed; then
-      jp_plan_full "$LINT_LABEL" "lint script or project configuration requires full set"
+      if _node_lint_cmd; then
+        jp_plan_full "$LINT_LABEL" "lint script or project configuration requires full set"
+      fi
     else
       # shellcheck disable=SC2086
       files=$(jp_changed $NODE_TEST_EXTS)
       if [ -z "$files" ]; then
         jp_plan "$LINT_LABEL" skip "no changed lintable files"
-      else
+      elif jp_check_cmd lint "$LINT_LABEL" narrowed "$eslint_bin"; then
         jp_plan "$LINT_LABEL" filtered "eslint files: $(printf '%s\n' "$files" | paste -sd, -)"
       fi
     fi
   fi
 
-  if ! _node_has_script typecheck || [ -z "$MGR_BIN" ]; then
+  if jp_covered typecheck "$TYPECHECK_LABEL"; then
+    :
+  elif ! _node_has_script typecheck || [ -z "$MGR_BIN" ]; then
     jp_plan "$TYPECHECK_LABEL" skip "no typecheck script or $MGR not found"
   else
-    jp_plan_full "$TYPECHECK_LABEL" "typecheck cannot narrow by file"
+    if _node_typecheck_cmd; then
+      jp_plan_full "$TYPECHECK_LABEL" "typecheck cannot narrow by file"
+    fi
   fi
   exit 0
 fi
@@ -509,7 +568,9 @@ fi
 
 # --- lint ------------------------------------------------------------------
 
-if ! _node_has_script lint || [ -z "$MGR_BIN" ]; then
+if jp_covered lint "$LINT_LABEL"; then
+  :
+elif ! _node_has_script lint || [ -z "$MGR_BIN" ]; then
   jp_skip "$LINT_LABEL" "no lint script or $MGR not found"
 else
   eslint_bin=""
@@ -541,14 +602,18 @@ else
       set -- $files
       set +f
       IFS=$' \t\n'
-      jp_run "$LINT_LABEL" "$v, scope: eslint, $n files" "$eslint_bin" "$@"
+      if jp_check_cmd lint "$LINT_LABEL" narrowed "$eslint_bin" -- "$@"; then
+        jp_run "$LINT_LABEL" "$v, scope: eslint, $n files" "${JP_CMD[@]}"
+      fi
     fi
   fi
 fi
 
 # --- typecheck ---------------------------------------------------------------
 
-if ! _node_has_script typecheck || [ -z "$MGR_BIN" ]; then
+if jp_covered typecheck "$TYPECHECK_LABEL"; then
+  :
+elif ! _node_has_script typecheck || [ -z "$MGR_BIN" ]; then
   jp_skip "$TYPECHECK_LABEL" "no typecheck script or $MGR not found"
 else
   mgr_v=$(jp_version "$MGR_BIN" --version)

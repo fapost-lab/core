@@ -2,12 +2,15 @@
 import {computed, ref, watch} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
 import SearchSelect from '../SearchSelect.vue'
+import SchemaFields from '../SchemaFields.vue'
+import type {FieldEntry} from '../SchemaFields.vue'
 import {createWebhookEndpoint, fetchAssistantOptions, generateWebhookSecret, setWebhookSecret} from '@builder/api/builderApi'
 import type {ApiError, SelectOption} from '@builder/api/builderApi'
 import type {WebhookEndpointInfo} from '@builder/dto/types'
 import {useConfirm} from '@builder/composables/useConfirm'
 import {usePermissions} from '@builder/composables/usePermissions'
 import {useTranslations} from '@builder/composables/useTranslations'
+import {useTriggerTypes} from '@builder/composables/useTriggerTypes'
 import {
     WEBHOOK_PRESETS,
     defaultWebhookConfig,
@@ -57,6 +60,73 @@ const triggerTypes = [
     { value: 'api', label: 'API' },
     { value: 'event', label: 'Event' },
 ]
+
+const BUILTIN_TYPES = new Set(triggerTypes.map((option) => option.value))
+
+const { triggerTypes: registeredTypes, loaded: typesLoaded, load: loadTriggerTypes, find: findTriggerType } = useTriggerTypes()
+
+void loadTriggerTypes()
+
+/** Trigger types a Solution registered and that are active for the tenant, offered after the built-in ones. */
+const registeredOptions = computed(() =>
+    registeredTypes.value.filter((entry) => !entry.builtin && !BUILTIN_TYPES.has(entry.type) && entry.available)
+)
+
+function registeredLabel(entry: { label: string, solution: { name: string } | null }): string {
+    return entry.solution === null ? entry.label : `${entry.label} (${entry.solution.name})`
+}
+
+const currentType = computed(() => String(currentTrigger.value.type ?? ''))
+
+const currentRegistered = computed(() =>
+    BUILTIN_TYPES.has(currentType.value) ? undefined : findTriggerType(currentType.value)
+)
+
+/**
+ * Why the trigger cannot be edited: its type is registered but its Solution is not active, or the type is
+ * unknown altogether (judged only once the list has loaded). Null for an editable trigger.
+ */
+const unavailableReason = computed<'inactive' | 'unknown' | null>(() => {
+    if (BUILTIN_TYPES.has(currentType.value)) {
+        return null
+    }
+
+    if (currentRegistered.value !== undefined) {
+        return currentRegistered.value.available ? null : 'inactive'
+    }
+
+    return typesLoaded.value ? 'unknown' : null
+})
+
+/** A registered, available type whose form comes from its config schema. */
+const registeredForm = computed(() => {
+    const entry = currentRegistered.value
+
+    return entry !== undefined && entry.available && entry.config_schema !== null ? entry : null
+})
+
+const SCHEMA_RESERVED_KEYS = new Set(['required', 'sections'])
+
+const registeredFields = computed<FieldEntry[]>(() => {
+    const raw = registeredForm.value?.config_schema ?? {}
+    const requiredList = Array.isArray(raw.required) ? (raw.required as string[]) : []
+
+    return Object.entries(raw)
+        .filter(([key, value]) => !SCHEMA_RESERVED_KEYS.has(key) && typeof value === 'object' && value !== null && 'type' in value)
+        .map(([key, value]) => ({
+            key,
+            schema: value as Record<string, unknown>,
+            required: Boolean((value as Record<string, unknown>).required) || requiredList.includes(key),
+        }))
+})
+
+const payloadHint = computed(() => {
+    const fields = registeredForm.value?.payload_fields ?? []
+
+    return fields.length === 0
+        ? ''
+        : t('trigger_types.payload_hint').replace(':fields', fields.map((field) => `flow.trigger.${field}`).join(', '))
+})
 
 const currentTrigger = computed(() =>
     props.trigger ?? createDefaultTrigger('message')
@@ -389,6 +459,7 @@ function defaultConfig(type: string): Record<string, unknown> {
             {{ t('permission_hints.automations') }}
         </p>
         <div class="automation-lock" :inert="automationLocked" data-testid="automation-lock">
+        <div class="trigger-unavailable" :class="{ 'is-unavailable': unavailableReason !== null }" :inert="unavailableReason !== null" data-testid="trigger-general">
         <AccordionSection title="General" default-open>
             <div class="config-field">
                 <div class="field-label">Trigger type</div>
@@ -403,6 +474,17 @@ function defaultConfig(type: string): Record<string, unknown> {
                         :value="option.value"
                         :disabled="option.value !== 'message' && !canManageAutomations"
                     >{{ option.label }}</option>
+                    <option
+                        v-for="entry in registeredOptions"
+                        :key="entry.type"
+                        :value="entry.type"
+                        :disabled="!canManageAutomations"
+                    >{{ registeredLabel(entry) }}</option>
+                    <option
+                        v-if="!BUILTIN_TYPES.has(currentType) && !registeredOptions.some((entry) => entry.type === currentType)"
+                        :value="currentType"
+                        disabled
+                    >{{ currentRegistered?.label ?? currentType }}</option>
                 </select>
             </div>
 
@@ -425,6 +507,23 @@ function defaultConfig(type: string): Record<string, unknown> {
                 >
                 <span>Trigger is active</span>
             </label>
+        </AccordionSection>
+        </div>
+
+        <p v-if="unavailableReason !== null" class="field-help trigger-unavailable-notice" data-testid="trigger-unavailable">
+            {{ unavailableReason === 'inactive'
+                ? t('trigger_types.inactive').replace(':solution', currentRegistered?.solution?.name ?? '')
+                : t('trigger_types.unknown').replace(':type', currentType) }}
+        </p>
+
+        <AccordionSection v-if="registeredForm !== null" :title="registeredForm.label" default-open>
+            <p v-if="payloadHint" class="field-hint" data-testid="trigger-payload-hint">{{ payloadHint }}</p>
+            <SchemaFields
+                :config="triggerCfg"
+                :fields="registeredFields"
+                :root-config="triggerCfg"
+                @update:config="(patch: Record<string, unknown>) => update({ config: patch })"
+            />
         </AccordionSection>
 
         <AccordionSection v-if="currentTrigger.type === 'message'" title="Message matching" default-open>
@@ -770,6 +869,15 @@ function defaultConfig(type: string): Record<string, unknown> {
 </template>
 
 <style scoped>
+.trigger-unavailable {
+    display: contents;
+}
+
+.trigger-unavailable.is-unavailable {
+    display: block;
+    opacity: 0.55;
+}
+
 .automation-lock {
     display: contents;
 }
