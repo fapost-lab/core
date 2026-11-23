@@ -532,9 +532,10 @@ final class FlowTriggersPublishTest extends FeatureTestCase
             && (string) $draft->assistant_id === $entry->assistant_id
             && 1 === $entry->properties['version']));
         $this->assertSame('schedule', $added[$schedule]->properties['trigger_type']);
+        // jsonb keeps its own key order, so the values are compared as a map.
         $this->assertSame(
-            ['type' => 'schedule', 'is_active' => false, 'priority' => 5],
-            $added[$schedule]->attribute_changes?->toArray()['attributes'],
+            $this->sortedKeys(['type' => 'schedule', 'is_active' => false, 'priority' => 5]),
+            $this->sortedKeys($added[$schedule]->attribute_changes?->toArray()['attributes']),
         );
         $this->assertSame(1, ActivityEntry::query()->where('description', 'flow.published')->count());
 
