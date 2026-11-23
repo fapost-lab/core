@@ -43,6 +43,7 @@ final class SystemStateNamespacePolicyTest extends TestCase
         yield 'set_tag writes system marker' => ['set_tag', 'system.set_tag.n1'];
         yield 'request_operator writes its request marker' => ['request_operator', 'system.request_operator.n1'];
         yield 'ask_person writes its question marker' => ['ask_person', 'system.ask_person.n1.question_id'];
+        yield 'auth_request writes its attempt counters' => ['auth_request', 'system.auth.n1'];
         yield 'rag_query writes rag.*' => ['rag_query', 'rag.answer'];
         yield 'a Solution node writes its own namespace' => ['feedback.collect', 'feedback.last_score'];
         yield 'a Solution node writes flow.*' => ['feedback.collect', 'flow.answer'];
@@ -56,6 +57,7 @@ final class SystemStateNamespacePolicyTest extends TestCase
         yield 'foreign handler writes system.*' => ['custom_solution_node', 'system.language'];
         yield 'request_operator writes rag.*' => ['request_operator', 'rag.answer'];
         yield 'branch writes system.*' => ['branch', 'system.sent_messages.n1'];
+        yield 'assign resets the attempts of an auth_request' => ['assign', 'system.auth.n1'];
         yield 'foreign handler writes rag.*' => ['send_message', 'rag.answer'];
         yield 'module namespace is read-only' => ['custom_solution_node', 'module.hr.department'];
         yield 'contact projection not writable' => ['assign', 'contact.first_name'];

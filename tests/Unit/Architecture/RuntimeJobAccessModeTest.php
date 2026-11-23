@@ -28,6 +28,7 @@ use App\Jobs\Flow\DispatchFlowTriggerEventJob;
 use App\Jobs\Flow\ExpireOperatorRequestJob;
 use App\Jobs\Flow\ResumeDelayedFlowSessionJob;
 use App\Jobs\Flow\ResumeTimedOutSendMessageNodeJob;
+use App\Jobs\Flow\SendOneTimeCodeJob;
 use App\Jobs\Flow\StartAutomationRunJob;
 use App\Jobs\Flow\StartFlowForContactJob;
 use App\Jobs\Flow\StartFlowFromEventJob;
@@ -71,6 +72,7 @@ final class RuntimeJobAccessModeTest extends TestCase
         ContinueAutomationRunJob::class,
         SendContactNotificationJob::class,
         SendStaffNotificationJob::class,
+        SendOneTimeCodeJob::class,
         ResumeDelayedFlowSessionJob::class,
         ResumeTimedOutSendMessageNodeJob::class,
         ExpireOperatorRequestJob::class,

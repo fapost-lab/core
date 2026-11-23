@@ -105,7 +105,7 @@ final class RunBroadcastJob implements ShouldQueue, TenantAccessGatedJob
                     ]);
 
                 if (1 === $completed) {
-                    event(new BroadcastCompleted($this->tenantId, $this->broadcastId, (string) $broadcast->name, 0, 0, 0));
+                    event(new BroadcastCompleted($this->tenantId, $this->broadcastId, (string) $broadcast->name, 0, 0, 0, (int) $broadcast->chain_depth));
                 }
 
                 return;

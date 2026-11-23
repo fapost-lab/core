@@ -7,11 +7,16 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Handlers\CallNodeHandler;
+use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Nodes\AnnotationNodeTypes;
+use App\Domains\Flow\Support\AddresseeResolver;
+use App\Domains\Flow\Templates\TemplateExpander;
 
 /**
  * What publishing a draft would change that needs a right beyond publishing: a saved credential the published version
- * does not reference yet, and an automatic trigger (any type but `message`) made live, changed or removed.
+ * does not reference yet, an automatic trigger (any type but `message`) made live, changed or removed, and a message to
+ * tags or a segment (a broadcast) added or changed.
  *
  * Both compare the draft with what runs now: credentials with the flow's published definition (a template's too),
  * triggers with the flow's live rows ({@see FlowTriggerSet::live()}). Dropping a credential reference needs nothing;
@@ -25,6 +30,7 @@ final readonly class FlowPublishChanges
     public function __construct(
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowTriggerSet $triggerSet,
+        private TemplateExpander $templates,
     ) {
     }
 
@@ -45,6 +51,35 @@ final readonly class FlowPublishChanges
         $current   = null === $published ? [] : self::credentialIds(is_array($published->nodes) ? $published->nodes : []);
 
         return array_values(array_diff($drafted, $current));
+    }
+
+    /**
+     * Whether publishing the draft adds a `send_message` node to tags or a segment, or changes what one sends or to whom
+     * (audience, text, broadcast name), against the published version. Removing one needs nothing.
+     *
+     * Unlike the credential check, the draft is compared after template expansion, as it will be published: a placed
+     * template can bring such a node, and a host's parameter values can rewrite its text. The copies' ids are stable
+     * (UUIDv5 of the reference and the template node), and the published definition is stored expanded, so the two
+     * compare by node id. A draft whose expansion fails is compared as it is: its publish is refused anyway.
+     */
+    public function changesAudienceMessages(FlowDraft $draft): bool
+    {
+        $drafted = self::audienceMessages($this->expandedNodes($draft));
+
+        if ([] === $drafted) {
+            return false;
+        }
+
+        $published = $this->definitions->findLatestPublishedByFlowId($draft->flow_id);
+        $current   = null === $published ? [] : self::audienceMessages(is_array($published->nodes) ? $published->nodes : []);
+
+        foreach ($drafted as $id => $message) {
+            if (! array_key_exists($id, $current) || $current[$id] !== $message) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -106,6 +141,52 @@ final readonly class FlowPublishChanges
     }
 
     /**
+     * The `send_message` nodes to tags or a segment, by id, as what decides who gets what: the audience, the text and
+     * the broadcast name, with keys sorted (jsonb does not keep their order) and tags in a stable order.
+     *
+     * @param  array<array-key, mixed>  $nodes
+     *
+     * @return array<string, string>
+     */
+    private static function audienceMessages(array $nodes): array
+    {
+        $messages = [];
+
+        foreach ($nodes as $node) {
+            if (! is_array($node) || SendMessageNodeHandler::TYPE !== ($node['type'] ?? null) || ! is_array($node['config'] ?? null)) {
+                continue;
+            }
+
+            $config    = $node['config'];
+            $addressee = AddresseeResolver::parse($config);
+            $id        = $node['id'] ?? null;
+
+            if (! AddresseeResolver::isAudience($addressee['kind']) || ! is_scalar($id)) {
+                continue;
+            }
+
+            $tags = $addressee['tags'];
+            sort($tags);
+
+            $text = $config['text'] ?? null;
+
+            if (is_array($text)) {
+                ksort($text);
+            }
+
+            $messages[(string) $id] = json_encode([
+                'kind'           => $addressee['kind'],
+                'tags'           => AddresseeResolver::KIND_TAGS === $addressee['kind'] ? $tags : [],
+                'segment_id'     => AddresseeResolver::KIND_SEGMENT === $addressee['kind'] ? mb_strtolower($addressee['segment_id']) : '',
+                'text'           => $text,
+                'broadcast_name' => $config['broadcast_name'] ?? null,
+            ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }
+
+        return $messages;
+    }
+
+    /**
      * @param  array<array-key, mixed>  $nodes
      *
      * @return list<string>
@@ -127,5 +208,32 @@ final readonly class FlowPublishChanges
         }
 
         return array_keys($ids);
+    }
+
+    /**
+     * The draft's nodes with its template references replaced by their copies, as {@see PublishFlowService} publishes
+     * them; a template's own draft is published unexpanded.
+     *
+     * @return array<int, mixed>
+     */
+    private function expandedNodes(FlowDraft $draft): array
+    {
+        [$nodes, $edges] = AnnotationNodeTypes::strip(
+            is_array($draft->nodes) ? $draft->nodes : [],
+            is_array($draft->edges) ? $draft->edges : [],
+        );
+
+        if ($draft->isTemplate()) {
+            return $nodes;
+        }
+
+        $expansion = $this->templates->expand(
+            $nodes,
+            $edges,
+            (string) $draft->assistant_id,
+            (string) $draft->expression_engine,
+        );
+
+        return [] === $expansion->errors ? $expansion->nodes : $nodes;
     }
 }

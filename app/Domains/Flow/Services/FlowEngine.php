@@ -158,6 +158,63 @@ final readonly class FlowEngine implements FlowEngineInterface
         return $session;
     }
 
+    public function prepare(FlowDefinition $definition, array $initialState, FlowRunOrigin $origin): FlowSession
+    {
+        if (FlowRunKind::Automation !== $origin->kind) {
+            throw new InvalidArgumentException('Only an automation run is prepared ahead of its start.');
+        }
+
+        $entry     = $this->graphResolver->resolveEntryNode($definition);
+        $baseState = $this->buildBaseState($definition, null, $origin->assistantId, $initialState);
+
+        return $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
+            'tenant_id'          => $definition->tenant_id,
+            'assistant_id'       => $origin->assistantId,
+            'contact_id'         => null,
+            'flow_definition_id' => $definition->getKey(),
+            'flow_version'       => $definition->version,
+            'current_node_id'    => $entry,
+            'state'              => $baseState,
+            'status'             => FlowSessionStatus::Pending,
+            'run_kind'           => $origin->kind,
+            'trigger_id'         => $origin->triggerId,
+            'fire_key'           => $origin->fireKey,
+            'deadline_at'        => $this->runDeadline->for(now()),
+            'event_chain_depth'  => $origin->chainDepth,
+            'version'            => 1,
+        ]));
+    }
+
+    public function activate(FlowSession $session): bool
+    {
+        $session->refresh();
+
+        if (FlowSessionStatus::Pending !== $session->status) {
+            return false;
+        }
+
+        $this->connection->transaction(function () use ($session): void {
+            try {
+                $session->saveWithOptimisticLock(['status' => FlowSessionStatus::Active]);
+            } catch (OptimisticLockConflictException $exception) {
+                throw FlowConcurrencyException::forSession((string)$session->getKey(), $exception);
+            }
+
+            $this->afterCommit(function () use ($session): void {
+                $this->analyticsWriter->record(
+                    new AnalyticsEvent(
+                        tenantId: (string)$session->tenant_id,
+                        eventType: AnalyticsEventType::FlowStarted,
+                        payload: ['session_id' => (string)$session->getKey()],
+                        occurredAt: new DateTimeImmutable(),
+                    )
+                );
+            });
+        });
+
+        return true;
+    }
+
     /**
      * @throws Throwable
      */

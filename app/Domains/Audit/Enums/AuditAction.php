@@ -64,6 +64,8 @@ enum AuditAction: string
     case CredentialCreated          = 'credential.created';
     case CredentialUpdated          = 'credential.updated';
     case CredentialDeleted          = 'credential.deleted';
+    case CredentialConnected        = 'credential.connected';
+    case CredentialDisconnected     = 'credential.disconnected';
     case ApiTokenIssued             = 'api_token.issued';
     case ApiTokenRotated            = 'api_token.rotated';
     case ApiTokenRevoked            = 'api_token.revoked';
@@ -126,6 +128,8 @@ enum AuditAction: string
             self::CredentialCreated,
             self::CredentialUpdated,
             self::CredentialDeleted,
+            self::CredentialConnected,
+            self::CredentialDisconnected,
             self::ApiTokenIssued,
             self::ApiTokenRotated,
             self::ApiTokenRevoked,

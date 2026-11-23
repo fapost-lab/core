@@ -18,7 +18,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | Laravel application | PHP 8.4, Laravel 12, PHP-FPM | Webhook ingress, the console (admin and assistant screens), builder and mini-app endpoints |
 | Queue workers | Laravel Horizon | Flow execution, message delivery, transcript logging, trigger fan-out |
 | Ingress gateway | Go, optional | Verifies, rate-limits, deduplicates and enqueues webhook deliveries in front of the application |
-| Landlord schema | PostgreSQL | Tenants, the webhook registry and Core's platform-wide settings |
+| Landlord schema | PostgreSQL | Tenants, the webhook registry, the derived schedule registry and Core's platform-wide settings |
 | Tenant schemas | PostgreSQL | Every domain's data, one schema per tenant, selected by switching the connection's search path |
 | Redis | Redis | Queues, locks, cache, sessions and the webhook spec registry |
 | Front ends | Inertia + Vue 3 (console, builder), Vue 3 + vue-router (mini app), Tailwind (public site) | Separately built surfaces |
@@ -27,7 +27,7 @@ sessions. The platform is extended from outside through public contracts, not by
 
 | Domain | Code | Responsibility | Must not |
 |---|---|---|---|
-| `tenancy` | `app/Domains/Tenancy` | Tenant context, schema switching, provisioning, landlord and webhook registry | Gain outward dependencies; every other domain depends on it |
+| `tenancy` | `app/Domains/Tenancy` | Tenant context, schema switching, provisioning, landlord, webhook registry and schedule registry | Gain outward dependencies; every other domain depends on it |
 | `flow` | `app/Domains/Flow`, `app/Infrastructure/Flow`, `app/Jobs/Flow` | The runtime: routing, engine, node handlers, state, session lock, subflows, triggers, content translation | Depend on messaging provider implementations; use the container or facades in the runtime |
 | `flow-builder` | `resources/js/builder`, builder controllers, Flow draft/validate/publish services | Authoring: drafts, validation, publishing, the visual editor | — (build-time code under PHP-FPM, outside the runtime isolation rules) |
 | `channel-ingress` | `app/Domains/Webhook`, `gateway/` | Inbound webhooks, signatures, handoff to the queue — in PHP and in the Go gateway | Touch Eloquent or the tenant context in the controller |
@@ -40,7 +40,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | `staff` | `app/Domains/Staff` | Staff users, roles, staff notifications | — |
 | `solution` | `app/Domains/Solution` | Installed extension packages — Solutions and, experimental, connectors (`adr-20261016-connector-package-type`): manifest discovery and validation, the catalog and its cache, `platform:update`, per-tenant activation (`ActiveSolutions`, `SolutionActivator`), the console extension registry (`Console/ConsoleExtensionRegistry`) and the check and publication of a Solution's prebuilt console UI (`SolutionUiBundleReader`, `SolutionUiPublisher`, `PublishedSolutionUi`) | Depend on a domain other than the Tenancy contracts, or on the database outside `Infrastructure` |
 | `audit` | `app/Domains/Audit`, `app/Infrastructure/Audit` | The tenant's audit log: what staff and platform support did in the console and builder, recorded explicitly by the write-path services in their transaction (`AuditTrailInterface`, `adr-20261111-audit-log-explicit-recording`); actor resolution, the screen's policy, sign-in listeners and the retention setting live in `Infrastructure/Audit`; `audit:prune` | Depend on a domain other than the Tenancy contracts; be called from the flow runtime, Messaging, Webhook or broadcast jobs (`AuditBoundariesTest`) |
-| `credentials` | `app/Domains/Credentials` | A tenant's saved credentials: the encrypted store (`EloquentCredentialStore`, the Foundation `CredentialStoreInterface`), credential types and their registry, allowed-host matching, secret masking, the OAuth2 token cache, the write path with its audit entry (`adr-20261119-credentials-store`) | Hand a secret to a log, a queue, a browser or the audit; keep a decrypted secret beyond one call |
+| `credentials` | `app/Domains/Credentials` | A tenant's saved credentials: the encrypted store (`EloquentCredentialStore`, the Foundation `CredentialStoreInterface`), credential types and their registry, allowed-host matching, secret masking, the OAuth2 token cache, the write path with its audit entry, and the consent grants of `oauth2_authorization_code` credentials (`credential_oauth_grants`, `OAuth2Consent`, the locked `OAuth2GrantRefresher`, the `credentials:refresh-oauth2-grants` keep-alive command) (`adr-20261119-credentials-store`) | Hand a secret to a log, a queue, a browser or the audit; keep a decrypted secret beyond one call |
 
 `app/Infrastructure/<X>` also holds the seams that compose two domains so neither knows the other:
 `app/Infrastructure/Solution` writes a Solution's actions into the Flow registry and answers Flow's
@@ -58,9 +58,11 @@ both use to list and drop partitions) carry no domain logic and have no knowledg
 
 Domain folders are bounded contexts in naming more than in isolation: Flow reads Contact, Staff,
 Assistant and Media models directly, and import cycles exist (for example Contact↔Flow through
-`NotifyNodeHandler`, Broadcasting↔Flow through Flow's listener on `BroadcastCompleted`). Credentials is another: Flow asks the Foundation `CredentialStoreInterface` (bound to
+`NotifyNodeHandler`, Broadcasting↔Flow through Flow's listener on `BroadcastCompleted`; the other way, `send_message` to tags or a segment
+reaches Broadcasting only through `AudienceBroadcasterInterface`, implemented in `Infrastructure/Flow`). Credentials is another: Flow asks the Foundation `CredentialStoreInterface` (bound to
 Credentials' store) for a call's secret and uses Credentials' type registry, `SecretRedactor` and `HostMatcher` in
-`HttpTransport`, while Credentials' OAuth2 type fetches its token through Flow's `GuardedHttpClient`, the egress guard
+`HttpTransport` (and its Core interface `RejectedTokenAwareInterface`, which a 401 from the target reaches), while
+Credentials' OAuth2 types fetch their tokens through Flow's `GuardedHttpClient`, the egress guard
 (`EgressGuardTest` covers `App\Domains\Credentials` too). The rules below are the boundaries that do hold.
 
 ## Boundaries and dependency direction
@@ -139,8 +141,10 @@ Credentials' store) for a call's secret and uses Credentials' type registry, `Se
    `FlowEngine`, which takes the session lock and runs handlers resolved by `(type, version)`.
    Replies are sent inline: `FlowMessageSender` → `MessageSender::send()` runs inside the
    `flow.execution` job (`messaging.transactional` is reserved and has no job); the transcript is persisted on `messaging.logging`.
-2. **Triggers and wake-ups.** Scheduled and event triggers start sessions from jobs on
-   `scheduled.triggers`; a `delay` node wakes its session through `ResumeDelayedFlowSessionJob`
+2. **Triggers and wake-ups.** Event triggers start sessions from jobs on `scheduled.triggers`; a schedule
+   trigger's slot is claimed every minute by `flow:fire-scheduled-triggers` in the tenants the landlord schedule
+   registry names, which creates the run `pending` and queues its start on `flow.automations`
+   (`adr-20261123-flow-schedule-trigger`); a `delay` node wakes its session through `ResumeDelayedFlowSessionJob`
    on `flow.execution`, and send-message timeouts through `ResumeTimedOutSendMessageNodeJob`. An automation run
    (a flow started by a trigger, not a message) starts and continues in segments on `flow.automations`
    (`StartAutomationRunJob`, `ContinueAutomationRunJob`). A flow's webhook trigger is a second inbound HTTP path,

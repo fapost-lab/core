@@ -43,6 +43,9 @@ final readonly class NodeTraceRecorder
     /** The error class of a session failed for crossing a step limit. */
     public const string STEP_LIMIT_ERROR = 'step_limit';
 
+    /** The node type whose incoming text is a one-time code; kept as a literal so the trace does not depend on handlers. */
+    private const string AUTH_REQUEST_TYPE = 'auth_request';
+
     public function __construct(
         private NodeTraceWriter $writer,
         private TracePayloadMasker $masker,
@@ -95,7 +98,7 @@ final readonly class NodeTraceRecorder
             ], $iterations);
 
             if ($this->carriesPayloads($session)) {
-                $envelope['input']  = $this->masker->mask($this->input($result, $incoming, $resumedAfterDelay));
+                $envelope['input']  = $this->masker->mask($this->input($type, $result, $incoming, $resumedAfterDelay));
                 $envelope['output'] = $this->masker->mask($this->output($result));
             }
 
@@ -183,14 +186,15 @@ final readonly class NodeTraceRecorder
     /**
      * @return array<string, mixed>
      */
-    private function input(NodeExecutionResult $result, ?IncomingMessage $incoming, bool $resumedAfterDelay): array
+    private function input(string $type, NodeExecutionResult $result, ?IncomingMessage $incoming, bool $resumedAfterDelay): array
     {
         $input = [];
 
         if (null !== $incoming) {
             $input['message'] = array_filter([
-                'type'    => $incoming->type->value,
-                'text'    => $incoming->text,
+                'type' => $incoming->type->value,
+                // What a contact types to an auth_request is a one-time code: it never reaches the trace.
+                'text'    => self::AUTH_REQUEST_TYPE === $type ? null : $incoming->text,
                 'payload' => [] === $incoming->payload ? null : $incoming->payload,
                 'media'   => [] === $incoming->media ? null : count($incoming->media),
             ], static fn (mixed $value): bool => null !== $value);

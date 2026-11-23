@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\ApiTokenController as AdminApiTokenController;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\CredentialController as AdminCredentialController;
+use App\Http\Controllers\Admin\CredentialOAuthController as AdminCredentialOAuthController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\HealthController as AdminHealthController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
@@ -168,10 +169,14 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         // Credentials: saved secrets a flow's call node uses to authorize an HTTP request; a new screen, so its own URI.
         Route::get('admin/credentials', [AdminCredentialController::class, 'index'])->name('console.admin.credentials.index');
         Route::get('admin/credentials/create', [AdminCredentialController::class, 'create'])->name('console.admin.credentials.create');
+        // The OAuth2 consent callback: one URL per tenant host, registered at the provider; declared before `{record}` routes.
+        Route::get('admin/credentials/oauth/callback', [AdminCredentialOAuthController::class, 'callback'])->name('console.admin.credentials.oauth.callback');
         Route::get('admin/credentials/{record}/edit', [AdminCredentialController::class, 'edit'])->name('console.admin.credentials.edit');
         Route::post('admin/credentials', [AdminCredentialController::class, 'store'])->name('console.admin.credentials.store');
         Route::put('admin/credentials/{record}', [AdminCredentialController::class, 'update'])->name('console.admin.credentials.update');
         Route::delete('admin/credentials/{record}', [AdminCredentialController::class, 'destroy'])->name('console.admin.credentials.destroy');
+        Route::post('admin/credentials/{record}/oauth/connect', [AdminCredentialOAuthController::class, 'connect'])->name('console.admin.credentials.oauth.connect');
+        Route::delete('admin/credentials/{record}/oauth', [AdminCredentialOAuthController::class, 'disconnect'])->name('console.admin.credentials.oauth.disconnect');
 
         // API tokens: integrations of the workspace, issued, rotated and revoked here; a new screen, so its own URI.
         Route::get('admin/api-tokens', [AdminApiTokenController::class, 'index'])->name('console.admin.api-tokens.index');

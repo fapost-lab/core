@@ -78,4 +78,12 @@ final class SystemStateKeys
      * of the question the node asked and waits for. Cleared when the node leaves, so the next pass (a loop) asks anew.
      */
     public const string ASK_PERSON_PREFIX = StateNamespace::System->value . '.ask_person';
+
+    /**
+     * Prefix for the per-node `auth_request@2` marker. Full path: `system.auth.{nodeId}`, holding the challenge
+     * in progress (`active`, `challenge`, `attempts`, and for a code method `sends` and `last_sent_at`) and never the
+     * code. Only `auth_request` writes `system.*` here, so a flow cannot reset its attempts. When the node exits only
+     * `challenge` stays, so entering it again starts the next challenge.
+     */
+    public const string AUTH_REQUEST_PREFIX = StateNamespace::System->value . '.auth';
 }

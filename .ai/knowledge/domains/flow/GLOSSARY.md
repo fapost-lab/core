@@ -63,6 +63,14 @@ list is the foundation enum `StateNamespace`.
 
 A `system.*` key recording that a node's side effect already happened, checked before repeating
 it: `system.sent_messages`, `system.set_tag.<node>`, `system.staff_notified.*`, `system.contacts_notified.*`.
+`system.auth.<node>` is a counter rather than a marker: the attempts and sends of an `auth_request`
+challenge, and the number of the last challenge once the node has exited.
+
+## One-time code
+
+The digits an `auth_request@2` node sends a contact by SMS or email (through a
+`OneTimeCodeSenderInterface`) and waits to be typed back. Only its keyed hash is stored
+(`AuthCodeStore`); it never enters the session state, the trace or a log.
 
 ## Session lock
 

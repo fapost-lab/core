@@ -22,7 +22,7 @@ Goal: a flow runs on a cron. Done when: reference automation 1 (a daily summary)
 and passes e2e, a tick is never run twice, and a trigger that overlaps itself is skipped visibly.
 
 - [x] Several triggers per flow, live on publish — stable trigger ids in the definition, sync by id, `UNIQUE(flow_id)` dropped, activation moved from draft save to publish for every trigger type
-- [ ] Schedule trigger — landlord registry of next fires, compare-and-set slot claim with the `pending` run in one transaction, skip-if-running on a `(tenant, trigger)` lock, no catch-up, jitter, DST semantics, one-minute floor (after: `flow-segmented-execution` — a scheduled run is a contactless run; after: Several triggers per flow, live on publish — `next_run_at` must survive a republish)
+- [x] Schedule trigger — landlord registry of next fires, compare-and-set slot claim with the `pending` run in one transaction, skip-if-running on a `(tenant, trigger)` lock, no catch-up, jitter, DST semantics, one-minute floor (after: `flow-segmented-execution` — a scheduled run is a contactless run; after: Several triggers per flow, live on publish — `next_run_at` must survive a republish)
 - [ ] Run rate breaker and quota seam — a Foundation "may this run start" contract and run counter for the SaaS shell, a Core breaker that pauses a trigger, a refusal counter and last reason on the trigger (after: Schedule trigger — the first trigger that fires on its own)
 
 ## Phase 3 — Credentials and permissions
@@ -53,7 +53,8 @@ approval with a timeout) passes e2e, and a scheduled flow messages a segment thr
 - [x] `send_message` addressee — a contact by expression in a flow with no contact; publish refuses `send_message` without an addressee there (after: `flow-contact-context` — the addressee is what satisfies the check)
 - [x] Start a flow for a contact — contact by expression, the event-start collision rules, a `no_channel` outcome (after: `flow-contactless-sessions` — the starter is a contactless run)
 - [x] Ask a person and wait — the run parks, a question with buttons to a contact of an assistant, a token per button routes the answer to the run, a timeout branch, "already decided" on a late tap (after: `flow-segmented-execution` — parking and resume of a contactless run)
-- [ ] Tag and segment addressees through Broadcasting — `send_message` to a tag or segment creates a broadcast; `input` towards many starts a flow per contact (after: spec `broadcast-flows` — Broadcasting cannot start a flow yet; after: `send_message` addressee — the same addressee field)
+- [x] Tag and segment addressees through Broadcasting — `send_message` to a tag or segment creates a broadcast (after: `send_message` addressee — the same addressee field)
+- [ ] `input` towards many — starts a flow per contact of a tag or segment (after: spec `broadcast-flows` — Broadcasting cannot start a flow yet; after: Tag and segment addressees through Broadcasting)
 - [ ] fog: staff on a messenger as an addressee, and staff targeting by tag (moved here from `flow-engine-v1x`'s `notify` fog) — waits for the draft `notification-bot` to settle how a staff member is linked to a messenger
 
 ## Phase 6 — Run trace as a graph
@@ -88,7 +89,7 @@ Goal: the remaining conveniences. Done when: a failed run is re-run from the sta
 credential is connected through an OAuth consent screen.
 
 - [ ] Re-run from the start — same trigger payload, `RerunFlow` permission (after: Node trace with full data — the payload must be stored)
-- [ ] OAuth2 with user consent — a callback route per tenant and scheduled token refresh (after: Credentials store — a new credential type)
+- [x] OAuth2 with user consent — a callback route per tenant and scheduled token refresh (after: Credentials store — a new credential type)
 
 ## Waves
 
@@ -97,6 +98,7 @@ credential is connected through an OAuth consent screen.
 3. `flow-run-deadline-sweeper`; Schedule trigger; Core events start contactless runs; `send_message` addressee; Start a flow for a contact; Ask a person and wait; Graph builder mode; Re-run from the start; OAuth2 with user consent
 4. Run rate breaker and quota seam; Registrable trigger types; `emit_event` `assistant_filter` on event triggers; Webhook trigger; Builder mode usage in SaaS; Credential and trigger changes in the activity log
 5. API trigger; Tag and segment addressees through Broadcasting
+6. `input` towards many
 
 <!--
 Rules (jig-idea §8):

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Tenancy\Services;
 
 use App\Domains\Tenancy\Contracts\ChannelWebhookRemoverInterface;
+use App\Domains\Tenancy\Contracts\FlowScheduleRegistryInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantMediaPurgerInterface;
@@ -19,14 +20,14 @@ use Psr\Log\LoggerInterface;
  * Removes a tenant, in an order that is safe to repeat after a failure at any step.
  *
  * {@see self::decommission()} is the local removal: webhook registry entries (landlord table and Redis cache),
- * support access tokens, the schema and the landlord row, so a webhook can never route into a schema that is being
+ * schedule registry entries, support access tokens, the schema and the landlord row, so a webhook can never route into a schema that is being
  * dropped. The load-test harness uses it for the throwaway tenants it provisioned itself.
  *
  * {@see self::decommissionCompletely()} is the removal of a real tenant, in this order:
  *  1. the tenant stops being served (Inactive), so a run that fails half way leaves it unserved and retriable;
  *  2. the channel webhooks are taken down at the provider and the tenant's cache entries forgotten, while the schema
  *     still holds the bot tokens;
- *  3. the webhook routing and the support tokens go;
+ *  3. the webhook routing, the schedule registry entries and the support tokens go;
  *  4. the media the installation holds goes;
  *  5. the schema is dropped;
  *  6. {@see TenantDecommissioned} is dispatched and the log line written, still with the landlord row in place;
@@ -49,6 +50,7 @@ final readonly class TenantDecommissioner
         private TenantCaches $caches,
         private Dispatcher $events,
         private LoggerInterface $logger,
+        private FlowScheduleRegistryInterface $schedules,
     ) {
     }
 
@@ -98,6 +100,7 @@ final readonly class TenantDecommissioner
     private function removeRouting(TenantInterface $tenant): void
     {
         $this->webhookRegistry->deleteForTenant($tenant->getId());
+        $this->schedules->forgetTenant($tenant->getId());
         $this->supportTokens->deleteForTenant($tenant->getId());
     }
 

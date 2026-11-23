@@ -256,7 +256,7 @@ final class AdminUsageConsoleTest extends FeatureTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('usage.limited', true)
                 ->where('usage.rows', [])
-                ->where('usage.unavailable', 3)
+                ->where('usage.unavailable', 5)
                 ->etc());
     }
 

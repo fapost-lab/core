@@ -35,6 +35,14 @@ broken.
   draft and refuses a stale revision (a hash of name, message, target; not `updated_at`), a base
   language without text and an audience that no longer exists, then lets
   `BroadcastDispatcher::start()` decide the single winner. Enforced: `BroadcastsConsoleTest`.
+- **An automation starts a broadcast only through `AutomationBroadcasts`, once per node execution and never while the
+  node's previous one is live.** A flow's `send_message` to tags or a segment has no revision to confirm (publishing the
+  flow was the confirmation, and needs `ManageBroadcast`), no audit record and no current assistant (the broadcast is
+  the flow's assistant's). `origin_key` is unique, so a retried step gets its broadcast back; a partial unique index on
+  `(flow_id, flow_node_id)` over `draft`/`running` rows refuses a second live one (`broadcast_running`). The insert runs
+  in its own transaction so a unique violation can be read back on PostgreSQL. Its completion event carries
+  `chain_depth` (`adr-20261123-flow-audience-message-through-broadcasting`). Enforced: `AutomationBroadcastsTest`,
+  `SendMessageBroadcastTest`.
 - **The run is queued after the transaction commits** (`->afterCommit()` in
   `BroadcastDispatcher::start()`), so a job never sees a draft that is already `Running` on the
   other side. Enforced: `BroadcastDispatcherTest`.

@@ -105,7 +105,9 @@ Graph-level checks (need `edges`):
 
 Trigger checks, per trigger of the list, at `triggers.<id>.…` (`triggers.<index>` for an entry without an id):
 `invalid_trigger`, `invalid_trigger_type`, `invalid_trigger_active_flag`, `invalid_trigger_priority`,
-`invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`), `duplicate_exact_trigger_keyword` (against other
+`invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`; a schedule's cron that is not five fields is
+`invalid_schedule_cron` at `triggers.<id>.config.cron`, a time zone outside the IANA list `invalid_schedule_timezone` at
+`triggers.<id>.config.timezone`, `adr-20261123-flow-schedule-trigger`), `duplicate_exact_trigger_keyword` (against other
 flows' live triggers), `missing_event_trigger_selection`, `unknown_event_trigger_selection`; the id — it becomes the
 `flow_triggers` primary key — `invalid_trigger_id` (not UUID-shaped), `duplicate_trigger_id` (twice in the list),
 `trigger_id_taken` (a live trigger of another flow); `duplicate_event_trigger` for two event triggers on one event
@@ -126,8 +128,8 @@ nothing (Foundation's `DeclaresContextRequirementInterface`, which a Solution's 
 `module.*` (a reference of the flow's expression engine — a `{{…}}` placeholder of `template` —, a bare path, a `source` operand), uses a variable with `storage: contact`, or is a
 legacy `assign` to the contact. Core handlers declaring `any`: `branch`, `delay`, `assign`, `end`, `loop`, `loop_end`,
 `template`, `template_output`, `call` (its `CallContext::$contactId` is `null` without a contact); every other Core node
-needs a contact — `subflow` (its target is not followed) included. A `send_message` whose `addressee` names a contact
-(`NamesOwnRecipientInterface`, Core-only) is not refused for its type, though its config is still checked for
+needs a contact — `subflow` (its target is not followed) included. A `send_message` whose `addressee` names a contact,
+tags or a segment (`NamesOwnRecipientInterface`, Core-only) is not refused for its type, though its config is still checked for
 contact reads. A template's publish republishes its hosts, so it is refused (`template_breaks_flow`) when a host
 with such a trigger would get a contact node.
 
@@ -150,6 +152,13 @@ channels gets none. Annotation nodes are skipped.
 | same, `keyboard_mode` `reply` | `ReplyButtons`; a button with `special` `request_contact` / `request_location` needs `ShareContact` / `ShareLocation` instead |
 | `input` expecting `select` or `confirm` | `CallbackButtons` |
 | `input` expecting `contact` / `location` | `ShareContact` / `ShareLocation` |
+| `auth_request` method `phone` | `ShareContact` |
+| `auth_request` method `sms_code` / `email_code` with a `resend_label` | `CallbackButtons` |
+
+`auth_request@2` checks its own config at validate and publish (`NodeConfigValidatorInterface`): errors
+`auth_method_unknown`, `auth_prompt_required`, `auth_button_label_required` (phone), `auth_limit_out_of_range`,
+`auth_destination_required` (email), `auth_sender_missing` (no sender for the channel: SMS without a connector, email
+while the platform mailer only logs); warning `auth_destination_from_flow` (the destination reads `flow.*`).
 
 `LoopConfigChecker` emits `loop_while_condition_unchanged` (path `nodes.{loop}.config.condition`) for a `while` loop whose
 condition reads a session or contact variable (or `flow.*` / `contact.*` source) that no node of the loop body writes.

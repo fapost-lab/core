@@ -93,6 +93,22 @@ final class ChannelCapabilityCheckerTest extends FeatureTestCase
         $this->assertSame(['nodes.c', 'nodes.l'], array_map(static fn ($warning): string => $warning->path, $warnings));
     }
 
+    public function test_an_auth_request_by_phone_needs_contact_sharing_and_a_resend_button_needs_callbacks(): void
+    {
+        $this->channel('plain');
+
+        $warnings = $this->check([
+            ['id' => 'p', 'type' => 'auth_request', 'config' => ['method' => 'phone']],
+            ['id' => 'e', 'type' => 'auth_request', 'config' => ['method' => 'email_code', 'resend_label' => 'Again']],
+            ['id' => 'n', 'type' => 'auth_request', 'config' => ['method' => 'email_code']],
+            ['id' => 'c', 'type' => 'auth_request', 'config' => ['method' => 'email_code', 'resend_label' => ['en' => ' ']]],
+            ['id' => 'b', 'type' => 'auth_request', 'config' => ['method' => 'basic']],
+        ]);
+
+        $this->assertSame(['nodes.p', 'nodes.e'], array_map(static fn ($warning): string => $warning->path, $warnings));
+        $this->assertStringContainsString('share a contact', $warnings[0]->message);
+    }
+
     public function test_select_and_confirm_inputs_need_callback_buttons_only(): void
     {
         $this->channel('plain', [ChannelCapability::ReplyButtons]);

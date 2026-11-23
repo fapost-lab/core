@@ -31,7 +31,7 @@ reviewed_at: 2026-11-23
 ## Responsibility
 
 Flow executes published flow definitions for a contact, or as a contactless automation run
-(no contact, optionally no assistant; started through `Orchestration/AutomationRunner` by `StartAutomationRunJob`, which a Core event dispatches — `DispatchFlowTriggerEventJob`, from the events of `Events/CoreEventCatalog` that `Listeners/PublishCoreEvents` publishes — and the webhook trigger dispatches). It routes an inbound message or event
+(no contact, optionally no assistant; started through `Orchestration/AutomationRunner` by `StartAutomationRunJob`, which a Core event dispatches — `DispatchFlowTriggerEventJob`, from the events of `Events/CoreEventCatalog` that `Listeners/PublishCoreEvents` publishes — the webhook trigger dispatches, and the schedule trigger dispatches for the `pending` run it created when it claimed a slot — `Schedule/ScheduleTriggerFirer`, run by `flow:fire-scheduled-triggers`). It routes an inbound message or event
 to a flow session, runs node handlers until the flow waits, ends or fails, and persists session
 state. It also owns triggers, subflows, the session lock, run history and logs, the template
 expression engine, and content translation (`Translations/`, `ContentTranslatorInterface`),
@@ -52,6 +52,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 | Flow templates | `Templates/` (`TemplateExpander` copies a template's active definition into a host at publish, `TemplateUsageRepository` over `flow_template_usages`, `TemplateUsageFinder`, `TemplateNodeOrigins` labels copied nodes by `origin` on the session and log screens); handlers `TemplateNodeHandler`, `TemplateOutputNodeHandler` are pass-throughs (`adr-20261111-flow-templates-expanded-at-publish`) |
 | Triggers and events | `Services/Resolvers/`, `Services/FlowTriggerSet` (a flow's trigger list; synced into `flow_triggers` on publish), `ResolveEventTriggersService`, `Events/`, `app/Jobs/Flow/` |
 | Call, RAG, Action, Expression | `Call/`, `Rag/`, `Action/`, `Expression/` — small registries |
+| One-time codes | `Auth/` (`AuthCodeStore`: the keyed hash of a pending code and the per-destination cap; `OneTimeCodeSenderRegistry`, Core's `EmailOneTimeCodeSender` and `OneTimeCodeMail`), `app/Jobs/Flow/SendOneTimeCodeJob.php` — used by `auth_request@2` |
 | History and logging | `History/`, `Logging/` (partitioned `flow_logs`), `Trace/` (node trace in `flow_session_history`) |
 | Translations | `Translations/`, `app/Infrastructure/Flow/CachedContentTranslator.php` |
 | Node usage statistics | `Statistics/NodeUsageStatisticsService` behind `Contracts/NodeUsageStatisticsInterface`; command `app/Console/Commands/Flow/NodeUsageCommand.php` (`flow:node-usage`), run on demand, not scheduled |
@@ -140,8 +141,10 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   store) for the `webhook_response` node's answer or the run's end (`Webhook/WebhookRunEndReply`, called by `FlowEngine`).
   The builder makes the URL and the secret through `Webhook/FlowWebhookEndpointService`
   (`adr-20261119-flow-webhook-trigger`).
-- Events and schedules: `StartFlowFromEventJob` (queue `scheduled.triggers`) and
-  `DispatchFlowTriggerEventJob`. Timeouts: `ResumeTimedOutSendMessageNodeJob`.
+- Events: `StartFlowFromEventJob` (queue `scheduled.triggers`) and `DispatchFlowTriggerEventJob`. Schedules:
+  `Schedule/ScheduleTriggerFirer` claims due slots (run by `flow:fire-scheduled-triggers`), `Schedule/ScheduleClock`
+  computes slots, `Schedule/ScheduleRegistrySync` copies `next_run_at` to the landlord registry after commit; the runs
+  start through `StartAutomationRunJob` on `flow.automations`. Timeouts: `ResumeTimedOutSendMessageNodeJob`.
 - Delays: the `delay` handler schedules `ResumeDelayedFlowSessionJob` (queue `flow.execution`)
   through `DelayResumeSchedulerInterface` → `DelayedSessionResumer`, which takes the session lock
   and calls `FlowEngine::runSession()`. The node is clock-gated, so an inbound message after
@@ -167,7 +170,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   `app/Infrastructure/Flow/DeferredResumeDispatcher`, which queues nothing on a `sync` queue: it
   cannot delay, and would re-enter the running engine. There a timeout never fires and a delay
   moves on only with the next inbound message.
-- Console: `flow:sweep-subflow-timeouts` and `flow:sweep-overdue-automation-runs` (every minute), `logs:prune-flow`, `logs:create-partition`
+- Console: `flow:sweep-subflow-timeouts`, `flow:sweep-overdue-automation-runs` and `flow:fire-scheduled-triggers` (every minute), `flow:rebuild-schedule-registry` (hourly), `logs:prune-flow`, `logs:create-partition`
   (`routes/console.php`; the prune drops a partition under `lock_timeout` 5s through
   `Shared/Infrastructure/PostgresMonthlyPartitions`, and on a timeout the tenant is marked ✘ and the next run retries); `flow:node-usage` is run by hand and is not scheduled.
 - Bindings: `Providers/FlowServiceProvider.php`. Registries are singletons, frozen after boot

@@ -27,6 +27,18 @@ final readonly class EloquentCredentialStore implements CredentialStoreInterface
     {
     }
 
+    /**
+     * Changes whenever the credential is saved: the save time with its microseconds and a hash of the stored
+     * ciphertext, which differs on every write of the secret even within one second of the clock. The consent flow
+     * compares it too, to refuse a grant for a credential changed since the consent began.
+     */
+    public static function versionOf(Credential $credential): string
+    {
+        $savedAt = $credential->updated_at?->format('Y-m-d\TH:i:s.u') ?? '';
+
+        return $savedAt . '-' . mb_substr(hash('sha256', (string) $credential->getRawOriginal('secret')), 0, 16);
+    }
+
     public function references(?string $type = null): array
     {
         $query = Credential::query()
@@ -74,21 +86,10 @@ final readonly class EloquentCredentialStore implements CredentialStoreInterface
             tenantId: $tenantId,
             id: $credential->id,
             type: $credential->type,
-            version: self::version($credential),
+            version: self::versionOf($credential),
             settings: array_filter($credential->settings, is_string(...)),
             allowedHosts: array_values(array_filter($credential->allowed_hosts, is_string(...))),
             values: array_filter($values, is_string(...)),
         );
-    }
-
-    /**
-     * Changes whenever the credential is saved: the save time with its microseconds and a hash of the stored
-     * ciphertext, which differs on every write of the secret even within one second of the clock.
-     */
-    private static function version(Credential $credential): string
-    {
-        $savedAt = $credential->updated_at?->format('Y-m-d\TH:i:s.u') ?? '';
-
-        return $savedAt . '-' . mb_substr(hash('sha256', (string) $credential->getRawOriginal('secret')), 0, 16);
     }
 }

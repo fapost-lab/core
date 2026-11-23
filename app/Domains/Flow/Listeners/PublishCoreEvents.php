@@ -12,6 +12,7 @@ use App\Domains\Conversation\Enums\OperatorRequestState;
 use App\Domains\Conversation\Events\OperatorRequestStateChanged;
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Events\CoreEventCatalog;
+use App\Domains\Flow\Services\EventChainContext;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Throwable;
 
@@ -31,6 +32,7 @@ final readonly class PublishCoreEvents
     public function __construct(
         private FlowTriggerEventPublisherInterface $publisher,
         private ExceptionHandler $exceptions,
+        private EventChainContext $eventChain,
     ) {
     }
 
@@ -60,15 +62,25 @@ final readonly class PublishCoreEvents
         ]);
     }
 
+    /**
+     * Raised by a broadcast job, where no run is on, so the depth comes from the broadcast: the publisher counts one more
+     * than the depth on the chain context, and a broadcast's `chainDepth` is already the depth of its event.
+     */
     public function broadcastCompleted(BroadcastCompleted $event): void
     {
-        $this->publish($event->tenantId, CoreEventCatalog::BROADCAST_COMPLETED, [
-            'broadcast_id'     => $event->broadcastId,
-            'name'             => $event->name,
-            'recipients_total' => $event->recipientsTotal,
-            'sent'             => $event->sent,
-            'failed'           => $event->failed,
-        ]);
+        $this->eventChain->enter($event->chainDepth - 1);
+
+        try {
+            $this->publish($event->tenantId, CoreEventCatalog::BROADCAST_COMPLETED, [
+                'broadcast_id'     => $event->broadcastId,
+                'name'             => $event->name,
+                'recipients_total' => $event->recipientsTotal,
+                'sent'             => $event->sent,
+                'failed'           => $event->failed,
+            ]);
+        } finally {
+            $this->eventChain->leave();
+        }
     }
 
     /**

@@ -11,6 +11,7 @@ export interface BroadcastsTranslations {
   statuses: Record<BroadcastStatus, string>
   stop_reasons: Record<BroadcastStopReason, string>
   targets: Record<BroadcastTarget, string>
+  origin: { automation: string }
   filters: { status: string; status_all: string }
   search_label: string
   empty: string
@@ -53,6 +54,8 @@ export type BroadcastStopReason = 'run_failed' | 'limit_reached'
 
 export type BroadcastTarget = 'all' | 'tags' | 'segment'
 
+export type BroadcastOrigin = 'console' | 'automation'
+
 export interface BroadcastRow extends Record<string, unknown> {
   id: string
   name: string
@@ -70,6 +73,10 @@ export interface BroadcastRow extends Record<string, unknown> {
   excerpt: string | null
   targetTags: string[]
   targetSegmentId: string | null
+  /** Where the broadcast came from: the console form or a send_message node of a flow. */
+  origin: BroadcastOrigin
+  flowName: string | null
+  flowUrl: string | null
   createdAt: string | null
   editUrl: string | null
   sendUrl: string | null

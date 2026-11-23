@@ -27,7 +27,7 @@ messaging.transactional - replies in an active dialogue
 messaging.broadcast    - low-priority broadcasts / fan-out
 messaging.system       - service notifications
 messaging.logging      - conversation capture, written outside the delivery path
-scheduled.triggers     - scheduled/event trigger fan-out
+scheduled.triggers     - event trigger fan-out (schedule slots are claimed by a minute command; their runs go to flow.automations)
 flow.automations       - automation runs: their start and each execution segment
 sync.external          - external synchronisations
 ```
@@ -58,6 +58,7 @@ Queue assignment by purpose, as it exists in the codebase today:
   `app/Domains/Contact/Jobs/SendContactNotificationJob.php` (line 61): it is a service
   notification that runs on the low-priority broadcast queue.
 - `messaging.system`: `app/Jobs/Messaging/SyncChannelWebhookJob.php`,
+  `app/Jobs/Flow/SendOneTimeCodeJob.php` (the encrypted one-time code of an `auth_request` node),
   `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,
   `app/Domains/Staff/Jobs/SendLimitNoticeJob.php`,
   `app/Domains/Conversation/Jobs/NotifyOperatorRequestJob.php`,

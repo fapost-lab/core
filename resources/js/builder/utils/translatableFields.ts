@@ -37,6 +37,14 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldDescriptor[] = [
         nodeType: 'input', field: 'on_invalid_message', labelKey: 'content.input_on_invalid', kind: 'invalid',
         shown: (config) => isFilled(config.on_invalid_message),
     },
+    // auth_request@2 contact-facing texts; v1 never carries them, so `isFilled` keeps v1 nodes out of the tab.
+    {nodeType: 'auth_request', field: 'prompt', labelKey: 'content.auth_request_prompt', kind: 'prompt', shown: (config) => isFilled(config.prompt)},
+    {nodeType: 'auth_request', field: 'button_label', labelKey: 'content.auth_request_button_label', kind: 'text', shown: (config) => isFilled(config.button_label)},
+    {nodeType: 'auth_request', field: 'resend_label', labelKey: 'content.auth_request_resend_label', kind: 'text', shown: (config) => isFilled(config.resend_label)},
+    {
+        nodeType: 'auth_request', field: 'on_invalid_message', labelKey: 'content.auth_request_on_invalid', kind: 'invalid',
+        shown: (config) => isFilled(config.on_invalid_message),
+    },
 ]
 
 /** The translatable fields of a node type, in listing order. */

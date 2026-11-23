@@ -7,6 +7,9 @@ namespace App\Http\Controllers\Admin;
 use App\Domains\Credentials\CredentialTypeRegistry;
 use App\Domains\Credentials\CredentialWriter;
 use App\Domains\Credentials\Models\Credential;
+use App\Domains\Credentials\OAuth2\OAuth2GrantRepository;
+use App\Domains\Credentials\Types\OAuth2AuthorizationCodeType;
+use App\Domains\Staff\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Admin\CredentialRequest;
@@ -33,6 +36,7 @@ final class CredentialController extends Controller
     public function __construct(
         private readonly CredentialWriter $credentials,
         private readonly CredentialTypeRegistry $types,
+        private readonly OAuth2GrantRepository $grants,
     ) {
     }
 
@@ -106,6 +110,7 @@ final class CredentialController extends Controller
                 'allowed_hosts'     => array_values($credential->allowed_hosts),
                 'secret_changed_at' => $credential->secret_changed_at->toIso8601String(),
             ],
+            'oauth' => $this->connectionOf($credential),
             'types' => $this->typeSchema(),
             'urls'  => [
                 'index'  => $this->url('index'),
@@ -152,6 +157,34 @@ final class CredentialController extends Controller
             'settings'      => $data['settings'] ?? [],
             'secrets'       => $data['secrets'] ?? [],
             'allowed_hosts' => $data['allowed_hosts'] ?? [],
+        ];
+    }
+
+    /**
+     * The consent connection of an `oauth2_authorization_code` credential: its state, dates and who connected it, and
+     * the callback URL to register at the provider. Never a token. Null for every other type.
+     *
+     * @return array{status: string, connected_at: string|null, connected_by_name: string|null, refreshed_at: string|null, failure_code: string|null, callback_url: string, urls: array{connect: string, disconnect: string}}|null
+     */
+    private function connectionOf(Credential $credential): ?array
+    {
+        if (OAuth2AuthorizationCodeType::ID !== $credential->type) {
+            return null;
+        }
+
+        $grant = $this->grants->find((string) $credential->getKey());
+
+        return [
+            'status'            => $grant?->status->value ?? 'not_connected',
+            'connected_at'      => $grant?->connected_at->toIso8601String(),
+            'connected_by_name' => null === $grant?->connected_by ? null : User::query()->whereKey($grant->connected_by)->value('name'),
+            'refreshed_at'      => $grant?->refreshed_at->toIso8601String(),
+            'failure_code'      => $grant?->failure_code,
+            'callback_url'      => CredentialOAuthController::callbackUrl(),
+            'urls'              => [
+                'connect'    => $this->url('oauth.connect', ['record' => $credential->getKey()]),
+                'disconnect' => $this->url('oauth.disconnect', ['record' => $credential->getKey()]),
+            ],
         ];
     }
 

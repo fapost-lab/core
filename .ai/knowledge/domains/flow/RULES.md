@@ -76,6 +76,20 @@ broken.
   `test_an_error_response_and_a_connection_exception_with_the_key_in_the_url_are_masked`),
   `CallTesterCredentialTest.php`. Not covered: a secret the target echoes in a transformed form (URL-encoded,
   re-encoded base64), and a value under 4 characters.
+- **A one-time code of `auth_request@2` never leaves `AuthCodeStore` and the job that delivers it.** The node
+  generates it with `random_int`, keeps only an HMAC-SHA256 under a key derived from `APP_KEY` (over tenant, session,
+  node and code) in the cache with the code's TTL, compares with `hash_equals`, marks it used on success (a retried step still matches;
+  the node's next challenge replaces it) and drops it on used-up attempts and on every `failed` exit. The state holds only counters (`system.auth.<node>`), the metadata a masked
+  destination; the code travels to the sender only in `SendOneTimeCodeJob`, which is `ShouldBeEncrypted`, runs once
+  behind a cache guard per send, and sends the mail synchronously (`OneTimeCodeMail` and `OneTimeCodeMessage` refuse
+  serialization). The node trace drops the incoming text of an `auth_request` node. One destination gets at most
+  5 codes an hour per tenant, whatever flow asks. Why: a code in state, a trace, a log or a plain queue payload lets
+  staff or an operator authenticate as the contact, and a flow that resets the counters can brute-force it
+  (`flow-auth-request`, design gate D1–D10). Enforced: `tests/Feature/Domains/Flow/AuthRequestV2NodeHandlerTest.php`
+  (`test_the_code_reaches_neither_state_nor_metadata_nor_the_prompt`, `test_wrong_codes_use_up_the_attempts_and_the_code_is_dropped`,
+  `test_a_retried_step_keeps_the_code_already_on_its_way`, `test_one_address_gets_at_most_five_codes_an_hour`),
+  `SendOneTimeCodeJobTest`, `NodeTraceRecordingTest::test_what_a_contact_types_to_an_auth_request_never_reaches_the_trace`,
+  `SystemStateNamespacePolicyTest`. Not covered: the contact's own reply stays in the conversation history (accepted, D8).
 - **Every class in `Handlers/` (except `Abstract` and `Support`) implements `NodeHandlerInterface`.**
   Enforced: `tests/Architecture/HandlerVersionContractTest.php`.
 - **Node handlers take collaborators as ordinary constructor dependencies.** The registry keeps
@@ -107,7 +121,8 @@ broken.
   `FlowEngineSolutionNodeTest`, `SolutionLifecycleTest` (`adr-20261113-solution-node-types-and-state-namespace`).
 - **Only whitelisted node types write `system.*` and `rag.*`.** `system.*`: `send_message`,
   `input`, `delay`, `notify`, `set_tag`, `request_operator` (its marker holds the id of the operator request it
-  waits for), `ask_person` (`system.ask_person.{node}.question_id`, the question it waits for); `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
+  waits for), `ask_person` (`system.ask_person.{node}.question_id`, the question it waits for), `auth_request` (its attempt and send counters, so no node of the flow's author can reset them);
+  `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
   every handler. A Solution's namespace (its id, `state: true`) is written only by node types with the same
   owner; no whitelist. Enforced: `SystemStateNamespacePolicy`, applied in `FlowSessionPersister`.
   Adding a writer of `system`/`rag` means editing the whitelist, on purpose.
@@ -164,7 +179,8 @@ broken.
   step), and only the outermost call queues the continuation, after writing a new `segment_id` on the run's root
   session. A continuation runs only while the root carries its `segment_id`, and then runs the run's one `active`
   session (down the `paused_subflow` chain); a start runs only when `(trigger_id, fire_key)` has no run yet, and
-  otherwise continues the run's `active` session. Jobs on `flow.automations` keep their timeout below the connection's
+  otherwise continues the run's `active` session (a `pending` root, which a schedule creates when it claims its slot, is
+  activated first). Jobs on `flow.automations` keep their timeout below the connection's
   `retry_after`, and the seconds setting's maximum keeps a segment plus the slowest node under that timeout. Why: a
   second runner or a re-reserved job repeats `call` side effects in somebody else's system, silently
   (`adr-20261118-segmented-automation-runs`). Enforced: `AutomationRunTest`, `AutomationRunLockRedisTest`,
@@ -307,6 +323,16 @@ broken.
   with side effects elsewhere, and an answer to someone else's run must not become input to the presser's own
   conversation (`adr-20261123-ask-person-question-outside-the-run`). Enforced: `AskPersonNodeTest`,
   `MessageRouterTest`, `FlowQuestionResumerRedisTest`.
+- **A message to tags or a segment is a broadcast, started once per node execution through Flow's port.**
+  `send_message` with `addressee.kind` `tags` or `segment` (static values; `AddresseeResolver` reads every kind) calls
+  `AudienceBroadcasterInterface`, implemented in `app/Infrastructure/Flow`, so the runtime never imports Broadcasting.
+  It is text only, its `{{contact.*}}`/`{{module.*}}` are refused in every flow (`addressee_broadcast_contact_expression`),
+  the broadcast is the flow's assistant's, its key is `sha256(idempotencyKey:nodeId)` and no `system.*` marker, it
+  never waits for the broadcast, and every refusal or failure takes `error` without throwing. The broadcast's completion
+  event is published at the run's chain depth + 1 (`broadcasts.chain_depth`, `PublishCoreEvents` sets it on
+  `EventChainContext`), so the chain limit stops flows that broadcast on each other's broadcasts
+  (`adr-20261123-flow-audience-message-through-broadcasting`). Enforced: `SendMessageBroadcastTest`,
+  `BuiltInNodeHandlersTest`, `PublishCoreEventsTest`.
 - **A flow started for a contact starts once per step, never for the run's contact, and never over a moving
   conversation or an operator.** A `start_flow` node's start key is the engine's execution key and the node id,
   written on the started session (`flow_sessions.start_key`, unique); the node answers `started` when a session has
@@ -325,18 +351,22 @@ broken.
   means "not written yet", and the flow's live `flow_triggers` rows count (`FlowTriggerSet`), `[]` means none. A draft
   save writes only the list; `PublishFlowService` validates every trigger and syncs the rows by id
   (`FlowTriggerRepository::syncForFlow`), keeping `last_run_at`/`next_run_at` of a trigger whose type and config did
-  not change (compared ignoring key order: jsonb reorders keys) and resetting `next_run_at` when they did. A republish
-  by a template takes the list from the host's active definition, never its draft, and a `null` list leaves the rows
-  alone. Nothing writes `flow_triggers` outside this sync. Why: a draft edit must not change what runs, and a live
+  not change (compared ignoring key order: jsonb reorders keys) and resetting `next_run_at` when they did (an active
+  schedule then gets its first slot after now). A republish by a template takes the list from the host's active
+  definition, never its draft, and a `null` list leaves the rows alone. Nothing else writes a trigger's definition
+  columns; its run state (`next_run_at`, `last_run_at`) is written only by this sync, by `ScheduleTriggerFirer`'s slot
+  claim and by flow deletion, which clears a schedule's slot (`adr-20261123-flow-schedule-trigger`). Why: a draft edit must not change what runs, and a live
   trigger must survive the release that introduced the list (`adr-20261119-flow-triggers-in-definition-live-on-publish`).
   Enforced: `FlowTriggersPublishTest`, `SaveDraftServiceTest`, `FlowTemplatePublishTest`, `FlowTriggerSetTest`.
 - **An automatic trigger or a new credential reference goes live only with its own right.** Publishing a draft that
   adds, removes or changes (type, config, `is_active`, `priority`) a trigger other than `message` against the live
   rows needs `ManageAutomations`; publishing a `call` node bound to a saved credential the published definition does
-  not reference needs `UseCredentials` (dropping one needs nothing). `FlowPublishChanges` computes both,
+  not reference needs `UseCredentials` (dropping one needs nothing); adding a `send_message` to tags or a segment, or
+  changing its audience, text or name, needs `ManageBroadcast`. `FlowPublishChanges` computes all three,
   `FlowDraftPolicy::publishChanges()` refuses with a translated reason, asked by the builder's publish after
-  `publish`; the draft is compared before template expansion, so a credential a template brings is checked when the
-  template is published. Turning on a flow with a live automatic trigger needs `ManageAutomations`
+  `publish`; credentials and triggers are compared on the draft before template expansion, so a credential a template
+  brings is checked when the template is published, while audience messages are compared after expansion (a template
+  can bring one, and a host's parameter value rewrites its text; copies keep stable ids). Turning on a flow with a live automatic trigger needs `ManageAutomations`
   (`FlowDraftPolicy::activate()`), turning it off does not; the builder's credential list and a call test with a
   credential need `UseCredentials` (`CredentialPolicy::use()`). Saving a draft checks neither: nothing saved runs.
   Why: `PublishFlow` alone would let an author start runs nobody asked for or spend a secret an administrator
@@ -356,6 +386,20 @@ broken.
   the config is copied into every version and template, and a URL held by an outside system must stop working when its
   flow cannot be managed (`adr-20261119-flow-webhook-trigger`). Enforced: `FlowWebhookTriggerTest`,
   `FlowWebhookEndpointTest`, `FlowWebhookHostModeTest`, `WebhookTriggerConfigTest`, `RedisWebhookDeliveryDedupRedisTest`.
+- **A schedule claims its slot in the tenant, creates its run `pending` in the same transaction, and never catches
+  up.** `ScheduleTriggerFirer` moves `flow_triggers.next_run_at` from the slot it read to the next one by compare-and-set
+  and, in the same transaction, creates the run `pending` (`FlowEngineInterface::prepare()`, fire key
+  `schedule:<UTC minute>`, deadline written) or skips the slot: more than 5 minutes late (`flow.schedule.tick_missed`,
+  the next slot counted from now), the flow cannot run (`tick_skipped` `flow_not_live`), or a previous root run of the
+  trigger is `pending` or in flight (`tick_skipped` `previous_run_live`). The start job is queued after the commit and
+  `AutomationRunner` activates the `pending` run (`FlowEngineInterface::activate()`). `ScheduleClock` skips a local time a
+  daylight saving change removes and fires a repeated one once; a cron is five fields in an IANA zone
+  (`invalid_schedule_cron`, `invalid_schedule_timezone`). The landlord `flow_schedule_registry` is only an index of whom
+  to visit, written after the tenant's commit through `ScheduleRegistrySync` and rebuilt hourly
+  (`flow:rebuild-schedule-registry`); `flow:fire-scheduled-triggers` enters only the tenants it names, never a stopped
+  one. Why: no transaction spans landlord and a tenant schema, and a slot eaten without a run is a silent loss
+  (`adr-20261123-flow-schedule-trigger`). Enforced: `ScheduleTriggerFirerTest`, `ScheduleClockTest`,
+  `FireScheduledTriggersCommandTest`, `FlowTriggersPublishTest`.
 - **A webhook request waits for its flow only while it holds a wait slot, and never past 30 seconds.** A trigger in
   `response_mode: sync` holds the request through `WebhookSyncWait`, which first takes a slot of
   `WebhookWaitSlotsInterface` (`flow.webhook.sync_waiters_max` on the installation, `flow.webhook.sync_waiters_per_tenant`

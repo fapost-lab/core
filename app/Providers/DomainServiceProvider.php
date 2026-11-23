@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Domains\Tenancy\Contracts\CoreBootstrapInterface;
+use App\Domains\Tenancy\Contracts\FlowScheduleRegistryInterface;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\SupportAccessRedeemerInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -26,6 +27,7 @@ use App\Domains\Tenancy\Infrastructure\CoreTenantRenamer;
 use App\Domains\Tenancy\Infrastructure\CoreTenantReservations;
 use App\Domains\Tenancy\Infrastructure\CoreTenantUsage;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
+use App\Domains\Tenancy\Infrastructure\LandlordFlowScheduleRegistry;
 use App\Domains\Tenancy\Repositories\TenantDeletionRequestRepository;
 use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\AlwaysActiveAccessMode;
@@ -189,6 +191,7 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
         $this->app->bind(WebhookRegistryHealthCheckerInterface::class, WebhookRegistryHealthChecker::class);
         $this->app->singleton(WebhookRegistryReaderInterface::class, EloquentWebhookRegistryReader::class);
+        $this->app->singleton(FlowScheduleRegistryInterface::class, LandlordFlowScheduleRegistry::class);
 
         // CoreBootstrap memoizes the booted tenant id; once TenantSwitcher restores
         // the previous context that memo is stale and must be dropped, otherwise a

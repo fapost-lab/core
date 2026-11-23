@@ -13,6 +13,7 @@ return [
     'publish_denied' => [
         'credentials' => 'This version uses a saved credential that the published one does not. Publishing it needs the Use credentials permission.',
         'automations' => 'This version adds, changes or removes a schedule, webhook, API or event trigger. Publishing it needs the Manage automations permission.',
+        'broadcasts'  => 'This version adds or changes a message to tags or a segment, which is sent as a broadcast. Publishing it needs the Manage broadcasts permission.',
     ],
 
     'read_only' => [
@@ -227,15 +228,38 @@ return [
         ],
 
         'auth_request' => [
-            'section'         => 'Authentication',
-            'method'          => 'Method',
-            'variable'        => 'Variable to check',
-            'operator'        => 'Operator',
-            'value'           => 'Expected value',
-            'condition_label' => 'Authenticate when',
-            'flag_hint'       => 'When the check passes, the contact is marked authenticated; the flow then continues from the single output. Verify the flag later with a Condition node, or rely on the private-flow access gate.',
-            'methods'         => [
-                'basic' => 'Basic (variable check)',
+            'section'                 => 'Authentication',
+            'method'                  => 'Method',
+            'variable'                => 'Variable to check',
+            'operator'                => 'Operator',
+            'value'                   => 'Expected value',
+            'condition_label'         => 'Authenticate when',
+            'flag_hint'               => 'When the check passes, the contact is marked authenticated; the flow then continues from the single output. Verify the flag later with a Condition node, or rely on the private-flow access gate.',
+            'flag_hint_v2'            => 'When the check passes, the contact is marked authenticated and the flow takes the Authenticated output; otherwise Failed (the reason is in the node\'s metadata).',
+            'prompt'                  => 'Message to the contact',
+            'button_label'            => 'Share button label',
+            'expected_phone'          => 'Expected phone number',
+            'expected_phone_hint'     => 'Optional. Without it the node only proves the contact owns a Telegram account with a phone number, not that they are a particular customer. With it (for example from your CRM via a call node) the shared number must match.',
+            'destination'             => 'Send the code to',
+            'destination_hint_sms'    => 'Phone number; defaults to the number the contact shared ({{contact.phone}}).',
+            'destination_hint_email'  => 'Email address, for example {{contact.email}}. An address the contact typed lets anyone have codes sent to any address: each address gets at most 5 codes an hour.',
+            'code_length'             => 'Code length (digits)',
+            'ttl_minutes'             => 'Code lifetime (minutes)',
+            'max_attempts'            => 'Attempts',
+            'max_sends'               => 'Codes per challenge',
+            'resend_cooldown_seconds' => 'Wait before a new code (seconds)',
+            'resend_label'            => '"New code" button label',
+            'on_invalid_message'      => 'Message after a wrong answer',
+            'outputs_authenticated'   => 'Authenticated',
+            'outputs_failed'          => 'Failed',
+            'no_sms_sender'           => 'No SMS sender is installed: SMS codes need an SMS connector.',
+            'no_email_sender'         => 'No mail is configured for one-time codes: the platform mailer only logs mail.',
+            'legacy_hint'             => 'This node was created with the first version: one output, basic check only. Add a new Authentication node for phone or code checks.',
+            'methods'                 => [
+                'basic'      => 'Basic (variable check)',
+                'phone'      => 'Phone number (share contact)',
+                'sms_code'   => 'Code by SMS',
+                'email_code' => 'Code by email',
             ],
         ],
 
@@ -268,10 +292,20 @@ return [
         ],
 
         'send_message' => [
-            'addressee_title' => 'Send to',
-            'addressee_label' => 'Contact id',
-            'addressee_hint'  => 'Leave empty to send to the contact of the conversation. A flow started by a schedule, a webhook or an API call has no contact and needs one here. A message sent this way cannot wait for an answer: no keyboard, timeout or saved answer.',
-            'addressee_badge' => 'addressee',
+            'addressee_title'          => 'Send to',
+            'addressee_label'          => 'Contact id',
+            'addressee_hint'           => 'Leave empty to send to the contact of the conversation. A flow started by a schedule, a webhook or an API call has no contact and needs one here. A message sent this way cannot wait for an answer: no keyboard, timeout or saved answer.',
+            'addressee_badge'          => 'addressee',
+            'addressee_kind_contact'   => 'Contact',
+            'addressee_kind_tags'      => 'Tags',
+            'addressee_kind_segment'   => 'Segment',
+            'addressee_tags_label'     => 'Contacts with any of these tags',
+            'addressee_tags_hint'      => 'Everyone who has at least one of the tags gets the message.',
+            'addressee_segment_label'  => 'Segment',
+            'broadcast_name_label'     => 'Broadcast name',
+            'save_broadcast_to_label'  => 'Save broadcast to',
+            'save_broadcast_to_hint'   => 'A flow variable that receives the id of the created broadcast, e.g. flow.broadcast.',
+            'addressee_broadcast_hint' => 'The message is sent as a broadcast: text only, no keyboard, timeout or saved answer, and no contact data ({{contact.*}}) in the text.',
         ],
 
         'template' => [
@@ -325,12 +359,16 @@ return [
     ],
 
     'content' => [
-        'ask_person_text'        => 'Question',
-        'ask_person_late_answer' => 'Late answer text',
-        'send_message_text'      => 'Message text',
-        'send_message_caption'   => 'Caption',
-        'input_prompt'           => 'Prompt',
-        'input_on_invalid'       => 'On invalid',
+        'ask_person_text'           => 'Question',
+        'ask_person_late_answer'    => 'Late answer text',
+        'send_message_text'         => 'Message text',
+        'send_message_caption'      => 'Caption',
+        'input_prompt'              => 'Prompt',
+        'input_on_invalid'          => 'On invalid',
+        'auth_request_prompt'       => 'Authentication prompt',
+        'auth_request_button_label' => 'Authentication button',
+        'auth_request_resend_label' => 'Resend button',
+        'auth_request_on_invalid'   => 'Authentication: on invalid',
     ],
 
     'operators' => [
@@ -349,6 +387,11 @@ return [
     'validation' => [
         'template_flow' => 'Template → breaks flow “:flow”',
         'flow_level'    => 'Template',
+    ],
+
+    'schedule_trigger' => [
+        'cron_hint'     => 'Five fields: minute, hour, day of month, month, day of week. "0 9 * * 1-5" runs at 09:00 on weekdays; a schedule runs at most once a minute.',
+        'timezone_hint' => 'An IANA time zone, such as Europe/Berlin or UTC. A time skipped by a daylight saving change does not run; a repeated hour runs once.',
     ],
 
     'webhook_trigger' => [

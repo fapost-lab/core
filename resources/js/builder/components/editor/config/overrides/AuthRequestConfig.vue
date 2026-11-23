@@ -3,8 +3,9 @@
  * auth_request node config — a single "authenticate when <operand> <op> <value>"
  * rule, reusing the Branch operand picker and operator vocabulary. On a match
  * the contact is flagged authenticated and the flow takes the `authenticated`
- * output; otherwise `failed`. Only the `basic` method exists today, so the
- * method selector is hidden and written implicitly.
+ * output; otherwise `failed`. Version 1 only knows the `basic` method (written
+ * implicitly, no selector). Version 2 adds a method selector with the phone and
+ * one-time-code methods, each with its own fields.
  */
 import {computed} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
@@ -12,9 +13,10 @@ import ConditionOperandPicker from './ConditionOperandPicker.vue'
 import {type BranchOperandUiState, compileLeft, decompileLeft} from '@builder/utils/branchOperandCompiler'
 import {useFlowVariables} from '@builder/composables/useFlowVariables'
 import {useTranslations} from '@builder/composables/useTranslations'
+import {useBuilderStore} from '@builder/store/builderStore'
 
 const props = defineProps<{
-    node:   { id: string; config?: Record<string, unknown> }
+    node:   { id: string; version?: number; config?: Record<string, unknown> }
     schema: Record<string, unknown>
 }>()
 
@@ -23,6 +25,7 @@ const emit = defineEmits<{
 }>()
 
 const {t} = useTranslations()
+const builderStore = useBuilderStore()
 const {userVars} = useFlowVariables()
 
 // Full operator vocabulary, mirrored from BranchOperator. Kept self-sufficient
@@ -56,10 +59,76 @@ const operatorOptions = computed<Array<{ value: string; label: string }>>(() =>
 
 const isUnary = computed<boolean>(() => UNARY_OPS.has(operator.value))
 
-// Always (re)assert method='basic' so the node config is complete even if the
-// author never touches a "method" control.
+const METHODS = ['basic', 'phone', 'sms_code', 'email_code'] as const
+
+// Mirrors AuthRequestV2NodeHandler::BOUNDS: [min, max, default].
+const BOUNDS = {
+    code_length:             [4, 8, 6],
+    ttl_minutes:             [1, 30, 10],
+    max_attempts:            [1, 10, 5],
+    max_sends:               [1, 5, 3],
+    resend_cooldown_seconds: [30, 600, 60],
+} as const
+
+type BoundedField = keyof typeof BOUNDS
+
+const isV2 = computed<boolean>(() => props.node.version === 2)
+
+const method = computed<string>(() => {
+    const m = config.value.method
+    return typeof m === 'string' && (METHODS as readonly string[]).includes(m) ? m : 'basic'
+})
+
+const isBasic = computed<boolean>(() => !isV2.value || method.value === 'basic')
+const isPhone = computed<boolean>(() => isV2.value && method.value === 'phone')
+const isCode = computed<boolean>(() => isV2.value && (method.value === 'sms_code' || method.value === 'email_code'))
+
+const baseLanguage = computed(() => builderStore.contentBaseLanguage)
+
+function localizedValue(raw: unknown): string {
+    if (raw == null) {
+        return ''
+    }
+    if (typeof raw === 'string') {
+        return raw
+    }
+    if (typeof raw === 'object') {
+        const map = raw as Record<string, unknown>
+        return String(map[baseLanguage.value] ?? Object.values(map)[0] ?? '')
+    }
+    return String(raw)
+}
+
+function onLocalized(key: string, e: Event) {
+    const value = (e.target as HTMLInputElement | HTMLTextAreaElement).value
+    const existing = config.value[key]
+    const base = existing && typeof existing === 'object' ? existing as Record<string, unknown> : {}
+    emit('update:config', {[key]: {...base, [baseLanguage.value]: value}})
+}
+
+function onText(key: string, e: Event) {
+    emit('update:config', {[key]: (e.target as HTMLInputElement).value})
+}
+
+function numberValue(key: BoundedField): number | string {
+    const v = config.value[key]
+    return typeof v === 'number' ? v : ''
+}
+
+function onNumber(key: BoundedField, e: Event) {
+    const raw = (e.target as HTMLInputElement).value
+    emit('update:config', {[key]: raw === '' ? null : Number(raw)})
+}
+
+function onMethod(e: Event) {
+    emit('update:config', {method: (e.target as HTMLSelectElement).value})
+}
+
+// v1 always (re)asserts method='basic' so its config is complete even though it
+// has no "method" control; v2 patches carry the author's chosen method.
 function patch(p: Record<string, unknown>) {
-    emit('update:config', {method: 'basic', ...p})
+    // Every patch carries the method, so a node whose author kept the default (basic) still stores it.
+    emit('update:config', {method: isV2.value ? method.value : 'basic', ...p})
 }
 
 function onOperand(state: BranchOperandUiState) {
@@ -78,29 +147,141 @@ function onValue(e: Event) {
 <template>
     <div class="accordion">
         <AccordionSection :title="t('nodes.auth_request.section')" default-open>
-            <div class="config-field">
-                <div class="field-label">{{ t('nodes.auth_request.condition_label') }}</div>
-                <ConditionOperandPicker
-                    :model-value="operandState"
-                    @update:model-value="onOperand"
-                />
-            </div>
-
-            <div class="cond-row">
-                <select class="field-input op-sel" :value="operator" @change="onOperator">
-                    <option v-for="op in operatorOptions" :key="op.value" :value="op.value">{{ op.label }}</option>
+            <div v-if="isV2" class="config-field">
+                <div class="field-label">{{ t('nodes.auth_request.method') }}</div>
+                <select class="field-input" :value="method" @change="onMethod">
+                    <option v-for="m in METHODS" :key="m" :value="m">{{ t(`nodes.auth_request.methods.${m}`) }}</option>
                 </select>
-                <input
-                    v-if="!isUnary"
-                    type="text"
-                    class="field-input val-input"
-                    placeholder="1234"
-                    :value="valueString"
-                    @input="onValue"
-                >
             </div>
 
-            <p class="auth-hint">{{ t('nodes.auth_request.flag_hint') }}</p>
+            <template v-if="isBasic">
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.condition_label') }}</div>
+                    <ConditionOperandPicker
+                        :model-value="operandState"
+                        @update:model-value="onOperand"
+                    />
+                </div>
+
+                <div class="cond-row">
+                    <select class="field-input op-sel" :value="operator" @change="onOperator">
+                        <option v-for="op in operatorOptions" :key="op.value" :value="op.value">{{ op.label }}</option>
+                    </select>
+                    <input
+                        v-if="!isUnary"
+                        type="text"
+                        class="field-input val-input"
+                        placeholder="1234"
+                        :value="valueString"
+                        @input="onValue"
+                    >
+                </div>
+            </template>
+
+            <template v-if="isPhone">
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.prompt') }}</div>
+                    <textarea
+                        class="field-input"
+                        rows="3"
+                        :value="localizedValue(config.prompt)"
+                        @input="onLocalized('prompt', $event)"
+                    />
+                </div>
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.button_label') }}</div>
+                    <input
+                        class="field-input"
+                        :value="localizedValue(config.button_label)"
+                        @input="onLocalized('button_label', $event)"
+                    >
+                </div>
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.expected_phone') }}</div>
+                    <input
+                        class="field-input"
+                        :placeholder="'{{contact.phone}}'"
+                        :value="typeof config.expected_phone === 'string' ? config.expected_phone : ''"
+                        @input="onText('expected_phone', $event)"
+                    >
+                    <p class="auth-hint">{{ t('nodes.auth_request.expected_phone_hint') }}</p>
+                </div>
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.max_attempts') }}</div>
+                    <input
+                        type="number"
+                        class="field-input num-input"
+                        :min="BOUNDS.max_attempts[0]"
+                        :max="BOUNDS.max_attempts[1]"
+                        :placeholder="'3'"
+                        :value="numberValue('max_attempts')"
+                        @input="onNumber('max_attempts', $event)"
+                    >
+                </div>
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.on_invalid_message') }}</div>
+                    <input
+                        class="field-input"
+                        :value="localizedValue(config.on_invalid_message)"
+                        @input="onLocalized('on_invalid_message', $event)"
+                    >
+                </div>
+            </template>
+
+            <template v-if="isCode">
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.destination') }}</div>
+                    <input
+                        class="field-input"
+                        :placeholder="method === 'sms_code' ? '{{contact.phone}}' : '{{contact.email}}'"
+                        :value="typeof config.destination === 'string' ? config.destination : ''"
+                        @input="onText('destination', $event)"
+                    >
+                    <p class="auth-hint">
+                        {{ t(method === 'sms_code' ? 'nodes.auth_request.destination_hint_sms' : 'nodes.auth_request.destination_hint_email') }}
+                    </p>
+                </div>
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.prompt') }}</div>
+                    <textarea
+                        class="field-input"
+                        rows="3"
+                        :value="localizedValue(config.prompt)"
+                        @input="onLocalized('prompt', $event)"
+                    />
+                </div>
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.resend_label') }}</div>
+                    <input
+                        class="field-input"
+                        :value="localizedValue(config.resend_label)"
+                        @input="onLocalized('resend_label', $event)"
+                    >
+                </div>
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.auth_request.on_invalid_message') }}</div>
+                    <input
+                        class="field-input"
+                        :value="localizedValue(config.on_invalid_message)"
+                        @input="onLocalized('on_invalid_message', $event)"
+                    >
+                </div>
+                <div v-for="key in (['code_length', 'ttl_minutes', 'max_attempts', 'max_sends', 'resend_cooldown_seconds'] as const)" :key="key" class="config-field">
+                    <div class="field-label">{{ t(`nodes.auth_request.${key}`) }}</div>
+                    <input
+                        type="number"
+                        class="field-input num-input"
+                        :min="BOUNDS[key][0]"
+                        :max="BOUNDS[key][1]"
+                        :placeholder="String(BOUNDS[key][2])"
+                        :value="numberValue(key)"
+                        @input="onNumber(key, $event)"
+                    >
+                </div>
+            </template>
+
+            <p class="auth-hint">{{ t(isV2 ? 'nodes.auth_request.flag_hint_v2' : 'nodes.auth_request.flag_hint') }}</p>
+            <p v-if="!isV2" class="auth-hint">{{ t('nodes.auth_request.legacy_hint') }}</p>
         </AccordionSection>
 
         <AccordionSection title="Meta">
@@ -143,6 +324,9 @@ function onValue(e: Event) {
 }
 .field-input:focus {
     border-color: var(--primary);
+}
+.num-input {
+    width: 110px;
 }
 .op-sel {
     flex: 0 0 170px;
