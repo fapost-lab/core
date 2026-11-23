@@ -6,6 +6,8 @@ describe('isTranslatableField', () => {
         expect(isTranslatableField('send_message', 'text')).toBe(true)
         expect(isTranslatableField('send_message', 'caption')).toBe(true)
         expect(isTranslatableField('input', 'prompt')).toBe(true)
+        expect(isTranslatableField('ask_person', 'text')).toBe(true)
+        expect(isTranslatableField('ask_person', 'late_answer_text')).toBe(true)
         expect(isTranslatableField('input', 'on_invalid_message')).toBe(true)
     })
 

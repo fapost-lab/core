@@ -17,12 +17,14 @@ use App\Domains\Flow\Concurrency\LockScope;
 use App\Domains\Flow\Concurrency\SessionLockManager;
 use App\Domains\Flow\Concurrency\SessionLockRegistry;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
+use App\Domains\Flow\Contracts\FlowQuestionsInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Exceptions\SessionLockLostException;
 use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Orchestration\DelayedSessionResumer;
+use App\Domains\Flow\Support\FlowQuestionButton;
 use App\Domains\Flow\Support\OperatorRequestCancelButton;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
@@ -73,6 +75,7 @@ final readonly class MessageRouter
         private TypingHeartbeatRegistry $typingHeartbeat,
         private DelayedSessionResumer $delayedResumer,
         private OperatorRequestsInterface $operatorRequests,
+        private FlowQuestionsInterface $questions,
         private LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -143,6 +146,19 @@ final readonly class MessageRouter
                     $this->operatorRequests->cancelForSession((string)$contact->tenant_id, $assistantId, (string)$contact->getKey(), $buttonSession);
 
                     return RoutingOutcome::dropped('operator_request_cancel');
+                }
+
+                // Step 4a″: the contact pressed a button of a question an `ask_person` node put to them. The press is
+                // the question's, never this contact's conversation's: it is recorded (or told it came too late) and
+                // swallowed, whether its token is known or not, and before the operator check below — an addressee
+                // whose thread an operator holds must still be able to answer. The run it answers lives under its own
+                // lock, so it is continued by a job, never here.
+                $questionPress = FlowQuestionButton::pressedIn($message);
+
+                if (null !== $questionPress) {
+                    $this->questions->receivePress((string)$contact->getKey(), $assistantId, $questionPress['token'], $questionPress['index'], $message->updateId);
+
+                    return RoutingOutcome::dropped('flow_question_answer');
                 }
 
                 // Step 4a: an operator holding this thread, or one requested and

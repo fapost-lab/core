@@ -420,6 +420,49 @@ than an operator conversation (hours, for example `P1D`); otherwise it is ended
 while the operator may still be talking, and the parent continues through `failed`.
 Messages the flow sends are not blocked while an operator holds the conversation.
 
+### Ask a person
+
+Sends a question with buttons to a contact and waits for the answer.
+
+The **addressee** is required: an expression that gives a contact id, such as
+`{{flow.manager_id}}`. The question goes to that contact on the run's assistant, so
+the block works in flows started by a schedule, a webhook, an event or the API, which
+have no contact of their own, as well as in conversations. The block sets:
+
+- **Question text** and **1 to 8 buttons**. A label is translatable; a button's value
+  is the same in every language.
+- **Wait** from 60 seconds to 7 days. Required.
+- **Late answer text**, optional. See below.
+- **Save the answer to**, optional: a variable that receives the pressed button's value.
+
+The block has one exit per button, plus `timeout` and `error`. `error` is taken when
+the addressee gives no contact id, when the run has no assistant or channel to send
+through, when the message could not be sent, or when the question was lost.
+
+The block's output in the run trace holds `answer`, `button_id`, `answered_by` and
+`answered_at`, or `timed_out_at` when nobody answered, plus `question_id`. When the
+wait was shortened (see below), `clamped_by_run_deadline` is set.
+
+Only the addressee, on that assistant, can answer, and only with one of the
+question's buttons. Anything else is ignored silently. A press never reaches the
+addressee's own conversation and never starts a flow for them, even if the question
+is unknown or gone, and it works while an operator holds the addressee's thread. An
+accepted press removes the buttons and sends no text. A press after the decision,
+after the timeout, or after the run ended or was reset gets the late answer text, or
+the system text "This has already been decided." (an operator can override it per
+tenant, like other system texts).
+
+<Note>
+  An automation run lives at most `flow.automation.max_run_hours` (24 hours by
+  default), and the wait ends one minute before the run's deadline at the latest. With
+  less than a minute left, the block takes `timeout` at once and asks nothing. To wait
+  longer than a day, raise that platform setting.
+</Note>
+
+In a conversation, while the run waits, its own contact gets the usual "busy" reply,
+and `/reset` ends the run. A question is deleted together with its run (under the
+automation run retention) and with its addressee's contact.
+
 ## Annotation
 
 ### Comment

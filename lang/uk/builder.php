@@ -189,6 +189,34 @@ return [
             ],
         ],
 
+        'ask_person' => [
+            'section_addressee'     => 'Кого запитати',
+            'addressee'             => 'Запитати контакт',
+            'addressee_help'        => 'Вираз, що дає id контакту, якого потрібно запитати, наприклад {{flow.manager_id}}. Запитання надсилається цьому контакту на цьому асистенті.',
+            'section_question'      => 'Запитання',
+            'text'                  => 'Запитання',
+            'text_help'             => 'Надсилається разом із кнопками нижче, мовою запуску.',
+            'section_buttons'       => 'Кнопки відповіді',
+            'buttons'               => 'Кнопки відповіді',
+            'button_label'          => 'Підпис',
+            'button_value'          => 'Значення',
+            'add_button'            => '+ Додати кнопку',
+            'default_approve'       => 'Схвалити',
+            'default_reject'        => 'Відхилити',
+            'section_wait'          => 'Очікування',
+            'timeout_seconds'       => 'Чекати відповідь (секунд)',
+            'timeout_seconds_help'  => 'Від 60 секунд до 7 днів. В автоматизації очікування також закінчується за хвилину до дедлайну запуску.',
+            'section_answer'        => 'Відповідь',
+            'late_answer_text'      => 'Текст для пізньої відповіді',
+            'late_answer_text_help' => 'Надсилається тому, хто натиснув кнопку після того, як рішення вже ухвалено. Порожньо = стандартний текст.',
+            'save_to_variable'      => 'Зберегти відповідь у',
+            'handle_timeout'        => 'Час вичерпано',
+            'handle_error'          => 'Помилка',
+            'defaults'              => [
+                'text' => 'Будь ласка, оберіть відповідь.',
+            ],
+        ],
+
         'send_message' => [
             'addressee_title' => 'Кому надіслати',
             'addressee_label' => 'ID контакту',
@@ -247,10 +275,12 @@ return [
     ],
 
     'content' => [
-        'send_message_text'    => 'Текст повідомлення',
-        'send_message_caption' => 'Підпис',
-        'input_prompt'         => 'Запит',
-        'input_on_invalid'     => 'При помилці вводу',
+        'ask_person_text'        => 'Запитання',
+        'ask_person_late_answer' => 'Текст пізньої відповіді',
+        'send_message_text'      => 'Текст повідомлення',
+        'send_message_caption'   => 'Підпис',
+        'input_prompt'           => 'Запит',
+        'input_on_invalid'       => 'При помилці вводу',
     ],
 
     'operators' => [

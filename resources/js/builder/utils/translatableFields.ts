@@ -27,6 +27,11 @@ export const TRANSLATABLE_FIELDS: TranslatableFieldDescriptor[] = [
         nodeType: 'send_message', field: 'caption', labelKey: 'content.send_message_caption', kind: 'caption',
         shown: (config) => ['image', 'document', 'video'].includes(String(config.content_type ?? 'text')),
     },
+    {nodeType: 'ask_person', field: 'text', labelKey: 'content.ask_person_text', kind: 'text', shown: () => true},
+    {
+        nodeType: 'ask_person', field: 'late_answer_text', labelKey: 'content.ask_person_late_answer', kind: 'text',
+        shown: (config) => isFilled(config.late_answer_text),
+    },
     {nodeType: 'input', field: 'prompt', labelKey: 'content.input_prompt', kind: 'prompt', shown: (config) => isFilled(config.prompt)},
     {
         nodeType: 'input', field: 'on_invalid_message', labelKey: 'content.input_on_invalid', kind: 'invalid',

@@ -42,6 +42,7 @@ final class SystemStateNamespacePolicyTest extends TestCase
         yield 'notify writes system marker' => ['notify', 'system.staff_notified.n1'];
         yield 'set_tag writes system marker' => ['set_tag', 'system.set_tag.n1'];
         yield 'request_operator writes its request marker' => ['request_operator', 'system.request_operator.n1'];
+        yield 'ask_person writes its question marker' => ['ask_person', 'system.ask_person.n1.question_id'];
         yield 'rag_query writes rag.*' => ['rag_query', 'rag.answer'];
         yield 'a Solution node writes its own namespace' => ['feedback.collect', 'feedback.last_score'];
         yield 'a Solution node writes flow.*' => ['feedback.collect', 'flow.answer'];

@@ -189,6 +189,34 @@ return [
             ],
         ],
 
+        'ask_person' => [
+            'section_addressee'     => 'Who to ask',
+            'addressee'             => 'Ask contact',
+            'addressee_help'        => 'An expression that gives the contact id of the person to ask, e.g. {{flow.manager_id}}. The question goes to that contact on this assistant.',
+            'section_question'      => 'Question',
+            'text'                  => 'Question',
+            'text_help'             => 'Sent with the buttons below, in the language of the run.',
+            'section_buttons'       => 'Answer buttons',
+            'buttons'               => 'Answer buttons',
+            'button_label'          => 'Label',
+            'button_value'          => 'Value',
+            'add_button'            => '+ Add button',
+            'default_approve'       => 'Approve',
+            'default_reject'        => 'Reject',
+            'section_wait'          => 'Waiting',
+            'timeout_seconds'       => 'Wait for an answer (seconds)',
+            'timeout_seconds_help'  => 'From 60 seconds to 7 days. In an automation the wait also ends one minute before the run\'s deadline.',
+            'section_answer'        => 'Answer',
+            'late_answer_text'      => 'Text for a late answer',
+            'late_answer_text_help' => 'Sent to the person who presses a button after the decision was made. Empty = the standard text.',
+            'save_to_variable'      => 'Save the answer to',
+            'handle_timeout'        => 'Timed out',
+            'handle_error'          => 'Error',
+            'defaults'              => [
+                'text' => 'Please choose an answer.',
+            ],
+        ],
+
         'send_message' => [
             'addressee_title' => 'Send to',
             'addressee_label' => 'Contact id',
@@ -247,10 +275,12 @@ return [
     ],
 
     'content' => [
-        'send_message_text'    => 'Message text',
-        'send_message_caption' => 'Caption',
-        'input_prompt'         => 'Prompt',
-        'input_on_invalid'     => 'On invalid',
+        'ask_person_text'        => 'Question',
+        'ask_person_late_answer' => 'Late answer text',
+        'send_message_text'      => 'Message text',
+        'send_message_caption'   => 'Caption',
+        'input_prompt'           => 'Prompt',
+        'input_on_invalid'       => 'On invalid',
     ],
 
     'operators' => [

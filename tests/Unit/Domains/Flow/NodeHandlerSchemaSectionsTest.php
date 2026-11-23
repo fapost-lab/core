@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
+use App\Domains\Flow\Handlers\AskPersonNodeHandler;
 use App\Domains\Flow\Handlers\AssignNodeHandler;
 use App\Domains\Flow\Handlers\BranchNodeHandler;
 use App\Domains\Flow\Handlers\CallNodeHandler;
@@ -31,6 +32,7 @@ final class NodeHandlerSchemaSectionsTest extends TestCase
     public static function handlerProvider(): array
     {
         return [
+            'ask_person'       => [AskPersonNodeHandler::class],
             'assign'           => [AssignNodeHandler::class],
             'branch'           => [BranchNodeHandler::class],
             'call'             => [CallNodeHandler::class],

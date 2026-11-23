@@ -85,7 +85,8 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   `session_lock:{tenant}:{contact}:{assistant}` (`Concurrency/LockScope`, Redis, 30 s TTL) taken through
   `LockAcquisitionPolicy` (3 attempts, 2 s apart) and published to `SessionLockRegistry`, so
   `FlowExecutionGuard` stays re-entrant and the engine extends the TTL before each node; (4) a press of an
-  operator request's cancel button (`operator_request_cancel` drop, `Support/OperatorRequestCancelButton`), then the staff
+  operator request's cancel button (`operator_request_cancel` drop, `Support/OperatorRequestCancelButton`), a press of an
+  `ask_person` question's button (`flow_question_answer` drop, `Support/FlowQuestionButton`), then the staff
   ownership check (`staff_handled` drop, before session classification, because the session may still
   be in `waiting_input` from before the takeover), then session classification by `SessionStateRouter`;
   (5) `FlowOrchestrator::handle()`; (6) cleanup. A lock miss sends the busy reply and returns
@@ -114,6 +115,12 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   `OperatorRequestStateChanged`, which under the session lock removes the cancel button, sends the stored text and
   resumes the session through `resume()` with a wake-up message while it still waits in that node. Commands that end a
   session cancel its pending request (`GlobalCommandExecutor`).
+- Questions: the `ask_person` node records a question in `flow_questions` (`FlowQuestionsInterface`), sends it with
+  `q1…` button payloads and parks `paused` until its `expires_at` (`delayed(resumeAt)`, capped a minute before an
+  automation's deadline). `MessageRouter` swallows every such press after the operator-cancel button
+  (`FlowQuestions::receivePress()`); an accepted answer queues `ContinueAfterFlowQuestionJob` (`flow.execution`) →
+  `Orchestration/FlowQuestionResumer`, which runs the session under `LockScope::ofSession()` while it still waits on
+  that question; the timeout is the ordinary delayed wake-up (`adr-20261123-ask-person-question-outside-the-run`).
 - Flow templates: a `FlowDraft` with `kind = template` is never started (the definition repository's
   `runnable()`); publishing a host expands each `template` node into a copy that runs in the host's
   session, and publishing a template republishes every host from its active definition in the same

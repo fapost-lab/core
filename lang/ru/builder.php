@@ -189,6 +189,34 @@ return [
             ],
         ],
 
+        'ask_person' => [
+            'section_addressee'     => 'Кого спросить',
+            'addressee'             => 'Спросить контакт',
+            'addressee_help'        => 'Выражение, дающее id контакта, которого нужно спросить, например {{flow.manager_id}}. Вопрос уходит этому контакту на этом ассистенте.',
+            'section_question'      => 'Вопрос',
+            'text'                  => 'Вопрос',
+            'text_help'             => 'Отправляется вместе с кнопками ниже, на языке запуска.',
+            'section_buttons'       => 'Кнопки ответа',
+            'buttons'               => 'Кнопки ответа',
+            'button_label'          => 'Подпись',
+            'button_value'          => 'Значение',
+            'add_button'            => '+ Добавить кнопку',
+            'default_approve'       => 'Одобрить',
+            'default_reject'        => 'Отклонить',
+            'section_wait'          => 'Ожидание',
+            'timeout_seconds'       => 'Ждать ответ (секунд)',
+            'timeout_seconds_help'  => 'От 60 секунд до 7 дней. В автоматизации ожидание также заканчивается за минуту до дедлайна запуска.',
+            'section_answer'        => 'Ответ',
+            'late_answer_text'      => 'Текст для позднего ответа',
+            'late_answer_text_help' => 'Отправляется тому, кто нажал кнопку после того, как решение уже принято. Пусто = стандартный текст.',
+            'save_to_variable'      => 'Сохранить ответ в',
+            'handle_timeout'        => 'Время вышло',
+            'handle_error'          => 'Ошибка',
+            'defaults'              => [
+                'text' => 'Пожалуйста, выберите ответ.',
+            ],
+        ],
+
         'send_message' => [
             'addressee_title' => 'Кому отправить',
             'addressee_label' => 'ID контакта',
@@ -247,10 +275,12 @@ return [
     ],
 
     'content' => [
-        'send_message_text'    => 'Текст сообщения',
-        'send_message_caption' => 'Подпись',
-        'input_prompt'         => 'Запрос',
-        'input_on_invalid'     => 'При ошибке ввода',
+        'ask_person_text'        => 'Вопрос',
+        'ask_person_late_answer' => 'Текст позднего ответа',
+        'send_message_text'      => 'Текст сообщения',
+        'send_message_caption'   => 'Подпись',
+        'input_prompt'           => 'Запрос',
+        'input_on_invalid'       => 'При ошибке ввода',
     ],
 
     'operators' => [

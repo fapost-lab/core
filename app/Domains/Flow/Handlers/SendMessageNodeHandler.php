@@ -13,6 +13,7 @@ use App\Domains\Flow\Contracts\SendMessageTimeoutSchedulerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
+use App\Domains\Flow\Handlers\Support\AddresseeResolver;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
@@ -56,7 +57,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
     final public const string TYPE = 'send_message';
 
     /** The one addressee kind so far; tags and segments come as further kinds of the same field. */
-    final public const string ADDRESSEE_KIND_CONTACT = 'contact';
+    final public const string ADDRESSEE_KIND_CONTACT = AddresseeResolver::KIND_CONTACT;
 
     private const string EXTERNAL_MESSAGE_ID_META = 'external_message_id';
     private const string NO_RESPONSE_HANDLE       = 'no_response';
@@ -403,10 +404,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
     }
 
     /**
-     * The addressee a node's config names: its kind (null when the config names none) and its contact expression.
-     *
-     * No `addressee`, an empty one, or the builder's untouched default (kind `contact`, no expression) names none; a
-     * kind other than `contact` is named even without an expression, so validation can refuse it.
+     * The addressee a node's config names ({@see AddresseeResolver::named()}).
      *
      * @param  array<array-key, mixed>  $config
      *
@@ -414,21 +412,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
      */
     private static function addresseeOf(array $config): array
     {
-        $addressee = $config['addressee'] ?? null;
-
-        if (! is_array($addressee)) {
-            return ['kind' => null, 'contact' => ''];
-        }
-
-        $rawKind = $addressee['kind'] ?? null;
-        $kind    = is_string($rawKind) && '' !== mb_trim($rawKind) ? mb_trim($rawKind) : self::ADDRESSEE_KIND_CONTACT;
-        $contact = is_string($addressee['contact'] ?? null) ? mb_trim($addressee['contact']) : '';
-
-        if (self::ADDRESSEE_KIND_CONTACT === $kind && '' === $contact) {
-            return ['kind' => null, 'contact' => ''];
-        }
-
-        return ['kind' => $kind, 'contact' => $contact];
+        return AddresseeResolver::named($config);
     }
 
     /**
@@ -552,10 +536,14 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
             throw new InvalidNodeConfigException("send_message {$contentType->value} requires media_file_id.");
         }
 
-        foreach ($buttons as $button) {
+        foreach ($buttons as $index => $button) {
             if (! is_array($button) || ! Uuid::isValid((string)($button['id'] ?? ''))) {
                 throw new InvalidNodeConfigException('send_message buttons must contain stable UUID ids.');
             }
+
+            // A button's own payload is the sender's seam for `ask_person`; an author's config never sets it, so every
+            // send_message button keeps the session-and-button payload its press is routed by.
+            unset($buttons[$index]['callback_payload']);
         }
 
         $saveTo = is_string($config['save_to'] ?? null) && '' !== $config['save_to']
@@ -590,22 +578,14 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
     }
 
     /**
-     * The contact id the addressee's expression gives, rendered with the flow's engine; null when it gives none.
-     * Never the contact of the run: a missing id must not message somebody else.
+     * The contact id the addressee's expression gives ({@see AddresseeResolver::resolve()}); never the run's contact.
      *
      * @param  array{kind: string|null, contact: string}  $addressee
      * @param  array<string, mixed>                       $state
      */
     private function resolveAddressee(array $addressee, array $state, NodeExecutionContext $context): ?string
     {
-        if (self::ADDRESSEE_KIND_CONTACT !== $addressee['kind']) {
-            return null;
-        }
-
-        $rendered = $this->templates->render($addressee['contact'], $context, $state);
-        $id       = is_scalar($rendered) ? mb_trim((string) $rendered) : '';
-
-        return Uuid::isValid($id) ? mb_strtolower($id) : null;
+        return AddresseeResolver::resolve($addressee, $this->templates, $context, $state);
     }
 
     /**

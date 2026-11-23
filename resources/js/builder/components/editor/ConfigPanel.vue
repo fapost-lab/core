@@ -18,6 +18,7 @@ import AssignConfig from './config/overrides/AssignConfig.vue'
 import AuthRequestConfig from './config/overrides/AuthRequestConfig.vue'
 import CallConfig from './config/overrides/CallConfig.vue'
 import NotifyConfig from './config/overrides/NotifyConfig.vue'
+import AskPersonConfig from './config/overrides/AskPersonConfig.vue'
 import SetTagConfig from './config/overrides/SetTagConfig.vue'
 import LoopConfig from './config/overrides/LoopConfig.vue'
 import LoopEndConfig from './config/overrides/LoopEndConfig.vue'
@@ -36,6 +37,7 @@ const OVERRIDES: Record<string, object> = {
     call: CallConfig,
     set_tag: SetTagConfig,
     notify: NotifyConfig,
+    ask_person: AskPersonConfig,
     auth_request: AuthRequestConfig,
     loop: LoopConfig,
     loop_end: LoopEndConfig,

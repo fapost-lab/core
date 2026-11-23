@@ -32,6 +32,9 @@ export function nodeMustBeLast(node: TerminalCheckInput): boolean {
     // Call is always terminal — continuation is only via success/error.
     if (node.type === 'call') return true
 
+    // Ask person is always terminal — continuation is only via its answer buttons, timeout or error.
+    if (node.type === 'ask_person') return true
+
     // Request operator is always terminal — continuation is only via returned/cancelled/timeout.
     if (node.type === 'request_operator') return true
 

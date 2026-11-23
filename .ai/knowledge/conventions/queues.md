@@ -48,7 +48,7 @@ Queue assignment by purpose, as it exists in the codebase today:
 
 - `flow.execution`: `app/Jobs/Flow/ResumeDelayedFlowSessionJob.php`,
   `app/Jobs/Flow/ResumeTimedOutSendMessageNodeJob.php`, `ExpireOperatorRequestJob.php`,
-  `ContinueAfterOperatorRequestJob.php`, and the webhook controller's initial
+  `ContinueAfterOperatorRequestJob.php`, `ContinueAfterFlowQuestionJob.php`, and the webhook controller's initial
   dispatch (`app/Domains/Webhook/Http/WebhookController.php`). Flow replies are sent inline inside
   these jobs, not through a separate queue.
 - `messaging.transactional`: reserved like `sync.external` — no job targets it. A reply delivered

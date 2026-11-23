@@ -72,4 +72,10 @@ final class SystemStateKeys
      * places nothing new; once the request has ended, the next pass (a loop) places a new one.
      */
     public const string REQUEST_OPERATOR_PREFIX = StateNamespace::System->value . '.request_operator';
+
+    /**
+     * Prefix for the per-node `ask_person` marker. Full path: `system.ask_person.{nodeId}.question_id`, holding the id
+     * of the question the node asked and waits for. Cleared when the node leaves, so the next pass (a loop) asks anew.
+     */
+    public const string ASK_PERSON_PREFIX = StateNamespace::System->value . '.ask_person';
 }

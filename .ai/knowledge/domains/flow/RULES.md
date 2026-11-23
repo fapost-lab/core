@@ -107,7 +107,7 @@ broken.
   `FlowEngineSolutionNodeTest`, `SolutionLifecycleTest` (`adr-20261113-solution-node-types-and-state-namespace`).
 - **Only whitelisted node types write `system.*` and `rag.*`.** `system.*`: `send_message`,
   `input`, `delay`, `notify`, `set_tag`, `request_operator` (its marker holds the id of the operator request it
-  waits for); `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
+  waits for), `ask_person` (`system.ask_person.{node}.question_id`, the question it waits for); `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
   every handler. A Solution's namespace (its id, `state: true`) is written only by node types with the same
   owner; no whitelist. Enforced: `SystemStateNamespacePolicy`, applied in `FlowSessionPersister`.
   Adding a writer of `system`/`rag` means editing the whitelist, on purpose.
@@ -256,6 +256,7 @@ broken.
   themselves instead of spending an attempt). A caller that may hold a contactless session takes its scope from `LockScope::ofSession()`, never
   builds it from the session's columns (callers that only ever hold a contact's session — buttons, operator requests,
   event starts — still pass the triple). `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
+  `FlowQuestionResumer` (`ContinueAfterFlowQuestionJob`),
   `StartFlowFromEventJob`, `SubflowTimeoutSweeper`, `AutomationRunDeadlineSweeper` and `AutomationRunner` follow it
   (`tests/Feature/Redis`); the sweepers skip a parent or run whose lock is busy and retry on their next run, and skip
   with a warning one they cannot lock at all, so one never ends the pass.
@@ -296,6 +297,16 @@ broken.
   Why: a contactless run reaches a contact through an empty id or dies on a typed error nobody watches
   (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`,
   `ContactlessFlowSessionTest` (the addressee), `BuiltInNodeHandlersTest`.
+- **A press of a question's button is always the router's, and only the question's addressee decides it.** A
+  `callback_query` whose text is `q1` + 32 hex + 2 hex (`Support/FlowQuestionButton`) is swallowed by `MessageRouter`
+  (`flow_question_answer`) before the staff-ownership check and never reaches `FlowOrchestrator`, whether its token is
+  known or not; `FlowQuestions::receivePress()` answers only for the question's contact, on its assistant, with an index
+  of its buttons, and tells any other presser nothing. The question leaves `pending` by one conditional UPDATE; the run
+  goes on only through `ContinueAfterFlowQuestionJob` under the run's own lock, never under the presser's. No other
+  payload may start with `q1`, and `send_message` drops an author's `callback_payload`. Why: a press decides for a run
+  with side effects elsewhere, and an answer to someone else's run must not become input to the presser's own
+  conversation (`adr-20261123-ask-person-question-outside-the-run`). Enforced: `AskPersonNodeTest`,
+  `MessageRouterTest`, `FlowQuestionResumerRedisTest`.
 - **A trigger goes live only on publish, and its id is its row's primary key.** A flow's triggers are a list
   `{id, type, is_active, priority, config}` in `flow_drafts.triggers` and `flow_definitions.triggers`; `null` there
   means "not written yet", and the flow's live `flow_triggers` rows count (`FlowTriggerSet`), `[]` means none. A draft
