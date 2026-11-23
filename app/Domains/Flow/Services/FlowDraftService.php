@@ -92,11 +92,13 @@ final readonly class FlowDraftService
                 'group_name' => FlowGroup::query()
                     ->select('name')
                     ->whereColumn('flow_groups.id', 'flow_drafts.flow_group_id'),
-                // 1 when a live trigger of the flow is paused by the run rate breaker, null otherwise.
+                // 1 when a live trigger of the flow is paused by the run rate breaker, null otherwise. A message trigger
+                // never asks admission: a pause left on a trigger a publish turned into one is not shown.
                 'has_paused_trigger' => FlowTriggerState::query()
                     ->selectRaw('1')
                     ->join('flow_triggers', 'flow_triggers.id', '=', 'flow_trigger_states.trigger_id')
                     ->whereColumn('flow_triggers.flow_id', 'flow_drafts.flow_id')
+                    ->where('flow_triggers.type', '!=', FlowTriggerType::Message->value)
                     ->whereNotNull('flow_trigger_states.paused_at')
                     ->limit(1),
             ]);

@@ -823,6 +823,7 @@ return [
                 'no_payload'        => 'This run kept no trigger payload: it started before payloads were kept, or no trigger fired it.',
                 'trigger_gone'      => 'The trigger that started this run is turned off or no longer exists.',
                 'flow_off'          => 'The flow is switched off in the flows list. Turn it on to run it again.',
+                'trigger_paused'    => 'The trigger that started this run started too many runs in a minute and was paused. Resume it in the builder, then run this run again.',
                 'no_active_version' => 'The flow has no active version to run.',
                 'already_rerun'     => 'This re-run has already started: it is listed under Re-runs. Reload the page to run it again once more.',
             ],

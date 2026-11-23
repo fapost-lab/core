@@ -429,8 +429,8 @@ broken.
   writes `flow_sessions.trigger_payload` = the `initialState` as handed over, only for a start with a fire key (a root
   automation run); conversations and subflow children keep NULL. `AutomationRunRerunService` re-runs only a root
   automation run in status `failed` with a trigger, a fire key and a kept payload, while its trigger row is active and
-  of the same flow and tenant, the flow's draft exists and is not switched off (`flow_off`) and the flow has an active
-  version; anything else is a
+  of the same flow and tenant and not paused by the run rate breaker (`trigger_paused`), the flow's draft exists and is
+  not switched off (`flow_off`) and the flow has an active version; anything else is a
   `RerunRefusal`, never an exception. It queues `StartAutomationRunJob` with the kept payload (never rebuilt from the
   trace or the final state), the source's tenant, assistant and `event_chain_depth`, under the fire key
   `rerun:<source id>:<n>` (`RerunFireKey`; `n` is the attempt the page offered — the highest attempt among the source's re-runs with a row + 1, never their count —
@@ -479,14 +479,16 @@ broken.
   trigger; over it `rate_breaker` and the trigger is paused), the plan's `flow_runs` through `PeriodQuota`
   (`plan_limit`). A retry or continuation of a fire that has a run is never asked; a message trigger never is.
   `StartFlowFromEventJob` asks under the contact's lock, after its start key, channel and collision checks, so a start
-  skipped for a busy or unreachable contact is never metered (`adr-20261123-event-start-collisions`). The
+  skipped for a busy or unreachable contact is never metered (`adr-20261123-event-start-collisions`), and through
+  `admitOnce()`: an allowed start is remembered by tenant and unit key for an hour, so the job's retry after a failure
+  that followed it (ending a stale conversation, the engine's start) is not counted by the breaker again. The
   meter's unit key is a hash of the trigger and what fired it, never the fire key. A refusal starts nothing and is
   counted on `flow_trigger_states`; the pause lives there too, written only through
   `FlowTriggerStateRepositoryInterface`, never on `flow_triggers`, and a publish never lifts it. A webhook to a paused
   trigger answers 503 before its delivery is claimed. Why: a looping or runaway automation must stop on its own without
   changing what was published, and the plan must count each run once (`adr-20261123-flow-run-admission`). Enforced:
   `TriggerRunAdmissionTest`, `TriggerResumeEndpointTest`, `FlowWebhookTriggerTest::test_a_paused_trigger_answers_503_with_retry_after_and_keeps_the_delivery_unclaimed`.
-  Not covered: that no message path asks (review only).
+  `TriggerRunAdmissionTest::test_a_message_trigger_never_asks_admission` covers the message router's start.
 - **A webhook request or an API call waits for its flow only while it holds a wait slot, and never past 30 seconds.** A
   webhook or API trigger in
   `response_mode: sync` holds the request through `WebhookSyncWait`, which first takes a slot of

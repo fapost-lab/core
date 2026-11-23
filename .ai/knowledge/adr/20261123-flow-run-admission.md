@@ -36,7 +36,9 @@ decision D1–D8); the schedule and event details below were settled by the agen
   is asked by `AutomationRunner::start()` (every `StartAutomationRunJob`: webhook, Core event, registered trigger type,
   re-run) only when `(trigger_id, fire_key)` has no run (a retry or continuation is
   never asked again), by `StartFlowFromEventJob` before its start (since `adr-20261123-event-start-collisions`: under the
-  contact's lock, after its start key, channel and collision checks), and by `ScheduleTriggerFirer` inside the slot claim
+  contact's lock, after its start key, channel and collision checks; through `admitOnce()`, which remembers an allowed
+  start by tenant and unit key for an hour, so the job's retry after a failure that followed the admission is not
+  counted by the breaker again), and by `ScheduleTriggerFirer` inside the slot claim
   before `prepare()`. A message trigger is never asked: conversations are not runs of a trigger, and inbound volume has
   its own limit.
 - **Order: pause, breaker, plan.** A paused trigger refuses (`trigger_paused`). The breaker counts every run asking
@@ -61,8 +63,9 @@ decision D1–D8); the schedule and event details below were settled by the agen
   flow and `ManageAutomations`), lifts the pause, writes `resumed_at`, clears the breaker window and keeps the refusal
   counter (`TriggerPauseService`). No timer lifts it.
 - **Who hears about it.** The pause queues `NotifyTriggerPausedJob` after the commit (`messaging.system`, tenant switch,
-  guard before delivery): one in-app notification to every active staff user holding `ManageAutomations`, linking the
-  flow. The console's flow list marks a flow with a paused trigger; the builder's trigger panel shows the pause, the
+  guard set once the flow and the recipients were read, right before delivery): one in-app notification to every active
+  staff user who could resume the trigger — `ManageAutomations` and the flow's `resumeTrigger` policy, so access to its
+  assistant — linking the flow through the named builder route; a flow deleted since is announced to nobody. The console's flow list marks a flow with a paused trigger; the builder's trigger panel shows the pause, the
   refused count and the last reason.
 - **A webhook to a paused trigger answers 503 with `Retry-After: 300`** before the delivery is claimed, so the sender's
   retry after a resume runs. A refusal by the breaker or the plan after the 202 is recorded on the trigger only; a

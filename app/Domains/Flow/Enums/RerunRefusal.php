@@ -31,6 +31,9 @@ enum RerunRefusal: string
     /** The flow is switched off in the flows list: it starts no automatic run, a re-run included. */
     case FlowOff = 'flow_off';
 
+    /** The run rate breaker paused the trigger: it starts no run, a re-run included, until a person resumes it. */
+    case TriggerPaused = 'trigger_paused';
+
     /** The flow has no active version to run. */
     case NoActiveVersion = 'no_active_version';
 

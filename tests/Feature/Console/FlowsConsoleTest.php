@@ -161,6 +161,22 @@ final class FlowsConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_a_pause_left_on_a_trigger_a_publish_turned_into_a_message_trigger_is_not_shown(): void
+    {
+        $flow    = $this->flow('Chatty');
+        $trigger = $this->trigger($flow, FlowTriggerType::Event, ['event_name' => 'order_created']);
+        $this->app->make(FlowTriggerStateRepositoryInterface::class)->pause($trigger->id, RefusalReason::RateBreaker, CarbonImmutable::now());
+        // A later publish keeps the row's id and changes its type: a message trigger never asks admission.
+        $trigger->forceFill(['type' => FlowTriggerType::Message->value, 'config' => ['keywords' => ['hi']]])->save();
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.name', 'Chatty')
+                ->where('table.rows.0.triggerPaused', false)
+                ->etc());
+    }
+
     public function test_a_registered_trigger_type_shows_its_label_and_a_type_nobody_registers_its_name(): void
     {
         $this->app->make(TriggerTypeRegistry::class)->register(FeedbackSubmittedTrigger::class, 'feedback');

@@ -85,8 +85,9 @@ was; its page lists the runs started again from it, and each of those links back
 - It is not offered for a conversation or for a subflow inside another run (run
   the outer run again), and only a run whose status is *Failed* can be run again —
   a run that reached an end node is not, whatever its outcome. It is refused when the
-  trigger that started the run is turned off or deleted, the flow is switched off
-  in the flows list, or the flow has no active version.
+  trigger that started the run is turned off, deleted or
+  [paused for starting too many runs](/using/publishing#when-a-trigger-starts-too-many-runs),
+  the flow is switched off in the flows list, or the flow has no active version.
 - Runs that failed before this was added kept no trigger data and cannot be run
   again.
 - A double click, a second tab or a repeated request starts one run. To run it

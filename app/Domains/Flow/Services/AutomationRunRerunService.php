@@ -10,6 +10,7 @@ use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\DTOs\RerunOutcome;
 use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
@@ -34,9 +35,9 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  * queue, the run's deadline and segments apply to it as to any run, and it runs the flow's latest active version. Its
  * key never starts with `wh:`, so it answers no webhook sender and leaves the delivery dedup alone.
  *
- * Only a root automation run that failed and kept its payload is re-run, and only while its trigger is still live, its
- * flow is not switched off in the flows list and has an active version; anything else is a refusal with its reason, never an exception. The source run is
- * not changed. Every queued re-run is recorded in the audit log, and the entry is committed before the job is queued:
+ * Only a root automation run that failed and kept its payload is re-run, and only while its trigger is still live and not
+ * paused by the run rate breaker, its flow is not switched off in the flows list and has an active version; anything
+ * else is a refusal with its reason, never an exception. The source run is not changed. Every queued re-run is recorded in the audit log, and the entry is committed before the job is queued:
  * a queue that refuses the job leaves an entry for a re-run the person is told failed, and asking again makes the same
  * key, so the run still starts once.
  *
@@ -48,6 +49,7 @@ final readonly class AutomationRunRerunService
         private FlowTriggerRepositoryInterface $triggers,
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowDraftRepositoryInterface $drafts,
+        private FlowTriggerStateRepositoryInterface $triggerStates,
         private AuditTrailInterface $audit,
         private DatabaseManager $db,
         private Dispatcher $dispatcher,
@@ -67,6 +69,11 @@ final readonly class AutomationRunRerunService
 
         if ($this->drafts->isSwitchedOff((string) $source->flowDefinition?->flow_id)) {
             return RerunOutcome::refused(RerunRefusal::FlowOff);
+        }
+
+        // Run admission would refuse the queued run silently; the person who asked is told now instead.
+        if ($this->triggerStates->isPaused((string) $source->trigger_id)) {
+            return RerunOutcome::refused(RerunRefusal::TriggerPaused);
         }
 
         $target = $this->targetDefinition($source);
