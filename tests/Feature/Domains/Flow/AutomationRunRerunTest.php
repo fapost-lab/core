@@ -106,9 +106,11 @@ final class AutomationRunRerunTest extends FeatureTestCase
         $this->assertNull($outcome->refusal);
         $this->assertSame('rerun:' . $source->getKey() . ':1', $outcome->fireKey);
         $job = Queue::pushed(StartAutomationRunJob::class)->sole();
-        $this->assertSame([self::TENANT_ID, $flowId, $triggerId, $outcome->fireKey, $payload, (string) $this->assistant->getKey(), 0], [
-            $job->tenantId, $job->flowId, $job->triggerId, $job->fireKey, $job->initialState, $job->assistantId, $job->chainDepth,
+        $this->assertSame([self::TENANT_ID, $flowId, $triggerId, $outcome->fireKey, (string) $this->assistant->getKey(), 0], [
+            $job->tenantId, $job->flowId, $job->triggerId, $job->fireKey, $job->assistantId, $job->chainDepth,
         ]);
+        // jsonb does not keep the order of keys, so the payload is compared as a map, not as a sequence.
+        $this->assertEquals($payload, $job->initialState);
 
         $this->runJob($job);
 
