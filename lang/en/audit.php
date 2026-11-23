@@ -82,9 +82,11 @@ return [
             'deleted' => 'Role deleted',
         ],
         'credential' => [
-            'created' => 'Credential created',
-            'updated' => 'Credential updated',
-            'deleted' => 'Credential deleted',
+            'created'      => 'Credential created',
+            'updated'      => 'Credential updated',
+            'deleted'      => 'Credential deleted',
+            'connected'    => 'Credential connected',
+            'disconnected' => 'Credential disconnected',
         ],
         'api_token' => [
             'issued'  => 'API token issued',

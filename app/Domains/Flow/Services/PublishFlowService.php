@@ -23,6 +23,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\VariableSchemaEntry;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
+use App\Domains\Flow\Schedule\ScheduleRegistrySync;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableType;
 use App\Domains\Flow\Subflow\CallGraphRepository;
@@ -49,6 +50,7 @@ final readonly class PublishFlowService
         private FlowTriggerSet $triggerSet,
         private FlowTriggerRepositoryInterface $triggerRows,
         private FlowWebhookEndpointRepositoryInterface $webhookEndpoints,
+        private ScheduleRegistrySync $scheduleRegistry,
     ) {
     }
 
@@ -196,8 +198,15 @@ final readonly class PublishFlowService
 
         // Every trigger goes live here, never on draft save: rows are synced by id, keeping a kept trigger's run state.
         if (is_array($carried)) {
-            $liveWebhooks = $this->webhookTriggerIds($this->triggerSet->live($draft->flow_id));
+            $live         = $this->triggerSet->live($draft->flow_id);
+            $liveWebhooks = $this->webhookTriggerIds($live);
             $this->triggerRows->syncForFlow($draft, $triggers);
+
+            // The landlord registry follows the schedules this version keeps, adds, changes or drops, after the commit.
+            $this->scheduleRegistry->syncAfterCommit(
+                (string) $draft->tenant_id,
+                array_values(array_unique([...$this->triggerIdsOfType($live, FlowTriggerType::Schedule), ...$this->triggerIdsOfType($triggers, FlowTriggerType::Schedule)])),
+            );
 
             // A live webhook trigger this version deletes, or turns into another type, loses its URL and secret.
             // An endpoint made for a trigger that never went live is left alone: it may be waiting for this draft.
@@ -270,10 +279,20 @@ final readonly class PublishFlowService
      */
     private function webhookTriggerIds(array $triggers): array
     {
+        return $this->triggerIdsOfType($triggers, FlowTriggerType::Webhook);
+    }
+
+    /**
+     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $triggers
+     *
+     * @return list<string>
+     */
+    private function triggerIdsOfType(array $triggers, FlowTriggerType $type): array
+    {
         $ids = [];
 
         foreach ($triggers as $trigger) {
-            if (FlowTriggerType::Webhook->value === $trigger['type']) {
+            if ($type->value === $trigger['type']) {
                 $ids[] = mb_strtolower($trigger['id']);
             }
         }

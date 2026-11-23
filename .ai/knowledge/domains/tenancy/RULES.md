@@ -33,7 +33,7 @@ paths:
   - tests/Feature/Staff/CoreOperatorAccessTest.php
   - tests/Feature/Staff/HorizonOperatorAccessTest.php
   - tests/Architecture/OperatorAccessBoundaryTest.php
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-23
 ---
 # Tenancy rules
 
@@ -179,6 +179,10 @@ broken.
   only an operator package does. Without a package nothing changes.
 - **The landlord table is the source of truth for the webhook registry; Redis is a cache.**
   Anything in Redis can be rebuilt by `WebhookRegistryHealthChecker`.
+- **The schedule registry is derived; the tenant's `flow_triggers` is the truth.** `flow_schedule_registry` is read and
+  written only by `LandlordFlowScheduleRegistry` (`FlowScheduleRegistryInterface`), has no foreign key, is written after
+  the tenant's commit, rebuilt hourly from the tenants, and its rows go with a decommissioned tenant
+  (`adr-20261123-flow-schedule-trigger`). Enforced: `FireScheduledTriggersCommandTest`, `CoreTenantDecommissionerTest`.
 
 - **Core's default for an operator-replaceable contract is bound with `bindIf`.** Package service
   providers register before application providers, so a plain `bind` in Core would overwrite the

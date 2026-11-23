@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow\Call;
 
 use App\Domains\Credentials\Models\Credential;
+use App\Domains\Credentials\Models\CredentialOAuthGrant;
 use App\Domains\Credentials\Types\OAuth2ClientCredentialsType;
 use App\Domains\Flow\Call\Egress\EgressGuardMiddleware;
 use App\Domains\Flow\Call\Egress\GuardedHttpClient;
@@ -308,6 +309,25 @@ final class HttpTransportCredentialTest extends CredentialsTestCase
         $this->assertSame('http_4xx', $result->errorCode);
         $this->assertSame(['error' => 'expired ***'], $result->payload);
         $this->assertSame([], $this->redis->values);
+    }
+
+    public function test_a_consented_credential_sends_its_access_token_and_a_401_marks_it_expired(): void
+    {
+        Http::fake(['api.example.com/*' => Http::sequence()
+            ->push(['echo' => 'access-token-1'], 200)
+            ->push([], 401)]);
+        $credential = $this->oauthCredential();
+        $this->grant($credential);
+
+        $result = $this->execute(new CallRequest('GET https://api.example.com/x', credential: $this->secretOf($credential)));
+
+        $this->assertSame(['echo' => '***'], $result->payload);
+        Http::assertSent(static fn (Request $request): bool => ['Bearer access-token-1'] === $request->header('Authorization'));
+
+        $this->execute(new CallRequest('GET https://api.example.com/x', credential: $this->secretOf($credential)));
+
+        $this->assertFalse(CredentialOAuthGrant::query()->findOrFail($credential->id)->accessValidFor(0));
+        Http::assertSentCount(2);
     }
 
     public function test_a_401_from_a_bearer_target_leaves_the_token_cache_alone(): void

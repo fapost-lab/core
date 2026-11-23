@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Validation;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Events\EventTriggerAssistantFilter;
+use App\Domains\Flow\Schedule\ScheduleTriggerConfig;
 use App\Domains\Flow\Webhook\WebhookTriggerConfig;
 use InvalidArgumentException;
 
@@ -65,13 +66,7 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
      */
     private function validateScheduleConfig(array $config): void
     {
-        $target = $config['timezone'] ?? $config['target'] ?? null;
-
-        if (! is_string($config['cron'] ?? null) || '' === mb_trim($config['cron'])
-             || ! is_string($target)
-             || '' === mb_trim($target)) {
-            throw new InvalidArgumentException('Invalid schedule trigger config.');
-        }
+        ScheduleTriggerConfig::fromConfig($config);
     }
 
     /**

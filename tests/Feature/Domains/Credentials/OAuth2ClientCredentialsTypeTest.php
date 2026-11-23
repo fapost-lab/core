@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Credentials;
 
+use App\Domains\Credentials\OAuth2\OAuth2TokenEndpoint;
 use App\Domains\Credentials\OAuth2TokenCache;
 use App\Domains\Credentials\RedisKeyPurger;
 use App\Domains\Credentials\Types\OAuth2ClientCredentialsType;
@@ -289,7 +290,7 @@ final class OAuth2ClientCredentialsTypeTest extends TestCase
 
     private function type(): OAuth2ClientCredentialsType
     {
-        return new OAuth2ClientCredentialsType($this->app->make(GuardedHttpClient::class), $this->cache, $this->logger);
+        return new OAuth2ClientCredentialsType(new OAuth2TokenEndpoint($this->app->make(GuardedHttpClient::class), $this->logger), $this->cache);
     }
 
     /**

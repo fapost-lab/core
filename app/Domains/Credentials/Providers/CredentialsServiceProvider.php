@@ -9,12 +9,17 @@ use App\Domains\Credentials\CredentialTypeRegistry;
 use App\Domains\Credentials\CredentialWriter;
 use App\Domains\Credentials\EloquentCredentialStore;
 use App\Domains\Credentials\Models\Credential;
+use App\Domains\Credentials\OAuth2\OAuth2Consent;
+use App\Domains\Credentials\OAuth2\OAuth2GrantLock;
+use App\Domains\Credentials\OAuth2\OAuth2GrantRefresher;
+use App\Domains\Credentials\OAuth2\OAuth2GrantRepository;
 use App\Domains\Credentials\OAuth2TokenCache;
 use App\Domains\Credentials\Policies\CredentialPolicy;
 use App\Domains\Credentials\Types\ApiKeyHeaderCredentialType;
 use App\Domains\Credentials\Types\ApiKeyQueryCredentialType;
 use App\Domains\Credentials\Types\BasicCredentialType;
 use App\Domains\Credentials\Types\BearerCredentialType;
+use App\Domains\Credentials\Types\OAuth2AuthorizationCodeType;
 use App\Domains\Credentials\Types\OAuth2ClientCredentialsType;
 use Fapost\Foundation\Credentials\Contracts\CredentialStoreInterface;
 use Illuminate\Contracts\Container\Container;
@@ -22,8 +27,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 /**
- * Credentials bounded context: the saved credentials of a tenant, the types that apply them to an HTTP request and
- * the OAuth2 token cache.
+ * Credentials bounded context: the saved credentials of a tenant, the types that apply them to an HTTP request, the
+ * OAuth2 token cache and the grants of credentials connected by consent.
  *
  * The type registry is a singleton of classes. Everything that reads or writes the tenant's credentials, or holds
  * the config repository, is scoped, so no job inherits another's tenant.
@@ -41,6 +46,7 @@ final class CredentialsServiceProvider extends ServiceProvider
                 ApiKeyHeaderCredentialType::class,
                 ApiKeyQueryCredentialType::class,
                 OAuth2ClientCredentialsType::class,
+                OAuth2AuthorizationCodeType::class,
             ] as $type) {
                 $registry->register($type);
             }
@@ -52,6 +58,11 @@ final class CredentialsServiceProvider extends ServiceProvider
         $this->app->scoped(OAuth2TokenCache::class);
         $this->app->scoped(CredentialStoreInterface::class, EloquentCredentialStore::class);
         $this->app->scoped(CredentialWriter::class);
+        // The consent grants of the current tenant, and what reads, refreshes and writes them.
+        $this->app->scoped(OAuth2GrantRepository::class);
+        $this->app->scoped(OAuth2GrantLock::class);
+        $this->app->scoped(OAuth2GrantRefresher::class);
+        $this->app->scoped(OAuth2Consent::class);
         $this->app->tag(CredentialCacheForgetter::class, 'tenancy.cache_forgetters');
     }
 

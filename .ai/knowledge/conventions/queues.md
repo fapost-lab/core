@@ -27,7 +27,7 @@ messaging.transactional - replies in an active dialogue
 messaging.broadcast    - low-priority broadcasts / fan-out
 messaging.system       - service notifications
 messaging.logging      - conversation capture, written outside the delivery path
-scheduled.triggers     - scheduled/event trigger fan-out
+scheduled.triggers     - event trigger fan-out (schedule slots are claimed by a minute command; their runs go to flow.automations)
 flow.automations       - automation runs: their start and each execution segment
 sync.external          - external synchronisations
 ```

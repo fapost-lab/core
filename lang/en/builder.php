@@ -321,6 +321,11 @@ return [
         'flow_level'    => 'Template',
     ],
 
+    'schedule_trigger' => [
+        'cron_hint'     => 'Five fields: minute, hour, day of month, month, day of week. "0 9 * * 1-5" runs at 09:00 on weekdays; a schedule runs at most once a minute.',
+        'timezone_hint' => 'An IANA time zone, such as Europe/Berlin or UTC. A time skipped by a daylight saving change does not run; a repeated hour runs once.',
+    ],
+
     'webhook_trigger' => [
         'copy'                      => 'Copy',
         'copied'                    => 'Copied',

@@ -32,6 +32,26 @@ export interface CredentialsTranslations {
   empty: string
   empty_hint: string
   delete_one: { title: string; description: string }
+  oauth: {
+    title: string
+    description: string
+    statuses: { not_connected: string; connected: string; reconnect_needed: string }
+    connected_by: string
+    connected_at: string
+    refreshed: string
+    reconnect_hint: string
+    failure: string
+    callback_url: string
+    callback_hint: string
+    copy: string
+    copied: string
+    connect: string
+    reconnect: string
+    disconnect: string
+    disconnect_confirm: { title: string; description: string }
+    save_first: string
+    params_hint: string
+  }
 }
 
 export type CredentialsPageProps = ShellPageProps & {
@@ -78,4 +98,17 @@ export interface EditableCredential {
   settings: Record<string, string>
   allowed_hosts: string[]
   secret_changed_at: string
+}
+
+export type OAuthStatus = 'not_connected' | 'connected' | 'reconnect_needed'
+
+/** The connection of an authorization-code credential; the page gets null for every other type. */
+export interface OAuthConnectionState {
+  status: OAuthStatus
+  connected_at: string | null
+  connected_by_name: string | null
+  refreshed_at: string | null
+  failure_code: string | null
+  callback_url: string
+  urls: { connect: string; disconnect: string }
 }

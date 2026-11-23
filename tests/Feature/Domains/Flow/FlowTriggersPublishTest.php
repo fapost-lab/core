@@ -12,6 +12,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Models\TenantEvent;
+use App\Domains\Flow\Services\FlowDraftService;
 use App\Domains\Flow\Services\FlowTriggerSet;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Services\SaveDraftService;
@@ -20,6 +21,8 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Database\Seeders\TenantAclSeeder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
@@ -43,6 +46,15 @@ final class FlowTriggersPublishTest extends FeatureTestCase
 
         $this->assistant = Assistant::factory()->create(['tenant_id' => $this->tenantId, 'default_language' => 'en']);
         $this->app->make(CurrentAssistantInterface::class)->set($this->assistant);
+
+        Carbon::setTestNow('2026-11-20 08:30:00');
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     public function test_a_flow_with_only_a_live_row_shows_it_in_the_builder_with_the_row_key_as_id(): void
@@ -218,7 +230,7 @@ final class FlowTriggersPublishTest extends FeatureTestCase
         $this->publish($draft->flow_id);
 
         $row = FlowTrigger::query()->sole();
-        $this->assertNull($row->next_run_at);
+        $this->assertSame('2026-11-20 10:00:00', $row->next_run_at?->format('Y-m-d H:i:s'), 'The new cron counts from now.');
         $this->assertSame('2026-11-30 09:00:00', $row->last_run_at?->format('Y-m-d H:i:s'));
         $this->assertSame('0 10 * * *', $row->config['cron']);
     }
@@ -240,7 +252,7 @@ final class FlowTriggersPublishTest extends FeatureTestCase
         $this->assertNull($row->next_run_at);
     }
 
-    public function test_changing_only_priority_or_the_active_flag_keeps_next_run(): void
+    public function test_changing_only_the_priority_keeps_next_run(): void
     {
         $draft = $this->draft();
         $id    = (string) Str::uuid();
@@ -249,13 +261,103 @@ final class FlowTriggersPublishTest extends FeatureTestCase
 
         FlowTrigger::query()->sole()->forceFill(['next_run_at' => '2026-12-01 09:00:00'])->save();
 
-        $this->storeDraftTriggers($draft, [$this->schedule($id, priority: 7, active: false)]);
+        $this->storeDraftTriggers($draft, [$this->schedule($id, priority: 7)]);
         $this->publish($draft->flow_id);
 
         $row = FlowTrigger::query()->sole();
         $this->assertSame(7, $row->priority);
-        $this->assertFalse($row->is_active);
         $this->assertSame('2026-12-01 09:00:00', $row->next_run_at?->format('Y-m-d H:i:s'));
+    }
+
+    public function test_a_new_schedule_gets_its_first_slot_and_the_registry_follows_after_the_commit(): void
+    {
+        $draft = $this->draft();
+        $id    = (string) Str::uuid();
+        $this->storeDraftTriggers($draft, [$this->schedule($id)]);
+        $this->publish($draft->flow_id);
+
+        $this->assertSame('2026-11-20 09:00:00', FlowTrigger::query()->sole()->next_run_at?->format('Y-m-d H:i:s'));
+        $this->assertSame([mb_strtolower($id) => '2026-11-20 09:00:00'], $this->registryRows());
+    }
+
+    public function test_a_schedule_switched_off_loses_its_slot_and_gets_a_new_one_when_switched_on(): void
+    {
+        $draft = $this->draft();
+        $id    = (string) Str::uuid();
+        $this->storeDraftTriggers($draft, [$this->schedule($id)]);
+        $this->publish($draft->flow_id);
+
+        $this->storeDraftTriggers($draft, [$this->schedule($id, active: false)]);
+        $this->publish($draft->flow_id);
+
+        $this->assertNull(FlowTrigger::query()->sole()->next_run_at);
+        $this->assertSame([], $this->registryRows());
+
+        Carbon::setTestNow('2026-11-20 09:30:00');
+        $this->storeDraftTriggers($draft, [$this->schedule($id)]);
+        $this->publish($draft->flow_id);
+
+        $this->assertSame('2026-11-21 09:00:00', FlowTrigger::query()->sole()->next_run_at?->format('Y-m-d H:i:s'));
+        $this->assertSame([mb_strtolower($id) => '2026-11-21 09:00:00'], $this->registryRows());
+    }
+
+    public function test_a_schedule_dropped_or_turned_into_another_type_leaves_the_registry(): void
+    {
+        $draft = $this->draft();
+        $kept  = (string) Str::uuid();
+        $gone  = (string) Str::uuid();
+        $this->storeDraftTriggers($draft, [$this->schedule($kept), $this->schedule($gone, ['cron' => '30 9 * * *', 'timezone' => 'UTC'])]);
+        $this->publish($draft->flow_id);
+
+        $this->assertCount(2, $this->registryRows());
+
+        $this->storeDraftTriggers($draft, [['id' => $kept, 'type' => 'api', 'is_active' => true, 'priority' => 100, 'config' => ['allowed_sources' => []]]]);
+        $this->publish($draft->flow_id);
+
+        $this->assertSame([], $this->registryRows());
+    }
+
+    public function test_a_republished_schedule_left_without_a_slot_gets_one(): void
+    {
+        $draft = $this->draft();
+        $id    = (string) Str::uuid();
+        $this->storeDraftTriggers($draft, [$this->schedule($id)]);
+        $this->publish($draft->flow_id);
+
+        // A schedule published before schedules ran has no slot; publishing its flow again gives it one.
+        FlowTrigger::query()->toBase()->update(['next_run_at' => null]);
+        $this->publish($draft->flow_id);
+
+        $this->assertSame('2026-11-20 09:00:00', FlowTrigger::query()->sole()->next_run_at?->format('Y-m-d H:i:s'));
+    }
+
+    public function test_a_schedule_with_an_invalid_cron_or_time_zone_is_refused(): void
+    {
+        $draft = $this->draft();
+        $id    = (string) Str::uuid();
+
+        foreach (['* * * * * *', '61 * * * *', '', '@reboot'] as $cron) {
+            $this->storeDraftTriggers($draft, [$this->schedule($id, ['cron' => $cron, 'timezone' => 'UTC'])]);
+            $this->assertRefused($draft->flow_id, 'invalid_schedule_cron', "triggers.{$id}.config.cron");
+        }
+
+        $this->storeDraftTriggers($draft, [$this->schedule($id, ['cron' => '0 9 * * *', 'timezone' => 'Mars/Olympus'])]);
+        $this->assertRefused($draft->flow_id, 'invalid_schedule_timezone', "triggers.{$id}.config.timezone");
+
+        $this->assertSame(0, FlowTrigger::query()->count());
+    }
+
+    public function test_deleting_the_flow_stops_its_schedule(): void
+    {
+        $draft = $this->draft();
+        $id    = (string) Str::uuid();
+        $this->storeDraftTriggers($draft, [$this->schedule($id)]);
+        $this->publish($draft->flow_id);
+
+        $this->app->make(FlowDraftService::class)->delete($draft->fresh());
+
+        $this->assertNull(FlowTrigger::query()->sole()->next_run_at, 'The row stays, without a slot.');
+        $this->assertSame([], $this->registryRows());
     }
 
     public function test_an_upper_case_id_in_the_draft_matches_the_lower_case_row(): void
@@ -485,6 +587,18 @@ final class FlowTriggersPublishTest extends FeatureTestCase
             ->where('flow_id', $flowId)
             ->pluck('id')
             ->map(static fn (mixed $key): string => mb_strtolower((string) $key))
+            ->all();
+    }
+
+    /**
+     * @return array<string, string> trigger id => next run, as the landlord registry holds them for the tenant
+     */
+    private function registryRows(): array
+    {
+        return DB::connection('landlord')->table('flow_schedule_registry')
+            ->where('tenant_id', $this->tenantId)
+            ->pluck('next_run_at', 'trigger_id')
+            ->map(static fn (mixed $at): string => Carbon::parse((string) $at)->format('Y-m-d H:i:s'))
             ->all();
     }
 

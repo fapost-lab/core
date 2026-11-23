@@ -472,6 +472,7 @@ function defaultConfig(type: string): Record<string, unknown> {
                     placeholder="0 9 * * 1-5"
                     @input="update({ config: { cron: ($event.target as HTMLInputElement).value } })"
                 >
+                <div class="field-hint">{{ t('schedule_trigger.cron_hint') }}</div>
             </div>
 
             <div class="config-field">
@@ -479,8 +480,10 @@ function defaultConfig(type: string): Record<string, unknown> {
                 <input
                     class="field-input"
                     :value="(triggerCfg.timezone as string) ?? 'UTC'"
+                    placeholder="Europe/Berlin"
                     @input="update({ config: { timezone: ($event.target as HTMLInputElement).value } })"
                 >
+                <div class="field-hint">{{ t('schedule_trigger.timezone_hint') }}</div>
             </div>
         </AccordionSection>
 

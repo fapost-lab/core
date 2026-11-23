@@ -286,6 +286,13 @@ address; that proxy must refuse private ranges itself. Names from `/etc/hosts` o
 container aliases still resolve, but their addresses are checked like any other, so allow
 them by range or name (a mock on `localhost` needs `FLOW_EGRESS_ALLOW=127.0.0.1/32`). See [Configuration](/self-hosting/configuration#outbound-calls-from-flows).
 
+## Schedule triggers start running
+
+Schedule triggers run from this release on, through `flow:fire-scheduled-triggers` every minute; the landlord migration
+adds the table `flow_schedule_registry`, so run `platform:update` (or the landlord migration) as usual. A schedule
+published before the upgrade does not run until its flow is published again: open each flow with a schedule and
+publish it. See [Schedule trigger](/using/schedule-trigger).
+
 ## Console route names and the assistant parameter
 
 The console's routes lost the names they inherited from Filament, and the assistant in
