@@ -208,7 +208,7 @@ final class AskPersonNodeHandler extends AbstractVersionedHandler implements Dec
         if (null === $addressee['kind']) {
             $issues[] = NodeConfigIssue::error('addressee_required', 'Name the contact to ask: an expression that gives a contact id.', 'addressee.contact');
         } elseif (AddresseeResolver::KIND_CONTACT !== $addressee['kind']) {
-            $issues[] = NodeConfigIssue::error('addressee_kind_unknown', "The addressee kind '{$addressee['kind']}' is not supported; use 'contact'.", 'addressee.kind');
+            $issues[] = NodeConfigIssue::error('addressee_kind_unknown', "The addressee kind '{$addressee['kind']}' is not supported; use 'contact'.", 'addressee.kind', ['kind' => (string) $addressee['kind']]);
         }
 
         if (! $this->hasText($config['text'] ?? null)) {
@@ -220,7 +220,7 @@ final class AskPersonNodeHandler extends AbstractVersionedHandler implements Dec
         if ([] === $buttons) {
             $issues[] = NodeConfigIssue::error('buttons_required', 'Add at least one answer button.', 'buttons');
         } elseif (count($buttons) > FlowQuestionButton::MAX_BUTTONS) {
-            $issues[] = NodeConfigIssue::error('buttons_too_many', 'A question takes at most ' . FlowQuestionButton::MAX_BUTTONS . ' buttons.', 'buttons');
+            $issues[] = NodeConfigIssue::error('buttons_too_many', 'A question takes at most ' . FlowQuestionButton::MAX_BUTTONS . ' buttons.', 'buttons', ['max' => FlowQuestionButton::MAX_BUTTONS]);
         }
 
         $seen = [];
@@ -249,6 +249,7 @@ final class AskPersonNodeHandler extends AbstractVersionedHandler implements Dec
                 'timeout_out_of_range',
                 'The wait must be from ' . self::MIN_TIMEOUT_SECONDS . ' seconds to 7 days.',
                 'timeout_seconds',
+                ['min' => self::MIN_TIMEOUT_SECONDS],
             );
         }
 

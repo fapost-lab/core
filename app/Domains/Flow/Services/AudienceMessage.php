@@ -96,6 +96,7 @@ final readonly class AudienceMessage
                     'addressee_broadcast_contact_expression',
                     "A message to tags or a segment goes to many people and must not read a contact: remove the contact placeholders from '{$field}'.",
                     $field,
+                    ['field' => $field],
                 );
             }
         }

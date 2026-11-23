@@ -49,6 +49,7 @@ use Exception;
 use Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface;
 use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
 use Fapost\Foundation\Flow\Enums\NodeConfigIssueSeverity;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
@@ -323,7 +324,7 @@ final readonly class ValidateFlowService
         }
 
         foreach ($issues as $issue) {
-            $dto = $this->issueToDto($issue, $path);
+            $dto = $this->issueToDto($issue, $path, $type, $this->registry->ownerOf($type));
 
             if (NodeConfigIssueSeverity::Warning === $issue->severity) {
                 $warnings[] = $dto;
@@ -335,13 +336,40 @@ final readonly class ValidateFlowService
         }
     }
 
-    private function issueToDto(NodeConfigIssue $issue, string $path): FlowValidationErrorDto
+    private function issueToDto(NodeConfigIssue $issue, string $path, string $type, ?string $owner): FlowValidationErrorDto
     {
         return new FlowValidationErrorDto(
             path: null !== $issue->field && '' !== $issue->field ? "{$path}.config.{$issue->field}" : $path,
             code: $issue->code,
-            message: $issue->message,
+            message: $this->issueMessage($issue, $type, $owner),
         );
+    }
+
+    /**
+     * The message of an issue in the admin UI language. An issue of a Core handler or trigger type (no owner) is translated by its
+     * code — `builder.node_issues.types.<type>.<code>` first, for a code whose wording differs per type, then
+     * `builder.node_issues.codes.<code>` — filled in from {@see NodeConfigIssue::$params}. Without a translation, and always for an
+     * issue of a Solution, which may reuse a Core code with its own meaning, the handler's own message is shown as written.
+     */
+    private function issueMessage(NodeConfigIssue $issue, string $type, ?string $owner): string
+    {
+        if (null !== $owner) {
+            return $issue->message;
+        }
+
+        foreach (["builder.node_issues.types.{$type}.{$issue->code}", "builder.node_issues.codes.{$issue->code}"] as $key) {
+            if (! Lang::has($key)) {
+                continue;
+            }
+
+            $translated = __($key, $issue->params);
+
+            if (is_string($translated)) {
+                return $translated;
+            }
+        }
+
+        return $issue->message;
     }
 
     /**
@@ -1488,7 +1516,7 @@ final readonly class ValidateFlowService
             $dto = new FlowValidationErrorDto(
                 path: null !== $issue->field && '' !== $issue->field ? "{$path}.config.{$issue->field}" : "{$path}.config",
                 code: $issue->code,
-                message: $issue->message,
+                message: $this->issueMessage($issue, $type, $owner),
             );
 
             if (NodeConfigIssueSeverity::Warning === $issue->severity) {

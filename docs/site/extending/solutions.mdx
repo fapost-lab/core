@@ -416,7 +416,9 @@ them greyed out with the reason, and keeps their settings. Publishing does not c
 **Validating a node.** Beyond the `required` fields of `configSchema()`, a handler may also implement
 `Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface`. Core calls `validate()` when it
 validates a flow for publishing and shows each `NodeConfigIssue`: an error blocks the publish, a
-warning does not. Keep it pure — no queries, no requests.
+warning does not. Keep it pure — no queries, no requests. The builder shows your issue's `message` as you wrote it, in
+every admin language, so translate it yourself if your Solution ships translations; Core translates only the issues of its
+own nodes, by code, from the values in `NodeConfigIssue::$params`.
 
 ## Registering trigger types
 

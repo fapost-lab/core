@@ -50,6 +50,7 @@ final class SubflowMappingValidator
                     'subflow_invalid_input_name',
                     "input_mapping: '{$name}' is not a valid variable name for the child flow.",
                     $field,
+                    ['name' => $name],
                 );
             }
 
@@ -58,6 +59,7 @@ final class SubflowMappingValidator
                     'subflow_invalid_input_value',
                     "input_mapping: the value for '{$name}' must be an expression or a literal text.",
                     $field,
+                    ['name' => $name],
                 );
             }
         }
@@ -93,6 +95,7 @@ final class SubflowMappingValidator
                     'subflow_invalid_output_name',
                     "output_mapping: '{$name}' is not a valid variable name for this flow.",
                     $field,
+                    ['name' => $name],
                 );
             }
 
@@ -102,6 +105,7 @@ final class SubflowMappingValidator
                     'subflow_invalid_output_source',
                     "output_mapping: '{$shown}' is not a valid variable name of the child flow.",
                     $field,
+                    ['name' => $shown],
                 );
             }
         }

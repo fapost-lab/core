@@ -204,6 +204,9 @@ return [
                 'email'  => 'Email',
                 'all'    => 'Все доступные каналы',
             ],
+            'empty_staff'      => 'Нет сотрудников',
+            'empty_assistants' => 'Нет ассистентов',
+            'empty_tags'       => 'Тегов пока нет',
         ],
 
         'request_operator' => [
@@ -463,6 +466,58 @@ return [
         'loop_end_invalid_loop_node_id'                 => 'loop_node_id \':id\' не указывает на существующий узел цикла.',
         'loop_nested_not_allowed'                       => 'Тело цикла узла \':node_id\' содержит вложенный узел цикла \':nested_id\'. Вложенные циклы не поддерживаются.',
         'loop_missing_loop_end'                         => 'У узла цикла \':node_id\' нет достижимого loop_end — итерация никогда не завершится.',
+    ],
+
+    'node_issues' => [
+        'types' => [
+            'ask_person' => [
+                'addressee_required'     => 'Укажите контакт, которого спросить: выражение, дающее id контакта.',
+                'addressee_kind_unknown' => 'Тип адресата \':kind\' не поддерживается; используйте \'contact\'.',
+                'text_required'          => 'У вопроса нет текста.',
+                'buttons_required'       => 'Добавьте хотя бы одну кнопку ответа.',
+                'buttons_too_many'       => 'У вопроса может быть не больше :max кнопок.',
+                'button_id_invalid'      => 'У кнопки нет постоянного id в формате uuid.',
+                'button_id_duplicate'    => 'У двух кнопок одинаковый id.',
+                'button_label_required'  => 'У кнопки нет подписи.',
+                'timeout_out_of_range'   => 'Ожидание должно быть от :min секунд до 7 дней.',
+            ],
+            'start_flow' => [
+                'addressee_required'     => 'Укажите контакт, для которого запустить флоу: узел никогда не запускает его для контакта текущего запуска.',
+                'addressee_kind_unknown' => 'Тип адресата \':kind\' не поддерживается; используйте \'contact\'.',
+            ],
+            'send_message' => [
+                'addressee_kind_unknown' => 'Тип адресата \':kind\' не поддерживается; используйте \'contact\', \'tags\' или \'segment\'.',
+            ],
+        ],
+        'codes' => [
+            'auth_method_unknown'                    => 'Выберите способ аутентификации.',
+            'auth_prompt_required'                   => 'Напишите сообщение, которое просит контакт подтвердить.',
+            'auth_button_label_required'             => 'Укажите подпись кнопки, которая отправляет номер телефона.',
+            'auth_limit_out_of_range'                => ':field должно быть от :min до :max.',
+            'auth_destination_required'              => 'Укажите адрес электронной почты, на который отправляется код.',
+            'auth_destination_from_flow'             => 'Код уходит на адрес из переменных флоу, который мог ввести сам контакт: кто угодно может отправлять коды на любой адрес — в пределах часового лимита на адрес.',
+            'call_invalid_strict_mapping'            => 'strict_mapping должно быть true или false.',
+            'call_invalid_credential'                => 'credential_id должен быть id сохранённого доступа.',
+            'call_credential_unsupported'            => 'Сохранённый доступ можно использовать только с транспортом http.',
+            'call_credential_not_found'              => 'Сохранённый доступ не существует.',
+            'addressee_cannot_wait'                  => 'Сообщение адресату не может ждать ответа: уберите \':field\' или адресата.',
+            'start_flow_invalid_busy_window'         => 'busy_window_minutes должно быть целым числом от 0 до :max.',
+            'webhook_response_invalid_status'        => 'Статус ответа должен быть целым числом от :min до :max.',
+            'webhook_response_invalid_body_type'     => 'Тип тела должен быть json или text.',
+            'webhook_response_invalid_body'          => 'JSON-тело должно быть объектом или списком.',
+            'webhook_response_invalid_text'          => 'Текстовое тело должно быть текстом.',
+            'addressee_tags_required'                => 'Сообщению по тегам нужен хотя бы один тег, каждый — непустой текст.',
+            'addressee_segment_unknown'              => 'Сообщению сегменту нужен сегмент этого пространства.',
+            'addressee_broadcast_text_only'          => 'Сообщение по тегам или сегменту отправляется рассылкой и может быть только текстом: без медиа и кнопок.',
+            'addressee_broadcast_contact_expression' => 'Сообщение по тегам или сегменту уходит многим людям и не должно читать контакт: уберите подстановки контакта из \':field\'.',
+            'save_broadcast_to_invalid'              => '\'save_broadcast_to\' должно называть переменную флоу, например \'flow.broadcast\'.',
+            'subflow_invalid_input_mapping'          => 'input_mapping должно сопоставлять имена переменных дочернего флоу выражениям.',
+            'subflow_invalid_input_name'             => 'input_mapping: \':name\' — недопустимое имя переменной для дочернего флоу.',
+            'subflow_invalid_input_value'            => 'input_mapping: значение для \':name\' должно быть выражением или текстом.',
+            'subflow_invalid_output_mapping'         => 'output_mapping должно сопоставлять имена переменных родительского флоу именам переменных дочернего.',
+            'subflow_invalid_output_name'            => 'output_mapping: \':name\' — недопустимое имя переменной для этого флоу.',
+            'subflow_invalid_output_source'          => 'output_mapping: \':name\' — недопустимое имя переменной дочернего флоу.',
+        ],
     ],
 
     'schedule_trigger' => [

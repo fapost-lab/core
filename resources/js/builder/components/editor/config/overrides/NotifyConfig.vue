@@ -4,6 +4,7 @@ import AccordionSection from '../AccordionSection.vue'
 import TextareaField from '../fields/TextareaField.vue'
 import SearchSelect from '../SearchSelect.vue'
 import {useKnownTags} from '@builder/composables/useKnownTags'
+import {useTranslations} from '@builder/composables/useTranslations'
 import {fetchAssistantOptions, fetchStaffOptions, type SelectOption} from '@builder/api/builderApi'
 
 const props = defineProps({
@@ -12,6 +13,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:config'])
+const { t } = useTranslations()
 
 // ── Remote option sources (loaded once on mount) ──────────────────────────
 const staffOptions     = ref<SelectOption[]>([])
@@ -122,7 +124,7 @@ function persist() {
                     :model-value="userIds"
                     :options="staffOptions"
                     multiple
-                    empty-text="No staff"
+                    :empty-text="t('nodes.notify.empty_staff')"
                     @update:model-value="(v: string[]) => { userIds = v; persist() }"
                 />
             </div>
@@ -142,7 +144,7 @@ function persist() {
                 <SearchSelect
                     :model-value="assistantId"
                     :options="assistantOptions"
-                    empty-text="No assistants"
+                    :empty-text="t('nodes.notify.empty_assistants')"
                     @update:model-value="(v: string[]) => { assistantId = v; persist() }"
                 />
             </div>
@@ -161,7 +163,7 @@ function persist() {
                     :options="tagOptions"
                     multiple
                     allow-create
-                    empty-text="No tags yet"
+                    :empty-text="t('nodes.notify.empty_tags')"
                     @update:model-value="(v: string[]) => { tags = v; persist() }"
                 />
             </div>

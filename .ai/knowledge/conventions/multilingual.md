@@ -58,6 +58,15 @@ worker may also catch and log: a worker has no person's locale, so an exception 
 English message for the log and carries a code the validator translates (see
 `InvalidScheduleConfigException::$errorCode`).
 
+A node handler's `NodeConfigIssue` keeps an English `message` and the values it was built from in
+`params` (Foundation 0.48). `ValidateFlowService` shows it in the staff member's language by code:
+`builder.node_issues.types.<type>.<code>` first, for a code whose wording differs per node type
+(`addressee_required`, `addressee_kind_unknown`), then `builder.node_issues.codes.<code>`, filled in
+from `params`; without a key the message is shown as written. Only issues of Core-owned node and
+trigger types are translated: a Solution may reuse a Core code with its own meaning, so its message
+always stays its own. The keys live apart from `builder.validation`, whose codes are flow-level. The
+English line equals the handler's message, so a changed handler message changes `lang/en` too.
+
 Enforcement is review only: no PHPat rule or test backs this, so a mixed layer or a
 literal in a handler is caught by a human reviewer, not CI.
 
