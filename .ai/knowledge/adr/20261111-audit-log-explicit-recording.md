@@ -13,7 +13,7 @@ paths:
   - config/audit.php
   - app/Console/Commands/PruneActivityLogCommand.php
   - tests/Architecture/AuditBoundariesTest.php
-reviewed_at: 2026-11-12
+reviewed_at: 2026-11-23
 ---
 # The audit log is recorded explicitly by the console's domain services, in their transaction, into the tenant's schema
 
@@ -114,3 +114,14 @@ actor with the operator's name Core is given and no `support_entry_id`. Decided 
 gate, the operator's revoke in its review (owner, 2026-11-19); built by `tenant-api-tokens` (2026-11-20):
 `AuditActorKind::ApiToken`, `AuditAction::ApiToken{Issued,Rotated,Revoked}` (area `settings`), and the resolver asks
 the token guard only `hasUser()`, so a console write never runs the token authenticator.
+
+## Amendment 2026-11-23: trigger changes are recorded at publish
+
+A flow's triggers go live only on publish (`adr-20261119-flow-triggers-in-definition-live-on-publish`), so that is
+where their changes are recorded: `PublishFlowService` compares the version's list with the rows live before the sync,
+by the sync's own rule (ids lowercased, configs compared ignoring key order), and records one entry per trigger —
+`flow.trigger_added`, `flow.trigger_changed`, `flow.trigger_removed` (area `flows`), subject the flow, with
+`trigger_id`, `trigger_type` and `version`. The type, the active flag and the priority are values; the config is a
+marker only (keywords, a cron, a call's settings are not the log's to copy). A publish that does not sync (a list
+never written) records none. Credentials were already covered by `credential.*`. Built by task
+`flow-activity-log-triggers-credentials` (roadmap `flow-automations`).

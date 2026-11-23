@@ -33,7 +33,7 @@ whose value no UI shows, and a content manager builds an automation on a credent
 
 - [x] Credentials store — a Foundation contract shared by `call`, Solutions and connectors; Bearer, Basic, API key, OAuth2 client credentials; encrypted cast, write-only in the UI, referenced by id
 - [x] `flow-automation-permissions` — Automation and credential permissions — `ManageAutomations`, `ManageCredentials`, `UseCredentials`, `ViewRunPayloads`; the content manager gets all but `ManageCredentials`; a data migration for existing tenants (after: Credentials store — two of the permissions guard it)
-- [ ] Credential and trigger changes in the activity log (after: spec `audit-log` — the staff activity log does not exist yet)
+- [x] Credential and trigger changes in the activity log (after: spec `audit-log` — the staff activity log does not exist yet)
 
 ## Phase 4 — Events without a contact
 

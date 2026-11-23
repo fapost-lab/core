@@ -42,6 +42,9 @@ return [
             'webhook_secret_rotated' => 'Webhook trigger secret replaced',
             'run_rerun'              => 'Automation run re-run from the start',
             'trigger_resumed'        => 'Paused trigger resumed',
+            'trigger_added'          => 'Trigger added on publish',
+            'trigger_changed'        => 'Trigger changed on publish',
+            'trigger_removed'        => 'Trigger removed on publish',
         ],
         'flow_group' => [
             'created' => 'Flow group created',

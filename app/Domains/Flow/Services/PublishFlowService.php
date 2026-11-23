@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
 use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
@@ -201,6 +202,7 @@ final readonly class PublishFlowService
             $live         = $this->triggerSet->live($draft->flow_id);
             $liveWebhooks = $this->webhookTriggerIds($live);
             $this->triggerRows->syncForFlow($draft, $triggers);
+            $this->recordTriggerChanges($draft, $definition, $live, $triggers, $republishedBy);
 
             // The landlord registry follows the schedules this version keeps, adds, changes or drops, after the commit.
             $this->scheduleRegistry->syncAfterCommit(
@@ -270,6 +272,91 @@ final readonly class PublishFlowService
         ));
 
         return $definition;
+    }
+
+    /**
+     * Records each trigger this version adds, removes or changes against the rows that were live before it, by the
+     * rule {@see FlowTriggerRepositoryInterface::syncForFlow()} follows: ids lowercased, configs compared ignoring key
+     * order. The type, the active flag and the priority are recorded as values; the config only as a marker, never its
+     * content (a call's headers, keywords or a webhook's settings are not the log's to copy).
+     *
+     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $before
+     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $after
+     */
+    private function recordTriggerChanges(
+        FlowDraft $draft,
+        FlowDefinition $definition,
+        array $before,
+        array $after,
+        ?FlowDefinition $republishedBy,
+    ): void {
+        $live = [];
+
+        foreach ($before as $trigger) {
+            $live[mb_strtolower($trigger['id'])] = $trigger;
+        }
+
+        foreach ($after as $trigger) {
+            $id      = mb_strtolower($trigger['id']);
+            $current = $live[$id] ?? null;
+            unset($live[$id]);
+
+            if (null === $current) {
+                $this->recordTrigger(AuditAction::FlowTriggerAdded, $draft, $definition, $trigger, $republishedBy, AuditChanges::created([
+                    'type'      => $trigger['type'],
+                    'is_active' => $trigger['is_active'],
+                    'priority'  => $trigger['priority'],
+                ]));
+
+                continue;
+            }
+
+            $changes = AuditChanges::between($current, $trigger, ['type', 'is_active', 'priority']);
+
+            if (! FlowTriggerSet::sameConfig($current['config'], $trigger['config'])) {
+                $changes = $changes->merge(AuditChanges::markers(['config']));
+            }
+
+            if (! $changes->isEmpty()) {
+                $this->recordTrigger(AuditAction::FlowTriggerChanged, $draft, $definition, $trigger, $republishedBy, $changes);
+            }
+        }
+
+        foreach ($live as $gone) {
+            $this->recordTrigger(AuditAction::FlowTriggerRemoved, $draft, $definition, $gone, $republishedBy);
+        }
+    }
+
+    /**
+     * @param  array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}  $trigger
+     */
+    private function recordTrigger(
+        AuditAction $action,
+        FlowDraft $draft,
+        FlowDefinition $definition,
+        array $trigger,
+        ?FlowDefinition $republishedBy,
+        ?AuditChanges $changes = null,
+    ): void {
+        $properties = [
+            'version'      => $definition->version,
+            'trigger_id'   => mb_strtolower($trigger['id']),
+            'trigger_type' => $trigger['type'],
+        ];
+
+        if (null !== $republishedBy) {
+            $properties['republished_by_template_flow_id'] = $republishedBy->flow_id;
+            $properties['republished_by_template_version'] = $republishedBy->version;
+        }
+
+        $this->audit->record(new AuditRecord(
+            action: $action,
+            subject: $draft,
+            subjectLabel: (string) $draft->name,
+            assistantId: $draft->assistant_id,
+            changes: $changes,
+            properties: $properties,
+        ));
     }
 
     /**
