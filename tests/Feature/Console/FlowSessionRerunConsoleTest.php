@@ -169,6 +169,7 @@ final class FlowSessionRerunConsoleTest extends FeatureTestCase
                 ->has('reruns', 1)
                 ->where('reruns.0.id', (string) $rerun->getKey())
                 ->where('reruns.0.status', 'completed')
+                ->where('reruns.0.isRunning', false)
                 ->where('reruns.0.url', "/assistant/{$this->assistant->getKey()}/flow-sessions/{$rerun->getKey()}")
                 ->etc());
 
@@ -180,6 +181,38 @@ final class FlowSessionRerunConsoleTest extends FeatureTestCase
                     'url' => "/assistant/{$this->assistant->getKey()}/flow-sessions/{$source->getKey()}",
                 ])
                 ->etc());
+    }
+
+    public function test_a_listed_re_run_says_whether_it_is_still_running(): void
+    {
+        $source = $this->automationRun(FlowSessionStatus::Failed);
+        $this->automationRun(FlowSessionStatus::Pending, ['fire_key' => 'rerun:' . $source->getKey() . ':1']);
+        $this->automationRun(FlowSessionStatus::WaitingInput, ['fire_key' => 'rerun:' . $source->getKey() . ':2']);
+        $this->automationRun(FlowSessionStatus::Paused, ['fire_key' => 'rerun:' . $source->getKey() . ':3']);
+
+        $this->actingAs($this->admin())
+            ->get($this->viewUrl($source))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('reruns', 3)
+                ->where('reruns.0.isRunning', true)
+                ->where('reruns.1.isRunning', true)
+                ->where('reruns.2.isRunning', false)
+                ->etc());
+    }
+
+    public function test_a_run_that_is_never_re_run_lists_no_re_runs(): void
+    {
+        // Only a failed root run is re-run: a run keyed to a completed one or to a subflow child is not looked up.
+        $completed = $this->automationRun(FlowSessionStatus::Completed);
+        $this->automationRun(FlowSessionStatus::Completed, ['fire_key' => 'rerun:' . $completed->getKey() . ':1']);
+        $child = $this->automationRun(FlowSessionStatus::Failed, ['parent_session_id' => $completed->getKey()]);
+        $this->automationRun(FlowSessionStatus::Completed, ['fire_key' => 'rerun:' . $child->getKey() . ':1']);
+
+        foreach ([$completed, $child] as $session) {
+            $this->actingAs($this->admin())
+                ->get($this->viewUrl($session))
+                ->assertInertia(fn (AssertableInertia $page) => $page->where('reruns', [])->etc());
+        }
     }
 
     public function test_re_running_needs_the_rerun_permission_beside_the_sessions_one(): void

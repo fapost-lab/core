@@ -52,8 +52,10 @@ somebody else's system. Approved at the design gate by the owner ("Да, всё 
 - **Who.** `FlowSessionPolicy::rerun()`: `ViewFlowSessions` and the new sensitive `RerunFlow` (automations group;
   `admin` through `Permission::cases()`, `content_manager` through `RoleEnum`, existing tenants by a tenant data
   migration). The console route is throttled (10 a minute) and finds the session within the assistant of the URL.
-- **Audit.** Every queued re-run is recorded as `flow.run_rerun` (area `flows`) with the source session, the new
-  run's fire key and the flow version it runs, committed before the job is queued.
+- **Audit.** Every queued re-run request is recorded as `flow.run_rerun` (area `flows`) with the source session, the
+  new run's fire key and the flow version it runs, committed before the job is queued. Entries are per request, not
+  per run: two requests for one attempt that arrive before its run starts both pass the check and both are recorded,
+  while the unique key starts one run.
 
 ## Alternatives
 
@@ -86,5 +88,6 @@ somebody else's system. Approved at the design gate by the owner ("Да, всё 
   a re-run that did not start (asking again makes the same key). Two requests with the same attempt before its run
   exists write two entries for one run.
 - Listing a run's re-runs filters `fire_key LIKE 'rerun:<id>:%'` within its trigger; under a non-C collation the
-  `(trigger_id, fire_key)` index narrows only by trigger, so the sessions page reads every kept run of the trigger.
-  Bounded by run retention; an index with `text_pattern_ops` is the remedy if it shows.
+  `(trigger_id, fire_key)` index narrows only by trigger, so the page of a failed root automation run (the only kind
+  with re-runs, and the only one that looks them up) reads every kept run of the trigger. Bounded by run retention;
+  an index with `text_pattern_ops` is the remedy if it shows.
