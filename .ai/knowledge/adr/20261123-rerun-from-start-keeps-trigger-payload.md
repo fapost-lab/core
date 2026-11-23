@@ -1,7 +1,7 @@
 ---
 id: adr-20261123-rerun-from-start-keeps-trigger-payload
 type: adr
-status: proposed
+status: accepted
 date: 2026-11-23
 domains:
   - flow
