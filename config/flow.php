@@ -33,6 +33,9 @@ return [
         'segment_steps'   => (int) env('FLOW_AUTOMATION_SEGMENT_STEPS', 50),
         'segment_seconds' => (int) env('FLOW_AUTOMATION_SEGMENT_SECONDS', 20),
         'max_run_hours'   => (int) env('FLOW_AUTOMATION_MAX_RUN_HOURS', 24),
+        // Only the default of the platform setting `flow.automations.runs_per_trigger_per_minute`: how many runs one
+        // trigger other than a message may start in a minute before the run rate breaker pauses it.
+        'runs_per_trigger_per_minute' => (int) env('FLOW_AUTOMATION_RUNS_PER_TRIGGER_PER_MINUTE', 60),
     ],
 
     // Only the defaults of the platform settings `flow.webhook.*`: how many requests one webhook trigger URL accepts in

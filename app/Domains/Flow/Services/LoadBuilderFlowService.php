@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Support\CountryCatalog;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Admission\TriggerPauseService;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
@@ -34,6 +35,7 @@ final readonly class LoadBuilderFlowService
         private TemplateExpander $expander,
         private TemplateUsageFinder $templateUsages,
         private FlowWebhookEndpointService $webhookEndpoints,
+        private TriggerPauseService $triggerPauses,
     ) {
     }
 
@@ -69,6 +71,7 @@ final readonly class LoadBuilderFlowService
                 ? array_map(static fn (FlowDraft $host): array => ['id' => $host->flow_id, 'name' => $host->name], $this->templateUsages->hostsOf($draft))
                 : [],
             webhookEndpoints: $draft->isTemplate() ? [] : $this->webhookEndpoints->describe($draft->flow_id),
+            triggerStates: $draft->isTemplate() ? [] : $this->triggerPauses->describe($draft->flow_id),
         );
     }
 

@@ -60,6 +60,7 @@ final class BuilderFlowController extends Controller
                 'availableTemplates'  => $dto->availableTemplates,
                 'usedBy'              => $dto->usedBy,
                 'webhookEndpoints'    => (object) $dto->webhookEndpoints,
+                'triggerStates'       => (object) $dto->triggerStates,
                 'readOnly'            => $writeGuard->refusesWritesFor($user),
                 'builderMode'         => ($user instanceof User ? $user->builder_mode : null)?->value ?? BuilderMode::Tree->value,
             ],

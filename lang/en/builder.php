@@ -445,4 +445,32 @@ return [
         'not_found'                 => 'This flow has no webhook trigger with this id. Save the flow and try again.',
         'secret_invalid'            => 'A secret is :min to :max characters, without spaces.',
     ],
+
+    'trigger_state' => [
+        'title'         => 'Runs',
+        'paused'        => 'Paused since :at',
+        'paused_hint'   => 'It started more than the allowed number of runs in a minute. Nothing it fires runs until it is resumed; a publish does not resume it.',
+        'resume'        => 'Resume',
+        'resuming'      => 'Resuming…',
+        'resume_failed' => 'The trigger could not be resumed.',
+        'resume_denied' => 'Only someone who manages automations can resume it.',
+        'refused_count' => 'Runs not started: :count',
+        'last_refusal'  => 'Last: :reason, :at',
+        'reasons'       => [
+            'trigger_paused' => 'the trigger is paused',
+            'rate_breaker'   => 'too many runs in a minute',
+            'plan_limit'     => 'plan limit',
+        ],
+        'not_found'     => 'This trigger is not live.',
+        'paused_notice' => 'The :type trigger of the flow “:flow” was paused: it started more than :limit runs in a minute. Nothing it fires runs until someone resumes it in the builder.',
+        'open_flow'     => 'Open the flow',
+        'types'         => [
+            'schedule' => 'schedule',
+            'webhook'  => 'webhook',
+            'api'      => 'API',
+            'event'    => 'event',
+            'message'  => 'message',
+            'other'    => 'automatic',
+        ],
+    ],
 ];

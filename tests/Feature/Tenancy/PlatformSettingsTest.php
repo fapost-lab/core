@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Tenancy;
 
 use App\Domains\Conversation\Retention\PartitionRetention;
+use App\Domains\Flow\Admission\TriggerRateBreaker;
 use App\Domains\Flow\Call\RedisCallExecutionLedger;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Orchestration\AutomationRunDeadline;
@@ -107,6 +108,7 @@ final class PlatformSettingsTest extends FeatureTestCase
             FlowEngineInterface::SEGMENT_STEPS_SETTING,
             AutomationRunRetention::FAILED_SETTING,
             AutomationRunRetention::SUCCEEDED_SETTING,
+            TriggerRateBreaker::SETTING,
             RedisCallExecutionLedger::TTL_SETTING,
             self::ITERATIONS,
             FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING,
@@ -125,6 +127,8 @@ final class PlatformSettingsTest extends FeatureTestCase
         $this->assertSame(192, $byKey[RedisCallExecutionLedger::TTL_SETTING]->default);
         $this->assertSame(168, $byKey[RedisCallExecutionLedger::TTL_SETTING]->min, 'The call dedup window may not drop below the failed-job retention.');
         $this->assertSame(1000, $byKey[FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING]->default);
+        $this->assertSame(60, $byKey[TriggerRateBreaker::SETTING]->default);
+        $this->assertSame(1, $byKey[TriggerRateBreaker::SETTING]->min);
         $this->assertSame(30, $byKey[WebhookSyncWait::WAIT_SECONDS_SETTING]->default);
         $this->assertSame(30, $byKey[WebhookSyncWait::WAIT_SECONDS_SETTING]->max, 'A webhook request is never held longer than 30 seconds.');
         $this->assertSame(5, $byKey[WebhookSyncWait::INSTALLATION_WAITERS_SETTING]->default);

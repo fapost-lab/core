@@ -13,6 +13,7 @@ return [
         'monthly_active_contacts' => 'Monthly active contacts',
         'outbound_messages'       => 'Outbound messages',
         'call_executions'         => 'Call executions',
+        'flow_runs'               => 'Flow runs',
         'media_storage'           => 'Media storage',
     ],
 
@@ -27,6 +28,7 @@ return [
         'inbound_message'  => 'A message from a new contact was not processed, so the bot did not answer it.',
         'outbound_message' => 'An outgoing message was not sent.',
         'call_execution'   => 'A call from a flow was not made.',
+        'flow_run'         => 'A flow run started by a schedule, an event, a webhook or an API call did not start.',
         'media_upload'     => 'A file was not uploaded.',
         'inbound_media'    => 'A file received from a client was not stored.',
         'other'            => 'Some work was turned away.',

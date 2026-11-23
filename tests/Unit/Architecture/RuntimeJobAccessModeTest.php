@@ -26,6 +26,7 @@ use App\Jobs\Flow\ContinueAfterOperatorRequestJob;
 use App\Jobs\Flow\ContinueAutomationRunJob;
 use App\Jobs\Flow\DispatchFlowTriggerEventJob;
 use App\Jobs\Flow\ExpireOperatorRequestJob;
+use App\Jobs\Flow\NotifyTriggerPausedJob;
 use App\Jobs\Flow\ResumeDelayedFlowSessionJob;
 use App\Jobs\Flow\ResumeTimedOutSendMessageNodeJob;
 use App\Jobs\Flow\SendOneTimeCodeJob;
@@ -90,6 +91,7 @@ final class RuntimeJobAccessModeTest extends TestCase
      * @var list<class-string>
      */
     private const array KEEPS_RUNNING_JOBS = [
+        NotifyTriggerPausedJob::class,
         PersistConversationMessageJob::class,
         UpdateConversationDeliveryStatusJob::class,
         FetchConversationMediaJob::class,

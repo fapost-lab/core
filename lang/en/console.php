@@ -317,9 +317,11 @@ return [
             'active_yes' => 'Active',
             'active_no'  => 'Inactive',
         ],
-        'group_rows' => 'Group by flow group',
-        'ungrouped'  => 'No group',
-        'status'     => [
+        'group_rows'          => 'Group by flow group',
+        'ungrouped'           => 'No group',
+        'trigger_paused'      => 'Paused',
+        'trigger_paused_hint' => 'A trigger of this flow started too many runs in a minute and was paused. Open the flow in the builder to resume it.',
+        'status'              => [
             'active'   => 'Active',
             'inactive' => 'Inactive',
         ],

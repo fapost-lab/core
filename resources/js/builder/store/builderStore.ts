@@ -21,6 +21,7 @@ import type {
   BuilderFlowPayload,
   BuilderTrigger,
   WebhookEndpointInfo,
+  TriggerStateInfo,
   FlowDefinition,
   FlowEdge,
   FlowNode,
@@ -104,6 +105,8 @@ export const useBuilderStore = defineStore('builder', () => {
   const tenantEvents = ref<string[]>([])
     /** Webhook endpoints that exist for this flow's triggers, keyed by lower-cased trigger id. */
     const webhookEndpoints = ref<Record<string, WebhookEndpointInfo>>({})
+    /** Admission state of the flow's live triggers that have one, keyed by lower-cased trigger id. */
+    const triggerStates = ref<Record<string, TriggerStateInfo>>({})
     const contentBaseLanguage = ref('en')
     const availableLanguages = ref<string[]>([])
     const availableFlows     = ref<Array<{id: string; name: string}>>([])
@@ -339,6 +342,7 @@ export const useBuilderStore = defineStore('builder', () => {
         triggers.value = normalizeTriggers(flow.triggers)
       tenantEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
         webhookEndpoints.value = flow.webhookEndpoints && !Array.isArray(flow.webhookEndpoints) ? { ...flow.webhookEndpoints } : {}
+        triggerStates.value = flow.triggerStates && !Array.isArray(flow.triggerStates) ? { ...flow.triggerStates } : {}
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
         availableLanguages.value = Array.isArray(flow.availableLanguages) ? flow.availableLanguages : []
         availableFlows.value     = Array.isArray(flow.availableFlows) ? flow.availableFlows : []
@@ -405,6 +409,10 @@ export const useBuilderStore = defineStore('builder', () => {
     function deleteTrigger(id: string) {
         if (readOnly.value) return
         triggers.value = triggers.value.filter((item) => item.id !== id)
+    }
+
+    function setTriggerStates(states: Record<string, TriggerStateInfo>) {
+        triggerStates.value = states && !Array.isArray(states) ? { ...states } : {}
     }
 
     function setWebhookEndpoint(triggerId: string, info: WebhookEndpointInfo) {
@@ -1230,6 +1238,8 @@ export const useBuilderStore = defineStore('builder', () => {
         availableEvents,
         webhookEndpoints,
         setWebhookEndpoint,
+        triggerStates,
+        setTriggerStates,
         registerDraftFlusher,
         flushDraft,
         contentBaseLanguage,

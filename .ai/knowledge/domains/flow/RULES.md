@@ -405,7 +405,8 @@ broken.
   and, in the same transaction, creates the run `pending` (`FlowEngineInterface::prepare()`, fire key
   `schedule:<UTC minute>`, deadline written) or skips the slot: more than 5 minutes late (`flow.schedule.tick_missed`,
   the next slot counted from now), the flow cannot run (`tick_skipped` `flow_not_live`), or a previous root run of the
-  trigger is `pending` or in flight (`tick_skipped` `previous_run_live`). The start job is queued after the commit and
+  trigger is `pending` or in flight (`tick_skipped` `previous_run_live`), or run admission refuses it (`tick_skipped`
+  `admission_refused`, `adr-20261123-flow-run-admission`). The start job is queued after the commit and
   `AutomationRunner` activates the `pending` run (`FlowEngineInterface::activate()`). `ScheduleClock` skips a local time a
   daylight saving change removes and fires a repeated one once; a cron is five fields in an IANA zone
   (`invalid_schedule_cron`, `invalid_schedule_timezone`). The landlord `flow_schedule_registry` is only an index of whom
@@ -414,6 +415,19 @@ broken.
   one. Why: no transaction spans landlord and a tenant schema, and a slot eaten without a run is a silent loss
   (`adr-20261123-flow-schedule-trigger`). Enforced: `ScheduleTriggerFirerTest`, `ScheduleClockTest`,
   `FireScheduledTriggersCommandTest`, `FlowTriggersPublishTest`.
+- **A trigger's new run passes run admission once, before it exists; a pause is lifted only by a person.** Every
+  automatic start — `AutomationRunner::start()` for a fire with no run yet, `StartFlowFromEventJob`, and
+  `ScheduleTriggerFirer`'s claim before `prepare()` — asks `TriggerRunAdmission` in this order: a paused trigger
+  (`trigger_paused`), the run rate breaker (`flow.automations.runs_per_trigger_per_minute` runs a minute per tenant and
+  trigger; over it `rate_breaker` and the trigger is paused), the plan's `flow_runs` through `PeriodQuota`
+  (`plan_limit`). A retry or continuation of a fire that has a run is never asked; a message trigger never is. The
+  meter's unit key is a hash of the trigger and what fired it, never the fire key. A refusal starts nothing and is
+  counted on `flow_trigger_states`; the pause lives there too, written only through
+  `FlowTriggerStateRepositoryInterface`, never on `flow_triggers`, and a publish never lifts it. A webhook to a paused
+  trigger answers 503 before its delivery is claimed. Why: a looping or runaway automation must stop on its own without
+  changing what was published, and the plan must count each run once (`adr-20261123-flow-run-admission`). Enforced:
+  `TriggerRunAdmissionTest`, `TriggerResumeEndpointTest`, `FlowWebhookTriggerTest::test_a_paused_trigger_answers_503_with_retry_after_and_keeps_the_delivery_unclaimed`.
+  Not covered: that no message path asks (review only).
 - **A webhook request waits for its flow only while it holds a wait slot, and never past 30 seconds.** A trigger in
   `response_mode: sync` holds the request through `WebhookSyncWait`, which first takes a slot of
   `WebhookWaitSlotsInterface` (`flow.webhook.sync_waiters_max` on the installation, `flow.webhook.sync_waiters_per_tenant`

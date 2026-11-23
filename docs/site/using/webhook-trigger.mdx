@@ -97,7 +97,7 @@ The flow has no contact, so blocks that need one cannot be published in it; see
 | `413` | The body is larger than 256 KB |
 | `415` | A `multipart/form-data` body: send JSON, a form (`application/x-www-form-urlencoded`) or text |
 | `429` | Too many requests for this URL (see `flow.webhook.per_token_per_minute` in [Platform settings](/self-hosting/platform-settings)), or too many requests to unknown URLs from one address; wait for `Retry-After` |
-| `503` | The workspace is stopped; retry after `Retry-After` seconds |
+| `503` | The workspace is stopped, or the trigger is paused for starting too many runs (see [Publishing](/using/publishing#when-a-trigger-starts-too-many-runs)); retry after `Retry-After` seconds |
 
 ## Response mode
 

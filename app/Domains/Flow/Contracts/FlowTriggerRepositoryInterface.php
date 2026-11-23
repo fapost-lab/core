@@ -15,6 +15,11 @@ interface FlowTriggerRepositoryInterface
     public function getActiveByType(string $tenantId, ?string $assistantId, string $type): iterable;
 
     /**
+     * The live trigger with this id, or null when no published flow has it.
+     */
+    public function find(string $triggerId): ?FlowTrigger;
+
+    /**
      * The flow's live triggers, active or not, in routing order (priority, then id).
      *
      * @return list<FlowTrigger>

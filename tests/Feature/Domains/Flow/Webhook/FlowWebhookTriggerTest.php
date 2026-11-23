@@ -6,6 +6,8 @@ namespace Tests\Feature\Domains\Flow\Webhook;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Flow\Admission\RefusalReason;
+use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowWebhookEndpoint;
@@ -20,6 +22,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Services\CurrentAccessState;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Jobs\Flow\StartAutomationRunJob;
+use Carbon\CarbonImmutable;
 use Fapost\Foundation\Tenancy\DTO\TenantAccessState;
 use Fapost\Foundation\Tenancy\Enums\AccessMode;
 use Illuminate\Support\Facades\Queue;
@@ -317,6 +320,25 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
             ->assertHeader('Retry-After', (string) FlowWebhookReceiver::STOPPED_RETRY_AFTER_SECONDS);
 
         Queue::assertNothingPushed();
+    }
+
+    public function test_a_paused_trigger_answers_503_with_retry_after_and_keeps_the_delivery_unclaimed(): void
+    {
+        [, $triggerId, $token] = $this->liveWebhook();
+        $states                = $this->app->make(FlowTriggerStateRepositoryInterface::class);
+        $states->pause($triggerId, RefusalReason::RateBreaker, CarbonImmutable::now());
+
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'p-1'])
+            ->assertStatus(503)
+            ->assertHeader('Retry-After', (string) FlowWebhookReceiver::PAUSED_RETRY_AFTER_SECONDS);
+
+        Queue::assertNothingPushed();
+        $this->assertSame([], $this->dedup->claimed, 'The delivery is not claimed, so its retry after a resume runs.');
+
+        $states->resume($triggerId, CarbonImmutable::now());
+
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'p-1'])->assertStatus(202);
+        Queue::assertPushed(StartAutomationRunJob::class, 1);
     }
 
     public function test_a_failed_dispatch_gives_the_claim_back(): void

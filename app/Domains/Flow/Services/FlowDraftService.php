@@ -22,6 +22,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Models\FlowTriggerState;
 use App\Domains\Flow\Schedule\ScheduleRegistrySync;
 use App\Domains\Flow\Templates\TemplateUsageFinder;
 use App\Domains\Flow\Templates\TemplateUsageRepository;
@@ -73,7 +74,8 @@ final readonly class FlowDraftService
 
     /**
      * The flows (or the templates) of the current assistant for the list: with their trigger and group, the highest active published
-     * version (`published_version`) and the group's name (`group_name`, to sort by).
+     * version (`published_version`), the group's name (`group_name`, to sort by) and whether a live trigger is paused
+     * (`has_paused_trigger`).
      *
      * @return Builder<FlowDraft>
      */
@@ -90,6 +92,13 @@ final readonly class FlowDraftService
                 'group_name' => FlowGroup::query()
                     ->select('name')
                     ->whereColumn('flow_groups.id', 'flow_drafts.flow_group_id'),
+                // 1 when a live trigger of the flow is paused by the run rate breaker, null otherwise.
+                'has_paused_trigger' => FlowTriggerState::query()
+                    ->selectRaw('1')
+                    ->join('flow_triggers', 'flow_triggers.id', '=', 'flow_trigger_states.trigger_id')
+                    ->whereColumn('flow_triggers.flow_id', 'flow_drafts.flow_id')
+                    ->whereNotNull('flow_trigger_states.paused_at')
+                    ->limit(1),
             ]);
     }
 

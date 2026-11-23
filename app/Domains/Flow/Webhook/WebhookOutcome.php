@@ -40,6 +40,11 @@ final readonly class WebhookOutcome
         return new self(WebhookOutcomeStatus::TenantStopped, null, $retryAfterSeconds);
     }
 
+    public static function triggerPaused(int $retryAfterSeconds): self
+    {
+        return new self(WebhookOutcomeStatus::TriggerPaused, null, $retryAfterSeconds);
+    }
+
     public static function of(WebhookOutcomeStatus $status): self
     {
         return new self($status);

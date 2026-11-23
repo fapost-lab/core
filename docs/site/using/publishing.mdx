@@ -79,6 +79,18 @@ stop sessions already under way.
 Turning on a flow that has a schedule, webhook, API or event trigger needs **Manage automations**, because it then
 starts runs on its own. Turning any flow off needs only the permission to edit it.
 
+## When a trigger starts too many runs
+
+A schedule, webhook, API or event trigger that starts more runs in one minute than the platform allows
+(`flow.automations.runs_per_trigger_per_minute`, 60 by default) is **paused**: nothing it fires runs until someone
+resumes it. Everyone with **Manage automations** gets a notification, the flow list marks the flow **Paused**, and
+the trigger's panel in the builder says since when. **Resume** in that panel, available to someone who can edit the flow and has **Manage automations**,
+lets runs start again; publishing the flow does not.
+
+A run that did not start — the trigger was paused, it went over the minute's limit, or the workspace's plan has no
+runs left this period — is counted on the trigger, and its panel shows how many and the last reason. Conversations
+started by a message trigger are never paused or counted.
+
 ## Publishing again
 
 Every publish produces a new version. The one before it is not lost — the version

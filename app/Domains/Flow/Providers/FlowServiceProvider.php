@@ -11,6 +11,10 @@ use App\Domains\Contact\Events\ContactTagAdded;
 use App\Domains\Contact\Events\ContactTagRemoved;
 use App\Domains\Conversation\Events\OperatorRequestStateChanged;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Admission\TriggerPauseService;
+use App\Domains\Flow\Admission\TriggerRateBreaker;
+use App\Domains\Flow\Admission\TriggerRefusals;
+use App\Domains\Flow\Admission\TriggerRunAdmission;
 use App\Domains\Flow\Auth\AuthCodeStore;
 use App\Domains\Flow\Auth\EmailOneTimeCodeSender;
 use App\Domains\Flow\Auth\OneTimeCodeSenderRegistry;
@@ -51,6 +55,7 @@ use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowWebhookEndpointRepositoryInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\LanguageResolverInterface;
@@ -125,6 +130,7 @@ use App\Domains\Flow\Repositories\FlowDefinitionRepository;
 use App\Domains\Flow\Repositories\FlowDraftRepository;
 use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Repositories\FlowTriggerRepository;
+use App\Domains\Flow\Repositories\FlowTriggerStateRepository;
 use App\Domains\Flow\Repositories\FlowWebhookEndpointRepository;
 use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
@@ -281,6 +287,14 @@ final class FlowServiceProvider extends ServiceProvider
             description: 'One-time codes the auth_request node sends by email. A code over the limit is not sent and the node takes its failed output.',
         ));
 
+        $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
+            key: TriggerRunAdmission::LIMIT_KEY,
+            label: 'Flow runs',
+            unit: 'runs',
+            kind: LimitKind::PerPeriod,
+            description: 'Runs started by a schedule, an event, a webhook or an API trigger. A run over the limit does not start; conversations are not counted.',
+        ));
+
         $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
             key: FlowEngineInterface::MAX_ITERATIONS_SETTING,
             type: PlatformSettingType::Integer,
@@ -407,6 +421,19 @@ final class FlowServiceProvider extends ServiceProvider
             description: 'How many requests one webhook trigger URL accepts in a minute, signed or not, before it answers 429 Too Many Requests. Applies to every tenant.',
             group: 'Flow',
             unit: 'requests',
+            min: 1,
+            max: 6000,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: TriggerRateBreaker::SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.automation.runs_per_trigger_per_minute',
+            fallback: 60,
+            label: 'Runs per trigger a minute',
+            description: 'How many runs one schedule, event, webhook or API trigger may start in a minute before it is paused. A paused trigger starts nothing until someone who manages automations resumes it in the builder. Applies to every tenant.',
+            group: 'Flow',
+            unit: 'runs',
             min: 1,
             max: 6000,
         ));
@@ -750,6 +777,11 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(FlowTriggerRepositoryInterface::class, FlowTriggerRepository::class);
         $this->app->scoped(FlowTriggerConfigValidatorInterface::class, FlowTriggerConfigValidator::class);
         $this->app->scoped(FlowWebhookEndpointRepositoryInterface::class, FlowWebhookEndpointRepository::class);
+        $this->app->scoped(FlowTriggerStateRepositoryInterface::class, FlowTriggerStateRepository::class);
+        $this->app->scoped(TriggerRateBreaker::class);
+        $this->app->scoped(TriggerRefusals::class);
+        $this->app->scoped(TriggerRunAdmission::class);
+        $this->app->scoped(TriggerPauseService::class);
         $this->app->scoped(WebhookDeliveryDedupInterface::class, RedisWebhookDeliveryDedup::class);
         $this->app->scoped(FlowWebhookEndpointService::class);
         $this->app->scoped(FlowWebhookReceiver::class);

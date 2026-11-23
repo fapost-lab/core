@@ -5,6 +5,7 @@ import {flushPromises, mount} from '@vue/test-utils'
 vi.mock('@builder/api/builderApi', async (importOriginal) => ({
     ...(await importOriginal<typeof import('@builder/api/builderApi')>()),
     fetchAssistantOptions: vi.fn(async () => [{value: 'a-sales', label: 'Sales'}, {value: 'a-support', label: 'Support'}]),
+    resumeTrigger: vi.fn(async () => ({})),
 }))
 
 
@@ -21,6 +22,8 @@ function grant(permissions: string[]): void {
 
 import TriggerConfig from './TriggerConfig.vue'
 import SearchSelect from '../SearchSelect.vue'
+import {resumeTrigger} from '@builder/api/builderApi'
+import type {TriggerStateInfo} from '@builder/dto/types'
 
 function mountEventTrigger(eventName: string, extra: Record<string, unknown> = {}) {
     return mount(TriggerConfig, {
@@ -156,5 +159,50 @@ describe('TriggerConfig automation permission', () => {
 
         expect(wrapper.get('[data-testid="automation-lock"]').attributes('inert')).toBeUndefined()
         expect(wrapper.findAll('select option').some((o) => o.attributes('disabled') !== undefined)).toBe(false)
+    })
+})
+
+describe('TriggerConfig run state', () => {
+    const paused: TriggerStateInfo = {
+        paused_at:           '2026-11-20T08:30:00+00:00',
+        paused_reason:       'rate_breaker',
+        refused_count:       3,
+        last_refused_at:     '2026-11-20T08:31:00+00:00',
+        last_refusal_reason: 'trigger_paused',
+    }
+
+    function mountScheduleTrigger(states: Record<string, TriggerStateInfo>) {
+        return mount(TriggerConfig, {
+            props: {
+                trigger:       {id: 'T-1', type: 'schedule', is_active: true, priority: 0, config: {cron: '0 9 * * *', timezone: 'UTC'}},
+                flowId:        'flow-1',
+                triggerStates: states,
+            },
+        })
+    }
+
+    it('shows a paused trigger and resumes it for someone who manages automations', async () => {
+        grant(['manage_automations'])
+        const wrapper = mountScheduleTrigger({'t-1': paused})
+
+        expect(wrapper.find('[data-testid=trigger-state]').exists()).toBe(true)
+        await wrapper.find('[data-testid=trigger-resume]').trigger('click')
+        await flushPromises()
+
+        expect(resumeTrigger).toHaveBeenCalledWith('flow-1', 'T-1')
+        expect(wrapper.emitted('trigger-states')).toHaveLength(1)
+    })
+
+    it('keeps the resume button off without the right to manage automations', () => {
+        grant([])
+        const wrapper = mountScheduleTrigger({'t-1': paused})
+
+        expect(wrapper.find('[data-testid=trigger-resume]').attributes('disabled')).toBeDefined()
+    })
+
+    it('shows nothing for a trigger with no state', () => {
+        grant(['manage_automations'])
+
+        expect(mountScheduleTrigger({}).find('[data-testid=trigger-state]').exists()).toBe(false)
     })
 })

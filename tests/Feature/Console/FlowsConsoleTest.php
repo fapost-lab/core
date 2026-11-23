@@ -7,6 +7,8 @@ namespace Tests\Feature\Console;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Admission\RefusalReason;
+use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
@@ -18,6 +20,7 @@ use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
 use Fapost\Foundation\Flow\DTO\ExpressionContext;
@@ -96,6 +99,7 @@ final class FlowsConsoleTest extends FeatureTestCase
                     'publishedVersion' => 3,
                     'trigger'          => ['type' => 'message', 'text' => 'help, support, reset password'],
                     'moreTriggers'     => 0,
+                    'triggerPaused'    => false,
                     'editUrl'          => "/assistant/{$this->assistant->getKey()}/flows/{$flow->getKey()}/edit",
                     'deleteUrl'        => "/assistant/{$this->assistant->getKey()}/flows/{$flow->getKey()}",
                     'activityUrl'      => "/assistant/{$this->assistant->getKey()}/flows/{$flow->getKey()}/active",
@@ -135,6 +139,22 @@ final class FlowsConsoleTest extends FeatureTestCase
                 ->where('table.rows.0.trigger.type', 'message')
                 ->where('table.rows.0.trigger.text', 'first')
                 ->where('table.rows.0.moreTriggers', 2)
+                ->etc());
+    }
+
+    public function test_a_flow_with_a_paused_trigger_is_marked_paused(): void
+    {
+        $paused  = $this->flow('Looping');
+        $trigger = $this->trigger($paused, FlowTriggerType::Event, ['event_name' => 'order_created']);
+        $this->app->make(FlowTriggerStateRepositoryInterface::class)->pause($trigger->id, RefusalReason::RateBreaker, CarbonImmutable::now());
+        $this->trigger($this->flow('Quiet'), FlowTriggerType::Event, ['event_name' => 'order_created']);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.name', 'Looping')
+                ->where('table.rows.0.triggerPaused', true)
+                ->where('table.rows.1.triggerPaused', false)
                 ->etc());
     }
 

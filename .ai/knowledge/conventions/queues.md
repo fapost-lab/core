@@ -61,6 +61,7 @@ Queue assignment by purpose, as it exists in the codebase today:
   `app/Jobs/Flow/SendOneTimeCodeJob.php` (the encrypted one-time code of an `auth_request` node),
   `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,
   `app/Domains/Staff/Jobs/SendLimitNoticeJob.php`,
+  `app/Jobs/Flow/NotifyTriggerPausedJob.php` (a trigger the run rate breaker paused),
   `app/Domains/Conversation/Jobs/NotifyOperatorRequestJob.php`,
   `app/Jobs/Media/CleanupSoftDeletedMediaJob.php`, and the broadcast job of
   `app/Domains/Flow/Live/FlowActivityChanged.php` (live updates of the sessions and flow log screens). Its cost

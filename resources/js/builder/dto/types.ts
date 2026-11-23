@@ -75,6 +75,15 @@ export interface WebhookEndpointInfo {
     secret_rotated_at: string | null
 }
 
+/** What run admission knows about a live trigger: paused by the run rate breaker, and its refused runs. */
+export interface TriggerStateInfo {
+    paused_at: string | null
+    paused_reason: string | null
+    refused_count: number
+    last_refused_at: string | null
+    last_refusal_reason: string | null
+}
+
 export interface BuilderFlowPayload {
     flowId: string
     kind?: FlowKind
@@ -88,6 +97,8 @@ export interface BuilderFlowPayload {
     availableEvents?: string[]
     /** Webhook URLs that already exist, keyed by lower-cased trigger id. */
     webhookEndpoints?: Record<string, WebhookEndpointInfo>
+    /** Admission state of the live triggers that have one, keyed by lower-cased trigger id. */
+    triggerStates?: Record<string, TriggerStateInfo>
     availableLanguages?: string[]
     contentBaseLanguage?: string
     publishedAt?: string | null

@@ -120,6 +120,8 @@ final class DispatchFlowTriggerEventJob implements ShouldQueue, TenantAccessGate
                     $this->payload,
                     $this->eventName,
                     $this->depth(),
+                    $trigger->triggerId,
+                    $this->eventId ?? null,
                 );
             }
         });
