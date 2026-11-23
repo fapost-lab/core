@@ -14,7 +14,6 @@ use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
-use App\Domains\Flow\Contracts\MessageSenderInterface as FlowSenderContract;
 use App\Domains\Flow\Handlers\InputNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
@@ -180,21 +179,8 @@ final class FlowTelegramMarkupCharacterizationTest extends FeatureTestCase
 
     public function test_input_select_prompt_markup(): void
     {
-        $sessionId  = (string) $this->session->getKey();
-        $flowSender = $this->flowSender();
-        $sender     = new class ($flowSender) implements FlowSenderContract {
-            public function __construct(private readonly FlowMessageSender $inner)
-            {
-            }
-
-            public function send(string $tenantId, string $contactId, string $sessionId, array $payload): string
-            {
-                return $this->inner->send($tenantId, $contactId, $sessionId, $payload + [
-                    'node_id'         => 'input-select',
-                    'idempotency_key' => 'idem-select',
-                ]);
-            }
-        };
+        $sessionId = (string) $this->session->getKey();
+        $sender    = $this->flowSender();
 
         $translator = Mockery::mock(ContentTranslatorInterface::class);
         $translator->shouldReceive('resolveField')->andReturnUsing(

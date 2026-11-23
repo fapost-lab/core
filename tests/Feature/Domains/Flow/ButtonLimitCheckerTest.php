@@ -167,6 +167,24 @@ final class ButtonLimitCheckerTest extends FeatureTestCase
         ))));
     }
 
+    public function test_an_ask_person_question_puts_one_button_in_a_row_and_skips_templated_labels(): void
+    {
+        $this->channel('plain', new ButtonLimits(maxButtons: 2, maxButtonsPerRow: 1, maxLabelLength: 5));
+
+        $warnings = $this->check([
+            ['id' => 'q', 'type' => 'ask_person', 'config' => ['buttons' => [
+                ['id' => 'a', 'label' => 'Approve'],
+                ['id' => 'b', 'label' => 'No {{flow.reason}}'],
+                ['id' => 'c', 'label' => 'Later'],
+            ]]],
+        ]);
+
+        $this->assertSame([
+            'Plain shows at most 2 buttons in one message; this node has 3.',
+            'Plain shows at most 5 characters in a button label; the longest label here has 7.',
+        ], $this->messages($warnings));
+    }
+
     public function test_within_limits_give_no_warnings(): void
     {
         $this->channel('plain', new ButtonLimits(maxButtons: 4, maxButtonsPerRow: 4, maxLabelLength: 3));

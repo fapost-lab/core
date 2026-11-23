@@ -510,7 +510,7 @@ final class AuthRequestV2NodeHandler extends AbstractVersionedHandler implements
         $hint = $this->text($config['on_invalid_message'] ?? null, $context);
 
         if ('' !== $hint) {
-            $this->sendText($context, $hint);
+            $this->sendText($context, $hint, 'hint:');
         }
 
         return new NodeExecutionResult(
@@ -687,8 +687,10 @@ final class AuthRequestV2NodeHandler extends AbstractVersionedHandler implements
                     'row'     => 0,
                     'order'   => 0,
                 ]],
-                'keyboard_mode' => 'reply',
-                'session_id'    => $context->sessionId,
+                'keyboard_mode'   => 'reply',
+                'session_id'      => $context->sessionId,
+                'node_id'         => $context->nodeId,
+                'idempotency_key' => $context->idempotencyKey,
             ],
         );
     }
@@ -728,19 +730,29 @@ final class AuthRequestV2NodeHandler extends AbstractVersionedHandler implements
                     'row'   => 0,
                     'order' => 0,
                 ]],
-                'keyboard_mode' => 'inline',
-                'session_id'    => $context->sessionId,
+                'keyboard_mode'   => 'inline',
+                'session_id'      => $context->sessionId,
+                'node_id'         => $context->nodeId,
+                'idempotency_key' => $context->idempotencyKey,
             ],
         );
     }
 
-    private function sendText(NodeExecutionContext $context, string $text): void
+    /**
+     * @param  string  $keyPrefix  set apart the delivery key of a message that is not the step's prompt (the hint)
+     */
+    private function sendText(NodeExecutionContext $context, string $text, string $keyPrefix = ''): void
     {
         $this->sender->send(
             tenantId: $context->tenantId,
             contactId: (string) $context->contactId,
             sessionId: $context->sessionId,
-            payload: ['content_type' => 'text', 'text' => $text],
+            payload: [
+                'content_type'    => 'text',
+                'text'            => $text,
+                'node_id'         => $context->nodeId,
+                'idempotency_key' => $keyPrefix . $context->idempotencyKey,
+            ],
         );
     }
 

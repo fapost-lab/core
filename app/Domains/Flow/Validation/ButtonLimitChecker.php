@@ -14,9 +14,10 @@ use Fapost\Foundation\Messaging\ButtonLimits;
 /**
  * Finds keyboards that are larger than a channel of the assistant declares it can show.
  *
- * Counts what the node's configuration fixes in advance, mirroring how the send_message handler, the input handler
- * and FlowMessageSender build the keyboard: buttons are grouped into rows by their `row` field (default 0). Dynamic
- * buttons are built from a variable at runtime, so only their `max_per_row` is known. A send_message label that
+ * Counts what the node's configuration fixes in advance, mirroring how the send_message, input and ask_person
+ * handlers and FlowMessageSender build the keyboard: buttons are grouped into rows by their `row` field (default 0),
+ * except ask_person's, one to a row. Dynamic buttons are built from a variable at runtime, so only their
+ * `max_per_row` is known. A send_message label that
  * contains a `{{placeholder}}` is skipped: its length is known only after rendering. A limit a channel leaves
  * undeclared is not checked. Every channel of the assistant counts, active or not.
  *
@@ -141,8 +142,23 @@ final readonly class ButtonLimitChecker
         return match ($node['type'] ?? null) {
             'send_message' => $this->sendMessageKeyboard($config),
             'input'        => $this->inputKeyboard($config),
+            'ask_person'   => $this->askPersonKeyboard($config),
             default        => null,
         };
+    }
+
+    /**
+     * The ask_person handler puts each button on a row of its own and fills variables into the labels.
+     *
+     * @param  array<string, mixed>  $config
+     *
+     * @return array{total: int, row: int, label: int, dynamic: bool}|null
+     */
+    private function askPersonKeyboard(array $config): ?array
+    {
+        $keyboard = $this->staticKeyboard($config, skipTemplatedLabels: true);
+
+        return null === $keyboard ? null : ['row' => 1] + $keyboard;
     }
 
     /**
