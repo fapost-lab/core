@@ -286,6 +286,94 @@ final class FlowTemplatePublishTest extends FeatureTestCase
         $this->assertCount(2, $host->refresh()->triggers, 'the draft edits stay unpublished');
     }
 
+    public function test_a_template_republish_of_a_host_in_the_release_state_leaves_its_live_row_and_records_it(): void
+    {
+        $template = $this->publishedTemplate(withButtons: false);
+        $host     = $this->hostDraft($template->flow_id);
+
+        $liveId = (string) Str::uuid();
+        $host->forceFill(['triggers' => [
+            ['id' => $liveId, 'type' => 'message', 'is_active' => true, 'priority' => 100, 'config' => ['keywords' => ['live']]],
+        ]])->save();
+        $this->publish($host->flow_id);
+
+        // The host's nodes need a contact, so no schedule trigger can be live here: the row only carries run state to
+        // prove the republish does not write it. The release state: the live row exists and ran, the active definition predates carried triggers (null), and
+        // the host's draft carries other triggers that are not published.
+        $row = FlowTrigger::query()->where('flow_id', $host->flow_id)->sole();
+        $row->forceFill(['next_run_at' => '2026-12-01 09:00:00', 'last_run_at' => '2026-11-30 09:00:00'])->save();
+        FlowDefinition::query()->where('flow_id', $host->flow_id)->update(['triggers' => null]);
+        $host->forceFill(['triggers' => [
+            ['id' => (string) Str::uuid(), 'type' => 'api', 'is_active' => true, 'priority' => 100, 'config' => []],
+        ]])->save();
+        $before = FlowTrigger::query()->where('flow_id', $host->flow_id)->sole()->getAttributes();
+
+        $this->publish($template->flow_id);
+
+        $active = FlowDefinition::query()->where('flow_id', $host->flow_id)->active()->sole();
+        $this->assertSame(2, $active->version);
+        $this->assertSame($template->flow_id, $active->republished_by_template_flow_id);
+        $this->assertEquals(
+            [['id' => $liveId, 'type' => 'message', 'is_active' => true, 'priority' => 100, 'config' => ['keywords' => ['live']]]],
+            $active->triggers,
+            'the new definition records the live list',
+        );
+
+        $rows = FlowTrigger::query()->where('flow_id', $host->flow_id)->get();
+        $this->assertCount(1, $rows, 'the draft triggers are not made live');
+        $this->assertEquals($before, $rows[0]->getAttributes(), 'the live row is not touched');
+        $this->assertSame('2026-12-01 09:00:00', $rows[0]->next_run_at?->format('Y-m-d H:i:s'));
+        $this->assertCount(1, $host->refresh()->triggers, 'the draft stays as it was');
+    }
+
+    public function test_a_template_republish_of_a_host_with_unchanged_triggers_records_only_the_publish_with_the_template(): void
+    {
+        $template = $this->publishedTemplate(withButtons: false);
+        $host     = $this->hostDraft($template->flow_id);
+
+        $host->forceFill(['triggers' => [
+            ['id' => (string) Str::uuid(), 'type' => 'message', 'is_active' => true, 'priority' => 100, 'config' => ['keywords' => ['live']]],
+        ]])->save();
+        $this->publish($host->flow_id);
+        ActivityEntry::query()->delete();
+
+        $this->publish($template->flow_id);
+
+        $entries = ActivityEntry::query()->get();
+        $this->assertSame(['flow.published', 'flow.published'], $entries->pluck('description')->all(), 'no trigger entry for unchanged triggers');
+
+        $hostEntry = $entries->firstWhere('subject_id', (string) $host->getKey());
+        $this->assertNotNull($hostEntry);
+        $this->assertSameJson([
+            'version'                         => 2,
+            'republished_by_template_flow_id' => $template->flow_id,
+            'republished_by_template_version' => 2,
+        ], $hostEntry->properties?->toArray());
+    }
+
+    public function test_a_template_republish_that_changes_a_host_trigger_names_the_template_on_the_trigger_entry(): void
+    {
+        $template = $this->publishedTemplate(withButtons: false);
+        $host     = $this->hostDraft($template->flow_id);
+        $id       = (string) Str::uuid();
+
+        $host->forceFill(['triggers' => [
+            ['id' => $id, 'type' => 'message', 'is_active' => true, 'priority' => 100, 'config' => ['keywords' => ['live']]],
+        ]])->save();
+        $this->publish($host->flow_id);
+
+        // An active definition older than the live row: the republish records the difference as the host's.
+        FlowTrigger::query()->where('flow_id', $host->flow_id)->update(['priority' => 7]);
+        ActivityEntry::query()->delete();
+
+        $this->publish($template->flow_id);
+
+        $entry = ActivityEntry::query()->where('description', 'flow.trigger_changed')->sole();
+        $this->assertSame($id, $entry->properties['trigger_id']);
+        $this->assertSame($template->flow_id, $entry->properties['republished_by_template_flow_id']);
+        $this->assertSame(2, $entry->properties['republished_by_template_version']);
+    }
+
     public function test_a_template_definition_carries_no_triggers(): void
     {
         $template = $this->publishedTemplate();

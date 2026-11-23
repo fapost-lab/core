@@ -10,6 +10,7 @@ use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
@@ -84,6 +85,7 @@ final readonly class ScheduleTriggerFirer
         private ScheduleClock $clock,
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowDraftRepositoryInterface $drafts,
+        private FlowTriggerRepositoryInterface $triggers,
         private FlowEngineInterface $engine,
         private TriggerRunAdmission $admission,
         private AfterCommitDispatcherInterface $afterCommitDispatcher,
@@ -101,7 +103,7 @@ final readonly class ScheduleTriggerFirer
     {
         $report = ['fired' => 0, 'skipped' => 0, 'missed' => 0];
 
-        foreach ($this->dueTriggers($tenantId, $now) as $trigger) {
+        foreach ($this->triggers->dueSchedules($tenantId, $now, self::MAX_PER_PASS) as $trigger) {
             try {
                 $outcome = $this->claim($tenantId, $trigger, $now);
             } catch (Throwable $exception) {
@@ -150,23 +152,6 @@ final readonly class ScheduleTriggerFirer
     }
 
     /**
-     * @return iterable<FlowTrigger>
-     */
-    private function dueTriggers(string $tenantId, CarbonImmutable $now): iterable
-    {
-        return FlowTrigger::query()
-            ->where('tenant_id', $tenantId)
-            ->where('type', FlowTriggerType::Schedule->value)
-            ->where('is_active', true)
-            ->whereNotNull('next_run_at')
-            ->where('next_run_at', '<=', $now)
-            ->orderBy('next_run_at')
-            ->orderBy('id')
-            ->limit(self::MAX_PER_PASS)
-            ->get();
-    }
-
-    /**
      * @return 'fired'|'skipped'|'missed'|null null when another pass took the slot, or the config cannot run
      */
     private function claim(string $tenantId, FlowTrigger $trigger, CarbonImmutable $now): ?string
@@ -179,7 +164,7 @@ final readonly class ScheduleTriggerFirer
         } catch (InvalidScheduleConfigException) {
             // Published under an older validator: it can never run, so it stops coming due.
             $this->logger->warning('flow.schedule.unusable_config', $this->context($tenantId, $trigger));
-            $this->moveSlot($trigger, $readSlot, null, $slot, $now);
+            $this->triggers->moveScheduleSlot($trigger, $readSlot, null, $slot, $now);
 
             return null;
         }
@@ -188,7 +173,7 @@ final readonly class ScheduleTriggerFirer
 
         if (! $this->isManageable($trigger->flow_id)) {
             // Nobody can switch this schedule off any more: it stops, as it does when its flow is deleted.
-            if (! $this->moveSlot($trigger, $readSlot, null, $slot, $now)) {
+            if (! $this->triggers->moveScheduleSlot($trigger, $readSlot, null, $slot, $now)) {
                 return null;
             }
 
@@ -200,7 +185,7 @@ final readonly class ScheduleTriggerFirer
         $next = $this->clock->nextSlotAfter($config, $slot->greaterThan($now) ? $slot : $now);
 
         return $this->connection->transaction(function () use ($tenantId, $trigger, $readSlot, $slot, $next, $now, $config, $context): ?string {
-            if (! $this->moveSlot($trigger, $readSlot, $next, $slot, $now)) {
+            if (! $this->triggers->moveScheduleSlot($trigger, $readSlot, $next, $slot, $now)) {
                 return null;
             }
 
@@ -276,24 +261,6 @@ final readonly class ScheduleTriggerFirer
 
             return 'fired';
         });
-    }
-
-    /**
-     * The compare-and-set: move the row from the slot this pass read to {@code $next}, only if it still holds it and is
-     * still active.
-     */
-    private function moveSlot(FlowTrigger $trigger, mixed $readSlot, ?CarbonImmutable $next, CarbonImmutable $slot, CarbonImmutable $now): bool
-    {
-        return 1 === FlowTrigger::query()
-            ->whereKey($trigger->getKey())
-            ->where('next_run_at', $readSlot)
-            ->where('is_active', true)
-            ->toBase()
-            ->update([
-                'next_run_at' => $next,
-                'last_run_at' => $slot,
-                'updated_at'  => $now,
-            ]);
     }
 
     /**

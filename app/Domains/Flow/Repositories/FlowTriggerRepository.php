@@ -10,7 +10,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Schedule\ScheduleClock;
 use App\Domains\Flow\Schedule\ScheduleTriggerConfig;
-use App\Domains\Flow\Services\FlowTriggerSet;
+use App\Domains\Flow\Support\FlowTriggerComparison;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -98,7 +98,7 @@ final readonly class FlowTriggerRepository implements FlowTriggerRepositoryInter
                 'priority'     => $trigger['priority'],
             ]);
 
-            if ($row->typeName() !== $trigger['type'] || ! FlowTriggerSet::sameConfig($row->config, $trigger['config'])) {
+            if ($row->typeName() !== $trigger['type'] || ! FlowTriggerComparison::sameConfig($row->config, $trigger['config'])) {
                 $row->fill([
                     'type'        => $trigger['type'],
                     'config'      => $trigger['config'],
@@ -151,6 +151,73 @@ final readonly class FlowTriggerRepository implements FlowTriggerRepositoryInter
             ->where('is_active', true)
             ->where('config->event_name', $eventName)
             ->exists();
+    }
+
+    public function dueSchedules(string $tenantId, CarbonImmutable $now, int $limit): iterable
+    {
+        return FlowTrigger::query()
+            ->where('tenant_id', $tenantId)
+            ->where('type', FlowTriggerType::Schedule->value)
+            ->where('is_active', true)
+            ->whereNotNull('next_run_at')
+            ->where('next_run_at', '<=', $now)
+            ->orderBy('next_run_at')
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function nextScheduleRuns(string $tenantId, ?array $triggerIds): array
+    {
+        $query = FlowTrigger::query()
+            ->where('tenant_id', $tenantId)
+            ->where('type', FlowTriggerType::Schedule->value)
+            ->where('is_active', true)
+            ->whereNotNull('next_run_at');
+
+        if (null !== $triggerIds) {
+            $query->whereIn('id', array_map(mb_strtolower(...), $triggerIds));
+        }
+
+        $due = [];
+
+        foreach ($query->get(['id', 'next_run_at']) as $trigger) {
+            if (null !== $trigger->next_run_at) {
+                $due[mb_strtolower($trigger->id)] = $trigger->next_run_at;
+            }
+        }
+
+        return $due;
+    }
+
+    public function moveScheduleSlot(FlowTrigger $trigger, mixed $readSlot, ?CarbonImmutable $next, CarbonImmutable $slot, CarbonImmutable $now): bool
+    {
+        return 1 === FlowTrigger::query()
+            ->whereKey($trigger->getKey())
+            ->where('next_run_at', $readSlot)
+            ->where('is_active', true)
+            ->toBase()
+            ->update([
+                'next_run_at' => $next,
+                'last_run_at' => $slot,
+                'updated_at'  => $now,
+            ]);
+    }
+
+    public function stopSchedules(string $flowId): array
+    {
+        $schedules = FlowTrigger::query()
+            ->where('flow_id', $flowId)
+            ->where('type', FlowTriggerType::Schedule->value)
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
+
+        if ([] !== $schedules) {
+            FlowTrigger::query()->whereKey($schedules)->toBase()->update(['next_run_at' => null, 'updated_at' => now()]);
+        }
+
+        return $schedules;
     }
 
     /**

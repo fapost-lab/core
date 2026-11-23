@@ -37,27 +37,6 @@ final class FlowTriggerSetTest extends TestCase
         yield 'a negative priority' => [[['id' => $id, 'type' => 'message', 'priority' => -1, 'config' => []]]];
         yield 'one bad entry among good ones' => [[['id' => $id, 'type' => 'message', 'config' => []], ['id' => $id, 'type' => 'message']]];
     }
-    public function test_same_config_ignores_the_order_of_object_keys_at_every_level(): void
-    {
-        $left  = ['cron' => '0 9 * * *', 'timezone' => 'UTC', 'extra' => ['b' => 1, 'a' => ['y' => 2, 'x' => 3]]];
-        $right = ['extra' => ['a' => ['x' => 3, 'y' => 2], 'b' => 1], 'timezone' => 'UTC', 'cron' => '0 9 * * *'];
-
-        $this->assertTrue(FlowTriggerSet::sameConfig($left, $right));
-    }
-
-    public function test_same_config_keeps_the_order_of_a_list(): void
-    {
-        $this->assertFalse(FlowTriggerSet::sameConfig(['keywords' => ['a', 'b']], ['keywords' => ['b', 'a']]));
-        $this->assertFalse(FlowTriggerSet::sameConfig(['nested' => [['k' => 1], ['k' => 2]]], ['nested' => [['k' => 2], ['k' => 1]]]));
-    }
-
-    public function test_same_config_tells_different_values_and_keys_apart(): void
-    {
-        $this->assertFalse(FlowTriggerSet::sameConfig(['a' => 1], ['a' => 2]));
-        $this->assertFalse(FlowTriggerSet::sameConfig(['a' => 1], ['a' => 1, 'b' => null]));
-        $this->assertTrue(FlowTriggerSet::sameConfig([], []));
-    }
-
     public function test_from_payload_accepts_an_empty_list(): void
     {
         $this->assertSame([], FlowTriggerSet::fromPayload([]));

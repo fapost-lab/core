@@ -11,6 +11,7 @@ use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Jobs\Flow\NotifyTriggerPausedJob;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -54,6 +55,7 @@ final readonly class TriggerRunAdmission
         private Dispatcher $dispatcher,
         private Cache $cache,
         private LoggerInterface $logger,
+        private ExceptionHandler $exceptions,
     ) {
     }
 
@@ -73,7 +75,7 @@ final readonly class TriggerRunAdmission
                 return AdmissionDecision::allowed();
             }
         } catch (Throwable $exception) {
-            report($exception);
+            $this->exceptions->report($exception);
         }
 
         $decision = $this->admit($request);
@@ -82,7 +84,7 @@ final readonly class TriggerRunAdmission
             try {
                 $this->cache->put($key, true, self::ADMITTED_TTL_SECONDS);
             } catch (Throwable $exception) {
-                report($exception);
+                $this->exceptions->report($exception);
             }
         }
 
@@ -129,7 +131,7 @@ final readonly class TriggerRunAdmission
         try {
             return $this->breaker->hit($request->tenantId, $request->triggerId);
         } catch (Throwable $exception) {
-            report($exception);
+            $this->exceptions->report($exception);
 
             return false;
         }

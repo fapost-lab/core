@@ -6,7 +6,13 @@ namespace App\Domains\Flow\Contracts;
 
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Support\FlowTriggerComparison;
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 
+/**
+ * @phpstan-import-type Trigger from FlowTriggerComparison
+ */
 interface FlowTriggerRepositoryInterface
 {
     /**
@@ -32,7 +38,7 @@ interface FlowTriggerRepositoryInterface
      * (`last_run_at`, `next_run_at`) and is written only when its flag or priority changed; one whose type or config
      * changed loses `next_run_at`.
      *
-     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $triggers
+     * @param  list<Trigger>  $triggers
      */
     public function syncForFlow(FlowDraft $draft, array $triggers): void;
 
@@ -54,4 +60,36 @@ interface FlowTriggerRepositoryInterface
      * queued, so a Core event nobody listens to costs no job.
      */
     public function hasActiveEventTrigger(string $tenantId, string $eventName): bool;
+
+    /**
+     * The tenant's active schedule triggers whose next slot has come, earliest slot first (then id), at most `$limit`.
+     *
+     * @return iterable<FlowTrigger>
+     */
+    public function dueSchedules(string $tenantId, CarbonImmutable $now, int $limit): iterable;
+
+    /**
+     * The next slot of the tenant's active schedule triggers that have one, by lowercased trigger id.
+     *
+     * @param  list<string>|null  $triggerIds  null for all of the tenant's
+     *
+     * @return array<string, DateTimeInterface>
+     */
+    public function nextScheduleRuns(string $tenantId, ?array $triggerIds): array;
+
+    /**
+     * The compare-and-set that claims a schedule's slot: moves the row from `$readSlot` (its raw `next_run_at` as the
+     * caller read it) to `$next`, recording `$slot` as its last run, only if it still holds `$readSlot` and is still
+     * active.
+     *
+     * @return bool whether this call moved it
+     */
+    public function moveScheduleSlot(FlowTrigger $trigger, mixed $readSlot, ?CarbonImmutable $next, CarbonImmutable $slot, CarbonImmutable $now): bool;
+
+    /**
+     * Stops every schedule trigger of the flow (no next slot), active or not.
+     *
+     * @return list<string> the ids of the flow's schedule triggers, empty when it has none
+     */
+    public function stopSchedules(string $flowId): array;
 }

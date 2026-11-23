@@ -33,6 +33,7 @@ use App\Domains\Flow\Services\EventChainContext;
 use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\VariableResolver;
+use App\Domains\Flow\Support\AddresseeResolver;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
@@ -945,6 +946,7 @@ final class BuiltInNodeHandlersTest extends TestCase
                 new TemplateRenderer(),
                 new NullLogger(),
             ),
+            new AddresseeResolver(new TemplateRenderer()),
         );
 
         $context = new NodeExecutionContext(
@@ -1012,6 +1014,7 @@ final class BuiltInNodeHandlersTest extends TestCase
                 new TemplateRenderer(),
                 new NullLogger(),
             ),
+            new AddresseeResolver(new TemplateRenderer()),
         );
 
         $context = new NodeExecutionContext(
@@ -1473,6 +1476,48 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('ext-1', $result->stateChanges[SystemStateKeys::SENT_MESSAGES]['node-1']);
     }
 
+    public function test_send_message_with_an_addressee_refuses_a_timeout_and_sends_nothing(): void
+    {
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldNotReceive('send');
+
+        $handler = $this->makeHandler($sender, Mockery::mock(ContentTranslatorInterface::class));
+
+        $this->expectException(InvalidNodeConfigException::class);
+        $this->expectExceptionMessage('send_message: an addressee cannot wait for an answer');
+
+        $handler->execute([
+            'id'     => 'node-1',
+            'config' => [
+                'content_type'    => 'text',
+                'text'            => ['en' => 'Hi'],
+                'addressee'       => ['kind' => 'contact', 'contact' => '01938f3e-7c1a-7d2b-8e4f-123456789abc'],
+                'timeout_seconds' => 60,
+            ],
+        ], [], $this->contactlessContext());
+    }
+
+    public function test_send_message_with_an_addressee_refuses_save_to_and_sends_nothing(): void
+    {
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldNotReceive('send');
+
+        $handler = $this->makeHandler($sender, Mockery::mock(ContentTranslatorInterface::class));
+
+        $this->expectException(InvalidNodeConfigException::class);
+        $this->expectExceptionMessage('send_message: an addressee cannot wait for an answer');
+
+        $handler->execute([
+            'id'     => 'node-1',
+            'config' => [
+                'content_type' => 'text',
+                'text'         => ['en' => 'Hi'],
+                'addressee'    => ['kind' => 'contact', 'contact' => '01938f3e-7c1a-7d2b-8e4f-123456789abc'],
+                'save_to'      => 'flow.answer',
+            ],
+        ], [], $this->contactlessContext());
+    }
+
     public function test_send_message_with_an_addressee_that_gives_no_contact_id_takes_error_and_sends_nothing(): void
     {
         $sender = Mockery::mock(MessageSenderInterface::class);
@@ -1727,6 +1772,7 @@ final class BuiltInNodeHandlersTest extends TestCase
                 new TemplateRenderer(),
                 new NullLogger(),
             ),
+            new AddresseeResolver(new TemplateRenderer()),
         );
 
         $persistedButtons = [
@@ -1838,6 +1884,7 @@ final class BuiltInNodeHandlersTest extends TestCase
                 new TemplateRenderer(),
                 $logger ?? new NullLogger(),
             ),
+            new AddresseeResolver(new TemplateRenderer()),
         );
     }
 

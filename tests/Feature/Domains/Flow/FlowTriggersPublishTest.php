@@ -611,6 +611,31 @@ final class FlowTriggersPublishTest extends FeatureTestCase
         $this->assertSame('message', $removed->properties['trigger_type']);
     }
 
+    public function test_a_publish_records_a_trigger_whose_type_changed_by_its_type_values_and_a_config_marker(): void
+    {
+        $draft = $this->draft();
+        $id    = (string) Str::uuid();
+        $this->storeDraftTriggers($draft, [$this->schedule($id)]);
+        $this->publish($draft->flow_id);
+        ActivityEntry::query()->delete();
+
+        $this->storeDraftTriggers($draft, [['id' => $id, 'type' => 'api', 'is_active' => true, 'priority' => 100, 'config' => ['response_mode' => 'async']]]);
+        $this->publish($draft->flow_id);
+
+        $this->assertEqualsCanonicalizing(
+            ['flow.published', 'flow.trigger_changed'],
+            ActivityEntry::query()->pluck('description')->all(),
+        );
+
+        $changed = ActivityEntry::query()->where('description', 'flow.trigger_changed')->sole();
+        $this->assertSame($id, $changed->properties['trigger_id']);
+        $this->assertSame('api', $changed->properties['trigger_type'], 'the record names the type the trigger has now');
+        $this->assertSame(['type' => 'api'], $changed->attribute_changes?->toArray()['attributes']);
+        $this->assertSame(['type' => 'schedule'], $changed->attribute_changes?->toArray()['old']);
+        $this->assertSame(['config'], $changed->attribute_changes?->toArray()['changed']);
+        $this->assertStringNotContainsString('async', (string) json_encode($changed->getAttributes()));
+    }
+
     public function test_a_publish_that_changes_no_trigger_records_only_the_publish(): void
     {
         $draft = $this->draft();

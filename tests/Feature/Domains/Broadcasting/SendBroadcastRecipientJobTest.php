@@ -234,8 +234,8 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
         $broadcast->update(['total_recipients' => 1]);
         $service = app(BroadcastService::class);
 
-        $this->assertTrue($service->settleRecipient((string) $broadcast->getKey(), (string) $recipient->getKey(), RecipientStatus::Sent, 'sent_count'));
-        $this->assertFalse($service->settleRecipient((string) $broadcast->getKey(), (string) $recipient->getKey(), RecipientStatus::Failed, 'failed_count'));
+        $this->assertTrue($service->settleRecipient((string) $broadcast->getKey(), (string) $recipient->getKey(), RecipientStatus::Sent));
+        $this->assertFalse($service->settleRecipient((string) $broadcast->getKey(), (string) $recipient->getKey(), RecipientStatus::Failed));
 
         $broadcast->refresh();
         $this->assertSame(1, $broadcast->sent_count);

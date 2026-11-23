@@ -68,9 +68,6 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
 {
     final public const string TYPE = 'send_message';
 
-    /** One contact, named by an expression; tags and segments are the other kinds ({@see AddresseeResolver}). */
-    final public const string ADDRESSEE_KIND_CONTACT = AddresseeResolver::KIND_CONTACT;
-
     private const string EXTERNAL_MESSAGE_ID_META = 'external_message_id';
     private const string NO_RESPONSE_HANDLE       = 'no_response';
 
@@ -84,6 +81,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
         private readonly SendMessageTimeoutSchedulerInterface $timeoutScheduler,
         private readonly LoggerInterface $logger,
         private readonly AudienceMessage $audience,
+        private readonly AddresseeResolver $addressees,
     ) {
     }
 
@@ -196,7 +194,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
                                 SelectField::make('kind')
                                     ->label('Kind')
                                     ->options(AddresseeResolver::KINDS)
-                                    ->default(self::ADDRESSEE_KIND_CONTACT),
+                                    ->default(AddresseeResolver::KIND_CONTACT),
                                 TextField::make('contact')
                                     ->label('Contact id')
                                     ->placeholder('{{flow.contact_id}}')
@@ -350,7 +348,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
         $recipientId = $context->contactId;
 
         if (null !== $addressee['kind']) {
-            $recipientId = $this->resolveAddressee($addressee, $state, $context);
+            $recipientId = $this->addressees->resolve($addressee, $context, $state);
 
             if (null === $recipientId) {
                 return new NodeExecutionResult(
@@ -584,7 +582,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
             : null;
 
         if (null !== AddresseeResolver::parse($config)['kind'] && [] !== self::answerFields($config)) {
-            throw new InvalidNodeConfigException('send_message with an addressee cannot wait for an answer.');
+            throw new InvalidNodeConfigException('send_message: an addressee cannot wait for an answer');
         }
 
         return [
@@ -604,17 +602,6 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
             'save_to_variable'            => $saveToVariable,
             'remove_keyboard_after_press' => true === ($config['remove_keyboard_after_press'] ?? true),
         ];
-    }
-
-    /**
-     * The contact id the addressee's expression gives ({@see AddresseeResolver::resolve()}); never the run's contact.
-     *
-     * @param  array{kind: string|null, contact: string, tags: list<string>, segment_id: string}  $addressee
-     * @param  array<string, mixed>                                                               $state
-     */
-    private function resolveAddressee(array $addressee, array $state, NodeExecutionContext $context): ?string
-    {
-        return new AddresseeResolver($this->templates)->resolve($addressee, $context, $state);
     }
 
     /**

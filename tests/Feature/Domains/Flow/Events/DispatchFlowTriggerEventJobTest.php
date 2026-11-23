@@ -107,6 +107,25 @@ final class DispatchFlowTriggerEventJobTest extends FeatureTestCase
         $this->assertSame($expected, $started, 'The support-only trigger must not start on an event of the sales assistant.');
     }
 
+    public function test_an_event_emitted_by_a_subflow_child_is_filtered_by_the_parents_assistant(): void
+    {
+        Bus::fake();
+
+        $sales   = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
+        $support = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
+
+        $listsSales   = (string) Str::uuid();
+        $listsSupport = (string) Str::uuid();
+
+        $this->eventTrigger($listsSales, 'order.created', assistantFilter: [(string) $sales->getKey()]);
+        $this->eventTrigger($listsSupport, 'order.created', assistantFilter: [(string) $support->getKey()]);
+
+        $this->runDispatch('order.created', [], contactId: 'contact-9', sessionId: $this->childSessionOf($this->sessionOf($sales)));
+
+        Bus::assertDispatchedTimes(StartFlowFromEventJob::class, 1);
+        Bus::assertDispatched(StartFlowFromEventJob::class, static fn (StartFlowFromEventJob $job): bool => $job->flowId === $listsSales);
+    }
+
     public function test_an_event_whose_session_is_unknown_starts_only_the_triggers_without_a_filter(): void
     {
         Bus::fake();
@@ -148,6 +167,28 @@ final class DispatchFlowTriggerEventJobTest extends FeatureTestCase
             'state'              => [],
             'status'             => FlowSessionStatus::Active,
             'version'            => 0,
+        ])->getKey();
+    }
+
+    /**
+     * A child session as the subflow starter creates it: the parent's tenant, assistant and contact, linked to the parent.
+     */
+    private function childSessionOf(string $parentSessionId): string
+    {
+        $parent = FlowSession::query()->findOrFail($parentSessionId);
+
+        return (string) FlowSession::query()->create([
+            'tenant_id'             => $parent->tenant_id,
+            'assistant_id'          => $parent->assistant_id,
+            'contact_id'            => $parent->contact_id,
+            'flow_definition_id'    => $parent->flow_definition_id,
+            'flow_version'          => 1,
+            'current_node_id'       => 'emit-1',
+            'parent_session_id'     => $parentSessionId,
+            'parent_resume_node_id' => 'subflow-1',
+            'state'                 => [],
+            'status'                => FlowSessionStatus::Active,
+            'version'               => 0,
         ])->getKey();
     }
 

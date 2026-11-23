@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use LogicException;
 
 /**
  * Writes and reads the {@see Broadcast}s of the current assistant on the console.
@@ -325,18 +326,21 @@ final readonly class BroadcastService
      * Lock order, shared with {@see failRun()}: the broadcast row first, then its recipient rows. Taking
      * them in the other order lets the two deadlock on Postgres.
      *
-     * @param  'sent_count'|'failed_count'|'skipped_count'  $counter
+     * The counter follows from the status ({@see RecipientStatus::counterColumn()}); a pending status is refused.
+     *
      * @return bool false when the recipient was already settled (nothing changed)
+     *
+     * @throws LogicException when `$status` is {@see RecipientStatus::Pending}
      */
     public function settleRecipient(
         string $broadcastId,
         string $recipientId,
         RecipientStatus $status,
-        string $counter,
         ?string $error = null,
         ?string $providerMessageId = null,
     ): bool {
-        $values = [
+        $counter = $status->counterColumn();
+        $values  = [
             'status'              => $status->value,
             'error'               => $error,
             'provider_message_id' => $providerMessageId,

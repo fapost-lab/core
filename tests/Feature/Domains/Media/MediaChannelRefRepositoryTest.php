@@ -16,7 +16,7 @@ final class MediaChannelRefRepositoryTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
-    public function test_the_provider_kind_is_stored_updated_and_optional(): void
+    public function test_the_provider_kind_is_stored_as_given_updated_and_cleared_by_null(): void
     {
         $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
 

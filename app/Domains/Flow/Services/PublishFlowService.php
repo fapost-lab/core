@@ -28,6 +28,7 @@ use App\Domains\Flow\Schedule\ScheduleRegistrySync;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableType;
 use App\Domains\Flow\Subflow\CallGraphRepository;
+use App\Domains\Flow\Support\FlowTriggerComparison;
 use App\Domains\Flow\Templates\TemplateExpander;
 use App\Domains\Flow\Templates\TemplateUsageRepository;
 use Closure;
@@ -36,6 +37,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use stdClass;
 
+/**
+ * @phpstan-import-type Trigger from FlowTriggerComparison
+ */
 final readonly class PublishFlowService
 {
     public function __construct(
@@ -256,19 +260,12 @@ final readonly class PublishFlowService
 
         // The graph itself is never stored in the trail: the action says a version went live. A republish made by a
         // template publish names the template version that caused it.
-        $properties = ['version' => $definition->version];
-
-        if (null !== $republishedBy) {
-            $properties['republished_by_template_flow_id'] = $republishedBy->flow_id;
-            $properties['republished_by_template_version'] = $republishedBy->version;
-        }
-
         $this->audit->record(new AuditRecord(
             action: AuditAction::FlowPublished,
             subject: $draft,
             subjectLabel: (string) $draft->name,
             assistantId: $draft->assistant_id,
-            properties: $properties,
+            properties: ['version' => $definition->version, ...$this->republishProperties($republishedBy)],
         ));
 
         return $definition;
@@ -280,8 +277,8 @@ final readonly class PublishFlowService
      * order. The type, the active flag and the priority are recorded as values; the config only as a marker, never its
      * content (a call's headers, keywords or a webhook's settings are not the log's to copy).
      *
-     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $before
-     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $after
+     * @param  list<Trigger>  $before
+     * @param  list<Trigger>  $after
      */
     private function recordTriggerChanges(
         FlowDraft $draft,
@@ -290,45 +287,33 @@ final readonly class PublishFlowService
         array $after,
         ?FlowDefinition $republishedBy,
     ): void {
-        $live = [];
+        $diff = FlowTriggerComparison::diff($before, $after);
 
-        foreach ($before as $trigger) {
-            $live[mb_strtolower($trigger['id'])] = $trigger;
+        foreach ($diff['added'] as $trigger) {
+            $this->recordTrigger(AuditAction::FlowTriggerAdded, $draft, $definition, $trigger, $republishedBy, AuditChanges::created([
+                'type'      => $trigger['type'],
+                'is_active' => $trigger['is_active'],
+                'priority'  => $trigger['priority'],
+            ]));
         }
 
-        foreach ($after as $trigger) {
-            $id      = mb_strtolower($trigger['id']);
-            $current = $live[$id] ?? null;
-            unset($live[$id]);
+        foreach ($diff['changed'] as ['before' => $was, 'after' => $trigger]) {
+            $changes = AuditChanges::between($was, $trigger, ['type', 'is_active', 'priority']);
 
-            if (null === $current) {
-                $this->recordTrigger(AuditAction::FlowTriggerAdded, $draft, $definition, $trigger, $republishedBy, AuditChanges::created([
-                    'type'      => $trigger['type'],
-                    'is_active' => $trigger['is_active'],
-                    'priority'  => $trigger['priority'],
-                ]));
-
-                continue;
-            }
-
-            $changes = AuditChanges::between($current, $trigger, ['type', 'is_active', 'priority']);
-
-            if (! FlowTriggerSet::sameConfig($current['config'], $trigger['config'])) {
+            if (! FlowTriggerComparison::sameConfig($was['config'], $trigger['config'])) {
                 $changes = $changes->merge(AuditChanges::markers(['config']));
             }
 
-            if (! $changes->isEmpty()) {
-                $this->recordTrigger(AuditAction::FlowTriggerChanged, $draft, $definition, $trigger, $republishedBy, $changes);
-            }
+            $this->recordTrigger(AuditAction::FlowTriggerChanged, $draft, $definition, $trigger, $republishedBy, $changes);
         }
 
-        foreach ($live as $gone) {
+        foreach ($diff['removed'] as $gone) {
             $this->recordTrigger(AuditAction::FlowTriggerRemoved, $draft, $definition, $gone, $republishedBy);
         }
     }
 
     /**
-     * @param  array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}  $trigger
+     * @param  Trigger  $trigger
      */
     private function recordTrigger(
         AuditAction $action,
@@ -338,29 +323,41 @@ final readonly class PublishFlowService
         ?FlowDefinition $republishedBy,
         ?AuditChanges $changes = null,
     ): void {
-        $properties = [
-            'version'      => $definition->version,
-            'trigger_id'   => mb_strtolower($trigger['id']),
-            'trigger_type' => $trigger['type'],
-        ];
-
-        if (null !== $republishedBy) {
-            $properties['republished_by_template_flow_id'] = $republishedBy->flow_id;
-            $properties['republished_by_template_version'] = $republishedBy->version;
-        }
-
         $this->audit->record(new AuditRecord(
             action: $action,
             subject: $draft,
             subjectLabel: (string) $draft->name,
             assistantId: $draft->assistant_id,
             changes: $changes,
-            properties: $properties,
+            properties: [
+                'version'      => $definition->version,
+                'trigger_id'   => mb_strtolower($trigger['id']),
+                'trigger_type' => $trigger['type'],
+                ...$this->republishProperties($republishedBy),
+            ],
         ));
     }
 
     /**
-     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $triggers
+     * The audit properties of a record written by a republish a template publish caused: the template and its version.
+     * Empty for a publish of the flow itself.
+     *
+     * @return array{republished_by_template_flow_id?: string, republished_by_template_version?: int}
+     */
+    private function republishProperties(?FlowDefinition $republishedBy): array
+    {
+        if (null === $republishedBy) {
+            return [];
+        }
+
+        return [
+            'republished_by_template_flow_id' => $republishedBy->flow_id,
+            'republished_by_template_version' => $republishedBy->version,
+        ];
+    }
+
+    /**
+     * @param  list<Trigger>  $triggers
      *
      * @return list<string>
      */
@@ -370,7 +367,7 @@ final readonly class PublishFlowService
     }
 
     /**
-     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $triggers
+     * @param  list<Trigger>  $triggers
      *
      * @return list<string>
      */
@@ -495,7 +492,7 @@ final readonly class PublishFlowService
      *
      * @param  array<int, mixed>  $nodes
      * @param  array<int, mixed>  $edges
-     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $triggers
+     * @param  list<Trigger>  $triggers
      */
     private function createDefinition(
         FlowDraft $draft,

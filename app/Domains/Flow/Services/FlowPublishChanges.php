@@ -11,6 +11,7 @@ use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\Support\AddresseeResolver;
+use App\Domains\Flow\Support\FlowTriggerComparison;
 use App\Domains\Flow\Templates\TemplateExpander;
 
 /**
@@ -23,7 +24,7 @@ use App\Domains\Flow\Templates\TemplateExpander;
  * any change to an automatic trigger does. The draft is compared before template expansion: a credential a placed
  * template brings is the template's, checked when the template is published.
  *
- * @phpstan-import-type Trigger from FlowTriggerSet
+ * @phpstan-import-type Trigger from FlowTriggerComparison
  */
 final readonly class FlowPublishChanges
 {
@@ -97,25 +98,12 @@ final readonly class FlowPublishChanges
             return false;
         }
 
-        $drafted = self::automatic(FlowTriggerSet::normalize($draft->triggers));
-        $live    = self::automatic($this->triggerSet->live($draft->flow_id));
+        $diff = FlowTriggerComparison::diff(
+            self::automatic($this->triggerSet->live($draft->flow_id)),
+            self::automatic(FlowTriggerSet::normalize($draft->triggers)),
+        );
 
-        if (count($drafted) !== count($live) || [] !== array_diff_key($drafted, $live)) {
-            return true;
-        }
-
-        foreach ($drafted as $id => $trigger) {
-            $current = $live[$id];
-
-            if ($trigger['type'] !== $current['type']
-                || $trigger['is_active'] !== $current['is_active']
-                || $trigger['priority'] !== $current['priority']
-                || ! FlowTriggerSet::sameConfig($trigger['config'], $current['config'])) {
-                return true;
-            }
-        }
-
-        return false;
+        return [] !== $diff['added'] || [] !== $diff['changed'] || [] !== $diff['removed'];
     }
 
     /**
@@ -130,7 +118,7 @@ final readonly class FlowPublishChanges
     /**
      * @param  list<Trigger>  $triggers
      *
-     * @return array<string, Trigger> the triggers other than `message`, by id
+     * @return list<Trigger> the triggers other than `message`
      */
     private static function automatic(array $triggers): array
     {
@@ -138,7 +126,7 @@ final readonly class FlowPublishChanges
 
         foreach ($triggers as $trigger) {
             if (FlowTriggerType::Message->value !== $trigger['type']) {
-                $automatic[$trigger['id']] = $trigger;
+                $automatic[] = $trigger;
             }
         }
 

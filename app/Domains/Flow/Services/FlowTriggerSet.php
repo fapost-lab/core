@@ -10,6 +10,7 @@ use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Support\FlowTriggerComparison;
 use Illuminate\Support\Str;
 
 /**
@@ -20,7 +21,7 @@ use Illuminate\Support\Str;
  * carried): the flow's live rows are its triggers then. `[]` means the flow has none. Builder load, validate and
  * publish all read the list through {@see self::ofDraft()} and {@see self::ofDefinition()}.
  *
- * @phpstan-type Trigger array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}
+ * @phpstan-import-type Trigger from FlowTriggerComparison
  */
 final readonly class FlowTriggerSet
 {
@@ -131,19 +132,6 @@ final readonly class FlowTriggerSet
     }
 
     /**
-     * Whether two trigger configs say the same, whatever the order of their keys: Postgres `jsonb` returns object
-     * keys in its own order, so a config read back from a row never compares equal to the one written as is. The
-     * order of a list is kept, it is part of the value.
-     *
-     * @param  array<array-key, mixed>  $left
-     * @param  array<array-key, mixed>  $right
-     */
-    public static function sameConfig(array $left, array $right): bool
-    {
-        return self::canonical($left) === self::canonical($right);
-    }
-
-    /**
      * The draft's triggers, or the flow's live ones while the draft carries none.
      *
      * @return list<Trigger>
@@ -170,25 +158,5 @@ final readonly class FlowTriggerSet
     public function live(string $flowId): array
     {
         return array_map(self::fromRow(...), $this->triggers->getByFlowId($flowId));
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $value
-     *
-     * @return array<array-key, mixed>
-     */
-    private static function canonical(array $value): array
-    {
-        foreach ($value as $key => $item) {
-            if (is_array($item)) {
-                $value[$key] = self::canonical($item);
-            }
-        }
-
-        if (! array_is_list($value)) {
-            ksort($value);
-        }
-
-        return $value;
     }
 }

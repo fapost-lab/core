@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Media\Services;
 
+use App\Domains\Media\Contracts\MediaFolderRepositoryInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\Exceptions\MediaFolderRuleException;
 use App\Domains\Media\Models\MediaFile;
@@ -18,7 +19,9 @@ use Illuminate\Support\Str;
  * the current tenant only, the tree is at most `media.folder.max_depth` deep, a folder never moves into its own
  * subtree, and deleting a folder first moves what it holds somewhere else.
  *
- * The writes themselves (and the `path_cache` rewrite of descendants) stay in {@see MediaServiceInterface}.
+ * Every tree write (create, rename, move, delete) runs in a transaction that takes the tenant's tree lock first; see
+ * {@see self::move()}. The writes themselves (and the `path_cache` rewrite of descendants) stay in
+ * {@see MediaServiceInterface}.
  */
 final readonly class MediaFolderService
 {
@@ -28,6 +31,7 @@ final readonly class MediaFolderService
     public function __construct(
         private TenantContextInterface $tenantContext,
         private MediaServiceInterface $media,
+        private MediaFolderRepositoryInterface $folders,
         private int $maxDepth = 10,
     ) {
     }
@@ -75,31 +79,51 @@ final readonly class MediaFolderService
      */
     public function create(string $name, ?MediaFolder $parent, ?string $createdBy = null): MediaFolder
     {
-        $this->assertRoomUnder($parent, 'parent_id');
+        $connection = $parent?->getConnection() ?? (new MediaFolder())->getConnection();
 
-        return $this->media->createFolder(name: $name, parent: $parent, createdBy: $createdBy);
-    }
+        return $connection->transaction(function () use ($name, $parent, $createdBy): MediaFolder {
+            $this->lockTree($parent?->tenant_id ?? $this->tenantContext->get()->getId());
 
-    public function rename(MediaFolder $folder, string $name): MediaFolder
-    {
-        return $this->media->renameFolder($folder, $name);
+            // The parent may have been moved deeper since the caller loaded it.
+            $parent = $this->reread($parent, 'parent_id');
+            $this->assertRoomUnder($parent, 'parent_id');
+
+            return $this->media->createFolder(name: $name, parent: $parent, createdBy: $createdBy);
+        });
     }
 
     /**
-     * Moves are serialised per tenant: the subtree and depth checks read the tree and the write changes it, so two
+     * @throws ModelNotFoundException<MediaFolder> when the folder was deleted since it was loaded
+     */
+    public function rename(MediaFolder $folder, string $name): MediaFolder
+    {
+        return $folder->getConnection()->transaction(function () use ($folder, $name): MediaFolder {
+            $this->lockTree($folder->tenant_id);
+
+            // The folder may have been moved since it was loaded; the new `path_cache` is built from its parent now.
+            $folder = $folder->fresh() ?? throw (new ModelNotFoundException())->setModel(MediaFolder::class, [$folder->id]);
+
+            return $this->media->renameFolder($folder, $name);
+        });
+    }
+
+    /**
+     * Tree writes are serialised per tenant: the subtree and depth checks read the tree and the write changes it, so two
      * concurrent moves (A into B, B into A) would each pass on the tree as it was and together close a `parent_id`
-     * cycle cut off from the root. One transaction-scoped advisory lock per tenant is taken before anything is read
+     * cycle cut off from the root; a create under X racing a move of X, or a rename racing a move, would build on a
+     * parent that is no longer where it was. So create, rename, move and delete all take the same lock. One
+     * transaction-scoped advisory lock per tenant is taken before anything is read
      * (a lock on rows would have to cover the whole ancestor chain in a stable order, and the chain is only known
-     * after reading it; a single lock key cannot deadlock). Moves are rare, so the wait is not felt. The lock is
-     * PostgreSQL's; SQLite allows one writer at a time anyway. The parent is re-read under the lock, since the model
-     * the caller holds may predate a move that just committed.
+     * after reading it; a single lock key cannot deadlock). Tree writes are rare, so the wait is not felt. The lock
+     * is behind {@see MediaFolderRepositoryInterface::lockTree()}. The models are re-read under the lock, since the
+     * ones the caller holds may predate a move that just committed.
      *
      * @throws MediaFolderRuleException
      */
     public function move(MediaFolder $folder, ?MediaFolder $parent, string $attribute = 'parent_id'): MediaFolder
     {
         return $folder->getConnection()->transaction(function () use ($folder, $parent, $attribute): MediaFolder {
-            $this->lockTree($folder);
+            $this->lockTree($folder->tenant_id);
 
             // Both models may predate a move that just committed; a stale folder would have only its path rewritten.
             $folder = $folder->fresh() ?? throw (new ModelNotFoundException())->setModel(MediaFolder::class, [$folder->id]);
@@ -140,7 +164,7 @@ final readonly class MediaFolderService
     public function deleteMovingContents(MediaFolder $folder, ?MediaFolder $target): void
     {
         $folder->getConnection()->transaction(function () use ($folder, $target): void {
-            $this->lockTree($folder);
+            $this->lockTree($folder->tenant_id);
 
             $target = $this->reread($target, 'move_to');
 
@@ -289,13 +313,9 @@ final readonly class MediaFolderService
     /**
      * Takes the tenant's tree lock until the surrounding transaction ends; see {@see self::move()}.
      */
-    private function lockTree(MediaFolder $folder): void
+    private function lockTree(string $tenantId): void
     {
-        $connection = $folder->getConnection();
-
-        if ('pgsql' === $connection->getDriverName()) {
-            $connection->select('select pg_advisory_xact_lock(hashtext(?))', ['media-folder-tree:' . $folder->tenant_id]);
-        }
+        $this->folders->lockTree($tenantId);
     }
 
     /**

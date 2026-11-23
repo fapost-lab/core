@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Infrastructure;
 
-use App\Domains\Tenancy\Models\Tenant;
-use App\Domains\Tenancy\Models\TenantStatus;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Closure;
 use Fapost\Foundation\Analytics\Contracts\BuilderModeUsageInterface;
 use Fapost\Foundation\Analytics\DTO\BuilderModeUsage;
-use Illuminate\Support\Str;
 
 /**
  * Core's implementation of the builder mode usage report: how many staff users of a tenant are on each builder mode.
@@ -18,7 +15,7 @@ use Illuminate\Support\Str;
  * Tenancy finds the tenant and switches to it; the count itself belongs to the staff domain and is handed in as a
  * closure by the service provider, so Tenancy takes no dependency on Staff. The closure runs inside
  * {@see TenantSwitcher::runForTenant()}, which restores the caller's tenant context also when it throws. A tenant
- * that is unknown or still provisioning has no storage to count and answers null.
+ * that is not reportable ({@see ReportableTenants}) answers null.
  */
 final readonly class CoreBuilderModeUsage implements BuilderModeUsageInterface
 {
@@ -27,22 +24,16 @@ final readonly class CoreBuilderModeUsage implements BuilderModeUsageInterface
      */
     public function __construct(
         private TenantSwitcher $switcher,
+        private ReportableTenants $tenants,
         private Closure $count,
     ) {
     }
 
     public function usageFor(string $tenantId): ?BuilderModeUsage
     {
-        $id = mb_strtolower($tenantId);
+        $tenant = $this->tenants->find($tenantId);
 
-        // Tenant ids are UUIDs; any other form names no tenant and must not reach a `uuid` column.
-        if (! Str::isUuid($id)) {
-            return null;
-        }
-
-        $tenant = Tenant::on('landlord')->find($id);
-
-        if (! $tenant instanceof Tenant || TenantStatus::Pending === $tenant->status) {
+        if (null === $tenant) {
             return null;
         }
 

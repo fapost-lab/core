@@ -10,6 +10,7 @@ use App\Domains\Audit\DTOs\AuditChanges;
 use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Actions\CreateFlowAction;
+use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowWebhookEndpointRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowLimitStatus;
 use App\Domains\Flow\Enums\FlowKind;
@@ -22,7 +23,6 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowSession;
-use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Models\FlowTriggerState;
 use App\Domains\Flow\Schedule\ScheduleRegistrySync;
 use App\Domains\Flow\Templates\TemplateUsageFinder;
@@ -70,6 +70,7 @@ final readonly class FlowDraftService
         private TemplateUsageRepository $templateIndex,
         private FlowWebhookEndpointRepositoryInterface $webhookEndpoints,
         private ScheduleRegistrySync $scheduleRegistry,
+        private FlowTriggerRepositoryInterface $triggers,
     ) {
     }
 
@@ -339,15 +340,9 @@ final readonly class FlowDraftService
 
             // A schedule of a flow nobody can publish again would come due every minute for ever: it stops here, and
             // leaves the landlord registry after the commit.
-            $schedules = FlowTrigger::query()
-                ->where('flow_id', $flow->flow_id)
-                ->where('type', FlowTriggerType::Schedule->value)
-                ->pluck('id')
-                ->map(static fn (mixed $id): string => (string) $id)
-                ->all();
+            $schedules = $this->triggers->stopSchedules($flow->flow_id);
 
             if ([] !== $schedules) {
-                FlowTrigger::query()->whereKey($schedules)->toBase()->update(['next_run_at' => null, 'updated_at' => now()]);
                 $this->scheduleRegistry->syncAfterCommit((string) $flow->tenant_id, $schedules);
             }
 

@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Models;
 
 use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Models\Builders\FlowDefinitionBuilder;
+use App\Domains\Flow\Support\FlowTriggerComparison;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Fapost\Support\Models\BaseModel;
 
@@ -23,7 +24,7 @@ use Fapost\Support\Models\BaseModel;
  * @property bool   $is_active
  * @property string $expression_engine  Engine id snapshot (immutable per definition row)
  * @property bool   $logging_enabled    Opt-in audit trail into flow_session_history
- * @property list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>|null $triggers  The triggers published with this version; null on a version published before triggers were carried
+ * @property list<Trigger>|null $triggers  The triggers published with this version; null on a version published before triggers were carried
  * @property \Illuminate\Support\Carbon|null $published_at
  * @method static FlowDefinitionBuilder<static>|FlowDefinition active()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition runnable()
@@ -43,6 +44,8 @@ use Fapost\Support\Models\BaseModel;
  * @method static FlowDefinitionBuilder<static>|FlowDefinition whereUpdatedAt($value)
  * @method static FlowDefinitionBuilder<static>|FlowDefinition whereVersion($value)
  * @mixin \Eloquent
+ *
+ * @phpstan-import-type Trigger from FlowTriggerComparison
  */
 final class FlowDefinition extends BaseModel
 {
