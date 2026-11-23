@@ -102,6 +102,26 @@ return [
             ],
         ],
 
+        'start_flow' => [
+            'label'              => 'Start flow for contact',
+            'section_target'     => 'Flow',
+            'flow'               => 'Flow to start',
+            'flow_help'          => 'Starts as a new conversation of the contact with the bot of this flow. This flow does not wait for it and goes on by started.',
+            'section_addressee'  => 'Contact',
+            'addressee'          => 'Contact',
+            'addressee_help'     => 'Required. The flow is never started for the contact of this run by default: name the contact with an expression, such as {{flow.customer_id}}.',
+            'addressee_kind'     => 'Kind',
+            'addressee_contact'  => 'Contact id',
+            'section_mapping'    => 'Data',
+            'input_mapping'      => 'Pass to the started flow',
+            'input_key'          => 'Variable there',
+            'input_value'        => 'Value',
+            'input_mapping_help' => 'Sets temporary variables of the started conversation. The value is text or an expression over this flow; a value that is only one expression keeps its type.',
+            'section_busy'       => 'If the contact is busy',
+            'busy_window'        => 'Busy window (minutes)',
+            'busy_window_help'   => 'The contact is busy — exit busy, nothing is sent — while an operator has the thread or a conversation with this bot moved in the last N minutes. An older live conversation is ended and replaced. 0 = never busy by time.',
+        ],
+
         'webhook_response' => [
             'label'            => 'Respond to webhook',
             'section_response' => 'Response',
