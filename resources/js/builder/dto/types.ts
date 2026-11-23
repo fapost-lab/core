@@ -96,7 +96,12 @@ export interface BuilderFlowPayload {
     availableCountries?: Array<{value: string; label: string}>
     /** The tenant is stopped and the user may only look: no editing, no saving, no publishing. */
     readOnly?: boolean
+    /** The layout the signed-in staff user chose for the builder (`users.builder_mode`); `tree` until they switch. */
+    builderMode?: BuilderMode
 }
+
+/** The builder's two layouts over the same draft: the structure tree with its sequence, or one graph of the whole flow. */
+export type BuilderMode = 'tree' | 'graph'
 
 /** The operator's notice for a stopped tenant, as the shared `accessState` prop and a 423 answer carry it. */
 export interface ReadOnlyNotice {

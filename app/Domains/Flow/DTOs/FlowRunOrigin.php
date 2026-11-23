@@ -20,11 +20,17 @@ use InvalidArgumentException;
  *
  * The chain depth is how deep in a chain of events the run starts: 0 when no event started it, n when an event of depth
  * n did ({@see \App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface::MAX_CHAIN_DEPTH}).
+ *
+ * The start key exists only on a conversation a `start_flow` node started: `flow_sessions.start_key` is unique, so that
+ * start happens once however often its step or job repeats.
  */
 final readonly class FlowRunOrigin
 {
     /** The length of `flow_sessions.fire_key`; a trigger hashes a longer id of its own before it starts a run. */
     public const int MAX_FIRE_KEY_LENGTH = 191;
+
+    /** The length of `flow_sessions.start_key`; a `start_flow` node hashes a longer key before it queues a start. */
+    public const int MAX_START_KEY_LENGTH = 191;
 
     public function __construct(
         public FlowRunKind $kind,
@@ -32,6 +38,7 @@ final readonly class FlowRunOrigin
         public ?string $assistantId = null,
         public ?string $fireKey = null,
         public int $chainDepth = 0,
+        public ?string $startKey = null,
     ) {
         if (null !== $fireKey && ('' === $fireKey || null === $triggerId || '' === $triggerId)) {
             throw new InvalidArgumentException('A fire key needs the trigger it belongs to, and cannot be empty.');
@@ -41,14 +48,22 @@ final readonly class FlowRunOrigin
             throw new InvalidArgumentException(sprintf('A fire key is at most %d characters.', self::MAX_FIRE_KEY_LENGTH));
         }
 
+        if (null !== $startKey && ('' === $startKey || FlowRunKind::Conversation !== $kind)) {
+            throw new InvalidArgumentException('A start key belongs only to a conversation, and cannot be empty.');
+        }
+
+        if (null !== $startKey && mb_strlen($startKey) > self::MAX_START_KEY_LENGTH) {
+            throw new InvalidArgumentException(sprintf('A start key is at most %d characters.', self::MAX_START_KEY_LENGTH));
+        }
+
         if ($chainDepth < 0) {
             throw new InvalidArgumentException('An event chain depth cannot be negative.');
         }
     }
 
-    public static function conversation(?string $triggerId = null, int $chainDepth = 0): self
+    public static function conversation(?string $triggerId = null, int $chainDepth = 0, ?string $startKey = null): self
     {
-        return new self(FlowRunKind::Conversation, $triggerId, chainDepth: $chainDepth);
+        return new self(FlowRunKind::Conversation, $triggerId, chainDepth: $chainDepth, startKey: $startKey);
     }
 
     public static function automation(

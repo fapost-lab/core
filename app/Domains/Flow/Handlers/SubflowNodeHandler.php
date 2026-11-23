@@ -8,8 +8,8 @@ use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Exceptions\SubflowPinnedVersionMissingException;
 use App\Domains\Flow\Exceptions\SubflowTargetInactiveException;
-use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Subflow\SubflowInputEvaluator;
 use App\Domains\Flow\Subflow\SubflowMapping;
 use App\Domains\Flow\Subflow\SubflowMappingValidator;
 use App\Domains\Flow\Subflow\SubflowPin;
@@ -55,12 +55,9 @@ final class SubflowNodeHandler extends AbstractVersionedHandler implements NodeC
 
     private const string DEFAULT_TIMEOUT = 'PT24H';
 
-    /** An input expression that is exactly one placeholder passes the value itself, not its text. */
-    private const string SINGLE_PLACEHOLDER_PATTERN = '/^\s*\{\{\s*([\w.]+)\s*\}\}\s*$/';
-
     public function __construct(
         private readonly SubflowStarterService $starter,
-        private readonly TemplateRenderer $templates,
+        private readonly SubflowInputEvaluator $inputs,
         private readonly SubflowMappingValidator $mappingValidator,
     ) {
     }
@@ -199,7 +196,7 @@ final class SubflowNodeHandler extends AbstractVersionedHandler implements NodeC
             throw new InvalidNodeConfigException('subflow: flow_version must be a positive whole number');
         }
 
-        $input = $this->evaluateInput($config, $state, $context);
+        $input = $this->inputs->evaluate($config, $state, $context, self::TYPE);
 
         try {
             $child = $this->starter->start($parent, $flowId, $duration, $context->nodeId, $input, $pinnedVersion);
@@ -224,58 +221,6 @@ final class SubflowNodeHandler extends AbstractVersionedHandler implements NodeC
                 ...(null !== $pinnedVersion ? ['flow_version' => $pinnedVersion] : []),
             ],
         );
-    }
-
-    /**
-     * The child's starting session variables, from `input_mapping` evaluated against the parent's state.
-     *
-     * @param  array<string, mixed>  $config
-     * @param  array<string, mixed>  $state
-     *
-     * @return array<string, mixed>  child variable name => value
-     */
-    private function evaluateInput(array $config, array $state, NodeExecutionContext $context): array
-    {
-        $entries = SubflowMapping::entries($config, SubflowMapping::INPUT);
-
-        if (null === $entries) {
-            throw new InvalidNodeConfigException('subflow: input_mapping must map child variable names to expressions');
-        }
-
-        $input = [];
-
-        foreach ($entries as $name => $expression) {
-            $name = (string) $name;
-
-            if (! SubflowMapping::isVariableName($name)) {
-                throw new InvalidNodeConfigException("subflow: invalid input_mapping variable name '{$name}'");
-            }
-
-            if (! is_string($expression)) {
-                throw new InvalidNodeConfigException("subflow: input_mapping value for '{$name}' must be a string");
-            }
-
-            $input[$name] = $this->evaluateExpression($expression, $state, $context);
-        }
-
-        return $input;
-    }
-
-    /**
-     * A single placeholder is read as the value it names (an array stays an array, a number a number); anything
-     * else is rendered as text.
-     *
-     * @param  array<string, mixed>  $state
-     */
-    private function evaluateExpression(string $expression, array $state, NodeExecutionContext $context): mixed
-    {
-        if (1 === preg_match(self::SINGLE_PLACEHOLDER_PATTERN, $expression, $match)) {
-            return null !== $context->stateReader
-                ? $context->stateReader->read($match[1])
-                : data_get($state, $match[1]);
-        }
-
-        return $this->templates->render($expression, $context, $state);
     }
 
     private function parentHasLiveChild(string $parentSessionId): bool

@@ -6,6 +6,7 @@ import {isThemePreference} from '@shared/theme/theme'
 import {useTheme} from '@shared/theme/useTheme'
 import {useTranslations} from '../composables/useTranslations.js'
 import TopBarMenu from './TopBarMenu.vue'
+import type {BuilderMode} from '@builder/dto/types'
 
 const { t } = useTranslations()
 
@@ -72,10 +73,12 @@ defineProps({
     isTemplate:       { type: Boolean, default: false },
     /** View-only: the tenant is stopped, so nothing can be edited, saved or published. */
     readOnly:         { type: Boolean, default: false },
+    /** The builder tab's layout, the person's choice: the structure tree or the graph. */
+    builderMode:      { type: String as () => BuilderMode, default: 'tree' },
 })
 
 const emit = defineEmits([
-    'tabChange', 'validate', 'saveDraft', 'publish', 'undo', 'redo', 'reload',
+    'tabChange', 'modeChange', 'validate', 'saveDraft', 'publish', 'undo', 'redo', 'reload',
 ])
 
 const SAVE_COLORS: Record<string, string> = {
@@ -131,22 +134,43 @@ const SAVE_COLORS: Record<string, string> = {
             </button>
         </div>
 
-        <!-- Tabs -->
-        <div class="topbar-tabs">
-            <button
-                class="tab-btn"
-                :class="{ active: activeTab === 'builder' }"
-                @click="emit('tabChange', 'builder')"
+        <div class="topbar-center">
+            <!-- Tabs -->
+            <div class="topbar-tabs">
+                <button
+                    class="tab-btn"
+                    :class="{ active: activeTab === 'builder' }"
+                    @click="emit('tabChange', 'builder')"
+                >
+                    {{ t('topbar.tab_builder') }}
+                </button>
+                <button
+                    class="tab-btn"
+                    :class="{ active: activeTab === 'content' }"
+                    @click="emit('tabChange', 'content')"
+                >
+                    {{ t('topbar.tab_content') }}
+                </button>
+            </div>
+            <!-- Builder layout: one choice of the person for every flow, kept on the server. -->
+            <div
+                v-if="activeTab === 'builder'"
+                class="topbar-tabs topbar-modes"
+                role="radiogroup"
+                :aria-label="t('topbar.mode')"
             >
-                {{ t('topbar.tab_builder') }}
-            </button>
-            <button
-                class="tab-btn"
-                :class="{ active: activeTab === 'content' }"
-                @click="emit('tabChange', 'content')"
-            >
-                {{ t('topbar.tab_content') }}
-            </button>
+                <button
+                    v-for="mode in (['tree', 'graph'] as const)"
+                    :key="mode"
+                    class="tab-btn mode-btn"
+                    :class="{ active: builderMode === mode }"
+                    role="radio"
+                    :aria-checked="builderMode === mode"
+                    @click="emit('modeChange', mode)"
+                >
+                    {{ t(`topbar.mode_${mode}`) }}
+                </button>
+            </div>
         </div>
 
         <!-- Right -->
@@ -335,6 +359,11 @@ const SAVE_COLORS: Record<string, string> = {
 
 .sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
 
+.topbar-center {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 .topbar-tabs {
     display: flex;
     gap: 2px;
@@ -355,6 +384,7 @@ const SAVE_COLORS: Record<string, string> = {
     cursor: pointer;
     transition: all .15s;
 }
+.mode-btn { padding: 5px 12px; }
 .tab-btn.active {
     background: var(--surface);
     color: var(--text);
@@ -381,6 +411,7 @@ const SAVE_COLORS: Record<string, string> = {
     .topbar-right { gap: 4px; }
     .topbar-right .btn { padding: 6px 8px; }
     .tab-btn { padding: 5px 12px; }
+    .mode-btn { padding: 5px 8px; }
     .published-msg { display: none; }
 }
 .btn {

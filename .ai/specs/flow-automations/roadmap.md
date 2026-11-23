@@ -51,7 +51,7 @@ Goal: a contactless run talks to people and waits for them. Done when: reference
 approval with a timeout) passes e2e, and a scheduled flow messages a segment through Broadcasting.
 
 - [x] `send_message` addressee — a contact by expression in a flow with no contact; publish refuses `send_message` without an addressee there (after: `flow-contact-context` — the addressee is what satisfies the check)
-- [ ] Start a flow for a contact — contact by expression, the event-start collision rules, a `no_channel` outcome (after: `flow-contactless-sessions` — the starter is a contactless run)
+- [x] Start a flow for a contact — contact by expression, the event-start collision rules, a `no_channel` outcome (after: `flow-contactless-sessions` — the starter is a contactless run)
 - [ ] Ask a person and wait — the run parks, a question with buttons to a contact of an assistant, a token per button routes the answer to the run, a timeout branch, "already decided" on a late tap (after: `flow-segmented-execution` — parking and resume of a contactless run)
 - [ ] Tag and segment addressees through Broadcasting — `send_message` to a tag or segment creates a broadcast; `input` towards many starts a flow per contact (after: spec `broadcast-flows` — Broadcasting cannot start a flow yet; after: `send_message` addressee — the same addressee field)
 - [ ] fog: staff on a messenger as an addressee, and staff targeting by tag (moved here from `flow-engine-v1x`'s `notify` fog) — waits for the draft `notification-bot` to settle how a staff member is linked to a messenger
@@ -79,7 +79,7 @@ the flow's answer within 30 s, and an API call with a tenant token starts a run.
 Goal: a person edits a flow on the graph or on the tree, as they prefer. Done when: the builder offers both
 modes over one definition, and the SaaS shell reports how many people use each.
 
-- [ ] Graph builder mode — editing on the graph component, the choice kept per person (after: Run graph page — the same component, made editable)
+- [x] Graph builder mode — editing on the graph component, the choice kept per person (after: Run graph page — the same component, made editable)
 - [ ] Builder mode usage in SaaS — a Core analytics event read by the shell through a Foundation contract (after: Graph builder mode — there is nothing to count before it)
 
 ## Phase 9 — Re-run and user-consent OAuth
