@@ -294,7 +294,7 @@ return [
         'send_message' => [
             'addressee_title'          => 'Send to',
             'addressee_label'          => 'Contact id',
-            'addressee_hint'           => 'Leave empty to send to the contact of the conversation. A flow started by a schedule, a webhook or an API call has no contact and needs one here. A message sent this way cannot wait for an answer: no keyboard, timeout or saved answer.',
+            'addressee_hint'           => 'Leave empty to send to the contact of the conversation. A flow started by a schedule, a webhook, an API call or a Core event has no contact and needs one here. A message sent this way cannot wait for an answer: no keyboard, timeout or saved answer.',
             'addressee_badge'          => 'addressee',
             'addressee_kind_contact'   => 'Contact',
             'addressee_kind_tags'      => 'Tags',

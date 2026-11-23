@@ -1,7 +1,7 @@
 # 10. Registered Nodes Catalog
 
 Reflects the handlers actually registered in `FlowServiceProvider::registerCoreNodeHandlers()`
-(called from the `NodeHandlerRegistry` singleton factory in `register()`). All 20 are Core
+(called from the `NodeHandlerRegistry` singleton factory in `register()`). All 22 are Core
 handlers, at `v1` except `auth_request@2` (`auth_request@1` stays registered beside it).
 
 | Type | Version | Category | Class | Purpose | Spec |
@@ -18,7 +18,7 @@ handlers, at `v1` except `auth_request@2` (`auth_request@1` stays registered bes
 | `template` | 1 | `Logic` | `App\Domains\Flow\Handlers\TemplateNodeHandler` | Pass-through reference node for a flow template; returns handle `enter`. Expanded into the template's published graph at flow publish. | No standalone node spec; see `.ai/knowledge/adr/20261111-flow-templates-expanded-at-publish.md` |
 | `template_output` | 1 | `Logic` | `TemplateOutputNodeHandler` | Pass-through named exit of a template (template-only); returns `default`. | No standalone node spec; see `.ai/knowledge/adr/20261111-flow-templates-expanded-at-publish.md` |
 | `rag_query` | 1 | `AI` | `RagQueryNodeHandler` | Queries a RAG provider via `RagAdapterRegistry` and writes the structured result into `state.rag.*`. | No standalone node spec; moves to the AI Solution, see `.ai/specs/ai-solution/` |
-| `webhook_response` | 1 | `Logic` | `WebhookResponseNodeHandler` | Hands the waiting sender of the webhook that started the run (trigger in `response_mode: sync`) a status 200–499 and a JSON or text body rendered from state, keyed by the run root's `(trigger_id, fire_key)`; first answer wins; a no-op outside a wait; always continues through `default`. Needs no contact. | No standalone node spec; see `.ai/knowledge/adr/20261119-flow-webhook-trigger.md` |
+| `webhook_response` | 1 | `Logic` | `WebhookResponseNodeHandler` | Hands the waiting caller of the webhook or API trigger that started the run (trigger in `response_mode: sync`) a status 200–499 and a JSON or text body rendered from state, keyed by the run root's `(trigger_id, fire_key)`; first answer wins; a no-op outside a wait; always continues through `default`. Needs no contact. | No standalone node spec; see `.ai/knowledge/adr/20261119-flow-webhook-trigger.md` |
 | `end` | 1 | `Logic` | `EndNodeHandler` | Terminal node — marks the session ended with a discriminated status (`success`/`cancelled`/`failed`). | [10-end.md](../../../reference/specs/flow-engine/nodes/10-end.md) |
 | `loop` | 1 | `Logic` | `LoopNodeHandler` | Evaluates a loop continuation condition (counted or while) and routes into the loop body (`loop`) or past it (`default`). | [11-loop.md](../../../reference/specs/flow-engine/nodes/11-loop.md) |
 | `loop_end` | 1 | `Logic` | `LoopEndNodeHandler` | Increments the loop iterator and signals the engine to navigate back to the parent `loop` node (engine special-case, no edge). | [11-loop.md](../../../reference/specs/flow-engine/nodes/11-loop.md) |
@@ -36,7 +36,7 @@ which returns `'Core'`.
 ## How registration works
 
 `FlowServiceProvider::register()` binds `NodeHandlerRegistry` as a singleton whose factory calls
-`registerCoreNodeHandlers()`, which lists the 20 handler classes above and calls
+`registerCoreNodeHandlers()`, which lists the 22 handler classes above and calls
 `$registry->register($handlerClass)` for each. Per
 [ADR-0001](../../../../.ai/knowledge/adr/0001-node-handlers-built-per-scope.md), the registry
 keeps only the handler **class** (a throwaway instance is built once at registration to read and

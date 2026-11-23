@@ -89,7 +89,7 @@ Annotation nodes (`comment`) are exempt from node-level checks. Per node:
 | `loop_invalid_iterator_name`, `loop_reserved_iterator_name`, `loop_count_exceeds_budget` | iterator name is an identifier and not one of `id, language, meta, tenant_id, external_id`; a literal count above `flow.execution.max_loop_iterations` (default 1000) is rejected |
 | `loop_iterator_variable_conflict`, `loop_count_not_numeric` | `LoopConfigChecker` (path `nodes.<loop>.config.iterator_name` / `.config.count_source`): no node writes a session variable named like a loop's `iterator_name` or `{iterator_name}_total` (the `_total` name is checked for counted loops only; a legacy `save_to` / `save_response_to` string counts as a write); a counted loop's literal `count_source` is a number (a numeric string counts) |
 | `list_max_size_invalid` | `ListSizeChecker` (path `nodes.<node>`): a list variable's `properties.max_size` is a whole number from 1 to 1000 and is set only on a list saved to the contact |
-| `variable_path_conflict` | `VariablePathConflictChecker` (path `nodes.<first writer of the single value>`): one state path is written as a single value by one node and as a group by another (`contact.profile` and `contact.profile.name`; legacy `flow.a` and an `assign` key `a.b`). Covers `input`, `send_message`, `assign` (variable contract and legacy `target` + `key`), `call` (`save_to_variable`, `save_response_to`, `result_mapping`), `subflow` `output_mapping` keys, the legacy `save_to` string and a `loop`'s counter (`flow.<iterator>`, `flow.<iterator>_total`). Session and contact are separate namespaces; only writes are compared. The runtime guard stays |
+| `variable_path_conflict` | `VariablePathConflictChecker` (path `nodes.<first writer of the single value>`): one state path is written as a single value by one node and as a group by another (`contact.profile` and `contact.profile.name`; legacy `flow.a` and an `assign` key `a.b`). Covers `input`, `send_message`, `assign` (variable contract and legacy `target` + `key`), `call` (`save_to_variable`, `save_response_to`, `result_mapping`), `subflow` `output_mapping` keys, the legacy `save_to` string and a `loop`'s counter (`flow.<iterator>` and, for a counted loop, `flow.<iterator>_total`). Session and contact are separate namespaces; only writes are compared. The runtime guard stays |
 | `loop_end_missing_loop_node_id`, `loop_end_invalid_loop_node_id` | `loop_end.loop_node_id` references an existing `loop` node |
 
 Graph-level checks (need `edges`):
@@ -105,8 +105,8 @@ Graph-level checks (need `edges`):
 
 Trigger checks, per trigger of the list, at `triggers.<id>.…` (`triggers.<index>` for an entry without an id):
 `invalid_trigger`, `invalid_trigger_type`, `invalid_trigger_active_flag`, `invalid_trigger_priority`,
-`invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`; a schedule's cron that is not five fields is
-`invalid_schedule_cron` at `triggers.<id>.config.cron`, a time zone outside the IANA list `invalid_schedule_timezone` at
+`invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`; a schedule's cron that is neither five valid fields nor a
+macro (`@hourly`, `@daily`, ...) is `invalid_schedule_cron` at `triggers.<id>.config.cron`, a time zone outside the IANA list `invalid_schedule_timezone` at
 `triggers.<id>.config.timezone`, `adr-20261123-flow-schedule-trigger`), `duplicate_exact_trigger_keyword` (against other
 flows' live triggers), `missing_event_trigger_selection`, `unknown_event_trigger_selection`; the id — it becomes the
 `flow_triggers` primary key — `invalid_trigger_id` (not UUID-shaped), `duplicate_trigger_id` (twice in the list),
@@ -127,7 +127,8 @@ all means a contact. A node needs a contact when its handler declares `NodeConte
 nothing (Foundation's `DeclaresContextRequirementInterface`, which a Solution's handler may implement too), or when its config reads `contact.*` or
 `module.*` (a reference of the flow's expression engine — a `{{…}}` placeholder of `template` —, a bare path, a `source` operand), uses a variable with `storage: contact`, or is a
 legacy `assign` to the contact. Core handlers declaring `any`: `branch`, `delay`, `assign`, `end`, `loop`, `loop_end`,
-`template`, `template_output`, `call` (its `CallContext::$contactId` is `null` without a contact); every other Core node
+`template`, `template_output`, `webhook_response`, `start_flow` and `ask_person` (they name their own contact or need
+none), `call` (its `CallContext::$contactId` is `null` without a contact); every other Core node
 needs a contact — `subflow` (its target is not followed) included. A `send_message` whose `addressee` names a contact,
 tags or a segment (`NamesOwnRecipientInterface`, Core-only) is not refused for its type, though its config is still checked for
 contact reads. A template's publish republishes its hosts, so it is refused (`template_breaks_flow`) when a host
@@ -168,6 +169,10 @@ and `subflow` (`output_mapping`); a legacy `save_to` (`send_message`) or `save_r
 id, and is never an error: the value may change from outside the flow. It is skipped when the condition is on the loop's
 own iterator, on a path the check cannot follow (`module.*`, `rag.*`), or when the body holds a Solution node (it may
 write anything) or a `template` node (its inner writes are not expanded before publish).
+
+`webhook_response_without_sync_trigger` (path `nodes.<id>`) is produced on every `execute()` that is given the trigger
+list: a `webhook_response` node in a flow with no `webhook` or `api` trigger in `response_mode: sync` does nothing
+unless the flow runs as a subflow of one that has such a trigger. It never blocks publishing.
 
 `ButtonLimitChecker` emits `channel_button_limit_exceeded` (path `nodes.{id}`) when a keyboard is larger than a
 channel declares in its `ButtonLimits`: one warning per node and per kind of limit (buttons in one message, buttons

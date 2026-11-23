@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Call\Egress;
 
 /**
- * Operator-level egress settings, read once from `config('flow.egress')`.
+ * Operator-level egress settings, read once from `config('flow.egress')`, together with the installation's own hosts
+ * (the `app.url` host and `tenancy.base_domain`, see FlowServiceProvider).
  *
  * Holds values rather than the config repository so a long-lived worker never
  * reads configuration mid-job.

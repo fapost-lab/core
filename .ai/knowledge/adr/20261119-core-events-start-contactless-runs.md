@@ -13,7 +13,7 @@ paths:
   - app/Jobs/Flow/DispatchFlowTriggerEventJob.php
   - "database/migrations/tenant/*event_chain_depth*"
 summary: "Why Core events start contactless runs through event triggers: catalog in code under the reserved core. prefix, event id as fire key, synchronous listeners with an after-commit fan-out, and an event chain depth (limit 5) kept on flow_sessions"
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-23
 ---
 # Core events start contactless runs through event triggers: a code catalog under a reserved `core.` prefix, an event id as the fire key, and a chain depth kept on the session
 
@@ -39,7 +39,9 @@ owner ("Да, всё по рекомендациям", 2026-11-19) together with
   reservation); `EmittedEventCollector` and the registry never write it. So a flow cannot fake a Core event.
 - **The domains raise plain events, Flow listens.** Contact (`ContactCreated`, `ContactTagAdded`, `ContactTagRemoved`,
   tenant id read from the contact row), Broadcasting (`BroadcastCompleted`, raised only by the conditional update that
-  wins) and Conversation (`OperatorRequestStateChanged`, now carrying the assistant and contact) do not depend on Flow;
+  wins) and Conversation (`OperatorRequestStateChanged`, now carrying the assistant and contact) raise them as
+  event classes that reference nothing of Flow (Conversation as a whole does not depend on Flow; Contact and Broadcasting
+  import Flow elsewhere);
   `Flow/Listeners/PublishCoreEvents` is synchronous and reports a failure instead of throwing it into the caller.
 - **One publisher.** `QueuedFlowTriggerEventPublisher` mints the event id, drops a Core event no active trigger listens
   to (one indexed read), takes the chain depth, and queues `DispatchFlowTriggerEventJob` `->afterCommit()`. For a

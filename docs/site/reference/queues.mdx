@@ -40,7 +40,8 @@ behind a retrying external sync. An automation run never holds one job for long 
 a number of steps or seconds (the platform settings `flow.automation.segment_steps` and
 `flow.automation.segment_seconds`) it saves its position and continues in a new job, so
 no job outlives its timeout and a retried job continues the run instead of starting it
-again.
+again. A delay's wake-up of an automation run stays on `flow.execution` and runs at most one
+segment there before the rest continues on `flow.automations`.
 
 `sync.external` is isolated for a different reason: it depends on systems whose
 availability is not ours. When a third party is down and its jobs are retrying with

@@ -70,7 +70,7 @@ final readonly class AutomationBroadcasts
         }
 
         try {
-            // Its own transaction (a savepoint inside the caller's): on PostgreSQL a unique violation aborts the
+            // The insert's own transaction (a savepoint only if a caller has one open): on PostgreSQL a unique violation aborts the
             // transaction it happens in, and the re-read below must run outside it.
             $broadcast = Broadcast::query()->getConnection()->transaction(function () use ($request, $tags, $message): Broadcast {
                 $broadcast = Broadcast::query()->create([

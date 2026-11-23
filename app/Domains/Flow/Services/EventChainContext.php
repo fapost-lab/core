@@ -11,8 +11,10 @@ namespace App\Domains\Flow\Services;
  * `FlowEngine::executeLoop()` pushes the depth of the session it runs ({@see enter()}) and pops it in a `finally`
  * ({@see leave()}); nested engine calls (a subflow child inside its parent's step, a parent resumed by its child) push
  * their own. Outside any engine call the stack is empty and {@see current()} is 0, so an event raised by an admin
- * action, a webhook or a broadcast job starts a chain at depth 1. The depth that must survive a job boundary lives on
- * the session row (`flow_sessions.event_chain_depth`), never here.
+ * action or a webhook starts a chain at depth 1. The depth that must survive a job boundary lives on a row, never
+ * here: the session's (`flow_sessions.event_chain_depth`), and a broadcast's (`broadcasts.chain_depth`), which
+ * {@see \App\Domains\Flow\Listeners\PublishCoreEvents::broadcastCompleted()} pushes so an automation broadcast's
+ * completion is published at its run's depth + 1 (a console broadcast's at 1).
  *
  * Bound as {@code scoped}: one per request or job. Worker safety: plain integers only, emptied by every outermost exit.
  */

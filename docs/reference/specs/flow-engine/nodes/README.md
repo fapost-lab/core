@@ -1,7 +1,8 @@
 # Flow Engine: per-node specs
 
-The 17 Core handlers registered in `FlowServiceProvider::registerCoreNodeHandlers()`. The same list, with
-categories and classes, is `docs/platform/runtime/flow/10-registered-nodes-catalog.md`.
+Specs of the Core handlers registered in `FlowServiceProvider::registerCoreNodeHandlers()` (22 classes; not every
+handler has a spec here). The full list, with categories and classes, is
+`docs/platform/runtime/flow/10-registered-nodes-catalog.md`.
 
 | File | Node type | Handler |
 |------|-----------|---------|

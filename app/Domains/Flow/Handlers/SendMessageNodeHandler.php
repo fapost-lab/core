@@ -206,7 +206,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
                     ->fields([
                         ObjectField::make('addressee')
                             ->label('Addressee')
-                            ->help('Leave empty to send to the contact of the run. A flow started by a schedule, a webhook or an API call has no contact and needs one. A message to an addressee cannot wait for an answer; a message to tags or a segment is a text-only broadcast.')
+                            ->help('Leave empty to send to the contact of the run. A flow started by a schedule, a webhook, an API call or a Core event has no contact and needs one. A message to an addressee cannot wait for an answer; a message to tags or a segment is a text-only broadcast.')
                             ->fields([
                                 SelectField::make('kind')
                                     ->label('Kind')
