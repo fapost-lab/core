@@ -58,6 +58,47 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertSame('nodes.sm_1', $result->errors[0]->path);
     }
 
+    public function test_validation_message_is_served_in_the_locale_of_the_request(): void
+    {
+        $service = $this->makeServiceWithSendMessage();
+
+        $validate = static fn (): string => $service->execute(
+            nodes: [
+                'sm_1' => [
+                    'id'      => 'sm_1',
+                    'type'    => 'send_message',
+                    'version' => 1,
+                    'config'  => [
+                        'content_type'  => 'text_with_keyboard',
+                        'keyboard_mode' => 'inline',
+                        'buttons'       => [],
+                    ],
+                ],
+                'sm_2' => [
+                    'id'      => 'sm_2',
+                    'type'    => 'send_message',
+                    'version' => 1,
+                    'config'  => ['content_type' => 'text'],
+                ],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'sm_1', 'to' => 'sm_2', 'handle' => 'default'],
+            ],
+        )->errors[0]->message;
+
+        app()->setLocale('en');
+        $this->assertSame(
+            'A send_message node with a keyboard cannot have a successor on the default output. It must be the last node in its branch.',
+            $validate(),
+        );
+
+        app()->setLocale('ru');
+        $this->assertSame(
+            'У узла send_message с клавиатурой не может быть следующего узла на выходе по умолчанию. Он должен быть последним узлом в своей ветке.',
+            $validate(),
+        );
+    }
+
     public function test_inline_keyboard_connected_only_via_button_handles_passes_validation(): void
     {
         $service = $this->makeServiceWithSendMessage();
