@@ -1,7 +1,7 @@
 ---
 id: adr-20261119-automation-run-deadline
 type: adr
-status: proposed
+status: accepted
 date: 2026-11-19
 domains:
   - flow
