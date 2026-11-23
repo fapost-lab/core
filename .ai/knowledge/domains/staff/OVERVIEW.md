@@ -64,7 +64,9 @@ API tokens, their `api-token` guard and stack, and their screen.
 - `Http/Middleware/EnsureUserIsActive.php` (the console stacks), `database/seeders/RoleSeeder.php`.
 - Personal settings are one column each on `users`, written for the signed-in user only: `locale`,
   `pinned_applications`, `onboarding_checklist_hidden`, and `builder_mode` (enum `Enums/BuilderMode`, `tree`/`graph`,
-  `null` read as tree; written by the builder's `PUT /builder/preferences`, `adr-20261123-flow-builder-graph-mode`).
+  `null` read as tree; written by the builder's `PUT /builder/preferences` through `Services/BuilderModePreference`,
+  `adr-20261123-flow-builder-graph-mode`). A switch to the other mode dispatches Foundation's `BuilderModeChanged`, and
+  `User::countByBuilderMode()` feeds the operator's `BuilderModeUsageInterface` (`adr-20261123-builder-mode-usage-for-operators`).
 - Admin UI: `app/Http/Controllers/Admin/{UserController,RoleController}.php`
   over `Services/StaffUserService.php` and `Services/StaffRoleService.php` (roles are written by
   `RoleWriterService`), pages in `resources/js/pages/Console/{Users,Roles}`.

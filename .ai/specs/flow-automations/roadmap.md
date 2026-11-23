@@ -81,7 +81,7 @@ Goal: a person edits a flow on the graph or on the tree, as they prefer. Done wh
 modes over one definition, and the SaaS shell reports how many people use each.
 
 - [x] Graph builder mode — editing on the graph component, the choice kept per person (after: Run graph page — the same component, made editable)
-- [ ] Builder mode usage in SaaS — a Core analytics event read by the shell through a Foundation contract (after: Graph builder mode — there is nothing to count before it)
+- [x] Builder mode usage in SaaS — a Core analytics event read by the shell through a Foundation contract (after: Graph builder mode — there is nothing to count before it)
 
 ## Phase 9 — Re-run and user-consent OAuth
 

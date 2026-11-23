@@ -710,6 +710,28 @@ Core reads the settings once per request or queue job, so a change applies from 
 `Analytics\Contracts\AnalyticsWriterInterface`, with `AnalyticsEvent` and
 `AnalyticsEventType`.
 
+### Builder mode usage (experimental)
+
+Since foundation 0.47 an operator package can see which layout of the flow builder, the tree or the graph,
+a tenant's staff work in.
+
+`Analytics\Contracts\BuilderModeUsageInterface::usageFor(string $tenantId): ?BuilderModeUsage` returns how
+many staff users of the tenant have each mode now: `tree`, `graph` and their `total`. Core implements it.
+
+- It counts the staff users the `staff` limit counts: every account not deactivated, invited ones included,
+  without the platform's support user. `total` therefore equals what `TenantUsageInterface` reports for
+  `staff`. Someone who never chose a mode works in the tree and is counted there.
+- It answers `null` for a tenant that does not exist and for one still being provisioned. Treat `null` as
+  "not reported", not as zero.
+- Call it outside a tenant context, and cache the answer: Core switches to the tenant's schema and runs a
+  query on each call.
+
+`Analytics\Events\BuilderModeChanged` is dispatched after a staff user switched the builder to the other
+mode and the choice was saved. It carries `tenantId`, `mode` and `previousMode` (`'tree'` or `'graph'`) and
+`occurredAt`, and names no user. Choosing the mode one already has dispatches nothing. Listen to it to follow
+the switches over time; do not rebuild the current counts from it, because deactivating or removing a user
+dispatches nothing — read `usageFor()` for those.
+
 ## Other
 
 `Contracts\ModelAttributeResolverInterface`, `Contracts\ModelUtilityInterface`,
