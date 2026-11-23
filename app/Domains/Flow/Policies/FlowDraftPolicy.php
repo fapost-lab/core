@@ -120,8 +120,8 @@ final class FlowDraftPolicy
 
     /**
      * Whether the user may turn the flow on. A flow with a live trigger other than `message` starts runs on its own once
-     * on, so that needs the right to manage automations as well as {@see self::update()}. Turning a flow off needs only
-     * `update`.
+     * on — while off, its automatic triggers start none — so that needs the right to manage automations as well as
+     * {@see self::update()}. Turning a flow off needs only `update`.
      */
     public function activate(AuthUser $authUser, FlowDraft $draft): bool
     {

@@ -821,6 +821,7 @@ return [
                 'not_failed'        => 'Only a run whose status is Failed can be run again. A run that reached an end node is not, whatever its outcome.',
                 'no_payload'        => 'This run kept no trigger payload: it started before payloads were kept, or no trigger fired it.',
                 'trigger_gone'      => 'The trigger that started this run is turned off or no longer exists.',
+                'flow_off'          => 'The flow is switched off in the flows list. Turn it on to run it again.',
                 'no_active_version' => 'The flow has no active version to run.',
                 'already_rerun'     => 'This re-run has already started: it is listed under Re-runs. Reload the page to run it again once more.',
             ],

@@ -152,6 +152,7 @@ the primary key of its live `flow_triggers` row, and goes live when the flow is 
 
 A trigger of any type but `message` (`schedule`, `webhook`, `api`, `event`): it starts runs without anyone writing to
 the assistant. Making one live, changing or removing it, and turning on a flow that has one need `ManageAutomations`.
+A flow switched off in the flows list starts no run from its automatic triggers.
 
 ## Subflow
 

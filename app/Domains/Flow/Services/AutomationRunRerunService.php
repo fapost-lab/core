@@ -34,8 +34,8 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  * queue, the run's deadline and segments apply to it as to any run, and it runs the flow's latest active version. Its
  * key never starts with `wh:`, so it answers no webhook sender and leaves the delivery dedup alone.
  *
- * Only a root automation run that failed and kept its payload is re-run, and only while its trigger is still live and
- * its flow has an active version; anything else is a refusal with its reason, never an exception. The source run is
+ * Only a root automation run that failed and kept its payload is re-run, and only while its trigger is still live, its
+ * flow is not switched off in the flows list and has an active version; anything else is a refusal with its reason, never an exception. The source run is
  * not changed. Every queued re-run is recorded in the audit log, and the entry is committed before the job is queued:
  * a queue that refuses the job leaves an entry for a re-run the person is told failed, and asking again makes the same
  * key, so the run still starts once.
@@ -63,6 +63,10 @@ final readonly class AutomationRunRerunService
 
         if (null !== $refusal) {
             return RerunOutcome::refused($refusal);
+        }
+
+        if ($this->drafts->isSwitchedOff((string) $source->flowDefinition?->flow_id)) {
+            return RerunOutcome::refused(RerunRefusal::FlowOff);
         }
 
         $target = $this->targetDefinition($source);

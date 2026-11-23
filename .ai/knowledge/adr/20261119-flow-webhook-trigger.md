@@ -15,7 +15,7 @@ paths:
   - "database/migrations/tenant/*webhook_endpoints*"
   - app/Domains/Flow/Handlers/WebhookResponseNodeHandler.php
 summary: Why a flow's webhook trigger is POST /hooks/flow/{token} on the tenant's host, keeps its secret encrypted in flow_webhook_endpoints outside the definition, checks it with Foundation's IngressSpec, runs once per delivery id, and answers 202 or, in sync mode, the flow's answer within a capped wait
-reviewed_at: 2026-11-20
+reviewed_at: 2026-11-23
 ---
 # A flow's webhook trigger is served by Laravel on the tenant's host, its secret lives encrypted outside the definition, and a delivery runs once
 
@@ -55,6 +55,9 @@ or the tenant context. The URL handed to outside systems is the costliest thing 
 - **Live only when manageable.** A request is served only for a live, active `flow_triggers` row of type webhook of the
   endpoint's flow, whose flow has an active runnable definition and still has its draft and assistant. A publish that
   deletes a live webhook trigger or changes its type deletes its endpoint; deleting the flow deletes its endpoints.
+  *Amended by the task `flow-active-toggle-gates-automations`:* a flow switched off in the flows list answers 404 too,
+  after the signature check, without counting the sender's address or claiming the delivery
+  (`adr-20261123-flow-switch-gates-automatic-starts`).
 - **Limits.** Unknown or dead tokens count against the tenant and address (60 a minute) before the lookup; a known token
   has the platform setting `flow.webhook.per_token_per_minute` (120). Body at most 256 KB. A stopped tenant answers 503
   with `Retry-After`. A `multipart/*` body is refused with 415: PHP keeps it from the raw input the check and the flow

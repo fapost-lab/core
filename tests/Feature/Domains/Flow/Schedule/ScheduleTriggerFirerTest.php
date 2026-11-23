@@ -12,6 +12,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Models\FlowTriggerState;
 use App\Domains\Flow\Orchestration\AutomationRunner;
 use App\Domains\Flow\Schedule\ScheduleTriggerFirer;
 use App\Domains\Flow\Services\PublishFlowService;
@@ -209,6 +210,36 @@ final class ScheduleTriggerFirerTest extends FeatureTestCase
         Log::shouldHaveReceived('warning')->with('flow.schedule.tick_skipped', Mockery::on(
             static fn (array $context): bool => ScheduleTriggerFirer::SKIP_FLOW_NOT_LIVE === $context['reason'],
         ))->twice();
+    }
+
+    public function test_a_flow_switched_off_in_the_flows_list_spends_its_slot_and_is_not_caught_up(): void
+    {
+        Log::spy();
+        [$draft, $triggerId] = $this->liveSchedule('0 9 * * *');
+        $draft->forceFill(['is_active' => false])->save();
+        Carbon::setTestNow('2026-11-20 09:00:00');
+
+        $this->assertSame(['fired' => 0, 'skipped' => 1, 'missed' => 0], $this->fire());
+        $this->assertSame(0, FlowSession::query()->count());
+        $this->assertSame(0, FlowTriggerState::query()->count(), 'Run admission is not asked: nothing is counted on the trigger.');
+        $this->assertSame('2026-11-21 09:00:00', $this->trigger()->next_run_at?->format('Y-m-d H:i:s'), 'The slot is spent.');
+        Queue::assertNothingPushed();
+        Log::shouldHaveReceived('warning')->with('flow.schedule.tick_skipped', Mockery::on(
+            fn (array $context): bool => $triggerId === $context['trigger_id']
+                && ScheduleTriggerFirer::SKIP_FLOW_OFF === $context['reason']
+                && '2026-11-20T09:00:00+00:00' === $context['slot'],
+        ))->once();
+
+        // Turned back on before the next slot: the spent one is not caught up.
+        $draft->forceFill(['is_active' => true])->save();
+        Carbon::setTestNow('2026-11-20 09:01:00');
+
+        $this->assertSame(['fired' => 0, 'skipped' => 0, 'missed' => 0], $this->fire());
+        $this->assertSame(0, FlowSession::query()->count());
+
+        Carbon::setTestNow('2026-11-21 09:00:00');
+
+        $this->assertSame(['fired' => 1, 'skipped' => 0, 'missed' => 0], $this->fire());
     }
 
     public function test_a_switched_off_or_not_yet_due_trigger_is_not_claimed(): void

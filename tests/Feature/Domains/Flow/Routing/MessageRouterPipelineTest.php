@@ -14,6 +14,7 @@ use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Live\FlowActivityChanged;
 use App\Domains\Flow\Live\FlowActivityWatchers;
 use App\Domains\Flow\Models\FlowDefinition;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Routing\MessageRouter;
@@ -87,6 +88,31 @@ final class MessageRouterPipelineTest extends FeatureTestCase
         $this->assertSame(EndStatus::Success->value, $session->end_status);
         $this->assertNull($session->current_node_id);
         $this->assertSame('first', $session->state['flow']['marker'] ?? null);
+    }
+
+    public function test_a_message_still_starts_the_default_flow_when_it_is_switched_off_in_the_flows_list(): void
+    {
+        [$tenantId, $assistant, $contact, $channel] = $this->seedTenantWithFlow(
+            nodes: [['id' => 'end-1', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']]],
+            edges: [],
+        );
+        // The switch gates only automatic triggers: conversations are left as they were (a decision of their own).
+        FlowDraft::factory()->create([
+            'tenant_id'    => $tenantId,
+            'flow_id'      => $assistant->default_flow_id,
+            'assistant_id' => $assistant->getKey(),
+            'is_active'    => false,
+        ]);
+
+        $outcome = $this->app->make(MessageRouter::class)->route(
+            contact: $contact,
+            message: $this->incoming('hello'),
+            assistant: $assistant,
+            channel: $channel,
+        );
+
+        $this->assertSame('executed', $outcome->kind);
+        $this->assertSame(1, FlowSession::query()->where('contact_id', $contact->getKey())->count());
     }
 
     public function test_global_reset_command_terminates_active_session_without_executing_flow(): void

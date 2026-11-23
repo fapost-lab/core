@@ -138,6 +138,11 @@ final class FlowAutomationPermissionsTest extends CredentialsTestCase
 
                 return $read;
             }
+
+            public function isSwitchedOff(string $flowId): bool
+            {
+                return $this->inner->isSwitchedOff($flowId);
+            }
         });
 
         $this->publish($this->author(), $draft)->assertForbidden();

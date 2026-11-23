@@ -341,6 +341,26 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
         Queue::assertPushed(StartAutomationRunJob::class, 1);
     }
 
+    public function test_a_flow_switched_off_in_the_flows_list_answers_404_without_claiming_or_counting_the_address(): void
+    {
+        [$draft, , $token] = $this->liveWebhook();
+        $draft->forceFill(['is_active' => false])->save();
+
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'off-1'])->assertNotFound();
+
+        Queue::assertNothingPushed();
+        $this->assertSame([], $this->dedup->claimed, 'The delivery is not claimed: its retry after the switch-on runs.');
+        $this->assertSame(0, $this->app->make(\Illuminate\Cache\RateLimiter::class)->attempts('flow-webhook:miss:' . $this->tenantId . ':127.0.0.1'));
+
+        // Without the secret the switch shows nothing: a wrong signature is answered as on a live flow.
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'off-2', 'X-Hub-Signature-256' => 'sha256=forged'])->assertStatus(401);
+
+        $draft->forceFill(['is_active' => true])->save();
+
+        $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'off-1'])->assertStatus(202);
+        Queue::assertPushed(StartAutomationRunJob::class, 1);
+    }
+
     public function test_a_failed_dispatch_gives_the_claim_back(): void
     {
         [, , $token] = $this->liveWebhook();

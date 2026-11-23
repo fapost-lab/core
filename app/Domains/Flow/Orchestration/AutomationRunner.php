@@ -8,6 +8,7 @@ use App\Domains\Flow\Admission\TriggerAdmissionRequest;
 use App\Domains\Flow\Admission\TriggerRunAdmission;
 use App\Domains\Flow\Concurrency\LockScope;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
@@ -27,8 +28,10 @@ use Psr\Log\LoggerInterface;
  * lock it looks the run up by `(trigger_id, fire_key)`: a run already there is continued when it is still `active`
  * — the job that started it was killed or retried — started when it is `pending` (a schedule creates its run when it
  * claims the slot, {@see \App\Domains\Flow\Schedule\ScheduleTriggerFirer}), and left alone otherwise; only a fire
- * with no run starts one, and only once run admission let it ({@see TriggerRunAdmission}): a paused trigger, the run rate
- * breaker or the plan's run limit refuse it, and a retry or continuation of a fire that has a run is never asked again.
+ * with no run starts one, and only while its flow is not switched off in the flows list and once run admission let it
+ * ({@see TriggerRunAdmission}): a paused trigger, the run rate breaker or the plan's run limit refuse it, and a retry or
+ * continuation of a fire that has a run is never asked again. A switched-off flow is not asked about either: its fire
+ * is dropped before admission, so it is counted on no trigger and spends no unit of the plan.
  * The session row is committed before its first node runs, so a job killed at any point leaves a row its retry
  * continues rather than a second run.
  *
@@ -59,6 +62,7 @@ final readonly class AutomationRunner
         private FlowEngineInterface $engine,
         private SegmentHandOff $handOff,
         private FlowTriggerRepositoryInterface $triggers,
+        private FlowDraftRepositoryInterface $drafts,
         private TriggerRunAdmission $admission,
         private LoggerInterface $logger,
     ) {
@@ -70,7 +74,8 @@ final readonly class AutomationRunner
      * @param  array<string, mixed>  $initialState  merged into the new session's state
      * @param  int                   $chainDepth    the depth of the event that fired the trigger; 0 when none did
      *
-     * @return AutomationStartResult the run started or continued, no active definition, or admission's refusal
+     * @return AutomationStartResult the run started or continued, no active definition, the flow switched off, or
+     *                               admission's refusal
      *
      * @throws \App\Domains\Flow\Exceptions\SessionLockTimeoutException when another run of the trigger holds the lock
      */
@@ -102,6 +107,17 @@ final readonly class AutomationRunner
                     ]);
 
                     return AutomationStartResult::noActiveFlow();
+                }
+
+                if ($this->drafts->isSwitchedOff($flowId)) {
+                    $this->logger->info('flow.automation.start_skipped_flow_off', [
+                        'tenant_id'  => $tenantId,
+                        'flow_id'    => $flowId,
+                        'trigger_id' => $triggerId,
+                        'fire_key'   => $fireKey,
+                    ]);
+
+                    return AutomationStartResult::flowOff();
                 }
 
                 $decision = $this->admission->admit(new TriggerAdmissionRequest(

@@ -10,6 +10,7 @@ use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Flow\Admission\TriggerAdmissionRequest;
 use App\Domains\Flow\Admission\TriggerRunAdmission;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
@@ -46,6 +47,9 @@ use Throwable;
  * made of the trigger id and the event id, so a retry of this job or of the fan-out that queued it is the same unit. A
  * refused start is counted on the trigger and starts nothing. A job queued before the trigger and event ids existed
  * unserializes without them: it starts without admission.
+ *
+ * A flow switched off in the flows list starts nothing, and admission is not asked for it: the event is not caught up
+ * once the flow is turned back on.
  */
 final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
 {
@@ -86,6 +90,7 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
         TenantRepositoryInterface $tenants,
         TenantSwitcher $switcher,
         FlowDefinitionRepositoryInterface $definitions,
+        FlowDraftRepositoryInterface $drafts,
         ContactServiceInterface $contacts,
         AssistantRepositoryInterface $assistants,
         CurrentAssistantInterface $currentAssistant,
@@ -102,6 +107,7 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
 
         $switcher->runForTenant($tenant, function () use (
             $definitions,
+            $drafts,
             $contacts,
             $assistants,
             $currentAssistant,
@@ -114,6 +120,16 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
 
             if (null === $definition) {
                 $logger->warning('flow.event.start_skipped_no_active_flow', [
+                    'tenant_id'  => $this->tenantId,
+                    'flow_id'    => $this->flowId,
+                    'event_name' => $this->eventName,
+                ]);
+
+                return;
+            }
+
+            if ($drafts->isSwitchedOff($this->flowId)) {
+                $logger->info('flow.event.start_skipped_flow_off', [
                     'tenant_id'  => $this->tenantId,
                     'flow_id'    => $this->flowId,
                     'event_name' => $this->eventName,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow\TriggerTypes;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Admission\RefusalReason;
 use App\Domains\Flow\Admission\TriggerRunAdmission;
 use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
@@ -11,6 +12,7 @@ use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Models\FlowTriggerState;
@@ -140,6 +142,26 @@ final class RegisteredTriggerTypesTest extends FeatureTestCase
         $state = FlowTriggerState::query()->where('trigger_id', $trigger->id)->sole();
         $this->assertSame(1, $state->refused_count);
         $this->assertSame(RefusalReason::TriggerPaused, $state->last_refusal_reason);
+    }
+
+    public function test_a_fire_of_a_flow_switched_off_in_the_flows_list_starts_no_run_and_spends_no_unit(): void
+    {
+        Queue::fake();
+        $meter = new FakeUsageMeter(UsageDecision::allowed());
+        $this->app->instance(UsageMeterInterface::class, $meter);
+        $trigger = $this->trigger(['min_score' => 1]);
+        FlowDraft::factory()->create([
+            'tenant_id'    => self::TENANT_ID,
+            'flow_id'      => $trigger->flow_id,
+            'assistant_id' => Assistant::factory()->create(['tenant_id' => self::TENANT_ID])->getKey(),
+            'is_active'    => false,
+        ]);
+
+        $this->fireAndStart('entry-1');
+
+        $this->assertSame(0, FlowSession::query()->count());
+        $this->assertSame([], $meter->units);
+        $this->assertSame(0, FlowTriggerState::query()->count());
     }
 
     public function test_nothing_starts_while_the_solution_is_not_active_for_the_tenant(): void
