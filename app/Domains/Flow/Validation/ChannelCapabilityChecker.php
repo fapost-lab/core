@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Validation;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
+use App\Domains\Flow\Enums\AuthMethod;
 use App\Domains\Flow\Enums\InputExpectedType;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use Fapost\Foundation\Flow\Enums\KeyboardMode;
@@ -93,6 +94,7 @@ final readonly class ChannelCapabilityChecker
         return match ($node['type'] ?? null) {
             'send_message' => $this->sendMessageCapabilities($config),
             'input'        => $this->inputCapabilities($config),
+            'auth_request' => $this->authRequestCapabilities($config),
             default        => [],
         };
     }
@@ -160,6 +162,29 @@ final readonly class ChannelCapabilityChecker
             InputExpectedType::Select, InputExpectedType::Confirm => [ChannelCapability::CallbackButtons],
             default                                               => [],
         };
+    }
+
+    /**
+     * The phone method asks for the contact's number with a share button; a code method offers a new code with an
+     * inline button when the author named it. `basic` (and every `@1` node) needs nothing.
+     *
+     * @param  array<string, mixed>  $config
+     *
+     * @return list<ChannelCapability>
+     */
+    private function authRequestCapabilities(array $config): array
+    {
+        $method = AuthMethod::tryFrom(is_string($config['method'] ?? null) ? $config['method'] : '');
+
+        if (AuthMethod::Phone === $method) {
+            return [ChannelCapability::ShareContact];
+        }
+
+        $label           = $config['resend_label'] ?? null;
+        $hasResendButton = (is_string($label) && '' !== mb_trim($label))
+            || (is_array($label) && [] !== array_filter($label, static fn (mixed $text): bool => is_string($text) && '' !== mb_trim($text)));
+
+        return null !== $method?->codeChannel() && $hasResendButton ? [ChannelCapability::CallbackButtons] : [];
     }
 
     private function describe(ChannelCapability $capability): string

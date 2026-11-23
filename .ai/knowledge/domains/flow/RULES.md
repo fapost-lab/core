@@ -72,6 +72,20 @@ broken.
   `test_an_error_response_and_a_connection_exception_with_the_key_in_the_url_are_masked`),
   `CallTesterCredentialTest.php`. Not covered: a secret the target echoes in a transformed form (URL-encoded,
   re-encoded base64), and a value under 4 characters.
+- **A one-time code of `auth_request@2` never leaves `AuthCodeStore` and the job that delivers it.** The node
+  generates it with `random_int`, keeps only an HMAC-SHA256 under a key derived from `APP_KEY` (over tenant, session,
+  node and code) in the cache with the code's TTL, compares with `hash_equals`, marks it used on success (a retried step still matches;
+  the node's next challenge replaces it) and drops it on used-up attempts and on every `failed` exit. The state holds only counters (`system.auth.<node>`), the metadata a masked
+  destination; the code travels to the sender only in `SendOneTimeCodeJob`, which is `ShouldBeEncrypted`, runs once
+  behind a cache guard per send, and sends the mail synchronously (`OneTimeCodeMail` and `OneTimeCodeMessage` refuse
+  serialization). The node trace drops the incoming text of an `auth_request` node. One destination gets at most
+  5 codes an hour per tenant, whatever flow asks. Why: a code in state, a trace, a log or a plain queue payload lets
+  staff or an operator authenticate as the contact, and a flow that resets the counters can brute-force it
+  (`flow-auth-request`, design gate D1–D10). Enforced: `tests/Feature/Domains/Flow/AuthRequestV2NodeHandlerTest.php`
+  (`test_the_code_reaches_neither_state_nor_metadata_nor_the_prompt`, `test_wrong_codes_use_up_the_attempts_and_the_code_is_dropped`,
+  `test_a_retried_step_keeps_the_code_already_on_its_way`, `test_one_address_gets_at_most_five_codes_an_hour`),
+  `SendOneTimeCodeJobTest`, `NodeTraceRecordingTest::test_what_a_contact_types_to_an_auth_request_never_reaches_the_trace`,
+  `SystemStateNamespacePolicyTest`. Not covered: the contact's own reply stays in the conversation history (accepted, D8).
 - **Every class in `Handlers/` (except `Abstract` and `Support`) implements `NodeHandlerInterface`.**
   Enforced: `tests/Architecture/HandlerVersionContractTest.php`.
 - **Node handlers take collaborators as ordinary constructor dependencies.** The registry keeps
@@ -103,7 +117,8 @@ broken.
   `FlowEngineSolutionNodeTest`, `SolutionLifecycleTest` (`adr-20261113-solution-node-types-and-state-namespace`).
 - **Only whitelisted node types write `system.*` and `rag.*`.** `system.*`: `send_message`,
   `input`, `delay`, `notify`, `set_tag`, `request_operator` (its marker holds the id of the operator request it
-  waits for); `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
+  waits for), `auth_request` (its attempt and send counters, so no node of the flow's author can reset them);
+  `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
   every handler. A Solution's namespace (its id, `state: true`) is written only by node types with the same
   owner; no whitelist. Enforced: `SystemStateNamespacePolicy`, applied in `FlowSessionPersister`.
   Adding a writer of `system`/`rag` means editing the whitelist, on purpose.

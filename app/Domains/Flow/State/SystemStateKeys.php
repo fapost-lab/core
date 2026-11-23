@@ -72,4 +72,12 @@ final class SystemStateKeys
      * places nothing new; once the request has ended, the next pass (a loop) places a new one.
      */
     public const string REQUEST_OPERATOR_PREFIX = StateNamespace::System->value . '.request_operator';
+
+    /**
+     * Prefix for the per-node `auth_request@2` marker. Full path: `system.auth.{nodeId}`, holding the challenge
+     * in progress (`active`, `challenge`, `attempts`, and for a code method `sends` and `last_sent_at`) and never the
+     * code. Only `auth_request` writes `system.*` here, so a flow cannot reset its attempts. When the node exits only
+     * `challenge` stays, so entering it again starts the next challenge.
+     */
+    public const string AUTH_REQUEST_PREFIX = StateNamespace::System->value . '.auth';
 }

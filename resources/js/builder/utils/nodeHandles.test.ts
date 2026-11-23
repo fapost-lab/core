@@ -34,3 +34,15 @@ describe('nodeHandles for templates', () => {
         expect(nodeMustBeLast({type: 'template_output', config: {}})).toBe(true)
     })
 })
+
+describe('nodeHandles for auth_request', () => {
+    it('keeps the single default output for version 1 and for a missing version', () => {
+        expect(nodeHandles({id: 'a', type: 'auth_request', version: 1, config: {}}).map((h) => h.handle)).toEqual(['default'])
+        expect(nodeHandles({id: 'a', type: 'auth_request', config: {}}).map((h) => h.handle)).toEqual(['default'])
+    })
+
+    it('exposes authenticated and failed for version 2', () => {
+        expect(nodeHandles({id: 'a', type: 'auth_request', version: 2, config: {method: 'sms_code'}}).map((h) => h.handle))
+            .toEqual(['authenticated', 'failed'])
+    })
+})

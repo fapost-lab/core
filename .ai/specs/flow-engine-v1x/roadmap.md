@@ -42,7 +42,7 @@ engine, and a Solution can register a bot command.
 
 - [x] Expression engine chosen per flow: a flow-level setting, snapshot at publish (ADR-08 revised by ADR 20261119-expression-engine-chosen-per-flow)
 - [ ] Commands and command action types registered by a Solution (ADR-09) (after: spec `solution-activation-lifecycle` — registration needs the Core registrar)
-- [ ] `auth_request` by phone, SMS and email
+- [x] `auth_request` by phone, SMS and email
 
 ## Waves
 
