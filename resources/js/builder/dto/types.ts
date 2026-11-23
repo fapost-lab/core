@@ -75,6 +75,16 @@ export interface WebhookEndpointInfo {
     secret_rotated_at: string | null
 }
 
+/**
+ * Where an API trigger is called — `runs_url` with `trigger_placeholder` standing for the trigger id — and where tenant
+ * API tokens are issued (null when the person cannot open that screen).
+ */
+export interface ApiTriggerInfo {
+    runs_url: string
+    trigger_placeholder: string
+    tokens_url: string | null
+}
+
 /** What run admission knows about a live trigger: paused by the run rate breaker, and its refused runs. */
 export interface TriggerStateInfo {
     paused_at: string | null
@@ -99,6 +109,8 @@ export interface BuilderFlowPayload {
     webhookEndpoints?: Record<string, WebhookEndpointInfo>
     /** Admission state of the live triggers that have one, keyed by lower-cased trigger id. */
     triggerStates?: Record<string, TriggerStateInfo>
+    /** Where the flow's API triggers are called and their tokens issued. */
+    apiTrigger?: ApiTriggerInfo | null
     availableLanguages?: string[]
     contentBaseLanguage?: string
     publishedAt?: string | null

@@ -157,7 +157,7 @@ return [
             'label'            => 'Respond to webhook',
             'section_response' => 'Response',
             'status'           => 'Status code',
-            'status_help'      => 'HTTP status sent to the webhook sender, 200 to 499.',
+            'status_help'      => 'HTTP status sent to the caller of the webhook or API trigger, 200 to 499.',
             'body_type'        => 'Body type',
             'body_types'       => [
                 'json' => 'JSON',
@@ -444,6 +444,20 @@ return [
         'request_failed'            => 'Request failed',
         'not_found'                 => 'This flow has no webhook trigger with this id. Save the flow and try again.',
         'secret_invalid'            => 'A secret is :min to :max characters, without spaces.',
+    ],
+
+    'api_trigger' => [
+        'legacy'              => 'This trigger uses an old format (route key, allowed sources) that no longer publishes; choose a response mode to update it.',
+        'choose_response'     => 'Choose a response mode…',
+        'url'                 => 'Address',
+        'url_hint'            => 'Calls are accepted once the flow is published with this trigger active. The address changes if the workspace address changes.',
+        'token'               => 'Token',
+        'token_hint'          => 'Calls need a tenant API token with the permission "Start flow runs through the API", sent as Authorization: Bearer.',
+        'tokens_link'         => 'API tokens',
+        'example'             => 'Example',
+        'example_hint'        => 'The body is a JSON object, at most 256 KB; the flow reads it as flow.api.body. A repeated Idempotency-Key from the same token starts no second run.',
+        'response_sync_hint'  => 'The caller waits up to 30 seconds for a "Respond to webhook" node or the end of the run; without an answer by then, or when too many calls already wait, it gets 202.',
+        'response_async_hint' => 'The caller gets 202 as soon as the run is queued.',
     ],
 
     'trigger_state' => [

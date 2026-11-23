@@ -47,6 +47,10 @@ final class AuditBoundariesTest
                 Selector::classname('App\\Domains\\Flow\\Webhook\\FlowWebhookReceiver'),
                 Selector::classname('App\\Domains\\Flow\\Webhook\\WebhookSyncWait'),
                 Selector::classname('App\\Http\\Controllers\\Flow\\FlowWebhookController'),
+                // The API trigger's ingress: the run and its `flow.api.token.id` are the log of a call (adr-20261119-tenant-api-tokens §12).
+                Selector::inNamespace('App\\Domains\\Flow\\Api'),
+                Selector::classname('App\\Domains\\Flow\\Services\\LiveTriggerLookup'),
+                Selector::classname('App\\Http\\Controllers\\Flow\\FlowApiTriggerController'),
                 Selector::inNamespace('App\\Domains\\Broadcasting\\Jobs'),
             )
             ->shouldNotDependOn()
@@ -54,6 +58,6 @@ final class AuditBoundariesTest
                 Selector::inNamespace('App\\Domains\\Audit'),
                 Selector::inNamespace('App\\Infrastructure\\Audit'),
             )
-            ->because('The audit log records people\'s actions synchronously in their transaction; on the flow runtime, message delivery, webhook ingress or broadcast fan-out it would add an insert per message and record system noise as actions.');
+            ->because('The audit log records people\'s actions synchronously in their transaction; on the flow runtime, message delivery, webhook or API trigger ingress or broadcast fan-out it would add an insert per message and record system noise as actions.');
     }
 }

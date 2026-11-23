@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Flow\Api\ApiTriggerConfig;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Registry\TriggerTypeRegistry;
@@ -50,7 +51,7 @@ final class FlowTriggerHint
             FlowTriggerType::Schedule => self::nonEmpty($config['cron'] ?? null),
             FlowTriggerType::Webhook  => self::webhookText($config),
             FlowTriggerType::Event    => self::nonEmpty($config['event_name'] ?? null),
-            FlowTriggerType::Api      => self::nonEmpty($config['route_key'] ?? null),
+            FlowTriggerType::Api      => self::apiText($config),
         };
 
         return null === $text ? null : ['type' => $type->value, 'text' => $text];
@@ -86,6 +87,14 @@ final class FlowTriggerHint
             WebhookTriggerConfig::VERIFICATION_HEADER_EQUALS => 'POST, secret header',
             default                                          => null,
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private static function apiText(array $config): string
+    {
+        return ApiTriggerConfig::RESPONSE_SYNC === ($config['response_mode'] ?? null) ? 'POST, sync' : 'POST';
     }
 
     /**

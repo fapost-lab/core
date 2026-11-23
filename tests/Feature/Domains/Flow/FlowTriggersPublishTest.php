@@ -245,7 +245,7 @@ final class FlowTriggersPublishTest extends FeatureTestCase
 
         FlowTrigger::query()->sole()->forceFill(['next_run_at' => '2026-12-01 09:00:00'])->save();
 
-        $this->storeDraftTriggers($draft, [['id' => $id, 'type' => 'api', 'is_active' => true, 'priority' => 100, 'config' => ['allowed_sources' => []]]]);
+        $this->storeDraftTriggers($draft, [['id' => $id, 'type' => 'api', 'is_active' => true, 'priority' => 100, 'config' => ['response_mode' => 'async']]]);
         $this->publish($draft->flow_id);
 
         $row = FlowTrigger::query()->sole();
@@ -312,7 +312,7 @@ final class FlowTriggersPublishTest extends FeatureTestCase
 
         $this->assertCount(2, $this->registryRows());
 
-        $this->storeDraftTriggers($draft, [['id' => $kept, 'type' => 'api', 'is_active' => true, 'priority' => 100, 'config' => ['allowed_sources' => []]]]);
+        $this->storeDraftTriggers($draft, [['id' => $kept, 'type' => 'api', 'is_active' => true, 'priority' => 100, 'config' => ['response_mode' => 'async']]]);
         $this->publish($draft->flow_id);
 
         $this->assertSame([], $this->registryRows());
@@ -344,6 +344,19 @@ final class FlowTriggersPublishTest extends FeatureTestCase
 
         $this->storeDraftTriggers($draft, [$this->schedule($id, ['cron' => '0 9 * * *', 'timezone' => 'Mars/Olympus'])]);
         $this->assertRefused($draft->flow_id, 'invalid_schedule_timezone', "triggers.{$id}.config.timezone");
+
+        $this->assertSame(0, FlowTrigger::query()->count());
+    }
+
+    public function test_an_api_trigger_of_the_old_shape_or_with_an_unknown_response_mode_is_refused(): void
+    {
+        $draft = $this->draft();
+        $id    = (string) Str::uuid();
+
+        foreach ([['route_key' => 'start', 'allowed_sources' => []], ['response_mode' => 'later']] as $config) {
+            $this->storeDraftTriggers($draft, [['id' => $id, 'type' => 'api', 'is_active' => true, 'priority' => 100, 'config' => $config]]);
+            $this->assertRefused($draft->flow_id, 'invalid_trigger_config', "triggers.{$id}.config");
+        }
 
         $this->assertSame(0, FlowTrigger::query()->count());
     }

@@ -81,7 +81,8 @@ a session with neither (`ContactlessSessionException`).
 
 ## Fire key
 
-What fired a trigger — a schedule slot, an event id, a webhook delivery id — kept on the session as `fire_key`,
+What fired a trigger — a schedule slot, an event id, a webhook delivery id (`wh:`), an API call's `Idempotency-Key`
+scoped to its token (`api:<token id>:<key>`, or `api:<ULID>` without one) — kept on the session as `fire_key`,
 unique with `trigger_id`, so a trigger starts one run per fire.
 
 ## Run admission

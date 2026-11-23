@@ -1,0 +1,106 @@
+---
+title: "API trigger"
+description: "Start a published flow from your own system with an API token and a JSON body."
+---
+
+An API trigger starts a flow when your own system — a backend, a script, an integration platform — calls the
+workspace's API with an [API token](/using/api-tokens). The flow runs without a contact, as an automation run, with
+the JSON body of the call available under `flow.api`.
+
+Use it when the system that starts the flow is yours and can send a token. When another service sends its own
+signed notifications (GitHub, a shop, a payment provider), use the [webhook trigger](/using/webhook-trigger) instead.
+
+## Setting it up
+
+1. Add a trigger to the flow and choose **API**.
+2. Choose the **Response**: **Accept at once (202)** or **Wait for the flow's answer** (see
+   [Response mode](#response-mode)).
+3. [Publish](/using/publishing) the flow. Until the flow is published with the trigger active, the address answers
+   `404`.
+4. In **System** → **API tokens**, issue a token with the permission **Start flow runs through the API** and give it
+   to your system. Only an administrator can put this permission on a token: a token reaches the flows of every
+   assistant in the workspace.
+
+The trigger's panel in the builder shows its address and an example call:
+
+```bash
+curl -X POST 'https://<your-workspace-host>/api/v1/flow-triggers/<trigger-id>/runs' \
+  -H 'Authorization: Bearer fpt_…' \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: order-42' \
+  -d '{"order_id": 42}'
+```
+
+The address contains the trigger's id, which stays the same across publishes. Making an API trigger live, changing
+it or removing it needs the permission to publish the flow and **Manage automations**, as for every trigger other
+than a message.
+
+<Warning>
+  The address depends on the workspace address (its slug). If you rename the workspace, every integration must be
+  updated, even though its token is still valid.
+</Warning>
+
+## The call
+
+- **Method and address.** `POST /api/v1/flow-triggers/<trigger-id>/runs` on the workspace's own host.
+- **Token.** `Authorization: Bearer fpt_…`, a token with **Start flow runs through the API**. The token is the only
+  credential; nothing in the trigger's settings is secret.
+- **Body.** A JSON object, with `Content-Type: application/json` (or another `+json` type), at most 256 KB.
+- **Idempotency key (optional).** `Idempotency-Key`, 1 to 255 printable ASCII characters.
+
+## Idempotency: no call runs twice
+
+A client that did not get an answer in time retries. Send an `Idempotency-Key` that is the same for every retry of
+one call — an order number, an event id — and the flow runs once: a repeated key from the same token is answered
+`200` with `"status": "duplicate"` and starts nothing. Repeats are recognised for a day by a quick check, and for as
+long as the earlier run is kept in the history.
+
+The key belongs to the token: two integrations with their own tokens may send the same key and each starts its own
+run. Without the header, every call starts a new run.
+
+## What the flow receives
+
+| Variable | Value |
+|---|---|
+| `flow.api.body` | The JSON body, decoded |
+| `flow.api.request_id` | The `Idempotency-Key` as sent, or the id made for a call without one |
+| `flow.api.token.id`, `flow.api.token.name` | The token that made the call |
+| `flow.api.received_at` | When the call arrived, ISO 8601 |
+
+No header of the call reaches the flow. The flow has no contact, so blocks that need one cannot be published in it;
+see [Publishing](/using/publishing). A call is recorded by its run: the run's history shows the trigger, and the run's
+variables show which token started it.
+
+A run that failed can be started again by hand from its session page, with the same body — see
+[Running a failed run again](/using/sessions#running-a-failed-run-again). That run answers nobody.
+
+## Answers
+
+| Code | Meaning |
+|---|---|
+| `202` | Accepted: the run is queued. The body is `{"status": "accepted", "request_id": "…"}` |
+| `200` | A repeat of an `Idempotency-Key` already accepted; nothing new runs. In *Wait for the flow's answer* mode, a repeat that arrives while the answer is kept (a minute) gets that answer instead |
+| any | In *Wait for the flow's answer* mode: the status and body the flow answered (see below) |
+| `401` | No token, or a token that is unknown, expired or revoked |
+| `403` | The token lacks **Start flow runs through the API** |
+| `404` | No published, active API trigger with this id in this workspace |
+| `413` | The body is larger than 256 KB |
+| `415` | The body is not declared JSON |
+| `422` | The body is not a JSON object (`invalid_json`), or the `Idempotency-Key` is empty, too long or not printable ASCII (`invalid_idempotency_key`) |
+| `423` | The workspace is stopped |
+| `429` | The token made too many requests this minute (60 by default, see [API tokens](/using/api-tokens#using-a-token)); wait for `Retry-After` |
+| `503` | The trigger is paused for starting too many runs (see [Publishing](/using/publishing#when-a-trigger-starts-too-many-runs)); retry after `Retry-After` seconds |
+
+Every refusal is a JSON body `{"error": "<code>"}`. A run that is accepted still passes the workspace's limits when it
+starts: a run over the plan's limit is not started, and the trigger's panel in the builder counts it.
+
+## Response mode
+
+**Response** in the trigger's settings chooses what the caller gets once the call is accepted. It works as the
+webhook trigger's [response mode](/using/webhook-trigger#response-mode) does, with the same limits:
+
+- **Accept at once (202)** — the default. The caller gets `202` as soon as the run is queued.
+- **Wait for the flow's answer** — the call is held open while the flow runs, for up to 30 seconds, and the caller
+  gets the first **Respond to webhook** block the run reaches, or the end of the run (`200` completed or cancelled,
+  `500` failed). Without an answer in time, or when too many calls already wait, the caller gets `202` and the run
+  goes on.

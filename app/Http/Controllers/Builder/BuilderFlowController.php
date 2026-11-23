@@ -15,6 +15,7 @@ use App\Domains\Flow\Services\SaveDraftService;
 use App\Domains\Flow\Services\ValidateFlowService;
 use App\Domains\Flow\Templates\TemplateExpander;
 use App\Domains\Staff\Enums\BuilderMode;
+use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\RefuseWritesWhenTenantStopped;
@@ -28,6 +29,9 @@ use Inertia\Response;
 
 final class BuilderFlowController extends Controller
 {
+    /** Stands for the trigger id in the API trigger's address the builder is given; the builder puts the id in. */
+    private const string API_TRIGGER_PLACEHOLDER = '00000000-0000-0000-0000-000000000000';
+
     public function show(
         string $flow,
         FlowDraftRepositoryInterface $drafts,
@@ -61,6 +65,7 @@ final class BuilderFlowController extends Controller
                 'usedBy'              => $dto->usedBy,
                 'webhookEndpoints'    => (object) $dto->webhookEndpoints,
                 'triggerStates'       => (object) $dto->triggerStates,
+                'apiTrigger'          => 'template' === $dto->kind ? null : $this->apiTrigger(),
                 'readOnly'            => $writeGuard->refusesWritesFor($user),
                 'builderMode'         => ($user instanceof User ? $user->builder_mode : null)?->value ?? BuilderMode::Tree->value,
             ],
@@ -202,5 +207,20 @@ final class BuilderFlowController extends Controller
         $edges = $definition['edges'] ?? [];
 
         return is_array($edges) ? $edges : [];
+    }
+
+    /**
+     * Where the flow's API triggers are called (adr-20261119-tenant-api-tokens: on the tenant's host, with a token) and
+     * where the token screen is, for a person who may open it.
+     *
+     * @return array{runs_url: string, trigger_placeholder: string, tokens_url: string|null}
+     */
+    private function apiTrigger(): array
+    {
+        return [
+            'runs_url'            => route('api.flow-triggers.runs.store', ['trigger' => self::API_TRIGGER_PLACEHOLDER]),
+            'trigger_placeholder' => self::API_TRIGGER_PLACEHOLDER,
+            'tokens_url'          => Gate::allows(Permission::ManageApiTokens->value) ? route('console.admin.api-tokens.index') : null,
+        ];
     }
 }

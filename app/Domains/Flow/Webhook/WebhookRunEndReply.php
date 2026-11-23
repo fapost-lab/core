@@ -11,11 +11,11 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
- * Answers a waiting webhook sender when the run its request started has ended and no `webhook_response` node answered
+ * Answers a waiting webhook sender or API caller when the run its request started has ended and no `webhook_response` node answered
  * first: 200 `{"status":"completed"}` (or `cancelled`), 500 `{"status":"failed"}` ({@see WebhookReply::forRunEnd()}).
  *
  * {@see \App\Domains\Flow\Services\FlowEngine} calls it whenever it stops running a session. Only the root of an
- * automation run a webhook started counts — told apart in memory before any query, so a conversation pays nothing; a
+ * automation run a webhook or an API call started counts — told apart in memory before any query, so a conversation pays nothing; a
  * subflow child never answers, its parent's own end does. The status is read fresh from the row, so only an end that
  * was committed answers. A node's earlier answer wins ({@see WebhookReplyStoreInterface}), and calling this again for
  * the same run changes nothing.
@@ -40,7 +40,7 @@ final readonly class WebhookRunEndReply
             || (is_string($session->parent_session_id) && '' !== $session->parent_session_id)
             || ! is_string($triggerId)
             || ! is_string($fireKey)
-            || ! WebhookFireKey::isWebhookFireKey($fireKey)) {
+            || ! InboundFireKey::isInbound($fireKey)) {
             return;
         }
 

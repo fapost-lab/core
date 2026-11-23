@@ -23,7 +23,8 @@ use Tests\Feature\FeatureTestCase;
 /**
  * What a run a webhook started answers its waiting sender, end to end through the engine and a real Redis: the
  * `webhook_response` node's answer (from the run's state, also from a subflow, the first one winning), or the run's
- * end — completed, cancelled, failed — when no node answered; and nothing for a run no webhook started.
+ * end — completed, cancelled, failed — when no node answered; the same for a run an API call started; and nothing for a
+ * run neither started.
  */
 #[Group('redis')]
 final class WebhookRunReplyTest extends FeatureTestCase
@@ -152,6 +153,17 @@ final class WebhookRunReplyTest extends FeatureTestCase
         $this->assertSame('from the child', $reply->body);
     }
 
+    public function test_a_run_an_api_call_started_is_answered_by_the_node_and_by_its_end(): void
+    {
+        $flowId = $this->flow([
+            $this->respond(['status' => 202, 'body_type' => 'text', 'text' => 'queued {{flow.api.request_id}}']),
+            $this->end('success'),
+        ]);
+
+        $this->assertSame([202, 'queued r-1'], $this->statusAndBody($this->startRun($flowId, 'api:01jtoken:r-1', ['flow' => ['api' => ['request_id' => 'r-1']]])));
+        $this->assertSame([200, '{"status":"completed"}'], $this->statusAndBody($this->startRun($this->flow([$this->end('success')]), 'api:01jtoken:r-2')));
+    }
+
     public function test_a_run_no_webhook_started_answers_nobody(): void
     {
         $flowId = $this->flow([
@@ -165,7 +177,10 @@ final class WebhookRunReplyTest extends FeatureTestCase
     /**
      * Start the run as a webhook's job would, and read what it answered.
      */
-    private function startRun(string $flowId, string $fireKey): ?WebhookReply
+    /**
+     * @param  array<string, mixed>|null  $initialState  the trigger payload; a webhook's by default
+     */
+    private function startRun(string $flowId, string $fireKey, ?array $initialState = null): ?WebhookReply
     {
         $this->fireKeys[] = $fireKey;
 
@@ -174,7 +189,7 @@ final class WebhookRunReplyTest extends FeatureTestCase
             flowId: $flowId,
             triggerId: $this->triggerId,
             fireKey: $fireKey,
-            initialState: ['flow' => ['webhook' => ['body' => ['name' => 'Ann "the" <b>']]]],
+            initialState: $initialState ?? ['flow' => ['webhook' => ['body' => ['name' => 'Ann "the" <b>']]]],
         ), 'handle']);
 
         return $this->reply($fireKey);

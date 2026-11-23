@@ -58,7 +58,9 @@ final class FlowTriggerHintTest extends TestCase
         $this->assertSame(['type' => 'webhook', 'text' => 'POST, secret header'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Webhook, ['verification' => 'header_equals', 'signature_header' => 'X-Webhook-Secret'])));
         $this->assertNull(FlowTriggerHint::for($this->trigger(FlowTriggerType::Webhook, ['method' => 'POST', 'path' => '/orders'])));
         $this->assertSame(['type' => 'event', 'text' => 'employee_registered'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Event, ['event_name' => 'employee_registered'])));
-        $this->assertSame(['type' => 'api', 'text' => 'start_onboarding'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Api, ['route_key' => 'start_onboarding'])));
+        $this->assertSame(['type' => 'api', 'text' => 'POST'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Api, ['response_mode' => 'async'])));
+        $this->assertSame(['type' => 'api', 'text' => 'POST, sync'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Api, ['response_mode' => 'sync'])));
+        $this->assertSame(['type' => 'api', 'text' => 'POST'], FlowTriggerHint::for($this->trigger(FlowTriggerType::Api, [])));
     }
 
     public function test_a_trigger_with_nothing_to_say_and_no_trigger_give_no_hint(): void
@@ -67,7 +69,6 @@ final class FlowTriggerHintTest extends TestCase
         $this->assertNull(FlowTriggerHint::for($this->trigger(FlowTriggerType::Schedule, ['cron' => ''])));
         $this->assertNull(FlowTriggerHint::for($this->trigger(FlowTriggerType::Webhook, [])));
         $this->assertNull(FlowTriggerHint::for($this->trigger(FlowTriggerType::Event, ['event_name' => 5])));
-        $this->assertNull(FlowTriggerHint::for($this->trigger(FlowTriggerType::Api, [])));
     }
 
     /**

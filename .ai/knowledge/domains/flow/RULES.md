@@ -406,6 +406,22 @@ broken.
   the config is copied into every version and template, and a URL held by an outside system must stop working when its
   flow cannot be managed (`adr-20261119-flow-webhook-trigger`). Enforced: `FlowWebhookTriggerTest`,
   `FlowWebhookEndpointTest`, `FlowWebhookHostModeTest`, `WebhookTriggerConfigTest`, `RedisWebhookDeliveryDedupRedisTest`.
+- **An API trigger starts a run only for a token holding `StartFlowRuns`, only while its flow can be managed, and once
+  per key and token.** `POST /api/v1/flow-triggers/{trigger}/runs` runs on the `api-token` stack (tenant of the host,
+  token, its rate limit, a stopped tenant's write refusal); `FlowApiTriggerController` asks
+  `Gate::allows(Permission::StartFlowRuns->value)`, never a policy (`adr-20261119-tenant-api-tokens` §7), and hands
+  only the token's id and name to Flow. `FlowApiTriggerReceiver` serves a trigger only through `LiveTriggerLookup` —
+  the same check the webhook uses: a live, active row of the tenant and of the asked type whose flow has an active
+  runnable definition and still has its draft and assistant — and answers 404 for every other reason, a row whose
+  config `ApiTriggerConfig` refuses (the old `route_key`/`allowed_sources`) included. A flow switched off in the flows list answers
+  404 too, before the paused check and the claim. The config is `{response_mode}`
+  only. The fire key is `api:<token id>:<Idempotency-Key>` (hashed when too long), so a key dedups per token, or
+  `api:<ULID>` without a key; dedup, the paused-trigger 503 before the claim and the `sync` wait are the webhook's
+  (`WebhookDeliveryDedupInterface`, `WebhookSyncWait`). The run's state is `flow.api` = body, request id, token id
+  and name, received at — never a header. A run whose fire key is `wh:` or `api:` (`InboundFireKey`) is the one a
+  `webhook_response` node or the run's end answers. Why: a token reaches every assistant of the tenant, and the
+  call's log is the run itself (§12 of the ADR). Enforced: `FlowApiTriggerTest`, `ApiTriggerConfigTest`,
+  `WebhookRunReplyTest`, `FlowTriggersPublishTest`.
 - **A run is re-run from the start only through its trigger's start job, with the payload it kept.** `FlowEngine::start()`
   writes `flow_sessions.trigger_payload` = the `initialState` as handed over, only for a start with a fire key (a root
   automation run); conversations and subflow children keep NULL. `AutomationRunRerunService` re-runs only a root
@@ -442,13 +458,14 @@ broken.
   false) after deduplication and before run admission: `AutomationRunner::start()` after `findByFireKey` (a fire that
   already has a run, a schedule's `pending` one included, goes on; `flow.automation.start_skipped_flow_off`),
   `ScheduleTriggerFirer`'s claim (the slot is spent, `tick_skipped` `flow_off`), `StartFlowFromEventJob` after its start
-  key and before its channel and collision checks (`flow.event.start_skipped_flow_off`), `FlowWebhookReceiver` after the signature (404, the delivery not claimed, the address not counted) and
+  key and before its channel and collision checks (`flow.event.start_skipped_flow_off`), `FlowWebhookReceiver` after the signature (404, the delivery not claimed, the address not counted),
+  `FlowApiTriggerReceiver` before the paused check (404, the key not claimed) and
   `AutomationRunRerunService::check()` (`RerunRefusal::FlowOff`). A new automatic start path asks it too. Run admission
   is not asked for a switched-off flow, so it spends no unit and counts no refusal. Conversations (message triggers,
   `/start`, the default flow, subflows, `start_flow`) do not read the switch. Why: the switch and its
   `ManageAutomations` check must mean what they say, without a refusal counted every minute on a flow a person turned
   off (`adr-20261123-flow-switch-gates-automatic-starts`). Enforced: `FlowSwitchGatesAutomaticStartsTest`,
-  `ScheduleTriggerFirerTest`, `FlowWebhookTriggerTest`, `RegisteredTriggerTypesTest`, `AutomationRunRerunTest`,
+  `ScheduleTriggerFirerTest`, `FlowWebhookTriggerTest`, `FlowApiTriggerTest`, `RegisteredTriggerTypesTest`, `AutomationRunRerunTest`,
   `MessageRouterPipelineTest` (a message still starts). Not covered: that a future start path asks (review only).
   *(proposed)*
 - **A trigger's new run passes run admission once, before it exists; a pause is lifted only by a person.** Every
@@ -467,7 +484,8 @@ broken.
   changing what was published, and the plan must count each run once (`adr-20261123-flow-run-admission`). Enforced:
   `TriggerRunAdmissionTest`, `TriggerResumeEndpointTest`, `FlowWebhookTriggerTest::test_a_paused_trigger_answers_503_with_retry_after_and_keeps_the_delivery_unclaimed`.
   Not covered: that no message path asks (review only).
-- **A webhook request waits for its flow only while it holds a wait slot, and never past 30 seconds.** A trigger in
+- **A webhook request or an API call waits for its flow only while it holds a wait slot, and never past 30 seconds.** A
+  webhook or API trigger in
   `response_mode: sync` holds the request through `WebhookSyncWait`, which first takes a slot of
   `WebhookWaitSlotsInterface` (`flow.webhook.sync_waiters_max` on the installation, `flow.webhook.sync_waiters_per_tenant`
   per tenant, both at once or neither) and gives it back in `finally`; no slot, no answer in time or a Redis failure

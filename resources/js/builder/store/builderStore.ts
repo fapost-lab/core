@@ -22,6 +22,7 @@ import type {
   BuilderTrigger,
   WebhookEndpointInfo,
   TriggerStateInfo,
+  ApiTriggerInfo,
   FlowDefinition,
   FlowEdge,
   FlowNode,
@@ -107,6 +108,8 @@ export const useBuilderStore = defineStore('builder', () => {
     const webhookEndpoints = ref<Record<string, WebhookEndpointInfo>>({})
     /** Admission state of the flow's live triggers that have one, keyed by lower-cased trigger id. */
     const triggerStates = ref<Record<string, TriggerStateInfo>>({})
+    /** Where the flow's API triggers are called and their tokens issued. */
+    const apiTrigger = ref<ApiTriggerInfo | null>(null)
     const contentBaseLanguage = ref('en')
     const availableLanguages = ref<string[]>([])
     const availableFlows     = ref<Array<{id: string; name: string}>>([])
@@ -343,6 +346,7 @@ export const useBuilderStore = defineStore('builder', () => {
       tenantEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
         webhookEndpoints.value = flow.webhookEndpoints && !Array.isArray(flow.webhookEndpoints) ? { ...flow.webhookEndpoints } : {}
         triggerStates.value = flow.triggerStates && !Array.isArray(flow.triggerStates) ? { ...flow.triggerStates } : {}
+        apiTrigger.value = flow.apiTrigger ?? null
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
         availableLanguages.value = Array.isArray(flow.availableLanguages) ? flow.availableLanguages : []
         availableFlows.value     = Array.isArray(flow.availableFlows) ? flow.availableFlows : []
@@ -1240,6 +1244,7 @@ export const useBuilderStore = defineStore('builder', () => {
         setWebhookEndpoint,
         triggerStates,
         setTriggerStates,
+        apiTrigger,
         registerDraftFlusher,
         flushDraft,
         contentBaseLanguage,

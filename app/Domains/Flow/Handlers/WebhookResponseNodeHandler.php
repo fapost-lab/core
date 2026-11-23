@@ -7,7 +7,7 @@ namespace App\Domains\Flow\Handlers;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Services\SegmentHandOff;
-use App\Domains\Flow\Webhook\WebhookFireKey;
+use App\Domains\Flow\Webhook\InboundFireKey;
 use App\Domains\Flow\Webhook\WebhookReply;
 use App\Domains\Flow\Webhook\WebhookReplyStoreInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -28,14 +28,14 @@ use JsonException;
 use Psr\Log\LoggerInterface;
 
 /**
- * "Respond to webhook": hands the sender of the webhook that started this run the flow's answer — a status of 200–499
- * and a JSON or text body rendered from the run's state — while that sender waits (a webhook trigger in
- * `response_mode: sync`).
+ * "Respond to webhook": hands the caller that started this run — a webhook's sender or an API trigger's caller — the
+ * flow's answer, a status of 200–499 and a JSON or text body rendered from the run's state, while that caller waits (a
+ * webhook or API trigger in `response_mode: sync`).
  *
  * The answer is keyed by the `(trigger_id, fire_key)` of the run's root, so a node inside a subflow answers too. The
  * first answer of a run wins: a repeat of this step, a second such node, and the end of the run change nothing
  * ({@see WebhookReplyStoreInterface}). Outside a wait — an async trigger, a wait that gave up, a run no webhook
- * started — the node does nothing and goes on. Either way it takes its one exit, `default`: a webhook answer is never a
+ * or API call started — the node does nothing and goes on. Either way it takes its one exit, `default`: a webhook answer is never a
  * reason to fail the run. A rendered body over {@see WebhookReply::MAX_BODY_BYTES} is not sent (logged); the end of the
  * run answers instead.
  *
@@ -165,8 +165,8 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
         $triggerId = $root->trigger_id;
         $fireKey   = $root->fire_key;
 
-        // No webhook started this run, so nobody can be waiting for it.
-        if (! is_string($triggerId) || ! is_string($fireKey) || ! WebhookFireKey::isWebhookFireKey($fireKey)) {
+        // No webhook or API call started this run, so nobody can be waiting for it.
+        if (! is_string($triggerId) || ! is_string($fireKey) || ! InboundFireKey::isInbound($fireKey)) {
             return $done;
         }
 
