@@ -169,6 +169,10 @@ Pauses before continuing.
 Useful for pacing a conversation so a series of messages does not arrive as a
 wall, and for waiting a defined period before a follow-up.
 
+An automation run (a flow its trigger starts without a contact, such as a schedule, a webhook, an API call or a Core
+event) lives at most the [platform setting](/self-hosting/platform-settings) `flow.automation.max_run_hours` (24
+hours by default): a delay that outlasts it fails the whole run, no further block runs, and the run is not resumed.
+
 ### Loop and Loop end
 
 Repeats the blocks between them.
@@ -252,7 +256,8 @@ The block continues on one of four exits:
   last **Busy window** minutes (30 by default), or a conversation with the bot is
   waiting in a [Delay](#delay) to go on by itself. Nothing is sent. A live
   conversation older than the window is ended and replaced by the new one; with a
-  window of 0 the contact is busy only while an operator has the thread. A
+  window of 0 the contact is busy only while an operator has the thread, a
+  conversation waits in a Delay, or the conversation is the one starting the flow. A
   conversation never starts a flow over itself: a flow that names its own contact
   on the same bot leaves by `busy`.
 - `no_channel` — the contact has no channel on an active channel of that bot, so
@@ -364,7 +369,8 @@ builder marks them as stored there. A saved credential is sent only to its allow
 a call to another host is not made and takes the failure outcome with
 `error_code = credential_host_denied`. Redirects are not followed when a credential is used.
 The credential's headers or query parameter replace any of the same name the author set, and the
-author's `Host` and forwarding headers are dropped. The secret is shown as `***` in the result,
+author's `Host` and the headers that carry a host (`X-Forwarded-Host`, `Forwarded`, `X-Original-Host`,
+`X-Host`) are dropped. The secret is shown as `***` in the result,
 the saved variables and the flow log. The other failures are `credential_not_found` (the
 credential was deleted), `credential_unsupported` (the block does not use the HTTP transport) and
 `credential_unavailable` (the secret cannot be read, for example after the application key changed).

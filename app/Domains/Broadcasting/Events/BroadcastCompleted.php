@@ -8,7 +8,7 @@ namespace App\Domains\Broadcasting\Events;
  * A broadcast run reached `completed`: every recipient was processed, or the audience was empty.
  *
  * Raised once per broadcast by the job that made the transition (the last recipient job, or the run job for an empty
- * audience); a cancelled or failed run does not raise it. Broadcasting does not depend on Flow: the Flow domain
+ * audience); a cancelled or failed run does not raise it. Nothing here references Flow: the Flow domain
  * listens and turns it into the `core.broadcast.completed` event trigger. Dispatched synchronously.
  *
  * `chainDepth` is the broadcast's own (`broadcasts.chain_depth`): the depth of the event chain its completion continues.

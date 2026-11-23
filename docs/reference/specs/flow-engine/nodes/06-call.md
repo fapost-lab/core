@@ -48,7 +48,8 @@ Calls an external or internal service. Combines Integration (HTTP) and Action (i
 
 A node with neither `transport` nor `target` is a **legacy** node and runs through `executeLegacy()`:
 it POSTs `url` through the `http` transport with `{session_id, contact_id, state}` from
-`include_state`, and saves the body to `save_to_variable` or the legacy `save_response_to` path.
+`include_state`, and saves the body to `save_to_variable` or the legacy `save_response_to` path. In a run without a
+contact, `contact_id` is `null`.
 
 ## Target by transport
 
@@ -173,7 +174,9 @@ call still counts. A replayed step (see "Outbound idempotency") is neither asked
 4. Build `CallRequest{target, parameters, options}` and `CallContext{tenantId, contactId, sessionId,
    nodeId, idempotencyKey = "{engineKey}:{nodeId}"}`. The engine key changes with each persisted step, so
    every pass of a loop gets a new key, and it stays the same when the queue retries the step; the node
-   id is a defensive suffix.
+   id is a defensive suffix. `contactId` is `null` in a run without a contact: `call` declares `any`, so it runs under
+   a `schedule`, `webhook` or `api` trigger or an `event` trigger on a Core event, but a `call` whose config reads
+   `contact.*` / `module.*` or uses a contact variable is refused there at publish (`node_needs_contact`).
 5. Ask the ledger for an earlier success of that key and, if there is one, use it as the result (steps 6
    and 7 run on it); otherwise count the send, pass its number to the transport as `options.attempt_number`
    (the node overwrites that key, a flow author cannot set it), call `transport->execute()` and, on a

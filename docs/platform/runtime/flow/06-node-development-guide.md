@@ -308,7 +308,7 @@ registered `type@version`, the required config fields from `configSchema()`, the
 (branch rules, `emit_event`, `end`, `rag_query`, `input` save target, `subflow`, `loop` / `loop_end`,
 media, module references), and across the graph: terminal `end` nodes, nested loops, keyboard
 `send_message` terminal rules, button edges and the subflow call graph. In a flow whose trigger starts it without a
-contact (`schedule`, `webhook`, `api`), `ContactContextChecker` refuses every node that needs one
+contact (`schedule`, `webhook`, `api`, or `event` on a Core event), `ContactContextChecker` refuses every node that needs one
 (`node_needs_contact`): a handler needs a contact unless it implements Foundation's
 `DeclaresContextRequirementInterface` and returns `none` or `any`, and a config that reads `contact.*` / `module.*` or
 uses a contact variable needs one whatever the handler declares. A new handler that can run without a contact declares
@@ -355,7 +355,8 @@ Recommendation:
 2. Implement the handler class in `app/Domains/Flow/Handlers/`.
 3. Add a `configSchema()` with clear fields (and `required`).
    Implement `DeclaresContextRequirementInterface` with `any` (or `none`) only when the handler never uses
-   `$context->contactId`, `$context->platform` or the contact writer without a contact and never hands them on;
+   `$context->contactId`, `$context->platform` or the contact writer without a contact, and hands them on only where
+   the receiver takes `null` (`call` is `any` because `CallContext::$contactId` is nullable);
    otherwise leave it out: the node then needs a contact and is refused in flows started by a schedule, webhook or
    API trigger, or an event trigger on a Core event (`adr-20261118-node-contact-context-checked-at-publish`).
 4. Register the handler in `FlowServiceProvider::registerCoreNodeHandlers()` (not in `boot()`).

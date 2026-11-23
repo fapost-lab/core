@@ -50,7 +50,8 @@ use Throwable;
  *  - `started` — the start is queued ({@see \App\Jobs\Flow\StartFlowForContactJob}), once per step: the start key is
  *    the engine's execution key and the node id, unique on the started session;
  *  - `busy` — the contact's thread is with an operator, a live conversation with that bot moved within
- *    `busy_window_minutes`, or the live conversation is the one asking ({@see ContactFlowStartCollision});
+ *    `busy_window_minutes` or sleeps in a `delay`, or the live conversation is the one asking
+ *    ({@see ContactFlowStartCollision});
  *  - `no_channel` — the contact has no channel on an active channel of that bot;
  *  - `error` — `addressee_unresolved`, `contact_not_found`, `target_inactive` or `chain_depth_exceeded`.
  *

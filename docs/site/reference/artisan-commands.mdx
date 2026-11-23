@@ -141,6 +141,12 @@ media are kept. See [Conversation retention](/self-hosting/observability#convers
 `audit:prune` accepts `--dry-run`, which only counts. The package command
 `activitylog:clean` is not used: it does not walk the tenants.
 
+## Credentials
+
+| Command | Does |
+|---|---|
+| `credentials:refresh-oauth2-grants` | Refresh the [OAuth 2.0 authorization code](/using/credentials#connecting-with-user-consent) connections that have not been refreshed for a week or whose refresh token ends within three days, in every active tenant that is not stopped, so a flow that runs rarely keeps a live connection. A failure is printed (never with a token) and the others go on. Scheduled daily at 02:30 |
+
 ## API tokens
 
 | Command | Does |

@@ -224,11 +224,14 @@ broken.
   `fire_key = event_id`. An event raised while a session runs is one deeper than the session's `event_chain_depth`
   (written at start, copied to subflow children, pushed by `FlowEngine::executeLoop()` into the scoped
   `EventChainContext`); one deeper than `FlowTriggerEventPublisherInterface::MAX_CHAIN_DEPTH` starts nothing
-  (`flow.event.chain_depth_exceeded`), on the contact path too. The Core domains raise plain events and never depend on
-  Flow; `PublishCoreEvents` never throws into them. Why: a retried fan-out must not start a run twice, a flow must not
-  fake a Core fact, and flows that set each other off must stop (`adr-20261119-core-events-start-contactless-runs`).
+  (`flow.event.chain_depth_exceeded`), on the contact path too. The Core domains raise plain events: the event classes
+  reference nothing of Flow, Flow only listens, and `PublishCoreEvents` never throws into them. Conversation as a whole
+  does not depend on Flow; Contact and Broadcasting import Flow elsewhere (`ContactCard`, `SendContactNotificationJob`,
+  `SendBroadcastRecipientJob`), so for them this holds by review only. Why: a retried fan-out must not start a run
+  twice, a flow must not fake a Core fact, and flows that set each other off must stop (`adr-20261119-core-events-start-contactless-runs`).
   Enforced: `CoreEventTriggersTest`, `QueuedFlowTriggerEventPublisherTest`, `PublishCoreEventsTest`,
-  `ContactTagEventsTest`, `ValidateFlowServiceTest`, `BuiltInNodeHandlersTest`, `ConversationBoundariesTest`.
+  `ContactTagEventsTest`, `ValidateFlowServiceTest`, `BuiltInNodeHandlersTest`, `ConversationBoundariesTest`
+  (Conversation only).
 - **A registered trigger type starts contactless runs once per fire, only while its Solution is active, and a row of an
   unknown type never breaks a read.** Extensions add trigger types through Foundation's `TriggerTypeInterface`
   (`TriggerTypeRegistry`: classes built per call, owner = Solution id or null for Core, a Solution's type starts with
@@ -446,7 +449,7 @@ broken.
   trigger is `pending` or in flight (`tick_skipped` `previous_run_live`), or run admission refuses it (`tick_skipped`
   `admission_refused`, `adr-20261123-flow-run-admission`). The start job is queued after the commit and
   `AutomationRunner` activates the `pending` run (`FlowEngineInterface::activate()`). `ScheduleClock` skips a local time a
-  daylight saving change removes and fires a repeated one once; a cron is five fields in an IANA zone
+  daylight saving change removes and fires a repeated one once; a cron is five valid fields or a macro (`@hourly`, `@daily`, ...) in an IANA zone
   (`invalid_schedule_cron`, `invalid_schedule_timezone`). The landlord `flow_schedule_registry` is only an index of whom
   to visit, written after the tenant's commit through `ScheduleRegistrySync` and rebuilt hourly
   (`flow:rebuild-schedule-registry`); `flow:fire-scheduled-triggers` enters only the tenants it names, never a stopped

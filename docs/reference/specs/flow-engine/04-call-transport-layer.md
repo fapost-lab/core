@@ -35,7 +35,7 @@ final readonly class CallContext
 {
     public function __construct(
         public string $tenantId,
-        public string $contactId,
+        public ?string $contactId, // null when the run has no contact (a schedule, webhook, API or Core-event start)
         public string $sessionId,
         public string $nodeId,
         public string $idempotencyKey,
@@ -87,7 +87,9 @@ Registered in `FlowServiceProvider` through `CallTransportRegistry`.
 - The success boundary is `options.success_when`: `2xx` (default), `any_response`, `2xx_or_4xx`. The node's own `success_statuses` (see `nodes/06-call.md`) overrides it, for any transport.
   Transport-level failures (DNS, timeout, TLS) are always errors with code `transport_failure`.
 - Error codes: `invalid_target`, `invalid_method`, `egress_denied`, `transport_failure`, `http_4xx`,
-  `http_5xx`, `http_other`, and with a credential `credential_host_denied`, `credential_unavailable`.
+  `http_5xx`, `http_other`, and with a credential `credential_host_denied`, `credential_unavailable`. On a call with a
+  credential, a header value or URL the HTTP client refuses is `transport_failure` with the refusal message masked, never
+  a thrown exception.
 - The request goes through `GuardedHttpClient` (`app/Domains/Flow/Call/Egress/`), never the raw HTTP
   client; a PHPat rule (`tests/Architecture/EgressGuardTest.php`) enforces it. The guard refuses
   non-public addresses (see `nodes/06-call.md`, "Egress guard") and ends such a call with
@@ -105,13 +107,16 @@ Registered in `FlowServiceProvider` through `CallTransportRegistry`.
      lists (the values, `base64(user:pass)`, an OAuth2 access token) replaced by `***` in the payload and the whole
      metadata (`SecretRedactor`). The error code is left alone. The ledger records what the transport returned, so a
      stored result is masked too;
-  5. a 401 from the target drops the cached OAuth2 token of the credential (no resend; retries are the node's business);
+  5. a 401 from the target is told to the credential's type when it keeps a token (`RejectedTokenAwareInterface`): the
+     client-credentials type drops its cached token, the authorization-code type marks its access token expired (no
+     resend; retries are the node's business);
   6. authorizing spends the call's own `timeout`: an OAuth2 token request on a cold cache leaves the target only what
-     is left of it, and with under a second left nothing is sent (`credential_unavailable`, metadata `{reason: timeout}`),
+     is left of it, and with less than `min(1 s, half the timeout)` left nothing is sent (`credential_unavailable`, metadata
+     `{reason: timeout}`),
      so a credential never stretches the node past the window the runtime sizes its jobs and locks by. The credential's
      query reaches the URL on every method, a DELETE without a body included.
-  The transport is a singleton without tenant state: the credential travels in the request, the type registry is a
-  singleton of classes, and the scoped `OAuth2TokenCache` is taken from the container only when a 401 needs it.
+  The transport is a singleton without tenant state: the credential travels in the request, and the type registry is a
+  singleton of classes that builds a type, with its scoped collaborators, on each `get()`.
 
 **HandlerTransport** (`id() = 'handler'`, `app/Domains/Flow/Call/Transports/HandlerTransport.php`):
 

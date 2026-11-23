@@ -83,7 +83,7 @@ A run that failed can be started again by hand from its session page, with the s
 | any | In *Wait for the flow's answer* mode: the status and body the flow answered (see below) |
 | `401` | No token, or a token that is unknown, expired or revoked |
 | `403` | The token lacks **Start flow runs through the API** |
-| `404` | No published, active API trigger with this id in this workspace |
+| `404` | No published, active API trigger with this id in this workspace, or its flow is switched off in the flows list; a call answered `404` is not kept, so a retry with the same `Idempotency-Key` after the flow is turned on runs |
 | `413` | The body is larger than 256 KB |
 | `415` | The body is not declared JSON |
 | `422` | The body is not a JSON object (`invalid_json`), or the `Idempotency-Key` is empty, too long or not printable ASCII (`invalid_idempotency_key`) |

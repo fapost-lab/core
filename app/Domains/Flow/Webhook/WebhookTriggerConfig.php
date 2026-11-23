@@ -229,7 +229,7 @@ final readonly class WebhookTriggerConfig
             }
 
             if (str_starts_with($alternative, 'header.') && $this->isStrippedHeader(mb_substr($alternative, mb_strlen('header.')))) {
-                throw new InvalidArgumentException("Invalid webhook trigger config: delivery_id may not name {{$alternative}}: the credentials, signature and timestamp headers never leave the check.");
+                throw new InvalidArgumentException("Invalid webhook trigger config: delivery_id may not name {{$alternative}}: the Authorization, Cookie, signature and timestamp headers never leave the check.");
             }
         }
     }

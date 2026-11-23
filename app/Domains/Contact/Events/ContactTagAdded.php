@@ -8,7 +8,7 @@ namespace App\Domains\Contact\Events;
  * A tag was attached to a contact that did not have it.
  *
  * Raised by {@see \App\Domains\Contact\Repositories\ContactTagRepository} only when a row was really inserted, never
- * for a tag the contact already had. Contact does not depend on Flow: the Flow domain listens and turns it into the
+ * for a tag the contact already had. Nothing here references Flow: the Flow domain listens and turns it into the
  * `core.contact.tag_added` event trigger. Dispatched synchronously.
  */
 final readonly class ContactTagAdded

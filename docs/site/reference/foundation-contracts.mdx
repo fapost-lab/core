@@ -49,6 +49,7 @@ Experimental since 0.15; see [Console UI](/extending/console-ui).
 | `Contracts\DataAccessorInterface` | Reading module data under `module.*` |
 | `Flow\Enums\StateNamespace` | The canonical state namespaces |
 | `Flow\Contracts\ContactWriterInterface` | Mutating the contact from a handler |
+| `Flow\Contracts\DeclaresContextRequirementInterface`, `Flow\Enums\NodeContextRequirement` | Declaring whether a node needs a contact (`contact`, `none`, `any`); a node that declares nothing needs one and is refused in a flow started without a contact |
 | `Flow\Contracts\ScopedStateReaderInterface` | Reading state within a scope |
 | `Flow\Contracts\ExpressionEngineInterface` | Evaluating expressions |
 | `Flow\Contracts\TriggerResolverInterface`, `TriggerTypeResolverInterface` | Resolving what starts a flow |
