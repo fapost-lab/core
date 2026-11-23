@@ -4,7 +4,7 @@ import { Handle, Position } from '@vue-flow/core'
 import { interpolate } from '@console/shell'
 import type { DrawnFrame, RunGraphTranslations } from './runGraph'
 
-/** A frame of the run graph: a branch of a node, or the subflow run a node started, drawn around its nodes. */
+/** A frame of the run graph: a branch of a node, the subflow run a node started, or a pass of an unrolled loop, drawn around its nodes. */
 const props = defineProps<{
   data: { drawn: DrawnFrame; labels: RunGraphTranslations; width: number; height: number }
 }>()
@@ -17,6 +17,10 @@ const title = computed(() => {
     const name = interpolate(labels.subflow, { name: frame.title ?? labels.unnamed })
 
     return frame.count > 1 ? `${name} · ${interpolate(labels.runs, { count: frame.count })}` : name
+  }
+
+  if (frame.frame === 'pass') {
+    return interpolate(labels.pass, { pass: frame.title ?? '' })
   }
 
   // A rule's or a button's handle is its id: a long one is shortened, the way the session list shortens ids.

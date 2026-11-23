@@ -55,9 +55,9 @@ const { transport } = useLiveUpdates({
   active: () => props.session.isLive,
 })
 
-/** The pass each loop shows; a loop not chosen shows its last pass, so a live run follows its newest one. */
+/** The pass each loop shows; a loop not chosen shows its last pass, so a live run follows its newest one. An unrolled loop draws every pass and has no switcher. */
 const selection = ref<PassSelection>({})
-const loops = computed(() => loopsOf(props.graph.flow).filter((loop) => loop.count > 0))
+const loops = computed(() => loopsOf(props.graph.flow).filter((loop) => loop.count > 0 && !loop.unrolled))
 
 const drawn = computed(() => drawRunGraph(props.graph, selection.value))
 const selectedNode = ref<DrawnNode | null>(null)

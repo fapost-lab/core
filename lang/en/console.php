@@ -859,6 +859,7 @@ return [
                 'subflow' => 'Subflow «:name»',
                 'runs'    => ':count runs, the latest shown',
                 'unnamed' => 'unnamed',
+                'pass'    => 'Pass :pass',
             ],
             'node' => [
                 'title'       => 'Node',

@@ -55,9 +55,12 @@ card shows what happened there — done, waiting, failed or still running.
   frame of that branch.
 - **Subflows** — the run a subflow node started is drawn in a frame of its own
   next to that node; when the node started several, the latest is shown.
-- **Loops** — a loop is drawn once, marked with how many passes it ran. Pick a
-  pass above the graph to colour the path by that pass; by default the last one
-  is shown.
+- **Loops** — a short, simple loop is unrolled: each pass is drawn in a frame of
+  its own, with what every step did in that pass. Any other loop — one that ran
+  more than five passes, has a long body, branches, calls a subflow or sits
+  inside or around another loop — is drawn once, marked with how many passes it
+  ran. Pick a pass above the graph to colour the path by that pass; by default
+  the last one is shown.
 
 Click a card to see the node's latest visits: when it ran, which exit it took,
 how long it took and, for a failure, the error's type. The graph shows statuses
