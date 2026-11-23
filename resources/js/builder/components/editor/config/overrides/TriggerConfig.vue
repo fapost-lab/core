@@ -6,7 +6,7 @@ import {createWebhookEndpoint, fetchAssistantOptions, generateWebhookSecret, res
 import SchemaFields from '../SchemaFields.vue'
 import type {FieldEntry} from '../SchemaFields.vue'
 import type {ApiError, SelectOption} from '@builder/api/builderApi'
-import type {TriggerStateInfo, WebhookEndpointInfo} from '@builder/dto/types'
+import type {ApiTriggerInfo, TriggerStateInfo, WebhookEndpointInfo} from '@builder/dto/types'
 import {useConfirm} from '@builder/composables/useConfirm'
 import {usePermissions} from '@builder/composables/usePermissions'
 import {useTranslations} from '@builder/composables/useTranslations'
@@ -29,6 +29,8 @@ const props = defineProps({
     webhookEndpoints: { type: Object as () => Record<string, WebhookEndpointInfo>, default: () => ({}) },
     /** Admission state of the live triggers, keyed by lower-cased trigger id. */
     triggerStates: { type: Object as () => Record<string, TriggerStateInfo>, default: () => ({}) },
+    /** Where the API trigger is called and where its tokens are issued; null outside a flow. */
+    apiTrigger: { type: Object as () => ApiTriggerInfo | null, default: null },
     readOnly: { type: Boolean, default: false },
     /** Pushes the unsaved draft to the server; resolves false when it could not be saved. */
     flushDraft: { type: Function as unknown as () => () => Promise<boolean>, default: null },
@@ -327,7 +329,7 @@ const webhookBusy = ref(false)
 const webhookError = ref<string | null>(null)
 const generatedSecret = ref<string | null>(null)
 const pastedSecret = ref('')
-const copied = ref<'url' | 'secret' | null>(null)
+const copied = ref<'url' | 'secret' | 'api_url' | 'api_curl' | null>(null)
 
 watch(triggerId, () => {
     resumeError.value = null
@@ -424,7 +426,7 @@ async function savePastedSecret(): Promise<void> {
     })
 }
 
-async function copyText(kind: 'url' | 'secret', text: string): Promise<void> {
+async function copyText(kind: 'url' | 'secret' | 'api_url' | 'api_curl', text: string): Promise<void> {
     try {
         await navigator.clipboard.writeText(text)
         copied.value = kind
@@ -433,6 +435,29 @@ async function copyText(kind: 'url' | 'secret', text: string): Promise<void> {
         webhookError.value = t('webhook_trigger.copy_failed')
     }
 }
+
+/** The API trigger's config is `{response_mode}` only; any other key is of the old shape, which no longer publishes. */
+const apiLegacy = computed(() => Object.keys(triggerCfg.value).some((key) => key !== 'response_mode'))
+const apiResponseMode = computed(() => triggerCfg.value.response_mode === 'sync' ? 'sync' : 'async')
+
+/** API config edits replace the whole config, which also drops the keys of the old shape. */
+function setApiResponseMode(mode: string): void {
+    emit('update:trigger', { ...currentTrigger.value, config: { response_mode: mode === 'sync' ? 'sync' : 'async' } })
+}
+
+const apiRunsUrl = computed(() =>
+    props.apiTrigger === null || triggerId.value === ''
+        ? ''
+        : props.apiTrigger.runs_url.split(props.apiTrigger.trigger_placeholder).join(triggerId.value.toLowerCase())
+)
+
+const apiCurlExample = computed(() => [
+    `curl -X POST '${apiRunsUrl.value}' \\`,
+    `  -H 'Authorization: Bearer fpt_…' \\`,
+    `  -H 'Content-Type: application/json' \\`,
+    `  -H 'Idempotency-Key: order-42' \\`,
+    `  -d '{"order_id": 42}'`,
+].join('\n'))
 
 function updateType(type: string) {
     emit('update:trigger', { ...createDefaultTrigger(type), id: currentTrigger.value.id })
@@ -485,7 +510,7 @@ function defaultConfig(type: string): Record<string, unknown> {
         case 'webhook':
             return defaultWebhookConfig()
         case 'api':
-            return { route_key: '', allowed_sources: [] }
+            return { response_mode: 'async' }
         case 'event':
             return { event_name: '' }
         default:
@@ -831,31 +856,53 @@ function defaultConfig(type: string): Record<string, unknown> {
         </AccordionSection>
 
         <AccordionSection v-else-if="currentTrigger.type === 'api'" title="API" default-open>
-            <div class="config-field">
-                <div class="field-label">Route key</div>
-                <input
-                    class="field-input"
-                    :value="(triggerCfg.route_key as string) ?? ''"
-                    placeholder="start_onboarding"
-                    @input="update({ config: { route_key: ($event.target as HTMLInputElement).value } })"
-                >
+            <div v-if="apiLegacy" class="field-hint webhook-status-warn" data-testid="api-legacy">
+                {{ t('api_trigger.legacy') }}
+            </div>
+
+            <div v-if="apiRunsUrl !== ''" class="config-field">
+                <div class="field-label">{{ t('api_trigger.url') }}</div>
+                <div class="webhook-row">
+                    <input class="field-input webhook-mono" data-testid="api-url" type="text" readonly :value="apiRunsUrl" @focus="($event.target as HTMLInputElement).select()">
+                    <button type="button" class="webhook-btn" @click="copyText('api_url', apiRunsUrl)">
+                        {{ copied === 'api_url' ? t('webhook_trigger.copied') : t('webhook_trigger.copy') }}
+                    </button>
+                </div>
+                <div class="field-hint">{{ t('api_trigger.url_hint') }}</div>
             </div>
 
             <div class="config-field">
-                <div class="field-label">Allowed sources</div>
-                <div
-                    v-for="(source, index) in ((currentTrigger.config as Record<string, unknown>)?.allowed_sources as string[] ?? [])"
-                    :key="`source-${index}`"
-                    class="array-row"
-                >
-                    <input
-                        class="field-input"
-                        :value="source"
-                        @input="updateArray('allowed_sources', index, ($event.target as HTMLInputElement).value)"
-                    >
-                    <button type="button" class="delete-inline" @click="removeArrayItem('allowed_sources', index)">×</button>
+                <div class="field-label">{{ t('api_trigger.token') }}</div>
+                <div class="field-hint">
+                    {{ t('api_trigger.token_hint') }}
+                    <a v-if="apiTrigger !== null && apiTrigger.tokens_url !== null" :href="apiTrigger.tokens_url" target="_blank" rel="noopener">{{ t('api_trigger.tokens_link') }}</a>
                 </div>
-                <button type="button" class="add-item-btn" @click="addArrayItem('allowed_sources')">+ Add source</button>
+            </div>
+
+            <div v-if="apiRunsUrl !== ''" class="config-field">
+                <div class="field-label">{{ t('api_trigger.example') }}</div>
+                <pre class="api-example webhook-mono" data-testid="api-curl">{{ apiCurlExample }}</pre>
+                <button type="button" class="webhook-btn" @click="copyText('api_curl', apiCurlExample)">
+                    {{ copied === 'api_curl' ? t('webhook_trigger.copied') : t('webhook_trigger.copy') }}
+                </button>
+                <div class="field-hint">{{ t('api_trigger.example_hint') }}</div>
+            </div>
+
+            <div class="config-field">
+                <div class="field-label">{{ t('webhook_trigger.response') }}</div>
+                <select
+                    class="field-input"
+                    data-testid="api-response-mode"
+                    :value="apiLegacy ? '' : apiResponseMode"
+                    @change="setApiResponseMode(($event.target as HTMLSelectElement).value)"
+                >
+                    <option v-if="apiLegacy" value="" disabled>{{ t('api_trigger.choose_response') }}</option>
+                    <option value="async">{{ t('webhook_trigger.response_async') }}</option>
+                    <option value="sync">{{ t('webhook_trigger.response_sync') }}</option>
+                </select>
+                <div class="field-hint">
+                    {{ apiResponseMode === 'sync' ? t('api_trigger.response_sync_hint') : t('api_trigger.response_async_hint') }}
+                </div>
             </div>
         </AccordionSection>
 
@@ -995,6 +1042,16 @@ function defaultConfig(type: string): Record<string, unknown> {
 }
 .webhook-sub {
     margin-top: 10px;
+}
+.api-example {
+    margin: 0 0 6px;
+    padding: 8px;
+    border: 1px solid var(--border-2);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 .webhook-secret-box {
     margin-bottom: 8px;

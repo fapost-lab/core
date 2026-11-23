@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Webhook;
 
-use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
-use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowWebhookEndpointRepositoryInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
-use App\Domains\Flow\Models\FlowWebhookEndpoint;
+use App\Domains\Flow\Services\LiveTriggerLookup;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Services\CurrentAccessState;
@@ -21,7 +19,6 @@ use Fapost\Foundation\Channel\Ingress\IngressSpecExecutor;
 use Fapost\Foundation\Channel\Ingress\SignedRequest;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Bus\Dispatcher;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
@@ -68,8 +65,7 @@ final readonly class FlowWebhookReceiver
         private TenantContextInterface $tenantContext,
         private CurrentAccessState $accessState,
         private FlowWebhookEndpointRepositoryInterface $endpoints,
-        private FlowTriggerRepositoryInterface $triggers,
-        private FlowDefinitionRepositoryInterface $definitions,
+        private LiveTriggerLookup $liveTriggers,
         private FlowDraftRepositoryInterface $drafts,
         private FlowTriggerStateRepositoryInterface $triggerStates,
         private PlatformSettingsReaderInterface $settings,
@@ -118,7 +114,7 @@ final readonly class FlowWebhookReceiver
         }
 
         $endpoint = $this->endpoints->findByToken($tenantId, $request->token);
-        $trigger  = null === $endpoint ? null : $this->liveTrigger($endpoint);
+        $trigger  = null === $endpoint ? null : $this->liveTriggers->find($tenantId, $endpoint->trigger_id, FlowTriggerType::Webhook, $endpoint->flow_id);
         $config   = null === $trigger ? null : $this->config($trigger);
 
         if (null === $endpoint || null === $trigger || null === $config) {
@@ -157,7 +153,7 @@ final readonly class FlowWebhookReceiver
             return WebhookOutcome::of(WebhookOutcomeStatus::InvalidSignature);
         }
 
-        // Not through liveTrigger(): that answer counts against the sender's address, and a busy sender of a flow switched
+        // Not through the live-trigger lookup: that answer counts against the sender's address, and a busy sender of a flow switched
         // off would be held back from the tenant's live flows too.
         if ($this->drafts->isSwitchedOff($trigger->flow_id)) {
             $this->logger->info('flow.webhook.flow_off', $context);
@@ -219,44 +215,6 @@ final readonly class FlowWebhookReceiver
         $reply = $this->syncWait->await($tenantId, $trigger->id, $fireKey, [...$context, 'delivery_id' => $shownId]);
 
         return null === $reply ? WebhookOutcome::accepted($shownId) : WebhookOutcome::replied($shownId, $reply);
-    }
-
-    /**
-     * The endpoint's trigger as it is live now: a `flow_triggers` row of the endpoint's flow, of type webhook and
-     * active, whose flow has a published version. A trigger only saved in a draft has no row yet.
-     */
-    private function liveTrigger(FlowWebhookEndpoint $endpoint): ?FlowTrigger
-    {
-        foreach ($this->triggers->getByFlowId($endpoint->flow_id) as $row) {
-            if (mb_strtolower($row->id) !== mb_strtolower($endpoint->trigger_id)) {
-                continue;
-            }
-
-            if (FlowTriggerType::Webhook !== $row->type || ! $row->is_active) {
-                return null;
-            }
-
-            if (! $this->flowIsManaged($row->flow_id)) {
-                return null;
-            }
-
-            return null === $this->definitions->findLatestActiveByFlowId($row->flow_id) ? null : $row;
-        }
-
-        return null;
-    }
-
-    /**
-     * Whether someone can still manage the flow: its draft and the draft's assistant exist. A deleted flow or assistant
-     * leaves its definitions and trigger rows behind, but a URL nobody can revoke must not start runs.
-     */
-    private function flowIsManaged(string $flowId): bool
-    {
-        try {
-            return null !== $this->drafts->findByFlowId($flowId)->assistant;
-        } catch (ModelNotFoundException) {
-            return false;
-        }
     }
 
     /**

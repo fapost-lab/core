@@ -30,6 +30,9 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use RuntimeException;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\Flow\InMemoryWebhookDeliveryDedup;
+use Tests\Support\Flow\InMemoryWebhookReplyStore;
+use Tests\Support\Flow\InMemoryWebhookWaitSlots;
 
 /**
  * `POST /hooks/flow/{token}`: what a webhook trigger accepts, what it refuses and how, and that only an accepted
@@ -582,106 +585,5 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
         }
 
         return $this->call('POST', '/hooks/flow/' . $token . $query, [], [], [], $server, $body);
-    }
-}
-
-/**
- * {@see WebhookDeliveryDedupInterface} in memory: the Redis one has its own test against a real Redis.
- */
-final class InMemoryWebhookDeliveryDedup implements WebhookDeliveryDedupInterface
-{
-    /** @var array<string, true> */
-    public array $claimed = [];
-
-    public function claim(string $tenantId, string $triggerId, string $fireKey): bool
-    {
-        $key = "{$tenantId}:{$triggerId}:{$fireKey}";
-
-        if (isset($this->claimed[$key])) {
-            return false;
-        }
-
-        $this->claimed[$key] = true;
-
-        return true;
-    }
-
-    public function release(string $tenantId, string $triggerId, string $fireKey): void
-    {
-        unset($this->claimed["{$tenantId}:{$triggerId}:{$fireKey}"]);
-    }
-}
-
-/**
- * {@see WebhookReplyStoreInterface} in memory: an answer prepared for a fire key is "delivered" before the request
- * waits; the Redis one has its own test against a real Redis.
- */
-final class InMemoryWebhookReplyStore implements WebhookReplyStoreInterface
-{
-    /** @var array<string, WebhookReply> by fire key */
-    public array $prepared = [];
-
-    /** @var list<array{string, string, string, int}> */
-    public array $awaited = [];
-
-    /** @var list<string> */
-    public array $found = [];
-
-    public function keep(string $tenantId, string $triggerId, string $fireKey, WebhookReply $reply): bool
-    {
-        if (isset($this->prepared[$fireKey])) {
-            return false;
-        }
-
-        $this->prepared[$fireKey] = $reply;
-
-        return true;
-    }
-
-    public function await(string $tenantId, string $triggerId, string $fireKey, int $seconds): ?WebhookReply
-    {
-        $this->awaited[] = [$tenantId, mb_strtolower($triggerId), $fireKey, $seconds];
-
-        return $this->prepared[$fireKey] ?? null;
-    }
-
-    public function find(string $tenantId, string $triggerId, string $fireKey): ?WebhookReply
-    {
-        $this->found[] = $fireKey;
-
-        return $this->prepared[$fireKey] ?? null;
-    }
-}
-
-/**
- * {@see WebhookWaitSlotsInterface} in memory: records what was asked and what is still held.
- */
-final class InMemoryWebhookWaitSlots implements WebhookWaitSlotsInterface
-{
-    public bool $full = false;
-
-    /** @var list<array{int, int, int}> */
-    public array $acquired = [];
-
-    /** @var array<string, string> slot => tenant */
-    public array $held = [];
-
-    public function acquire(string $tenantId, int $installationMax, int $tenantMax, int $holdSeconds): ?string
-    {
-        $this->acquired[] = [$installationMax, $tenantMax, $holdSeconds];
-
-        if ($this->full) {
-            return null;
-        }
-
-        $slot              = 'slot-' . count($this->acquired);
-        $this->held[$slot] = $tenantId;
-
-        return $slot;
-    }
-
-    public function release(string $tenantId, string $slot): void
-    {
-        unset($this->held[$slot]);
     }
 }

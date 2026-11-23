@@ -265,3 +265,12 @@ fix, settled at the owner's gate of `flow-api-trigger` (2026-11-20) or by the ta
   `StartFlowRuns` included, so only an administrator puts it on a token (7).
 - The Staff `Gate::before` is registered as soon as the Gate is resolved, ahead of the permission package's own
   before-callback, which would otherwise answer `true` for the support user's admin-role permissions (7, 8).
+
+## Built 2026-11-23 (task `flow-api-trigger`)
+
+The first endpoint on the stack: `POST /api/v1/flow-triggers/{trigger}/runs` (Flow, `FlowApiTriggerController`), asking
+`StartFlowRuns` by value. Every refusal of the tenant API is JSON `{"error":"<code>"}` whatever the client accepts:
+the stack's 401, the endpoint's own refusals, and the framework's HTTP exceptions under `api/v1/*` (429, 404, 405,
+413) through a render callback in `bootstrap/app.php`. The webhook's sync answer (`adr-20261119-flow-webhook-trigger`)
+now serves an API trigger in `response_mode: sync` too: the run-end answer and `webhook_response@1` recognise `api:`
+fire keys as well as `wh:`.

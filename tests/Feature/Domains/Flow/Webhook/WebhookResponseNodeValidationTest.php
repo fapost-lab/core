@@ -62,6 +62,14 @@ final class WebhookResponseNodeValidationTest extends FeatureTestCase
         $this->assertSame('nodes.respond', $result->warnings[0]->path);
     }
 
+    public function test_an_api_trigger_that_waits_also_takes_the_node_and_one_that_does_not_is_a_warning(): void
+    {
+        $this->assertSame([], $this->validate($this->draft($this->respond(['status' => 200, 'body_type' => 'text', 'text' => 'ok']), 'sync', 'api'))->warnings);
+
+        $result = $this->validate($this->draft($this->respond(['status' => 200, 'body_type' => 'text', 'text' => 'ok']), 'async', 'api'));
+        $this->assertSame(['webhook_response_without_sync_trigger'], array_map(static fn ($warning): string => $warning->code, $result->warnings));
+    }
+
     public function test_a_status_out_of_range_or_a_body_of_the_wrong_kind_is_refused(): void
     {
         $codes = fn (array $config): array => array_map(
@@ -89,7 +97,7 @@ final class WebhookResponseNodeValidationTest extends FeatureTestCase
     /**
      * @param  array<string, mixed>  $node
      */
-    private function draft(array $node, string $responseMode): FlowDraft
+    private function draft(array $node, string $responseMode, string $triggerType = 'webhook'): FlowDraft
     {
         return FlowDraft::factory()->create([
             'tenant_id'    => $this->tenantId,
@@ -98,10 +106,12 @@ final class WebhookResponseNodeValidationTest extends FeatureTestCase
             'edges'        => [['id' => 'e1', 'from' => 'respond', 'to' => 'end', 'handle' => 'default']],
             'triggers'     => [[
                 'id'        => mb_strtolower(Str::ulid()->toRfc4122()),
-                'type'      => 'webhook',
+                'type'      => $triggerType,
                 'is_active' => true,
                 'priority'  => 100,
-                'config'    => ['verification' => 'header_equals', 'signature_header' => 'X-Webhook-Secret', 'response_mode' => $responseMode],
+                'config'    => 'api' === $triggerType
+                    ? ['response_mode' => $responseMode]
+                    : ['verification' => 'header_equals', 'signature_header' => 'X-Webhook-Secret', 'response_mode' => $responseMode],
             ]],
         ]);
     }

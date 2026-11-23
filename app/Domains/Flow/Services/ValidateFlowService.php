@@ -377,7 +377,7 @@ final readonly class ValidateFlowService
     }
 
     /**
-     * A `webhook_response` node answers only a sender that waits, which only a webhook trigger in `sync` mode makes.
+     * A `webhook_response` node answers only a caller that waits, which only a webhook or API trigger in `sync` mode makes.
      * Without one the node does nothing — unless the flow runs as a subflow of a flow that has one — so the author is
      * told. Skipped when the triggers are not given.
      *
@@ -395,7 +395,7 @@ final readonly class ValidateFlowService
             $config = is_array($trigger) && is_array($trigger['config'] ?? null) ? $trigger['config'] : [];
 
             if (is_array($trigger)
-                && FlowTriggerType::Webhook->value === ($trigger['type'] ?? null)
+                && in_array($trigger['type'] ?? null, [FlowTriggerType::Webhook->value, FlowTriggerType::Api->value], true)
                 && WebhookTriggerConfig::RESPONSE_SYNC === ($config['response_mode'] ?? null)) {
                 return;
             }
@@ -409,7 +409,7 @@ final readonly class ValidateFlowService
             $warnings[] = new FlowValidationErrorDto(
                 path: "nodes.{$nodeId}",
                 code: 'webhook_response_without_sync_trigger',
-                message: "Node {$nodeId} answers a webhook sender, but the flow has no webhook trigger that waits for the answer (response mode sync): unless the flow runs as a subflow of one that has, the node does nothing.",
+                message: "Node {$nodeId} answers a webhook sender or an API caller, but the flow has no webhook or API trigger that waits for the answer (response mode sync): unless the flow runs as a subflow of one that has, the node does nothing.",
             );
         }
     }

@@ -166,6 +166,7 @@ function deleteTrigger() {
                                     :flow-id="builderStore.flowId"
                                     :webhook-endpoints="builderStore.webhookEndpoints"
                                     :trigger-states="builderStore.triggerStates"
+                                    :api-trigger="builderStore.apiTrigger"
                                     :read-only="builderStore.readOnly"
                                     :flush-draft="builderStore.flushDraft"
                                     @webhook-endpoint="builderStore.setWebhookEndpoint"

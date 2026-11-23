@@ -146,6 +146,54 @@ describe('TriggerConfig webhook response mode', () => {
     })
 })
 
+describe('TriggerConfig API trigger', () => {
+    beforeEach(() => grant(['manage_automations']))
+
+    const apiTrigger = {
+        runs_url:            'https://acme.example.test/api/v1/flow-triggers/00000000-0000-0000-0000-000000000000/runs',
+        trigger_placeholder: '00000000-0000-0000-0000-000000000000',
+        tokens_url:          'https://acme.example.test/admin/api-tokens',
+    }
+
+    function mountApiTrigger(config: Record<string, unknown>, info: typeof apiTrigger | null = apiTrigger) {
+        return mount(TriggerConfig, {
+            props: {
+                trigger: {id: '0193A1B2-C3D4-7E5F-8091-A2B3C4D5E6F7', type: 'api', is_active: true, priority: 0, config},
+                apiTrigger: info,
+            },
+        })
+    }
+
+    it('shows the address of this trigger and a curl call with a token and an idempotency key', () => {
+        const wrapper = mountApiTrigger({response_mode: 'async'})
+        const url     = 'https://acme.example.test/api/v1/flow-triggers/0193a1b2-c3d4-7e5f-8091-a2b3c4d5e6f7/runs'
+
+        expect((wrapper.find('[data-testid=api-url]').element as HTMLInputElement).value).toBe(url)
+        expect(wrapper.find('[data-testid=api-curl]').text()).toContain(`curl -X POST '${url}'`)
+        expect(wrapper.find('[data-testid=api-curl]').text()).toContain('Authorization: Bearer fpt_')
+        expect(wrapper.find('[data-testid=api-curl]').text()).toContain('Idempotency-Key:')
+        expect(wrapper.find('a[href="https://acme.example.test/admin/api-tokens"]').exists()).toBe(true)
+        expect(wrapper.find('[data-testid=api-legacy]').exists()).toBe(false)
+        expect((wrapper.find('[data-testid=api-response-mode]').element as HTMLSelectElement).value).toBe('async')
+    })
+
+    it('shows no address without one from the server', () => {
+        expect(mountApiTrigger({response_mode: 'async'}, null).find('[data-testid=api-url]').exists()).toBe(false)
+    })
+
+    it('replaces an old config with the chosen response mode', async () => {
+        const wrapper = mountApiTrigger({route_key: 'start', allowed_sources: []})
+
+        expect(wrapper.find('[data-testid=api-legacy]').exists()).toBe(true)
+        // Nothing is preselected: picking "async" must be a change the browser reports.
+        expect((wrapper.find('[data-testid=api-response-mode]').element as HTMLSelectElement).value).toBe('')
+
+        await wrapper.find('[data-testid=api-response-mode]').setValue('async')
+
+        expect((wrapper.emitted('update:trigger')?.at(-1)?.[0] as {config: Record<string, unknown>}).config).toEqual({response_mode: 'async'})
+    })
+})
+
 describe('TriggerConfig automation permission', () => {
     beforeEach(() => grant([]))
 

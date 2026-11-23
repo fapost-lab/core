@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Validation;
 
+use App\Domains\Flow\Api\ApiTriggerConfig;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Events\EventTriggerAssistantFilter;
@@ -121,12 +122,7 @@ final readonly class FlowTriggerConfigValidator implements FlowTriggerConfigVali
      */
     private function validateApiConfig(array $config): void
     {
-        $routeKey = $config['route_key'] ?? null;
-
-        if ((null !== $routeKey && (! is_string($routeKey) || '' === mb_trim($routeKey)))
-            || ! is_array($config['allowed_sources'] ?? null)) {
-            throw new InvalidArgumentException('Invalid api trigger config.');
-        }
+        ApiTriggerConfig::fromConfig($config);
     }
 
     /**

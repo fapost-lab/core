@@ -31,7 +31,7 @@ reviewed_at: 2026-11-23
 ## Responsibility
 
 Flow executes published flow definitions for a contact, or as a contactless automation run
-(no contact, optionally no assistant; started through `Orchestration/AutomationRunner` by `StartAutomationRunJob`, which a Core event dispatches — `DispatchFlowTriggerEventJob`, from the events of `Events/CoreEventCatalog` that `Listeners/PublishCoreEvents` publishes — the webhook trigger dispatches, and the schedule trigger dispatches for the `pending` run it created when it claimed a slot — `Schedule/ScheduleTriggerFirer`, run by `flow:fire-scheduled-triggers`). It routes an inbound message or event
+(no contact, optionally no assistant; started through `Orchestration/AutomationRunner` by `StartAutomationRunJob`, which a Core event dispatches — `DispatchFlowTriggerEventJob`, from the events of `Events/CoreEventCatalog` that `Listeners/PublishCoreEvents` publishes — the webhook and API triggers dispatch, and the schedule trigger dispatches for the `pending` run it created when it claimed a slot — `Schedule/ScheduleTriggerFirer`, run by `flow:fire-scheduled-triggers`). It routes an inbound message or event
 to a flow session, runs node handlers until the flow waits, ends or fails, and persists session
 state. It also owns triggers, subflows, the session lock, run history and logs, the template
 expression engine, and content translation (`Translations/`, `ContentTranslatorInterface`),
@@ -144,6 +144,11 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   store) for the `webhook_response` node's answer or the run's end (`Webhook/WebhookRunEndReply`, called by `FlowEngine`).
   The builder makes the URL and the secret through `Webhook/FlowWebhookEndpointService`
   (`adr-20261119-flow-webhook-trigger`).
+- API triggers: `POST /api/v1/flow-triggers/{trigger}/runs` (`routes/api.php`, the `api-token` stack) →
+  `Http/Controllers/Flow/FlowApiTriggerController` (`StartFlowRuns` by value) → `Api/FlowApiTriggerReceiver` (JSON
+  object, `Services/LiveTriggerLookup` — shared with the webhook — `Api/ApiFireKey`, the webhook's dedup) →
+  `StartAutomationRunJob` with the call under `flow.api`, 202; `response_mode: sync` waits through
+  `Webhook/WebhookSyncWait` like a webhook (`Webhook/InboundFireKey` tells both kinds of run apart).
 - Events: `StartFlowFromEventJob` (queue `scheduled.triggers`) and `DispatchFlowTriggerEventJob`; a flow event's start
   takes the `start_flow` collision and once-only rules (`event:` start key, the emitting session as the asking one,
   `adr-20261123-event-start-collisions`). Schedules:

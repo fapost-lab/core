@@ -36,6 +36,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -198,6 +199,27 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return response()->json(['error' => 'unauthenticated'], 401);
+        });
+
+        // The tenant API answers every refusal the framework raises — the token's rate limit (429), an address that names
+        // no route (404), another method (405), a body over PHP's limit (413) — as JSON `{"error":"<code>"}`, like its own
+        // refusals, whatever the client accepts: an outside system gets no HTML page. The headers stay (`Retry-After`).
+        $exceptions->render(function (HttpExceptionInterface $exception, Request $request) {
+            if (! $request->is('api/v1/*')) {
+                return null;
+            }
+
+            $status = $exception->getStatusCode();
+            $code   = match ($status) {
+                404     => 'not_found',
+                405     => 'method_not_allowed',
+                413     => 'payload_too_large',
+                429     => 'too_many_requests',
+                503     => 'service_unavailable',
+                default => 'http_' . $status,
+            };
+
+            return response()->json(['error' => $code], $status, $exception->getHeaders());
         });
 
         $exceptions->render(function (DraftVersionConflictException $exception, Request $request) {

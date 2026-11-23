@@ -154,7 +154,9 @@ Credentials' OAuth2 types fetch their tokens through Flow's `GuardedHttpClient`,
   (`adr-20261123-flow-switch-gates-automatic-starts`). A flow's webhook trigger is a second inbound HTTP path,
    owned by `flow`, not `channel-ingress`: `POST /hooks/flow/{token}` on the tenant's host, checked with Foundation's
    `IngressSpec`, deduplicated by delivery id, answered 202 once `StartAutomationRunJob` is queued
-   (`adr-20261119-flow-webhook-trigger`). A trigger type an extension registered is fired by the extension's own code
+   (`adr-20261119-flow-webhook-trigger`). A flow's API trigger is a third: `POST /api/v1/flow-triggers/{trigger}/runs`
+   on the tenant API's `api-token` stack, for a tenant API token holding `StartFlowRuns`, sharing the webhook's live
+   trigger check, dedup and sync wait (`adr-20261119-tenant-api-tokens`). A trigger type an extension registered is fired by the extension's own code
    (Foundation's `TriggerFirerInterface`): `FireRegisteredTriggerJob` on `scheduled.triggers` fans out one
    `StartAutomationRunJob` per matching active trigger (`adr-20261123-solution-trigger-types`).
 3. **Broadcast fan-out.** `BroadcastDispatcher` → `RunBroadcastJob` → `SendBroadcastRecipientJob`
