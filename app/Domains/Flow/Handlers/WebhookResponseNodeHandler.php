@@ -10,6 +10,7 @@ use App\Domains\Flow\Services\SegmentHandOff;
 use App\Domains\Flow\Webhook\InboundFireKey;
 use App\Domains\Flow\Webhook\WebhookReply;
 use App\Domains\Flow\Webhook\WebhookReplyStoreInterface;
+use App\Domains\Flow\Webhook\WebhookReplyType;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
@@ -81,8 +82,8 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
      */
     public function configSchema(): array
     {
-        $json = ['body_type' => WebhookReply::TYPE_JSON];
-        $text = ['body_type' => WebhookReply::TYPE_TEXT];
+        $json = ['body_type' => WebhookReplyType::Json->value];
+        $text = ['body_type' => WebhookReplyType::Text->value];
 
         return Schema::make()
             ->section(
@@ -95,14 +96,14 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
                             ->required()
                             ->default(self::DEFAULT_STATUS)
                             ->min(WebhookReply::MIN_STATUS)
-                            ->max(WebhookReply::MAX_STATUS),
+                            ->max(WebhookReply::MAX_NODE_STATUS),
                         SelectField::make('body_type')
                             ->label((string) __('builder.nodes.webhook_response.body_type'))
                             ->required()
-                            ->default(WebhookReply::TYPE_JSON)
+                            ->default(WebhookReplyType::Json->value)
                             ->options([
-                                WebhookReply::TYPE_JSON => (string) __('builder.nodes.webhook_response.body_types.json'),
-                                WebhookReply::TYPE_TEXT => (string) __('builder.nodes.webhook_response.body_types.text'),
+                                WebhookReplyType::Json->value => (string) __('builder.nodes.webhook_response.body_types.json'),
+                                WebhookReplyType::Text->value => (string) __('builder.nodes.webhook_response.body_types.text'),
                             ]),
                         JsonField::make('body')
                             ->label((string) __('builder.nodes.webhook_response.body'))
@@ -129,22 +130,22 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
         if (null === self::status($config['status'] ?? self::DEFAULT_STATUS)) {
             $issues[] = NodeConfigIssue::error(
                 'webhook_response_invalid_status',
-                'The response status must be a whole number from ' . WebhookReply::MIN_STATUS . ' to ' . WebhookReply::MAX_STATUS . '.',
+                'The response status must be a whole number from ' . WebhookReply::MIN_STATUS . ' to ' . WebhookReply::MAX_NODE_STATUS . '.',
                 'status',
             );
         }
 
-        $type = $config['body_type'] ?? WebhookReply::TYPE_JSON;
+        $type = WebhookReplyType::fromValue($config['body_type'] ?? WebhookReplyType::Json->value);
 
-        if (WebhookReply::TYPE_JSON !== $type && WebhookReply::TYPE_TEXT !== $type) {
+        if (null === $type) {
             $issues[] = NodeConfigIssue::error('webhook_response_invalid_body_type', 'The body type must be json or text.', 'body_type');
         }
 
-        if (WebhookReply::TYPE_JSON === $type && array_key_exists('body', $config) && ! is_array($config['body'])) {
+        if (WebhookReplyType::Json === $type && array_key_exists('body', $config) && ! is_array($config['body'])) {
             $issues[] = NodeConfigIssue::error('webhook_response_invalid_body', 'A JSON body must be an object or a list.', 'body');
         }
 
-        if (WebhookReply::TYPE_TEXT === $type && array_key_exists('text', $config) && null !== $config['text'] && ! is_string($config['text'])) {
+        if (WebhookReplyType::Text === $type && array_key_exists('text', $config) && null !== $config['text'] && ! is_string($config['text'])) {
             $issues[] = NodeConfigIssue::error('webhook_response_invalid_text', 'A text body must be text.', 'text');
         }
 
@@ -191,7 +192,7 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
             $value = (int) $value;
         }
 
-        if (! is_int($value) || $value < WebhookReply::MIN_STATUS || $value > WebhookReply::MAX_STATUS) {
+        if (! is_int($value) || $value < WebhookReply::MIN_STATUS || $value > WebhookReply::MAX_NODE_STATUS) {
             return null;
         }
 
@@ -205,9 +206,9 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
     private function reply(array $config, NodeExecutionContext $context, array $state): ?WebhookReply
     {
         $status = self::status($config['status'] ?? self::DEFAULT_STATUS) ?? self::DEFAULT_STATUS;
-        $type   = WebhookReply::TYPE_TEXT === ($config['body_type'] ?? null) ? WebhookReply::TYPE_TEXT : WebhookReply::TYPE_JSON;
+        $type   = WebhookReplyType::fromValue($config['body_type'] ?? null) ?? WebhookReplyType::Json;
 
-        if (WebhookReply::TYPE_TEXT === $type) {
+        if (WebhookReplyType::Text === $type) {
             $rendered = $this->templates->render(is_string($config['text'] ?? null) ? $config['text'] : '', $context, $state);
             $body     = is_scalar($rendered) ? (string) $rendered : '';
         } else {

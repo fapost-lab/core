@@ -17,6 +17,7 @@ use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Webhook\WebhookDeliveryDedupInterface;
 use App\Domains\Flow\Webhook\WebhookReply;
 use App\Domains\Flow\Webhook\WebhookReplyStoreInterface;
+use App\Domains\Flow\Webhook\WebhookReplyType;
 use App\Domains\Flow\Webhook\WebhookWaitSlotsInterface;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
@@ -339,7 +340,7 @@ final class FlowApiTriggerTest extends FeatureTestCase
         [, $triggerId] = $this->liveApiTrigger(config: ['response_mode' => 'sync']);
         $fireKey       = 'api:' . $this->tokenId() . ':sync-1';
 
-        $this->replies->prepared[$fireKey] = new WebhookReply(201, '{"order":"created"}', WebhookReply::TYPE_JSON);
+        $this->replies->prepared[$fireKey] = new WebhookReply(201, '{"order":"created"}', WebhookReplyType::Json);
 
         $response = $this->callTrigger($triggerId, '{}', ['Idempotency-Key' => 'sync-1'])
             ->assertStatus(201)

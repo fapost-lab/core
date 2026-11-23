@@ -17,6 +17,7 @@ use App\Domains\Flow\Webhook\FlowWebhookReceiver;
 use App\Domains\Flow\Webhook\WebhookDeliveryDedupInterface;
 use App\Domains\Flow\Webhook\WebhookReply;
 use App\Domains\Flow\Webhook\WebhookReplyStoreInterface;
+use App\Domains\Flow\Webhook\WebhookReplyType;
 use App\Domains\Flow\Webhook\WebhookWaitSlotsInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Services\CurrentAccessState;
@@ -386,7 +387,7 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
     public function test_a_sync_trigger_answers_with_the_flows_reply_while_holding_a_wait_slot(): void
     {
         [, $triggerId, $token]                = $this->liveWebhook(config: $this->syncConfig());
-        $this->replies->prepared['wh:sync-1'] = new WebhookReply(201, '{"order":"created"}', WebhookReply::TYPE_JSON);
+        $this->replies->prepared['wh:sync-1'] = new WebhookReply(201, '{"order":"created"}', WebhookReplyType::Json);
 
         $response = $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'sync-1'])
             ->assertStatus(201)
@@ -402,7 +403,7 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
     public function test_a_text_reply_is_sent_as_plain_text_and_carries_no_header_of_the_flow(): void
     {
         [, , $token]                             = $this->liveWebhook(config: $this->syncConfig());
-        $this->replies->prepared['wh:sync-text'] = new WebhookReply(200, 'ok', WebhookReply::TYPE_TEXT);
+        $this->replies->prepared['wh:sync-text'] = new WebhookReply(200, 'ok', WebhookReplyType::Text);
 
         $response = $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'sync-text'])->assertOk();
 
@@ -415,7 +416,7 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
     {
         [, , $token]                        = $this->liveWebhook(config: $this->syncConfig());
         $this->slots->full                  = true;
-        $this->replies->prepared['wh:busy'] = new WebhookReply(200, '{}', WebhookReply::TYPE_JSON);
+        $this->replies->prepared['wh:busy'] = new WebhookReply(200, '{}', WebhookReplyType::Json);
 
         $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'busy'])
             ->assertStatus(202)
@@ -451,7 +452,7 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
             ->assertExactJson(['status' => 'duplicate', 'delivery_id' => 'again']);
 
         // The flow answered meanwhile: a repeat gets that answer while it is kept.
-        $this->replies->prepared['wh:again'] = new WebhookReply(202, '{"queued":true}', WebhookReply::TYPE_JSON);
+        $this->replies->prepared['wh:again'] = new WebhookReply(202, '{"queued":true}', WebhookReplyType::Json);
         $this->assertSame('{"queued":true}', $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'again'])->assertStatus(202)->getContent());
 
         $this->assertCount(1, $this->replies->awaited, 'A duplicate never waits: it would take the first request\'s wake-up.');
@@ -461,7 +462,7 @@ final class FlowWebhookTriggerTest extends FeatureTestCase
     public function test_an_async_trigger_never_waits_or_reads_a_kept_answer(): void
     {
         [, , $token]                         = $this->liveWebhook();
-        $this->replies->prepared['wh:async'] = new WebhookReply(200, '{"ignored":true}', WebhookReply::TYPE_JSON);
+        $this->replies->prepared['wh:async'] = new WebhookReply(200, '{"ignored":true}', WebhookReplyType::Json);
 
         $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'async'])->assertStatus(202);
         $this->deliver($token, '{}', ['X-GitHub-Delivery' => 'async'])->assertExactJson(['status' => 'duplicate', 'delivery_id' => 'async']);
