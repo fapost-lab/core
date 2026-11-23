@@ -78,7 +78,7 @@ final class CredentialsConsoleTest extends CredentialsTestCase
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('Console/Credentials/Create')
-                ->where('types', fn ($types): bool => ['bearer', 'basic', 'api_key_header', 'api_key_query', 'oauth2_client_credentials'] === collect($types)->pluck('id')->all())
+                ->where('types', fn ($types): bool => ['bearer', 'basic', 'api_key_header', 'api_key_query', 'oauth2_client_credentials', 'oauth2_authorization_code'] === collect($types)->pluck('id')->all())
                 ->where('types.0', [
                     'id'     => 'bearer',
                     'label'  => 'Bearer token',

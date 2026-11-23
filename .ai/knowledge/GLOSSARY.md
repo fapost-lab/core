@@ -117,7 +117,9 @@ Use in: source code, schema, documentation.
 A secret a tenant saved once (a bearer token, a basic login, an API key in a header or query, OAuth2 client
 credentials) so that a flow's `call` node can authorize a request without the value sitting in the flow
 definition. A flow names it by `credential_id`; the value is never shown again after saving. A credential
-works only against its allowed hosts.
+works only against its allowed hosts. An OAuth2 authorization code credential also has a **consent grant**: the
+access and refresh tokens a person granted at the provider by connecting it from the console, stored apart from the
+credential and dropped when its client changes.
 
 Use in: source code (`App\Domains\Credentials`), schema, documentation.
 

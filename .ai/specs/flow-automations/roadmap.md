@@ -88,7 +88,7 @@ Goal: the remaining conveniences. Done when: a failed run is re-run from the sta
 credential is connected through an OAuth consent screen.
 
 - [ ] Re-run from the start — same trigger payload, `RerunFlow` permission (after: Node trace with full data — the payload must be stored)
-- [ ] OAuth2 with user consent — a callback route per tenant and scheduled token refresh (after: Credentials store — a new credential type)
+- [x] OAuth2 with user consent — a callback route per tenant and scheduled token refresh (after: Credentials store — a new credential type)
 
 ## Waves
 

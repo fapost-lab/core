@@ -8,8 +8,12 @@ use App\Domains\Audit\Contracts\AuditTrailInterface;
 use App\Domains\Audit\DTOs\AuditChanges;
 use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Audit\Enums\AuditAction;
+use App\Domains\Credentials\Contracts\ValidatesOwnSettingsInterface;
 use App\Domains\Credentials\Models\Credential;
+use App\Domains\Credentials\OAuth2\OAuth2GrantRepository;
+use App\Domains\Credentials\Types\OAuth2AuthorizationCodeType;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use Fapost\Foundation\Credentials\Contracts\HttpCredentialTypeInterface;
 use Fapost\Foundation\Credentials\DTO\CredentialField;
 use Fapost\Foundation\Credentials\Enums\CredentialFieldKind;
 use Illuminate\Contracts\Encryption\DecryptException;
@@ -30,9 +34,13 @@ use Illuminate\Validation\ValidationException;
  * the type does not declare is dropped. On an update a secret left empty keeps the stored one, and the type never
  * changes. A refusal is a {@see ValidationException} whose messages never carry a value.
  *
+ * A type may add rules of its own for a setting ({@see ValidatesOwnSettingsInterface}).
+ *
  * Each write and its audit entry commit together. The entry names the credential's name, type and hosts and the fact
  * that settings changed or the secret was replaced; no setting or secret value is recorded. After an update or a
- * delete has committed, the cached OAuth2 token of the credential is dropped.
+ * delete has committed, the cached OAuth2 token of the credential is dropped. The consent grant of an
+ * `oauth2_authorization_code` credential is deleted in the same transaction when the client it was given to changes
+ * (a setting of {@see OAuth2AuthorizationCodeType::GRANT_BOUND_SETTINGS} or the secret), and with the credential.
  */
 final readonly class CredentialWriter
 {
@@ -48,6 +56,7 @@ final readonly class CredentialWriter
         private TenantContextInterface $tenants,
         private CredentialTypeRegistry $types,
         private OAuth2TokenCache $tokens,
+        private OAuth2GrantRepository $grants,
         private AuditTrailInterface $audit,
     ) {
     }
@@ -87,12 +96,13 @@ final readonly class CredentialWriter
             throw ValidationException::withMessages(['type' => __('credential_validation.type_unknown')]);
         }
 
-        $fields = $this->types->get($typeId)->fields();
+        $type   = $this->types->get($typeId);
+        $fields = $type->fields();
         $errors = [];
 
         $name     = $this->validName($data['name'] ?? null, null, $errors);
         $hosts    = $this->validHosts($data['allowed_hosts'] ?? null, $errors);
-        $settings = $this->validSettings($fields, $data['settings'] ?? null, $hosts, $errors);
+        $settings = $this->validSettings($type, $fields, $data['settings'] ?? null, $hosts, $errors);
         $secrets  = $this->validSecrets($fields, $data['secrets'] ?? null, [], $errors);
 
         $this->failOn($errors);
@@ -131,21 +141,23 @@ final readonly class CredentialWriter
      */
     public function update(Credential $credential, array $data): Credential
     {
-        $fields = $this->types->has($credential->type) ? $this->types->get($credential->type)->fields() : [];
+        $type   = $this->types->has($credential->type) ? $this->types->get($credential->type) : null;
+        $fields = $type?->fields() ?? [];
         $errors = [];
 
         $name     = $this->validName($data['name'] ?? null, $credential, $errors);
         $hosts    = $this->validHosts($data['allowed_hosts'] ?? null, $errors);
-        $settings = $this->validSettings($fields, $data['settings'] ?? null, $hosts, $errors);
+        $settings = $this->validSettings($type, $fields, $data['settings'] ?? null, $hosts, $errors);
         $stored   = $this->storedSecrets($credential);
         $secrets  = $this->validSecrets($fields, $data['secrets'] ?? null, $stored, $errors);
 
         $this->failOn($errors);
 
         $secretReplaced = self::sorted($secrets) !== self::sorted($stored);
+        $clientChanged  = $secretReplaced || self::grantBoundSettingsChanged($credential, $settings);
 
         try {
-            DB::transaction(function () use ($credential, $name, $settings, $hosts, $secrets, $secretReplaced): void {
+            DB::transaction(function () use ($credential, $name, $settings, $hosts, $secrets, $secretReplaced, $clientChanged): void {
                 $before = ['name' => $credential->name, 'allowed_hosts' => $credential->allowed_hosts, 'settings' => $credential->settings];
 
                 $credential->fill(['name' => $name, 'settings' => $settings, 'allowed_hosts' => $hosts]);
@@ -163,8 +175,14 @@ final readonly class CredentialWriter
                     ['settings'],
                 );
 
+                $properties = ['secret_replaced' => $secretReplaced];
+
+                if ($clientChanged && $this->grants->delete((string) $credential->getKey())) {
+                    $properties['grant_dropped'] = true;
+                }
+
                 if (!$changes->isEmpty() || $secretReplaced) {
-                    $this->record(AuditAction::CredentialUpdated, $credential, $changes, ['secret_replaced' => $secretReplaced]);
+                    $this->record(AuditAction::CredentialUpdated, $credential, $changes, $properties);
                 }
             });
         } catch (UniqueConstraintViolationException) {
@@ -182,12 +200,34 @@ final readonly class CredentialWriter
     public function delete(Credential $credential): void
     {
         DB::transaction(function () use ($credential): void {
+            // The foreign key cascades too; deleted here so it does not depend on the connection enforcing it.
+            $this->grants->delete((string) $credential->getKey());
             $credential->delete();
 
             $this->record(AuditAction::CredentialDeleted, $credential);
         });
 
         $this->tokens->forget($this->tenantId(), (string) $credential->getKey());
+    }
+
+    /**
+     * Whether an update changes the client an `oauth2_authorization_code` grant was given to.
+     *
+     * @param  array<string, string>  $settings  the settings about to be saved
+     */
+    private static function grantBoundSettingsChanged(Credential $credential, array $settings): bool
+    {
+        if (OAuth2AuthorizationCodeType::ID !== $credential->type) {
+            return false;
+        }
+
+        foreach (OAuth2AuthorizationCodeType::GRANT_BOUND_SETTINGS as $key) {
+            if (($credential->settings[$key] ?? null) !== ($settings[$key] ?? null)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -306,7 +346,7 @@ final readonly class CredentialWriter
      *
      * @return array<string, string> only the non-empty values of the type's own settings
      */
-    private function validSettings(array $fields, mixed $input, array $hosts, array &$errors): array
+    private function validSettings(?HttpCredentialTypeInterface $type, array $fields, mixed $input, array $hosts, array &$errors): array
     {
         $input    = is_array($input) ? $input : [];
         $settings = [];
@@ -335,6 +375,10 @@ final readonly class CredentialWriter
             }
 
             $error = $this->settingError($field, $value, $hosts);
+
+            if (null === $error && $type instanceof ValidatesOwnSettingsInterface) {
+                $error = $type->settingError($field->key, $value);
+            }
 
             if (null !== $error) {
                 $errors[$path] = $error;
