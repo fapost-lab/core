@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\CoreBootstrapInterface;
 use App\Domains\Tenancy\Contracts\FlowScheduleRegistryInterface;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
@@ -18,6 +19,7 @@ use App\Domains\Tenancy\Contracts\WebhookRegistryReaderInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
 use App\Domains\Tenancy\Database\TenantPostgresConnection;
+use App\Domains\Tenancy\Infrastructure\CoreBuilderModeUsage;
 use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
 use App\Domains\Tenancy\Infrastructure\CoreSupportAccess;
 use App\Domains\Tenancy\Infrastructure\CoreTenantDecommissioner;
@@ -66,6 +68,7 @@ use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use App\Domains\Tenancy\ValueObjects\PlatformSettingField;
 use Closure;
+use Fapost\Foundation\Analytics\Contracts\BuilderModeUsageInterface;
 use Fapost\Foundation\Quota\Contracts\LimitNoticeInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\PeriodUsageInterface;
@@ -358,6 +361,12 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->singleton(TenantUsageCounters::class);
         // Plain bind: Core is the only implementation of the usage report, called by an operator package.
         $this->app->bind(TenantUsageInterface::class, CoreTenantUsage::class);
+        // Plain bind for the same reason. The staff domain owns the count; it is handed in here so Tenancy
+        // does not import Staff.
+        $this->app->bind(BuilderModeUsageInterface::class, fn ($app): CoreBuilderModeUsage => new CoreBuilderModeUsage(
+            $app->make(TenantSwitcher::class),
+            User::countByBuilderMode(...),
+        ));
     }
 
     /**

@@ -142,6 +142,27 @@ final class User extends Authenticatable implements HasLocalePreference
     }
 
     /**
+     * How many of the staff places {@see countForLimit()} counts are on each builder mode, in one aggregate query.
+     * A user who never chose a mode (`null`) is on the tree.
+     *
+     * @return array{tree: int, graph: int}
+     */
+    public static function countByBuilderMode(): array
+    {
+        $row = self::query()->countedForLimit()->toBase()
+            ->selectRaw(
+                'COUNT(*) AS total, COALESCE(SUM(CASE WHEN builder_mode = ? THEN 1 ELSE 0 END), 0) AS graph',
+                [BuilderMode::Graph->value],
+            )
+            ->first();
+
+        $total = (int) ($row->total ?? 0);
+        $graph = (int) ($row->graph ?? 0);
+
+        return ['tree' => $total - $graph, 'graph' => $graph];
+    }
+
+    /**
      * Whether the person may use the console at all: active status AND not deactivated by an admin.
      */
     public function canAccessConsole(): bool
