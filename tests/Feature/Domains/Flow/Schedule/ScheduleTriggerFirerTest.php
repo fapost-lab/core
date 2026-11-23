@@ -8,6 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Exceptions\FlowHasLiveSessionsException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
@@ -15,12 +16,18 @@ use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Models\FlowTriggerState;
 use App\Domains\Flow\Orchestration\AutomationRunner;
 use App\Domains\Flow\Schedule\ScheduleTriggerFirer;
+use App\Domains\Flow\Services\FlowDraftService;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Jobs\Flow\StartAutomationRunJob;
 use Carbon\CarbonImmutable;
+use Fapost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
+use Fapost\Foundation\Analytics\DTO\AnalyticsEvent;
+use Fapost\Foundation\Analytics\Enums\AnalyticsEventType;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -200,6 +207,7 @@ final class ScheduleTriggerFirerTest extends FeatureTestCase
         Carbon::setTestNow('2026-11-20 09:00:00');
 
         $this->assertSame(['fired' => 0, 'skipped' => 1, 'missed' => 0], $this->fire());
+        $this->assertSame('2026-11-21 09:00:00', $this->trigger()->next_run_at?->format('Y-m-d H:i:s'), 'Publishing again can bring it back: the schedule keeps its next slot.');
 
         FlowDefinition::query()->where('flow_id', $draft->flow_id)->update(['is_active' => true]);
         $draft->delete();
@@ -207,9 +215,149 @@ final class ScheduleTriggerFirerTest extends FeatureTestCase
 
         $this->assertSame(['fired' => 0, 'skipped' => 1, 'missed' => 0], $this->fire());
         $this->assertSame(0, FlowSession::query()->count());
+        $this->assertNull($this->trigger()->next_run_at, 'Nobody can manage the flow any more: its schedule stops.');
         Log::shouldHaveReceived('warning')->with('flow.schedule.tick_skipped', Mockery::on(
             static fn (array $context): bool => ScheduleTriggerFirer::SKIP_FLOW_NOT_LIVE === $context['reason'],
         ))->twice();
+    }
+
+    public function test_the_schedule_of_a_deleted_assistant_stops_coming_due(): void
+    {
+        Log::spy();
+        $this->liveSchedule('* * * * *');
+        $this->assistant->delete();
+        Carbon::setTestNow('2026-11-20 08:31:00');
+
+        $this->assertSame(['fired' => 0, 'skipped' => 1, 'missed' => 0], $this->fire());
+        $this->assertNull($this->trigger()->next_run_at);
+
+        Carbon::setTestNow('2026-11-20 08:32:00');
+
+        $this->assertSame(['fired' => 0, 'skipped' => 0, 'missed' => 0], $this->fire());
+        $this->assertSame(0, FlowSession::query()->count());
+        Queue::assertNothingPushed();
+        Log::shouldHaveReceived('warning')->with('flow.schedule.tick_skipped', Mockery::on(
+            static fn (array $context): bool => ScheduleTriggerFirer::SKIP_FLOW_NOT_LIVE === $context['reason'],
+        ))->once();
+    }
+
+    public function test_a_late_pass_runs_the_earliest_slot_and_logs_the_slots_it_passed_over(): void
+    {
+        Log::spy();
+        [, $triggerId] = $this->liveSchedule('* * * * *');
+        $this->assertSame('2026-11-20 08:31:00', $this->trigger()->next_run_at?->format('Y-m-d H:i:s'));
+
+        // The pass of 08:31 overran: this one lands at 08:33:05, with 08:32 and 08:33 due as well.
+        Carbon::setTestNow('2026-11-20 08:33:05');
+
+        $this->assertSame(['fired' => 1, 'skipped' => 0, 'missed' => 0], $this->fire());
+        $this->assertSame('schedule:2026-11-20T08:31Z', FlowSession::query()->sole()->fire_key);
+        $this->assertSame('2026-11-20 08:34:00', $this->trigger()->next_run_at?->format('Y-m-d H:i:s'));
+        Log::shouldHaveReceived('warning')->with('flow.schedule.tick_missed', Mockery::on(
+            fn (array $context): bool => $triggerId === $context['trigger_id']
+                && '2026-11-20T08:32:00+00:00' === $context['slot']
+                && 2 === $context['missed_slots']
+                && '2026-11-20T08:31:00+00:00' === $context['run_slot'],
+        ))->once();
+    }
+
+    public function test_a_slot_another_pass_moved_after_this_one_read_it_is_not_claimed(): void
+    {
+        $this->liveSchedule('0 9 * * *');
+        Carbon::setTestNow('2026-11-20 09:00:00');
+
+        // Between this pass's read of the due triggers and its claim, another pass takes the slot.
+        $moved = false;
+        DB::listen(function (QueryExecuted $query) use (&$moved): void {
+            if ($moved || ! str_starts_with(mb_strtolower($query->sql), 'select') || ! str_contains($query->sql, 'flow_triggers') || ! str_contains($query->sql, 'next_run_at')) {
+                return;
+            }
+
+            $moved = true;
+            FlowTrigger::query()->toBase()->update(['next_run_at' => '2026-11-21 09:00:00']);
+        });
+
+        $this->assertSame(['fired' => 0, 'skipped' => 0, 'missed' => 0], $this->fire());
+        $this->assertTrue($moved);
+        $this->assertSame(0, FlowSession::query()->count());
+        $this->assertSame('2026-11-21 09:00:00', $this->trigger()->next_run_at?->format('Y-m-d H:i:s'));
+        $this->assertNull($this->trigger()->last_run_at);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_a_schedule_run_records_flow_started_once_at_its_activation(): void
+    {
+        $events = [];
+        $this->app->instance(AnalyticsWriterInterface::class, new class ($events) implements AnalyticsWriterInterface {
+            /** @param list<AnalyticsEvent> $events */
+            public function __construct(private array &$events)
+            {
+            }
+
+            public function record(AnalyticsEvent $event): void
+            {
+                $this->events[] = $event;
+            }
+        });
+        $started = static function () use (&$events): int {
+            return count(array_filter(
+                $events,
+                static fn (AnalyticsEvent $event): bool => AnalyticsEventType::FlowStarted === $event->eventType,
+            ));
+        };
+
+        $this->liveSchedule('0 9 * * *');
+        Carbon::setTestNow('2026-11-20 09:00:00');
+        $this->fire();
+
+        $this->assertSame(0, $started(), 'Creating the run pending records nothing.');
+
+        $job = Queue::pushed(StartAutomationRunJob::class)->sole();
+        $this->app->call([$job, 'handle']);
+
+        $this->assertSame(1, $started());
+
+        $this->app->call([$job, 'handle']);
+
+        $this->assertSame(1, $started(), 'A retry of the start job records nothing more.');
+    }
+
+    public function test_deleting_the_flow_cancels_its_run_waiting_to_start_and_the_start_job_starts_nothing(): void
+    {
+        [$draft] = $this->liveSchedule('* * * * *');
+        Carbon::setTestNow('2026-11-20 08:31:00');
+        $this->fire();
+        $this->assertSame(FlowSessionStatus::Pending, FlowSession::query()->sole()->status);
+
+        $this->app->make(FlowDraftService::class)->delete($draft);
+
+        $run = FlowSession::query()->sole();
+        $this->assertSame(FlowSessionStatus::Cancelled, $run->status);
+        $this->assertSame(2, $run->version);
+        $this->assertNull($this->trigger()->next_run_at);
+
+        $this->app->call([Queue::pushed(StartAutomationRunJob::class)->sole(), 'handle']);
+
+        $this->assertSame(FlowSessionStatus::Cancelled, FlowSession::query()->sole()->status, 'The start job finds nothing to start.');
+    }
+
+    public function test_a_run_that_has_started_still_keeps_the_flow_from_being_deleted(): void
+    {
+        [$draft] = $this->liveSchedule('* * * * *');
+        Carbon::setTestNow('2026-11-20 08:31:00');
+        $this->fire();
+        $pending = FlowSession::query()->sole();
+        $pending->replicate()->forceFill(['status' => FlowSessionStatus::WaitingInput, 'fire_key' => 'schedule:2026-11-20T08:00Z'])->save();
+
+        try {
+            $this->app->make(FlowDraftService::class)->delete($draft);
+            $this->fail('A started run must refuse the delete.');
+        } catch (FlowHasLiveSessionsException) {
+        }
+
+        $this->assertSame(FlowSessionStatus::Pending, $pending->refresh()->status, 'The refusal rolls the cancel back.');
+        $this->assertNotNull(FlowDraft::query()->find($draft->getKey()));
+        $this->assertNotNull($this->trigger()->next_run_at);
     }
 
     public function test_a_flow_switched_off_in_the_flows_list_spends_its_slot_and_is_not_caught_up(): void
@@ -224,7 +372,7 @@ final class ScheduleTriggerFirerTest extends FeatureTestCase
         $this->assertSame(0, FlowTriggerState::query()->count(), 'Run admission is not asked: nothing is counted on the trigger.');
         $this->assertSame('2026-11-21 09:00:00', $this->trigger()->next_run_at?->format('Y-m-d H:i:s'), 'The slot is spent.');
         Queue::assertNothingPushed();
-        Log::shouldHaveReceived('warning')->with('flow.schedule.tick_skipped', Mockery::on(
+        Log::shouldHaveReceived('info')->with('flow.schedule.tick_skipped', Mockery::on(
             fn (array $context): bool => $triggerId === $context['trigger_id']
                 && ScheduleTriggerFirer::SKIP_FLOW_OFF === $context['reason']
                 && '2026-11-20T09:00:00+00:00' === $context['slot'],

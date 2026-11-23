@@ -8,6 +8,7 @@ use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Tenancy\Contracts\FlowScheduleRegistryInterface;
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 
 /**
@@ -52,15 +53,17 @@ final readonly class ScheduleRegistrySync
     }
 
     /**
-     * Rewrite every registry row of the tenant from its triggers.
+     * Rewrite every registry row of the tenant from its triggers. The moment is taken before the triggers are read, so
+     * a row a publish writes meanwhile ({@see syncAfterCommit()}) is newer than the read and survives the rewrite.
      *
      * @return int how many triggers are recorded
      */
     public function rebuild(string $tenantId): int
     {
-        $due = $this->nextRuns($tenantId, null);
+        $readAt = CarbonImmutable::now();
+        $due    = $this->nextRuns($tenantId, null);
 
-        $this->registry->replaceForTenant($tenantId, $due);
+        $this->registry->replaceForTenant($tenantId, $due, $readAt);
 
         return count($due);
     }

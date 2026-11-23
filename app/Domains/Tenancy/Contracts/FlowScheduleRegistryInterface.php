@@ -33,11 +33,13 @@ interface FlowScheduleRegistryInterface
     public function forgetTenant(string $tenantId): int;
 
     /**
-     * Replace everything recorded for a tenant with {@code $nextRuns}, in one landlord transaction.
+     * Replace what was recorded for a tenant with {@code $nextRuns}, read from the tenant at {@code $readAt}, in one
+     * landlord transaction. A row written at or after {@code $readAt} ({@see put()} after a publish that committed
+     * while the tenant was being read) is newer than the list and is kept as it is.
      *
      * @param  array<string, DateTimeInterface>  $nextRuns  trigger id => when it is next due
      */
-    public function replaceForTenant(string $tenantId, array $nextRuns): void;
+    public function replaceForTenant(string $tenantId, array $nextRuns, DateTimeInterface $readAt): void;
 
     /**
      * The tenants with at least one trigger due at {@code $now}, the most overdue first.
