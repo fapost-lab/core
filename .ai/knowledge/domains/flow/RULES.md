@@ -312,6 +312,16 @@ broken.
   Why: a contactless run reaches a contact through an empty id or dies on a typed error nobody watches
   (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`,
   `ContactlessFlowSessionTest` (the addressee), `BuiltInNodeHandlersTest`.
+- **A message to tags or a segment is a broadcast, started once per node execution through Flow's port.**
+  `send_message` with `addressee.kind` `tags` or `segment` (static values; `AddresseeResolver` reads every kind) calls
+  `AudienceBroadcasterInterface`, implemented in `app/Infrastructure/Flow`, so the runtime never imports Broadcasting.
+  It is text only, its `{{contact.*}}`/`{{module.*}}` are refused in every flow (`addressee_broadcast_contact_expression`),
+  the broadcast is the flow's assistant's, its key is `sha256(idempotencyKey:nodeId)` and no `system.*` marker, it
+  never waits for the broadcast, and every refusal or failure takes `error` without throwing. The broadcast's completion
+  event is published at the run's chain depth + 1 (`broadcasts.chain_depth`, `PublishCoreEvents` sets it on
+  `EventChainContext`), so the chain limit stops flows that broadcast on each other's broadcasts
+  (`adr-20261123-flow-audience-message-through-broadcasting`). Enforced: `SendMessageBroadcastTest`,
+  `BuiltInNodeHandlersTest`, `PublishCoreEventsTest`.
 - **A flow started for a contact starts once per step, never for the run's contact, and never over a moving
   conversation or an operator.** A `start_flow` node's start key is the engine's execution key and the node id,
   written on the started session (`flow_sessions.start_key`, unique); the node answers `started` when a session has
@@ -340,10 +350,12 @@ broken.
 - **An automatic trigger or a new credential reference goes live only with its own right.** Publishing a draft that
   adds, removes or changes (type, config, `is_active`, `priority`) a trigger other than `message` against the live
   rows needs `ManageAutomations`; publishing a `call` node bound to a saved credential the published definition does
-  not reference needs `UseCredentials` (dropping one needs nothing). `FlowPublishChanges` computes both,
+  not reference needs `UseCredentials` (dropping one needs nothing); adding a `send_message` to tags or a segment, or
+  changing its audience, text or name, needs `ManageBroadcast`. `FlowPublishChanges` computes all three,
   `FlowDraftPolicy::publishChanges()` refuses with a translated reason, asked by the builder's publish after
-  `publish`; the draft is compared before template expansion, so a credential a template brings is checked when the
-  template is published. Turning on a flow with a live automatic trigger needs `ManageAutomations`
+  `publish`; credentials and triggers are compared on the draft before template expansion, so a credential a template
+  brings is checked when the template is published, while audience messages are compared after expansion (a template
+  can bring one, and a host's parameter value rewrites its text; copies keep stable ids). Turning on a flow with a live automatic trigger needs `ManageAutomations`
   (`FlowDraftPolicy::activate()`), turning it off does not; the builder's credential list and a call test with a
   credential need `UseCredentials` (`CredentialPolicy::use()`). Saving a draft checks neither: nothing saved runs.
   Why: `PublishFlow` alone would let an author start runs nobody asked for or spend a secret an administrator

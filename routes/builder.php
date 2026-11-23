@@ -9,6 +9,7 @@ use App\Http\Controllers\Builder\CallTestController;
 use App\Http\Controllers\Builder\ContactTagsController;
 use App\Http\Controllers\Builder\CredentialOptionsController;
 use App\Http\Controllers\Builder\NodeTypesController;
+use App\Http\Controllers\Builder\SegmentOptionsController;
 use App\Http\Controllers\Builder\StaffOptionsController;
 use App\Http\Controllers\Builder\WebhookEndpointController;
 use App\Http\Middleware\EnsureTenantOnboarded;
@@ -29,6 +30,7 @@ Route::middleware(['auth', 'tenant', 'verified', EnsureTenantOnboarded::class, R
         ->whereUuid('trigger');
     Route::get('/node-types', [NodeTypesController::class, 'index']);
     Route::get('/tags', [ContactTagsController::class, 'index']);
+    Route::get('/segments', [SegmentOptionsController::class, 'index']);
     Route::get('/staff', [StaffOptionsController::class, 'index']);
     Route::get('/credentials', [CredentialOptionsController::class, 'index']);
     Route::get('/assistants', [AssistantOptionsController::class, 'index']);

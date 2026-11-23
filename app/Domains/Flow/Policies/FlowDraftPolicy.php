@@ -18,7 +18,8 @@ use Illuminate\Foundation\Auth\User as AuthUser;
  * Authoring drafts requires {@see Permission::ManageFlowDefinitions}.
  * Publishing requires the additional {@see Permission::PublishFlow} gate, and what a publish changes may need more
  * ({@see self::publishChanges()}): a new saved credential needs {@see Permission::UseCredentials}, a changed automatic
- * trigger {@see Permission::ManageAutomations}. Turning on a flow with an automatic trigger needs the latter too.
+ * trigger {@see Permission::ManageAutomations}, a new or changed message to tags or a segment
+ * {@see Permission::ManageBroadcast}. Turning on a flow with an automatic trigger needs the right to manage automations.
  * Everything that targets a concrete draft also requires access to the draft's assistant
  * ({@see User::hasAssistantAccess()}), so a permission alone never reaches another assistant's flows.
  */
@@ -98,6 +99,10 @@ final class FlowDraftPolicy
 
         if (! $authUser->can(Permission::ManageAutomations->value) && $this->changes->changesAutomations($draft)) {
             return Response::deny(__('builder.publish_denied.automations'));
+        }
+
+        if (! $authUser->can(Permission::ManageBroadcast->value) && $this->changes->changesAudienceMessages($draft)) {
+            return Response::deny(__('builder.publish_denied.broadcasts'));
         }
 
         return Response::allow();

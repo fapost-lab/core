@@ -87,6 +87,10 @@ export const fetchCredentialOptions = (): Promise<CredentialOption[]> =>
 export const fetchAssistantOptions = (): Promise<SelectOption[]> =>
     request<{ data: SelectOption[] }>('GET', '/assistants').then((r) => r.data)
 
+/** Tenant contact segments for the send_message node (segment addressee) picker. */
+export const fetchSegmentOptions = (): Promise<SelectOption[]> =>
+    request<{ data: SelectOption[] }>('GET', '/segments').then((r) => r.data)
+
 export const saveDraft = (
     flowId: string,
     definition: FlowDefinition,

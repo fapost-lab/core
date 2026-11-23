@@ -87,3 +87,12 @@ the limit lifts would also reach the people who already received it.
 Large sends are split into batches and paced, so they cannot delay replies to
 people in live conversations. How aggressively is a tenant-wide setting; see
 [Settings](/using/tenant-settings).
+
+## Broadcasts from flows
+
+A flow's **Send message** block addressed to tags or a segment starts a
+broadcast of its own (see the [node catalogue](/using/node-catalogue)). It skips
+the draft and the confirmation — publishing the flow was the confirmation, and it
+needs the **Manage broadcasts** permission — so it appears in the list already
+running, marked **From automation** with the name of the flow that started it.
+It cannot be edited; cancel and delete it like any other.

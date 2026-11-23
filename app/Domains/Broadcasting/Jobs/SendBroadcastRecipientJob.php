@@ -261,6 +261,7 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
             (int) $broadcast->total_recipients,
             (int) $broadcast->sent_count,
             (int) $broadcast->failed_count,
+            (int) $broadcast->chain_depth,
         ));
     }
 

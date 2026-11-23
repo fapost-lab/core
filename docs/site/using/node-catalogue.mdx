@@ -33,6 +33,26 @@ nothing is sent and the block leaves through its **error** exit with
 still means the contact of the conversation, which a flow without a contact cannot
 read.
 
+**Send to** can also name many people at once: **tags** (contacts with any of
+them) or a **segment**. The block then starts a broadcast for the flow's assistant
+and goes on at once, without waiting for it to finish; the broadcast appears on the
+Broadcasts screen marked *From automation*, with the flow's name, and can be
+cancelled there like any other. Such a message is text only — no media, keyboard or
+saved answer — and must not use `contact.*` or `module.*`, since it goes to everyone
+in the audience. Each language of the text is filled in when the block runs, and
+each recipient gets it in their own language. Optionally give the broadcast a
+**name** (otherwise the flow's name and the time) and a flow variable to **save**
+`{broadcast_id, recipient_count}` to; the count is the reach when the block ran.
+
+A step the engine repeats gets the same broadcast back, never a second one. While
+the block's previous broadcast is still running, the block leaves through **error**
+with `broadcast_running`; a segment that was deleted gives `audience_missing`, a text
+with nothing in the base language `message_empty`. An audience nobody is in still
+starts a broadcast, which completes with no recipients. Publishing a flow that adds
+such a block, or changes its audience or text, needs the **Manage broadcasts**
+permission. To act when the broadcast is done, start a flow on the
+`core.broadcast.completed` event.
+
 If the send fails, the flow leaves through the block's **error** exit, and the flow log
 shows `send_failure: ...` with the reason on the block. When the
 tenant has used up its outbound messages for the period, the message is not sent

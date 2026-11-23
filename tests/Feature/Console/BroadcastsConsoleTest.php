@@ -19,6 +19,7 @@ use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Models\ContactTag;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
@@ -709,6 +710,46 @@ final class BroadcastsConsoleTest extends FeatureTestCase
         $this->post($this->listUrl("/{$broadcast->getKey()}/cancel"))->assertInertiaFlash('error');
 
         $this->assertEquals($completedAt, $broadcast->fresh()->completed_at);
+    }
+
+    public function test_a_broadcast_a_flow_started_shows_its_flow_and_is_cancelled_like_any_other(): void
+    {
+        $draft = FlowDraft::factory()->create([
+            'tenant_id'    => $this->assistant->tenant_id,
+            'assistant_id' => $this->assistant->getKey(),
+            'name'         => 'Seasonal sale',
+        ]);
+        $automated = $this->broadcast('From a flow', [
+            'status'       => BroadcastStatus::Running->value,
+            'origin'       => 'automation',
+            'flow_id'      => $draft->flow_id,
+            'flow_node_id' => 'tell',
+            'origin_key'   => 'key-1',
+            'created_at'   => now()->addMinute(),
+        ]);
+        $orphan = $this->broadcast('From a deleted flow', [
+            'status'     => BroadcastStatus::Completed->value,
+            'origin'     => 'automation',
+            'flow_id'    => '01938f3e-7c1a-7d2b-8e4f-123456789abc',
+            'origin_key' => 'key-2',
+        ]);
+        $this->broadcast('By hand');
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.id', (string) $automated->getKey())
+                ->where('table.rows.0.origin', 'automation')
+                ->where('table.rows.0.flowName', 'Seasonal sale')
+                ->where('table.rows.0.flowUrl', route('builder.flows.show', ['flow' => $draft->flow_id]))
+                ->where('table.rows.0.editUrl', null)
+                ->where('table.rows', fn ($rows): bool => null === collect($rows)->firstWhere('id', (string) $orphan->getKey())['flowName']
+                    && 'console' === collect($rows)->firstWhere('name', 'By hand')['origin'])
+                ->etc());
+
+        $this->post($this->listUrl("/{$automated->getKey()}/cancel"))->assertInertiaFlash('success');
+
+        $this->assertSame(BroadcastStatus::Cancelled, $automated->refresh()->status);
     }
 
     public function test_only_a_running_broadcast_can_be_cancelled(): void

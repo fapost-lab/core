@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, ref, watch} from 'vue'
+import {computed, onMounted, ref, watch} from 'vue'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useInsertAtCursor} from '@builder/composables/useInsertAtCursor'
 import {useKnownGroups} from '@builder/composables/useKnownGroups'
@@ -7,6 +7,8 @@ import {useTranslations} from '@builder/composables/useTranslations'
 import KeyboardListEditor from './KeyboardListEditor.vue'
 import VariablePicker from '../VariablePicker.vue'
 import AccordionSection from '../AccordionSection.vue'
+import SearchSelect from '../SearchSelect.vue'
+import {fetchKnownTags, fetchSegmentOptions, type SelectOption} from '@builder/api/builderApi'
 import StatePathPicker from '../StatePathPicker.vue'
 import MediaPicker from '@builder/components/media/MediaPicker.vue'
 import VariableStorageEditor from '@builder/components/editor/variables/VariableStorageEditor.vue'
@@ -235,21 +237,39 @@ const insertCaption = useInsertAtCursor(captionRef, (next) => update({ caption: 
 
 // ── Addressee ────────────────────────────────────────────────────────────────
 
-// A contact named by an expression gets the message instead of the contact of the
-// run. The only kind so far is `contact`; a blank expression means no addressee.
+// Who gets the message: a contact named by an expression (blank = the contact of the run),
+// or an audience (tags / segment) that makes the node a text-only broadcast.
+type AddresseeKind = 'contact' | 'tags' | 'segment'
+
 const addressee = computed(() => (config.value.addressee as Record<string, unknown> | null | undefined) ?? null)
+const addresseeKind = computed((): AddresseeKind => {
+    const kind = addressee.value?.kind
+    return kind === 'tags' || kind === 'segment' ? kind : 'contact'
+})
+const isAudience = computed(() => addresseeKind.value !== 'contact')
 const addresseeContact = computed(() => String(addressee.value?.contact ?? ''))
-const hasAddressee = computed(() => addresseeContact.value.trim() !== '')
+const hasAddressee = computed(() => isAudience.value || addresseeContact.value.trim() !== '')
+const addresseeTags = computed((): string[] => {
+    const tags = addressee.value?.tags
+    return Array.isArray(tags) ? tags.filter((x): x is string => typeof x === 'string') : []
+})
+const addresseeSegmentId = computed((): string[] => {
+    const id = addressee.value?.segment_id
+    return typeof id === 'string' && id !== '' ? [id] : []
+})
 const addresseeRef = ref<HTMLInputElement | null>(null)
 
-function updateAddressee(contact: string) {
-    if (contact.trim() === '') {
-        update({ addressee: null })
-        return
-    }
+const tagOptions = ref<SelectOption[]>([])
+const segmentOptions = ref<SelectOption[]>([])
 
-    // A message to an addressee cannot wait for an answer, so the controls that make it wait are cleared.
-    const patch: Record<string, unknown> = { addressee: { kind: 'contact', contact } }
+onMounted(async () => {
+    tagOptions.value = (await fetchKnownTags().catch(() => [] as string[])).map((tag) => ({value: tag, label: tag}))
+    segmentOptions.value = await fetchSegmentOptions().catch(() => [] as SelectOption[])
+})
+
+// A message to an addressee cannot wait for an answer, so the controls that make it wait are cleared.
+function waitingControlsPatch(): Record<string, unknown> {
+    const patch: Record<string, unknown> = {}
     if (contentType.value === 'text_with_keyboard') {
         patch.content_type = 'text'
         patch.keyboard_mode = null
@@ -262,7 +282,66 @@ function updateAddressee(contact: string) {
     patch.save_to_type = undefined
     answerVariable.value = null
     saveAnswerEnabled.value = false
-    update(patch)
+
+    return patch
+}
+
+// A broadcast is plain text: media, caption and keyboard are dropped along with the waiting controls.
+function audiencePatch(addresseeValue: Record<string, unknown>): Record<string, unknown> {
+    const patch = waitingControlsPatch()
+    patch.addressee = addresseeValue
+    patch.content_type = 'text'
+    patch.keyboard_mode = null
+    patch.buttons = []
+    patch.dynamic_buttons = null
+    patch.media_file = null
+    patch.media_file_id = undefined
+    patch.media_url = undefined
+    patch.media_path = undefined
+    patch.caption = undefined
+
+    return patch
+}
+
+function updateAddressee(contact: string) {
+    if (contact.trim() === '') {
+        update({addressee: null, broadcast_name: undefined, save_broadcast_to: undefined})
+        return
+    }
+
+    update({
+        ...waitingControlsPatch(),
+        addressee: {kind: 'contact', contact},
+        broadcast_name: undefined,
+        save_broadcast_to: undefined,
+    })
+}
+
+function switchAddresseeKind(kind: AddresseeKind) {
+    if (kind === addresseeKind.value) {
+        return
+    }
+
+    if (kind === 'contact') {
+        // Leaving the audience: its keys would be rejected next to a contact addressee.
+        update({addressee: null, broadcast_name: undefined, save_broadcast_to: undefined})
+    } else if (kind === 'tags') {
+        update(audiencePatch({kind: 'tags', tags: []}))
+    } else {
+        update(audiencePatch({kind: 'segment', segment_id: ''}))
+    }
+}
+
+function updateAddresseeTags(tags: string[]) {
+    update(audiencePatch({kind: 'tags', tags}))
+}
+
+function updateAddresseeSegment(ids: string[]) {
+    update(audiencePatch({kind: 'segment', segment_id: ids[0] ?? ''}))
+}
+
+function updateOptionalText(key: 'broadcast_name' | 'save_broadcast_to', value: string) {
+    update({[key]: value.trim() === '' ? undefined : value})
 }
 
 const insertAddressee = useInsertAtCursor(addresseeRef, (next) => updateAddressee(next))
@@ -320,10 +399,10 @@ function updateKeyboardMode(value: string) {
                 >
                     <option value="text">Text</option>
                     <option value="text_with_keyboard" :disabled="hasAddressee">Text with keyboard</option>
-                    <option value="image">Image</option>
-                    <option value="document">Document</option>
-                    <option value="video">Video</option>
-                    <option value="voice">Voice</option>
+                    <option value="image" :disabled="isAudience">Image</option>
+                    <option value="document" :disabled="isAudience">Document</option>
+                    <option value="video" :disabled="isAudience">Video</option>
+                    <option value="voice" :disabled="isAudience">Voice</option>
                 </select>
             </div>
 
@@ -345,6 +424,20 @@ function updateKeyboardMode(value: string) {
             :badge="hasAddressee ? t('nodes.send_message.addressee_badge') : null"
         >
             <div class="config-field">
+                <div class="kb-type-toggle">
+                    <button
+                        v-for="kind in (['contact', 'tags', 'segment'] as const)"
+                        :key="kind"
+                        type="button"
+                        class="kb-type-btn"
+                        :class="{'kb-type-btn--active': addresseeKind === kind}"
+                        :data-test="`addressee-kind-${kind}`"
+                        @click="switchAddresseeKind(kind)"
+                    >{{ t(`nodes.send_message.addressee_kind_${kind}`) }}</button>
+                </div>
+            </div>
+
+            <div v-if="addresseeKind === 'contact'" class="config-field">
                 <div class="field-label field-label--row">
                     {{ t('nodes.send_message.addressee_label') }}
                     <VariablePicker @select="insertAddressee" />
@@ -359,6 +452,53 @@ function updateKeyboardMode(value: string) {
                 >
                 <p class="field-hint">{{ t('nodes.send_message.addressee_hint') }}</p>
             </div>
+
+            <template v-else>
+                <div v-if="addresseeKind === 'tags'" class="config-field">
+                    <div class="field-label">{{ t('nodes.send_message.addressee_tags_label') }}</div>
+                    <SearchSelect
+                        :model-value="addresseeTags"
+                        :options="tagOptions"
+                        multiple
+                        allow-create
+                        @update:model-value="updateAddresseeTags"
+                    />
+                    <p class="field-hint">{{ t('nodes.send_message.addressee_tags_hint') }}</p>
+                </div>
+
+                <div v-else class="config-field">
+                    <div class="field-label">{{ t('nodes.send_message.addressee_segment_label') }}</div>
+                    <SearchSelect
+                        :model-value="addresseeSegmentId"
+                        :options="segmentOptions"
+                        @update:model-value="updateAddresseeSegment"
+                    />
+                </div>
+
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.send_message.broadcast_name_label') }}</div>
+                    <input
+                        class="field-input"
+                        data-test="broadcast-name"
+                        :value="String(config.broadcast_name ?? '')"
+                        @change="updateOptionalText('broadcast_name', ($event.target as HTMLInputElement).value)"
+                    >
+                </div>
+
+                <div class="config-field">
+                    <div class="field-label">{{ t('nodes.send_message.save_broadcast_to_label') }}</div>
+                    <input
+                        class="field-input"
+                        data-test="save-broadcast-to"
+                        :value="String(config.save_broadcast_to ?? '')"
+                        placeholder="flow.broadcast"
+                        @change="updateOptionalText('save_broadcast_to', ($event.target as HTMLInputElement).value)"
+                    >
+                    <p class="field-hint">{{ t('nodes.send_message.save_broadcast_to_hint') }}</p>
+                </div>
+
+                <p class="field-hint">{{ t('nodes.send_message.addressee_broadcast_hint') }}</p>
+            </template>
         </AccordionSection>
 
         <AccordionSection v-if="showsButtons && !isReplyKeyboard" title="Behaviour">
