@@ -51,9 +51,9 @@ broken.
   `view`, `update` or `publish` on its draft (which includes access to the draft's assistant);
   option lists, the `call` test and the person's builder mode (`PUT /builder/preferences`) check the flow-draft permission. The credential list, and a `call` test that names a
   credential, also ask `CredentialPolicy::use` (`UseCredentials`); publishing also asks `publishChanges`, and a
-  webhook secret `manageAutomations`. Controls the server would refuse are disabled from the shared
+  webhook secret `manageAutomations`, and resuming a paused trigger `resumeTrigger` (`update` and `ManageAutomations`). Controls the server would refuse are disabled from the shared
   `auth.permissions` (`usePermissions`), never trusted: the server stays the arbiter. The builder has no panel
-  tenant to lean on. Enforced: `BuilderAuthorizationTest`, `FlowAutomationPermissionsTest`, `BuilderPreferenceTest`.
+  tenant to lean on. Enforced: `BuilderAuthorizationTest`, `FlowAutomationPermissionsTest`, `BuilderPreferenceTest`, `TriggerResumeEndpointTest`.
 
 - **A new node's UI starts as `configSchema()` on its handler.** Add a core override only when
   the schema renderer cannot express the UI, by adding a key to the map in `ConfigPanel.vue`.

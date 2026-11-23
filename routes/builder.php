@@ -11,6 +11,7 @@ use App\Http\Controllers\Builder\CredentialOptionsController;
 use App\Http\Controllers\Builder\NodeTypesController;
 use App\Http\Controllers\Builder\SegmentOptionsController;
 use App\Http\Controllers\Builder\StaffOptionsController;
+use App\Http\Controllers\Builder\TriggerStateController;
 use App\Http\Controllers\Builder\TriggerTypesController;
 use App\Http\Controllers\Builder\WebhookEndpointController;
 use App\Http\Middleware\EnsureTenantOnboarded;
@@ -28,6 +29,8 @@ Route::middleware(['auth', 'tenant', 'verified', EnsureTenantOnboarded::class, R
     Route::post('/flows/{flow}/triggers/{trigger}/webhook', [WebhookEndpointController::class, 'store'])
         ->whereUuid('trigger');
     Route::post('/flows/{flow}/triggers/{trigger}/webhook/secret', [WebhookEndpointController::class, 'secret'])
+        ->whereUuid('trigger');
+    Route::post('/flows/{flow}/triggers/{trigger}/resume', [TriggerStateController::class, 'resume'])
         ->whereUuid('trigger');
     Route::get('/node-types', [NodeTypesController::class, 'index']);
     Route::get('/trigger-types', [TriggerTypesController::class, 'index']);

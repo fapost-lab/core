@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Schedule;
 
+use App\Domains\Flow\Admission\TriggerAdmissionRequest;
+use App\Domains\Flow\Admission\TriggerRunAdmission;
 use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
@@ -38,6 +40,9 @@ use Throwable;
  *    nothing (`flow.schedule.tick_skipped`, `flow_not_live`);
  *  - a previous run of the trigger still going — its root `pending` or in flight, waiting in a `delay` or for an answer
  *    included — starts nothing (`flow.schedule.tick_skipped`, `previous_run_live`);
+ *  - run admission refuses the run ({@see TriggerRunAdmission}: the trigger is paused, the run rate breaker trips or the
+ *    plan's run limit is used up) — starts nothing (`tick_skipped`, `admission_refused`); the refusal is counted on the
+ *    trigger and the slot is spent;
  *  - otherwise the run is created `pending` ({@see FlowEngineInterface::prepare()}) with the slot's fire key, so a slot
  *    eaten by the claim always leaves a run: a lost start job leaves it for the deadline sweeper (`start_lost`).
  *
@@ -59,12 +64,15 @@ final readonly class ScheduleTriggerFirer
 
     public const string SKIP_PREVIOUS_RUN_LIVE = 'previous_run_live';
 
+    public const string SKIP_ADMISSION_REFUSED = 'admission_refused';
+
     public function __construct(
         private ConnectionInterface $connection,
         private ScheduleClock $clock,
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowDraftRepositoryInterface $drafts,
         private FlowEngineInterface $engine,
+        private TriggerRunAdmission $admission,
         private AfterCommitDispatcherInterface $afterCommitDispatcher,
         private Dispatcher $dispatcher,
         private LoggerInterface $logger,
@@ -193,7 +201,26 @@ final readonly class ScheduleTriggerFirer
                 return 'skipped';
             }
 
-            $fireKey      = ScheduleClock::fireKey($slot);
+            $fireKey  = ScheduleClock::fireKey($slot);
+            $decision = $this->admission->admit(new TriggerAdmissionRequest(
+                tenantId: $tenantId,
+                flowId: $trigger->flow_id,
+                triggerId: $trigger->id,
+                triggerType: FlowTriggerType::Schedule->value,
+                unitKey: TriggerAdmissionRequest::unitKeyFor($trigger->id, $fireKey),
+                occurredAt: $now,
+            ));
+
+            if (null !== $decision->refusal) {
+                $this->logger->warning('flow.schedule.tick_skipped', [
+                    ...$context,
+                    'reason'  => self::SKIP_ADMISSION_REFUSED,
+                    'refusal' => $decision->refusal->value,
+                ]);
+
+                return 'skipped';
+            }
+
             $initialState = self::initialState($slot, $config);
 
             $this->engine->prepare(

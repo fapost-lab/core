@@ -50,6 +50,8 @@ afresh from the moment of the publish. Switching the trigger off, deleting it or
   seconds after the full minute; each trigger always gets the same offset.
 - A flow that is not published, or whose published version is switched off, does not run; the moment is skipped and
   logged.
+- A paused trigger, or a workspace whose plan has no runs left, does not run either; the moment is skipped and counted
+  on the trigger (see [Publishing](/using/publishing#when-a-trigger-starts-too-many-runs)).
 
 ## What the flow receives
 

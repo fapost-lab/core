@@ -45,6 +45,11 @@ final readonly class FlowTriggerRepository implements FlowTriggerRepositoryInter
             ->get();
     }
 
+    public function find(string $triggerId): ?FlowTrigger
+    {
+        return FlowTrigger::query()->find(mb_strtolower($triggerId));
+    }
+
     public function getByFlowId(string $flowId): array
     {
         return FlowTrigger::query()

@@ -2,11 +2,11 @@
 import {computed, ref, watch} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
 import SearchSelect from '../SearchSelect.vue'
+import {createWebhookEndpoint, fetchAssistantOptions, generateWebhookSecret, resumeTrigger, setWebhookSecret} from '@builder/api/builderApi'
 import SchemaFields from '../SchemaFields.vue'
 import type {FieldEntry} from '../SchemaFields.vue'
-import {createWebhookEndpoint, fetchAssistantOptions, generateWebhookSecret, setWebhookSecret} from '@builder/api/builderApi'
 import type {ApiError, SelectOption} from '@builder/api/builderApi'
-import type {WebhookEndpointInfo} from '@builder/dto/types'
+import type {TriggerStateInfo, WebhookEndpointInfo} from '@builder/dto/types'
 import {useConfirm} from '@builder/composables/useConfirm'
 import {usePermissions} from '@builder/composables/usePermissions'
 import {useTranslations} from '@builder/composables/useTranslations'
@@ -27,12 +27,14 @@ const props = defineProps({
     availableEvents: { type: Array as () => string[], default: () => [] },
     flowId: { type: String as () => string | null, default: null },
     webhookEndpoints: { type: Object as () => Record<string, WebhookEndpointInfo>, default: () => ({}) },
+    /** Admission state of the live triggers, keyed by lower-cased trigger id. */
+    triggerStates: { type: Object as () => Record<string, TriggerStateInfo>, default: () => ({}) },
     readOnly: { type: Boolean, default: false },
     /** Pushes the unsaved draft to the server; resolves false when it could not be saved. */
     flushDraft: { type: Function as unknown as () => () => Promise<boolean>, default: null },
 })
 
-const emit = defineEmits(['update:trigger', 'delete:trigger', 'webhook-endpoint'])
+const emit = defineEmits(['update:trigger', 'delete:trigger', 'webhook-endpoint', 'trigger-states'])
 
 const { confirm } = useConfirm()
 const { t } = useTranslations()
@@ -283,6 +285,44 @@ function applyWebhookPreset(value: string): void {
 const triggerId = computed(() => String(currentTrigger.value.id ?? ''))
 const endpoint = computed<WebhookEndpointInfo | null>(() => props.webhookEndpoints[triggerId.value.toLowerCase()] ?? null)
 
+/** Shown for a live trigger other than a message that was paused or had a run refused. */
+const triggerState = computed<TriggerStateInfo | null>(() =>
+    currentTrigger.value.type === 'message' ? null : (props.triggerStates[triggerId.value.toLowerCase()] ?? null)
+)
+const resumeBusy = ref(false)
+const resumeError = ref<string | null>(null)
+
+/** A translation with its `:name` placeholders filled. */
+function tp(key: string, params: Record<string, string | number>): string {
+    return Object.entries(params).reduce((text, [name, value]) => text.split(`:${name}`).join(String(value)), t(key))
+}
+
+function formatMoment(at: string | null): string {
+    return at ? new Date(at).toLocaleString() : ''
+}
+
+function refusalReasonLabel(reason: string | null): string {
+    return reason ? t(`trigger_state.reasons.${reason}`) : ''
+}
+
+async function resumePausedTrigger(): Promise<void> {
+    if (props.flowId === null || triggerId.value === '' || resumeBusy.value) {
+        return
+    }
+
+    resumeBusy.value = true
+    resumeError.value = null
+
+    try {
+        emit('trigger-states', await resumeTrigger(props.flowId, triggerId.value))
+    } catch (error) {
+        const err = error as ApiError
+        resumeError.value = err.status === 403 ? t('trigger_state.resume_denied') : (err.message || t('trigger_state.resume_failed'))
+    } finally {
+        resumeBusy.value = false
+    }
+}
+
 const webhookBusy = ref(false)
 const webhookError = ref<string | null>(null)
 const generatedSecret = ref<string | null>(null)
@@ -290,6 +330,7 @@ const pastedSecret = ref('')
 const copied = ref<'url' | 'secret' | null>(null)
 
 watch(triggerId, () => {
+    resumeError.value = null
     generatedSecret.value = null
     pastedSecret.value = ''
     webhookError.value = null
@@ -458,6 +499,30 @@ function defaultConfig(type: string): Record<string, unknown> {
         <p v-if="automationLocked" class="field-help automation-lock-hint" data-testid="automation-lock-hint">
             {{ t('permission_hints.automations') }}
         </p>
+        <section v-if="triggerState" class="trigger-state" data-testid="trigger-state">
+            <div class="field-label">{{ t('trigger_state.title') }}</div>
+            <div v-if="triggerState.paused_at" class="trigger-state-paused" role="status">
+                <div>{{ tp('trigger_state.paused', { at: formatMoment(triggerState.paused_at) }) }}</div>
+                <div class="field-hint">{{ t('trigger_state.paused_hint') }}</div>
+                <button
+                    type="button"
+                    class="webhook-btn"
+                    data-testid="trigger-resume"
+                    :disabled="readOnly || resumeBusy || !canManageAutomations"
+                    @click="resumePausedTrigger"
+                >
+                    {{ resumeBusy ? t('trigger_state.resuming') : t('trigger_state.resume') }}
+                </button>
+                <div v-if="!canManageAutomations" class="field-hint">{{ t('trigger_state.resume_denied') }}</div>
+                <div v-if="resumeError" class="webhook-error" role="alert">{{ resumeError }}</div>
+            </div>
+            <div v-if="triggerState.refused_count > 0" class="field-hint">
+                {{ tp('trigger_state.refused_count', { count: triggerState.refused_count }) }}
+                <template v-if="triggerState.last_refusal_reason">
+                    · {{ tp('trigger_state.last_refusal', { reason: refusalReasonLabel(triggerState.last_refusal_reason), at: formatMoment(triggerState.last_refused_at) }) }}
+                </template>
+            </div>
+        </section>
         <div class="automation-lock" :inert="automationLocked" data-testid="automation-lock">
         <div class="trigger-unavailable" :class="{ 'is-unavailable': unavailableReason !== null }" :inert="unavailableReason !== null" data-testid="trigger-general">
         <AccordionSection title="General" default-open>
@@ -872,6 +937,21 @@ function defaultConfig(type: string): Record<string, unknown> {
 </template>
 
 <style scoped>
+.trigger-state {
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-2);
+    border-radius: 6px;
+    font-size: 12px;
+}
+.trigger-state-paused {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 6px;
+    color: var(--error);
+}
 .trigger-unavailable {
     display: contents;
 }

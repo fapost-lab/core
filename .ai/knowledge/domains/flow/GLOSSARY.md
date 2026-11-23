@@ -84,6 +84,18 @@ a session with neither (`ContactlessSessionException`).
 What fired a trigger — a schedule slot, an event id, a webhook delivery id — kept on the session as `fire_key`,
 unique with `trigger_id`, so a trigger starts one run per fire.
 
+## Run admission
+
+The one check a trigger's new run passes before it exists (`TriggerRunAdmission`): a paused trigger, the run rate
+breaker, the plan's `flow_runs` limit, in that order. A refused run is not created; it is counted on the trigger with
+its reason (`trigger_paused`, `rate_breaker`, `plan_limit`). Conversations never pass it.
+
+## Run rate breaker
+
+The per-trigger limit on new runs a minute (`flow.automations.runs_per_trigger_per_minute`); a trigger over it is
+paused in `flow_trigger_states` until a person resumes it. Not the same as switching the trigger off: `is_active` stays
+what was published.
+
 ## Re-run from the start
 
 A new automation run of a failed root run's trigger, started by a person from the run's page with the trigger payload

@@ -4,23 +4,31 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow\TriggerTypes;
 
+use App\Domains\Flow\Admission\RefusalReason;
+use App\Domains\Flow\Admission\TriggerRunAdmission;
+use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Models\FlowTriggerState;
 use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Flow\Services\EventChainContext;
 use App\Jobs\Flow\FireRegisteredTriggerJob;
 use App\Jobs\Flow\StartAutomationRunJob;
+use Carbon\CarbonImmutable;
 use Fapost\Foundation\Flow\Contracts\TriggerFirerInterface;
+use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
+use Fapost\Foundation\Quota\DTO\UsageDecision;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Feature\FeatureTestCase;
 use Tests\Fixtures\Solution\Triggers\FeedbackSubmittedTrigger;
+use Tests\Support\FakeUsageMeter;
 
 /**
  * A trigger type the fixture Solution registers (`feedback.submitted`): a fire starts one contactless run per matching
@@ -112,6 +120,28 @@ final class RegisteredTriggerTypesTest extends FeatureTestCase
         $this->assertSame(FeedbackSubmittedTrigger::TYPE, $session->state['flow']['trigger_type']);
     }
 
+    public function test_a_registered_triggers_run_passes_run_admission(): void
+    {
+        Queue::fake();
+        $meter = new FakeUsageMeter(UsageDecision::allowed());
+        $this->app->instance(UsageMeterInterface::class, $meter);
+        $trigger = $this->trigger(['min_score' => 1]);
+
+        $this->fireAndStart('entry-1');
+
+        $this->assertSame(1, FlowSession::query()->count());
+        $this->assertCount(1, $meter->units, 'The run spends one unit of the plan.');
+        $this->assertSame(TriggerRunAdmission::LIMIT_KEY, $meter->units[0]->key);
+
+        $this->app->make(FlowTriggerStateRepositoryInterface::class)->pause($trigger->id, RefusalReason::RateBreaker, CarbonImmutable::now());
+        $this->fireAndStart('entry-2');
+
+        $this->assertSame(1, FlowSession::query()->count(), 'A paused registered trigger starts nothing.');
+        $state = FlowTriggerState::query()->where('trigger_id', $trigger->id)->sole();
+        $this->assertSame(1, $state->refused_count);
+        $this->assertSame(RefusalReason::TriggerPaused, $state->last_refusal_reason);
+    }
+
     public function test_nothing_starts_while_the_solution_is_not_active_for_the_tenant(): void
     {
         Queue::fake();
@@ -167,6 +197,19 @@ final class RegisteredTriggerTypesTest extends FeatureTestCase
             $this->fail('The fire was accepted.');
         } catch (InvalidArgumentException) {
             Queue::assertNothingPushed();
+        }
+    }
+
+    private function fireAndStart(string $fireKey): void
+    {
+        $this->firer()->fire(self::TENANT_ID, FeedbackSubmittedTrigger::TYPE, $fireKey, ['score' => 4, 'comment' => 'Fine']);
+
+        foreach (Queue::pushed(FireRegisteredTriggerJob::class)->filter(static fn (FireRegisteredTriggerJob $job): bool => 'tt:' . $fireKey === $job->fireKey) as $fire) {
+            $this->app->call([$fire, 'handle']);
+        }
+
+        foreach (Queue::pushed(StartAutomationRunJob::class)->filter(static fn (StartAutomationRunJob $job): bool => 'tt:' . $fireKey === $job->fireKey) as $start) {
+            $this->app->call([$start, 'handle']);
         }
     }
 

@@ -15,5 +15,6 @@ enum RefusedWork: string
     case CallExecution   = 'call_execution';
     case MediaUpload     = 'media_upload';
     case InboundMedia    = 'inbound_media';
+    case FlowRun         = 'flow_run';
     case Other           = 'other';
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Notifications;
 
+use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\StaffNotifyTarget;
 use App\Domains\Staff\Enums\UserStatus;
@@ -46,6 +47,17 @@ final class StaffRecipientResolver
     public function admins(): Collection
     {
         return $this->activeStaff()->role(RoleEnum::Admin->value)->get();
+    }
+
+    /**
+     * The tenant's staff who can sign in and hold the permission, through a role or directly: the people a notice
+     * about the work that permission covers goes to.
+     *
+     * @return Collection<int, User>
+     */
+    public function withPermission(Permission $permission): Collection
+    {
+        return $this->activeStaff()->permission($permission->value)->get();
     }
 
     /**

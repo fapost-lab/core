@@ -129,6 +129,16 @@ final class FlowDraftPolicy
                && ($authUser->can(Permission::ManageAutomations->value) || ! $this->changes->hasLiveAutomation($draft));
     }
 
+    /**
+     * Whether the user may resume a trigger the run rate breaker paused: it starts runs again, so it takes what turning on
+     * a flow with an automatic trigger takes, {@see self::update()} and the right to manage automations.
+     */
+    public function resumeTrigger(AuthUser $authUser, FlowDraft $draft): bool
+    {
+        return $this->update($authUser, $draft)
+               && $authUser->can(Permission::ManageAutomations->value);
+    }
+
     private function canAccessAssistant(User $authUser, FlowDraft $draft): bool
     {
         $assistant = $draft->assistant;

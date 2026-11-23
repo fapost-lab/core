@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Orchestration;
 
+use App\Domains\Flow\Admission\TriggerAdmissionRequest;
+use App\Domains\Flow\Admission\TriggerRunAdmission;
 use App\Domains\Flow\Concurrency\LockScope;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\SegmentHandOff;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Psr\Log\LoggerInterface;
 
@@ -23,7 +27,8 @@ use Psr\Log\LoggerInterface;
  * lock it looks the run up by `(trigger_id, fire_key)`: a run already there is continued when it is still `active`
  * — the job that started it was killed or retried — started when it is `pending` (a schedule creates its run when it
  * claims the slot, {@see \App\Domains\Flow\Schedule\ScheduleTriggerFirer}), and left alone otherwise; only a fire
- * with no run starts one.
+ * with no run starts one, and only once run admission let it ({@see TriggerRunAdmission}): a paused trigger, the run rate
+ * breaker or the plan's run limit refuse it, and a retry or continuation of a fire that has a run is never asked again.
  * The session row is committed before its first node runs, so a job killed at any point leaves a row its retry
  * continues rather than a second run.
  *
@@ -53,6 +58,8 @@ final readonly class AutomationRunner
         private FlowExecutionGuardInterface $guard,
         private FlowEngineInterface $engine,
         private SegmentHandOff $handOff,
+        private FlowTriggerRepositoryInterface $triggers,
+        private TriggerRunAdmission $admission,
         private LoggerInterface $logger,
     ) {
     }
@@ -63,7 +70,7 @@ final readonly class AutomationRunner
      * @param  array<string, mixed>  $initialState  merged into the new session's state
      * @param  int                   $chainDepth    the depth of the event that fired the trigger; 0 when none did
      *
-     * @return FlowSession|null the run, or null when the flow has no active definition
+     * @return AutomationStartResult the run started or continued, no active definition, or admission's refusal
      *
      * @throws \App\Domains\Flow\Exceptions\SessionLockTimeoutException when another run of the trigger holds the lock
      */
@@ -75,14 +82,14 @@ final readonly class AutomationRunner
         array $initialState = [],
         ?string $assistantId = null,
         int $chainDepth = 0,
-    ): ?FlowSession {
+    ): AutomationStartResult {
         return $this->guard->runInScope(
             LockScope::forTrigger($tenantId, $triggerId),
-            function () use ($flowId, $triggerId, $fireKey, $initialState, $assistantId, $chainDepth): ?FlowSession {
+            function () use ($tenantId, $flowId, $triggerId, $fireKey, $initialState, $assistantId, $chainDepth): AutomationStartResult {
                 $fired = $this->sessions->findByFireKey($triggerId, $fireKey);
 
                 if (null !== $fired) {
-                    return $this->continueFired($fired);
+                    return AutomationStartResult::continued($this->continueFired($fired));
                 }
 
                 $definition = $this->definitions->findLatestActiveByFlowId($flowId);
@@ -94,16 +101,29 @@ final readonly class AutomationRunner
                         'fire_key'   => $fireKey,
                     ]);
 
-                    return null;
+                    return AutomationStartResult::noActiveFlow();
+                }
+
+                $decision = $this->admission->admit(new TriggerAdmissionRequest(
+                    tenantId: $tenantId,
+                    flowId: $flowId,
+                    triggerId: $triggerId,
+                    triggerType: $this->triggers->find($triggerId)?->typeName(),
+                    unitKey: TriggerAdmissionRequest::unitKeyFor($triggerId, $fireKey),
+                    occurredAt: CarbonImmutable::now(),
+                ));
+
+                if (null !== $decision->refusal) {
+                    return AutomationStartResult::refused($decision->refusal);
                 }
 
                 try {
-                    return $this->engine->start(
+                    return AutomationStartResult::started($this->engine->start(
                         $definition,
                         null,
                         $initialState,
                         FlowRunOrigin::automation($triggerId, $assistantId, $fireKey, $chainDepth),
-                    );
+                    ));
                 } catch (UniqueConstraintViolationException $exception) {
                     // Another worker created the run past the lock (its TTL lapsed): continue that one.
                     $fired = $this->sessions->findByFireKey($triggerId, $fireKey);
@@ -112,7 +132,7 @@ final readonly class AutomationRunner
                         throw $exception;
                     }
 
-                    return $this->continueFired($fired);
+                    return AutomationStartResult::continued($this->continueFired($fired));
                 }
             },
         );

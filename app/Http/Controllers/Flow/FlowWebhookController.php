@@ -45,6 +45,7 @@ final class FlowWebhookController extends Controller
             WebhookOutcomeStatus::UnsupportedMediaType => $this->bare(415),
             WebhookOutcomeStatus::Throttled            => $this->bare(429, ['Retry-After' => (string) $outcome->retryAfterSeconds]),
             WebhookOutcomeStatus::TenantStopped        => $this->bare(503, ['Retry-After' => (string) $outcome->retryAfterSeconds]),
+            WebhookOutcomeStatus::TriggerPaused        => $this->bare(503, ['Retry-After' => (string) $outcome->retryAfterSeconds]),
         };
     }
 

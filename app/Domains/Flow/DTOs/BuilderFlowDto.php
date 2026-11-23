@@ -76,6 +76,13 @@ final class BuilderFlowDto extends Data
          * @var array<string, array{url: string, has_secret: bool, secret_rotated_at: string|null}>
          */
         public readonly array $webhookEndpoints = [],
+        /**
+         * The admission state of the flow's live triggers that have one, keyed by trigger id: paused by the run rate
+         * breaker since when and why, and the runs refused with the last refusal.
+         *
+         * @var array<string, array{paused_at: string|null, paused_reason: string|null, refused_count: int, last_refused_at: string|null, last_refusal_reason: string|null}>
+         */
+        public readonly array $triggerStates = [],
     ) {
     }
 
@@ -89,6 +96,7 @@ final class BuilderFlowDto extends Data
      * @param  list<array{id: string, name: string, version: int, outputs: list<array{name: string, label: string|null}>, parameters: list<array{key: string, label: string|null, node_type: string, node_version: int, field: string, default: mixed}>}>  $availableTemplates
      * @param  list<array{id: string, name: string}>      $usedBy
      * @param  array<string, array{url: string, has_secret: bool, secret_rotated_at: string|null}>  $webhookEndpoints
+     * @param  array<string, array{paused_at: string|null, paused_reason: string|null, refused_count: int, last_refused_at: string|null, last_refusal_reason: string|null}>  $triggerStates
      */
     public static function fromDraftAndDefinition(
         FlowDraft $draft,
@@ -103,6 +111,7 @@ final class BuilderFlowDto extends Data
         array $availableTemplates = [],
         array $usedBy = [],
         array $webhookEndpoints = [],
+        array $triggerStates = [],
     ): self {
         return new self(
             flowId: $draft->flow_id,
@@ -126,6 +135,7 @@ final class BuilderFlowDto extends Data
             availableTemplates: $availableTemplates,
             usedBy: $usedBy,
             webhookEndpoints: $webhookEndpoints,
+            triggerStates: $triggerStates,
         );
     }
 }

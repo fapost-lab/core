@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Webhook;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowWebhookEndpointRepositoryInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
@@ -31,8 +32,9 @@ use Throwable;
  *
  * In order: a stopped tenant (503), a multipart body (415), the body size (413), the per-address limit on unknown tokens (429), the endpoint
  * behind the token and its live webhook trigger of a published flow whose draft and assistant still exist (404, one answer for every reason), the
- * per-token limit (429), the signature or secret header through Foundation's {@see IngressSpecExecutor} (401), the
- * delivery id and the fire key it makes, the dedup claim (200 duplicate), and finally {@see StartAutomationRunJob} with
+ * per-token limit (429), the signature or secret header through Foundation's {@see IngressSpecExecutor} (401), a trigger
+ * the run rate breaker paused (503 with `Retry-After`, the delivery not claimed, so the sender's retry after a resume
+ * runs), the delivery id and the fire key it makes, the dedup claim (200 duplicate), and finally {@see StartAutomationRunJob} with
  * the request under `flow.webhook` (202). Only an accepted request reaches the queue.
  *
  * A trigger in `response_mode: sync` then holds the request for the flow's answer through {@see WebhookSyncWait} (the
@@ -57,6 +59,9 @@ final readonly class FlowWebhookReceiver
     /** How long a sender is asked to wait while the tenant is stopped; the dedup window covers its retry. */
     public const int STOPPED_RETRY_AFTER_SECONDS = 300;
 
+    /** How long a sender is asked to wait while the trigger is paused; a person has to resume it. */
+    public const int PAUSED_RETRY_AFTER_SECONDS = 300;
+
     public function __construct(
         private TenantContextInterface $tenantContext,
         private CurrentAccessState $accessState,
@@ -64,6 +69,7 @@ final readonly class FlowWebhookReceiver
         private FlowTriggerRepositoryInterface $triggers,
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowDraftRepositoryInterface $drafts,
+        private FlowTriggerStateRepositoryInterface $triggerStates,
         private PlatformSettingsReaderInterface $settings,
         private IngressSpecExecutor $specExecutor,
         private WebhookDeliveryDedupInterface $dedup,
@@ -147,6 +153,13 @@ final readonly class FlowWebhookReceiver
             $this->logger->info('flow.webhook.rejected_signature', $context);
 
             return WebhookOutcome::of(WebhookOutcomeStatus::InvalidSignature);
+        }
+
+        // A cheap read, counted nowhere: run admission refuses the run anyway, but the sender should hear it and retry.
+        if ($this->triggerStates->isPaused($trigger->id)) {
+            $this->logger->info('flow.webhook.trigger_paused', $context);
+
+            return WebhookOutcome::triggerPaused(self::PAUSED_RETRY_AFTER_SECONDS);
         }
 
         $deliveryId = $this->specExecutor->idempotencyKey($spec, $signed, '');

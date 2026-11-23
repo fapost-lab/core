@@ -35,4 +35,7 @@ enum WebhookOutcomeStatus: string
 
     /** The tenant is stopped; the sender should retry later (503). */
     case TenantStopped = 'tenant_stopped';
+
+    /** The run rate breaker paused the trigger; the sender should retry later (503). */
+    case TriggerPaused = 'trigger_paused';
 }

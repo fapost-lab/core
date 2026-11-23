@@ -163,6 +163,7 @@ function toggleActivity(): void {
 
       <template #cell-name="{ row }">
         <span class="font-medium">{{ row.name }}</span>
+        <Badge v-if="row.triggerPaused" variant="warning" class="ml-2" :title="t.trigger_paused_hint">{{ t.trigger_paused }}</Badge>
         <TriggerHint v-if="row.trigger" :trigger="row.trigger" :more-triggers="row.moreTriggers" />
       </template>
 

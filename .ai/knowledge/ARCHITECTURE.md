@@ -148,7 +148,9 @@ Credentials' OAuth2 types fetch their tokens through Flow's `GuardedHttpClient`,
    (`adr-20261123-flow-schedule-trigger`); a `delay` node wakes its session through `ResumeDelayedFlowSessionJob`
    on `flow.execution`, and send-message timeouts through `ResumeTimedOutSendMessageNodeJob`. An automation run
    (a flow started by a trigger, not a message) starts and continues in segments on `flow.automations`
-   (`StartAutomationRunJob`, `ContinueAutomationRunJob`). A flow's webhook trigger is a second inbound HTTP path,
+   (`StartAutomationRunJob`, `ContinueAutomationRunJob`). Every new run of a trigger other than a message, and a
+  flow event's start, first passes run admission (`Flow/Admission`: pause, run rate breaker, the plan's `flow_runs`
+  through `PeriodQuota`; `adr-20261123-flow-run-admission`). A flow's webhook trigger is a second inbound HTTP path,
    owned by `flow`, not `channel-ingress`: `POST /hooks/flow/{token}` on the tenant's host, checked with Foundation's
    `IngressSpec`, deduplicated by delivery id, answered 202 once `StartAutomationRunJob` is queued
    (`adr-20261119-flow-webhook-trigger`). A trigger type an extension registered is fired by the extension's own code

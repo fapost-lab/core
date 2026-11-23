@@ -49,6 +49,21 @@ final class DispatchFlowTriggerEventJobTest extends FeatureTestCase
         );
     }
 
+    public function test_each_start_carries_its_trigger_and_the_event_id_for_run_admission(): void
+    {
+        Bus::fake();
+
+        $trigger = $this->eventTrigger((string) Str::uuid(), 'order.created');
+        $source  = ['tenant_id' => self::TENANT_ID, 'session_id' => 'sess-1', 'node_id' => 'emit-1', 'contact_id' => 'contact-9'];
+        $job     = new DispatchFlowTriggerEventJob(self::TENANT_ID, 'order.created', [], $source, 'event-42');
+        app()->call([$job, 'handle']);
+
+        Bus::assertDispatched(
+            StartFlowFromEventJob::class,
+            static fn (StartFlowFromEventJob $start): bool => $start->triggerId === $trigger->id && 'event-42' === $start->eventId,
+        );
+    }
+
     public function test_skips_fanout_when_event_has_no_originating_contact(): void
     {
         Bus::fake();

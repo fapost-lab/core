@@ -31,6 +31,8 @@ export interface FlowsTranslations {
   filters: { group: string; group_all: string; active: string; active_all: string; active_yes: string; active_no: string }
   group_rows: string
   ungrouped: string
+  trigger_paused: string
+  trigger_paused_hint: string
   status: { active: string; inactive: string }
   visibility: { public: string; private: string }
   no_version: string
@@ -70,6 +72,8 @@ export interface FlowRow extends Record<string, unknown> {
   trigger: FlowTrigger | null
   /** How many other live triggers the flow has besides the one hinted. */
   moreTriggers: number
+  /** Whether the run rate breaker paused one of the flow's live triggers; it is resumed in the builder. */
+  triggerPaused: boolean
   editUrl: string
   deleteUrl: string
   activityUrl: string
