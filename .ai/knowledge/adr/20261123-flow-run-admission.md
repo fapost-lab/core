@@ -24,7 +24,7 @@ contract and run counter for the SaaS shell, a Core breaker that pauses a trigge
 and a refusal counter with the last reason on the trigger. Foundation already has that contract: the operator's
 `UsageMeterInterface` decides one unit of a per-period limit, idempotently by unit key, and Core reaches it only
 through `PeriodQuota` (fail-open, refusals announced to the admins). Automatic runs start on four paths — the
-automation runner (webhook, Core event, API), a flow's own event (`StartFlowFromEventJob`, which bypasses the runner)
+automation runner (webhook, Core event, API, a trigger type an extension registers), a flow's own event (`StartFlowFromEventJob`, which bypasses the runner)
 and the schedule's slot claim (which creates the run `pending`, so the runner only activates it). `flow_triggers` is
 written only by a publish's sync and the schedule's claim (`rule-flow`), and `is_active` is what was published.
 Approved at the design gate by the owner ("Да, всё по рекомендациям", 2026-11-23: the recommended option of every
@@ -33,7 +33,8 @@ decision D1–D8); the schedule and event details below were settled by the agen
 ## Decision
 
 - **One admission, once per new fire, after deduplication and before the run exists.** `TriggerRunAdmission::admit()`
-  is asked by `AutomationRunner::start()` only when `(trigger_id, fire_key)` has no run (a retry or continuation is
+  is asked by `AutomationRunner::start()` (every `StartAutomationRunJob`: webhook, Core event, registered trigger type,
+  re-run) only when `(trigger_id, fire_key)` has no run (a retry or continuation is
   never asked again), by `StartFlowFromEventJob` before its start, and by `ScheduleTriggerFirer` inside the slot claim
   before `prepare()`. A message trigger is never asked: conversations are not runs of a trigger, and inbound volume has
   its own limit.

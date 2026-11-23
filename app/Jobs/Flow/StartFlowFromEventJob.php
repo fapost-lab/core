@@ -176,7 +176,7 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
             tenantId: $this->tenantId,
             flowId: $this->flowId,
             triggerId: $triggerId,
-            triggerType: FlowTriggerType::Event,
+            triggerType: FlowTriggerType::Event->value,
             unitKey: TriggerAdmissionRequest::unitKeyFor($triggerId, $this->fireIdentity()),
             occurredAt: CarbonImmutable::now(),
         ))->isAllowed();

@@ -112,7 +112,7 @@ final readonly class TriggerRunAdmission
             tenantId: $request->tenantId,
             flowId: $request->flowId,
             triggerId: $request->triggerId,
-            triggerType: $request->triggerType?->value,
+            triggerType: $request->triggerType,
             pausedAt: $request->occurredAt->format(DATE_ATOM),
         );
 
@@ -128,7 +128,7 @@ final readonly class TriggerRunAdmission
             'tenant_id'    => $request->tenantId,
             'flow_id'      => $request->flowId,
             'trigger_id'   => $request->triggerId,
-            'trigger_type' => $request->triggerType?->value,
+            'trigger_type' => $request->triggerType,
         ];
     }
 }

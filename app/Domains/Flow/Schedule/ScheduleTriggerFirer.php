@@ -206,7 +206,7 @@ final readonly class ScheduleTriggerFirer
                 tenantId: $tenantId,
                 flowId: $trigger->flow_id,
                 triggerId: $trigger->id,
-                triggerType: FlowTriggerType::Schedule,
+                triggerType: FlowTriggerType::Schedule->value,
                 unitKey: TriggerAdmissionRequest::unitKeyFor($trigger->id, $fireKey),
                 occurredAt: $now,
             ));

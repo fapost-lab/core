@@ -297,7 +297,7 @@ final class FlowServiceProvider extends ServiceProvider
             label: 'Flow runs',
             unit: 'runs',
             kind: LimitKind::PerPeriod,
-            description: 'Runs started by a schedule, an event, a webhook or an API trigger. A run over the limit does not start; conversations are not counted.',
+            description: 'Runs started by a schedule, an event, a webhook, an API or an extension\'s trigger. A run over the limit does not start; conversations are not counted.',
         ));
 
         $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(

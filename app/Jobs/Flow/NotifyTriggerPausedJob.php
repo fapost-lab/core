@@ -87,7 +87,7 @@ final class NotifyTriggerPausedJob implements ShouldQueue
         try {
             $notifier->send($recipient, new StaffMessage(
                 text: __('builder.trigger_state.paused_notice', [
-                    'type'  => __('builder.trigger_state.types.' . ($this->triggerType ?? 'other'), [], $locale),
+                    'type'  => $this->typeLabel($locale),
                     'flow'  => $flowName,
                     'limit' => $limit,
                 ], $locale),
@@ -109,5 +109,15 @@ final class NotifyTriggerPausedJob implements ShouldQueue
         } catch (ModelNotFoundException) {
             return $this->flowId;
         }
+    }
+
+    /**
+     * A built-in type's word in the recipient's language; a registered type's own name; "automatic" without one.
+     */
+    private function typeLabel(string $locale): string
+    {
+        $key = 'builder.trigger_state.types.' . ($this->triggerType ?? 'other');
+
+        return trans()->has($key, $locale) ? (string) __($key, [], $locale) : (string) $this->triggerType;
     }
 }

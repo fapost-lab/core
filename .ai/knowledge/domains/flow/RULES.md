@@ -431,7 +431,8 @@ broken.
   (`adr-20261123-flow-schedule-trigger`). Enforced: `ScheduleTriggerFirerTest`, `ScheduleClockTest`,
   `FireScheduledTriggersCommandTest`, `FlowTriggersPublishTest`.
 - **A trigger's new run passes run admission once, before it exists; a pause is lifted only by a person.** Every
-  automatic start — `AutomationRunner::start()` for a fire with no run yet, `StartFlowFromEventJob`, and
+  automatic start — `AutomationRunner::start()` for a fire with no run yet (webhook, Core event, a registered trigger
+  type, a re-run), `StartFlowFromEventJob`, and
   `ScheduleTriggerFirer`'s claim before `prepare()` — asks `TriggerRunAdmission` in this order: a paused trigger
   (`trigger_paused`), the run rate breaker (`flow.automations.runs_per_trigger_per_minute` runs a minute per tenant and
   trigger; over it `rate_breaker` and the trigger is paused), the plan's `flow_runs` through `PeriodQuota`

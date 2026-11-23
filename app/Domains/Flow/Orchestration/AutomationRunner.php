@@ -108,7 +108,7 @@ final readonly class AutomationRunner
                     tenantId: $tenantId,
                     flowId: $flowId,
                     triggerId: $triggerId,
-                    triggerType: $this->triggers->find($triggerId)?->type,
+                    triggerType: $this->triggers->find($triggerId)?->typeName(),
                     unitKey: TriggerAdmissionRequest::unitKeyFor($triggerId, $fireKey),
                     occurredAt: CarbonImmutable::now(),
                 ));

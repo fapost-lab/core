@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Admission;
 
-use App\Domains\Flow\Enums\FlowTriggerType;
 use DateTimeImmutable;
 
 /**
- * One new run a trigger fired, asking to start. The trigger's type is null when its row is gone (a publish removed it
+ * One new run a trigger fired, asking to start. The trigger's type is its name — a built-in type's value or a registered type's dotted name — and null when its row is gone (a publish removed it
  * after it fired); the run is asked about all the same.
  *
  * The unit key names the run to the operator's meter, the same on every retry of the same fire: a hash of the trigger id
@@ -20,7 +19,7 @@ final readonly class TriggerAdmissionRequest
         public string $tenantId,
         public string $flowId,
         public string $triggerId,
-        public ?FlowTriggerType $triggerType,
+        public ?string $triggerType,
         public string $unitKey,
         public DateTimeImmutable $occurredAt,
     ) {

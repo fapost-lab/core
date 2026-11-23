@@ -98,7 +98,7 @@ final readonly class TriggerPauseService
                 subject: $draft,
                 subjectLabel: (string) $draft->name,
                 assistantId: $draft->assistant_id,
-                properties: ['trigger_id' => $trigger->id, 'trigger_type' => $trigger->type->value],
+                properties: ['trigger_id' => $trigger->id, 'trigger_type' => $trigger->typeName()],
             ));
 
             return true;
