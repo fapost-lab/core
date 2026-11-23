@@ -12,7 +12,7 @@ paths:
   - app/Http/Controllers/Console/LocaleController.php
   - app/Http/Middleware/HandleInertiaRequests.php
 summary: "Admin UI language (per person: SetLocale, the locale cookie, users.locale, shared Inertia translations) and content language stay separate; content resolves via LanguageResolverInterface, and a button/select value is never translated"
-reviewed_at: 2026-10-26
+reviewed_at: 2026-11-23
 ---
 # Multilingual layers
 
@@ -51,6 +51,12 @@ their strings as shared Inertia props from `HandleInertiaRequests` — `translat
 (`builder`, `auth`, and on console routes `console`), never whole files another page needs —
 and there is no front-end i18n library. A key added for the console exists in every supported
 locale.
+
+A Flow validation message is translated where the error is built for staff
+(`__('builder.validation.<code>')` in the validator), never inside an exception that a queue
+worker may also catch and log: a worker has no person's locale, so an exception keeps its
+English message for the log and carries a code the validator translates (see
+`InvalidScheduleConfigException::$errorCode`).
 
 Enforcement is review only: no PHPat rule or test backs this, so a mixed layer or a
 literal in a handler is caught by a human reviewer, not CI.

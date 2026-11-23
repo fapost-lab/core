@@ -485,51 +485,51 @@ async function runTest() {
                 <button class="add-btn" @click="addRow(form.headerRows)">+ Add header</button>
             </AccordionSection>
 
-            <AccordionSection title="Authorization" default-open>
+            <AccordionSection :title="t('call.auth.section')" default-open>
                 <div class="config-field">
                     <select class="field-input" data-testid="auth-mode" :disabled="credentialLocked" :value="form.authMode" @change="form.authMode = ($event.target as HTMLSelectElement).value as 'none'|'credential'|'bearer'|'basic'; commit()">
-                        <option value="none">None</option>
+                        <option value="none">{{ t('call.auth.none') }}</option>
                         <option value="credential" :disabled="!canUseCredentials && !credentialLocked">
-                            {{ credentialLocked ? t('permission_hints.credential_locked') : 'Saved credential' }}
+                            {{ credentialLocked ? t('permission_hints.credential_locked') : t('call.auth.credential') }}
                         </option>
-                        <option value="bearer">Bearer token (stored in the flow definition)</option>
-                        <option value="basic">Basic auth (stored in the flow definition)</option>
+                        <option value="bearer">{{ t('call.auth.bearer') }}</option>
+                        <option value="basic">{{ t('call.auth.basic') }}</option>
                     </select>
                 </div>
                 <div v-if="form.authMode === 'credential'" class="config-field">
-                    <div class="field-label">Credential</div>
+                    <div class="field-label">{{ t('call.auth.credential_label') }}</div>
                     <select class="field-input" data-testid="credential-select" :disabled="credentialLocked" :value="form.credentialId" @change="form.credentialId = ($event.target as HTMLSelectElement).value; commit()">
                         <option value="">—</option>
                         <option v-for="c in credentialOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
                         <!-- A saved id the list does not have (deleted, or not listed to this user) stays visible rather than silently cleared. -->
                         <option v-if="form.credentialId !== '' && !credentialOptions.some(c => c.id === form.credentialId)" :value="form.credentialId">
-                            {{ credentialLocked ? t('permission_hints.credential_locked') : (credentialsLoaded ? 'Unavailable credential' : '…') }}
+                            {{ credentialLocked ? t('permission_hints.credential_locked') : (credentialsLoaded ? t('call.auth.credential_unavailable') : '…') }}
                         </option>
                     </select>
                     <p v-if="!canUseCredentials" class="field-help" data-testid="credential-permission-hint">
                         {{ t('permission_hints.credential_change') }}
                     </p>
                     <p v-else-if="credentialsLoaded && credentialOptions.length === 0" class="field-help">
-                        No saved credentials yet. Add one in Administration → System → Credentials.
+                        {{ t('call.auth.no_credentials') }}
                     </p>
                     <p v-else class="field-help">
-                        The secret is applied when the call runs and is never stored in the flow. It is sent only to the hosts the credential allows.
+                        {{ t('call.auth.secret_applied') }}
                     </p>
                 </div>
                 <p v-if="form.authMode === 'bearer' || form.authMode === 'basic'" class="field-help auth-warn">
-                    ⚠ These values are stored in the flow definition, readable by everyone who can open the flow. Prefer a saved credential for a real secret.
+                    {{ t('call.auth.inline_warning') }}
                 </p>
                 <div v-if="form.authMode === 'bearer'" class="config-field">
-                    <div class="field-label">Token</div>
+                    <div class="field-label">{{ t('call.auth.token') }}</div>
                     <TemplateInput v-model="form.authBearer" placeholder="{{flow.api_token}}" @update:model-value="commit" />
                 </div>
                 <template v-if="form.authMode === 'basic'">
                     <div class="config-field">
-                        <div class="field-label">Username</div>
+                        <div class="field-label">{{ t('call.auth.username') }}</div>
                         <TemplateInput v-model="form.authUser" placeholder="user" @update:model-value="commit" />
                     </div>
                     <div class="config-field">
-                        <div class="field-label">Password</div>
+                        <div class="field-label">{{ t('call.auth.password') }}</div>
                         <TemplateInput v-model="form.authPass" placeholder="{{flow.password}}" @update:model-value="commit" />
                     </div>
                 </template>

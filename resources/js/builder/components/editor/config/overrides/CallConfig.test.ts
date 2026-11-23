@@ -4,7 +4,14 @@ import {flushPromises, mount} from '@vue/test-utils'
 import {createPinia, setActivePinia} from 'pinia'
 
 
-const {pageProps} = vi.hoisted(() => ({pageProps: {auth: {permissions: [] as string[]}}}))
+const {pageProps} = vi.hoisted(() => ({pageProps: {
+    auth:         {permissions: [] as string[]},
+    translations: {builder: {call: {auth: {
+        bearer:                 'Bearer token (stored in the flow definition)',
+        credential_unavailable: 'Unavailable credential',
+        no_credentials:         'No saved credentials yet. Add one in Administration → System → Credentials.',
+    }}}},
+}}))
 
 vi.mock('@inertiajs/vue3', () => ({usePage: () => ({props: pageProps})}))
 

@@ -45,12 +45,13 @@ const { t } = useTranslations()
 const { can } = usePermissions()
 const canManageAutomations = computed(() => can('manage_automations'))
 
+/** The built-in types; the label of each is `trigger_panel.types.<value>`. */
 const triggerTypes = [
-    { value: 'message', label: 'Message' },
-    { value: 'schedule', label: 'Schedule' },
-    { value: 'webhook', label: 'Webhook' },
-    { value: 'api', label: 'API' },
-    { value: 'event', label: 'Event' },
+    { value: 'message' },
+    { value: 'schedule' },
+    { value: 'webhook' },
+    { value: 'api' },
+    { value: 'event' },
 ]
 
 const BUILTIN_TYPES = new Set(triggerTypes.map((option) => option.value))
@@ -208,7 +209,7 @@ const assistantFilterOptions = computed<SelectOption[]>(() => {
     const known = new Set(assistantOptions.value.map((option) => option.value))
     const missing = assistantFilter.value
         .filter((id) => !known.has(id))
-        .map((id) => ({ value: id, label: 'Deleted assistant' }))
+        .map((id) => ({ value: id, label: t('trigger_panel.placeholders.deleted_assistant') }))
 
     return [...assistantOptions.value, ...missing]
 })
@@ -545,9 +546,9 @@ function defaultConfig(type: string): Record<string, unknown> {
         </section>
         <div class="automation-lock" :inert="automationLocked" data-testid="automation-lock">
         <div class="trigger-unavailable" :class="{ 'is-unavailable': unavailableReason !== null }" :inert="unavailableReason !== null" data-testid="trigger-general">
-        <AccordionSection title="General" default-open>
+        <AccordionSection :title="t('trigger_panel.sections.general')" default-open>
             <div class="config-field">
-                <div class="field-label">Trigger type</div>
+                <div class="field-label">{{ t('trigger_panel.fields.type') }}</div>
                 <select
                     class="field-input"
                     :value="currentTrigger.type"
@@ -558,7 +559,7 @@ function defaultConfig(type: string): Record<string, unknown> {
                         :key="option.value"
                         :value="option.value"
                         :disabled="isAutomaticTrigger(option.value) && !canManageAutomations"
-                    >{{ option.label }}</option>
+                    >{{ t(`trigger_panel.types.${option.value}`) }}</option>
                     <option
                         v-for="entry in registeredOptions"
                         :key="entry.type"
@@ -574,7 +575,7 @@ function defaultConfig(type: string): Record<string, unknown> {
             </div>
 
             <div class="config-field">
-                <div class="field-label">Priority</div>
+                <div class="field-label">{{ t('trigger_panel.fields.priority') }}</div>
                 <input
                     class="field-input"
                     type="number"
@@ -591,7 +592,7 @@ function defaultConfig(type: string): Record<string, unknown> {
                     :checked="(currentTrigger.is_active as boolean) ?? false"
                     @change="update({ is_active: ($event.target as HTMLInputElement).checked })"
                 >
-                <span>Trigger is active</span>
+                <span>{{ t('trigger_panel.fields.is_active') }}</span>
             </label>
         </AccordionSection>
         </div>
@@ -618,9 +619,9 @@ function defaultConfig(type: string): Record<string, unknown> {
             />
         </AccordionSection>
 
-        <AccordionSection v-if="currentTrigger.type === 'message'" title="Message matching" default-open>
+        <AccordionSection v-if="currentTrigger.type === 'message'" :title="t('trigger_panel.sections.message_matching')" default-open>
             <div class="config-field">
-                <div class="field-label">Keywords</div>
+                <div class="field-label">{{ t('trigger_panel.fields.keywords') }}</div>
                 <div
                     v-for="(keyword, index) in ((currentTrigger.config as Record<string, unknown>)?.keywords as string[] ?? [])"
                     :key="`keyword-${index}`"
@@ -633,11 +634,11 @@ function defaultConfig(type: string): Record<string, unknown> {
                     >
                     <button type="button" class="delete-inline" @click="removeArrayItem('keywords', index)">×</button>
                 </div>
-                <button type="button" class="add-item-btn" @click="addArrayItem('keywords')">+ Add keyword</button>
+                <button type="button" class="add-item-btn" @click="addArrayItem('keywords')">{{ t('trigger_panel.fields.add_keyword') }}</button>
             </div>
 
             <div class="config-field">
-                <div class="field-label">Phrases</div>
+                <div class="field-label">{{ t('trigger_panel.fields.phrases') }}</div>
                 <div
                     v-for="(phrase, index) in ((currentTrigger.config as Record<string, unknown>)?.phrases as string[] ?? [])"
                     :key="`phrase-${index}`"
@@ -650,13 +651,13 @@ function defaultConfig(type: string): Record<string, unknown> {
                     >
                     <button type="button" class="delete-inline" @click="removeArrayItem('phrases', index)">×</button>
                 </div>
-                <button type="button" class="add-item-btn" @click="addArrayItem('phrases')">+ Add phrase</button>
+                <button type="button" class="add-item-btn" @click="addArrayItem('phrases')">{{ t('trigger_panel.fields.add_phrase') }}</button>
             </div>
         </AccordionSection>
 
-        <AccordionSection v-else-if="currentTrigger.type === 'schedule'" title="Schedule" default-open>
+        <AccordionSection v-else-if="currentTrigger.type === 'schedule'" :title="t('trigger_panel.sections.schedule')" default-open>
             <div class="config-field">
-                <div class="field-label">Cron</div>
+                <div class="field-label">{{ t('trigger_panel.fields.cron') }}</div>
                 <input
                     class="field-input"
                     :value="(triggerCfg.cron as string) ?? ''"
@@ -667,7 +668,7 @@ function defaultConfig(type: string): Record<string, unknown> {
             </div>
 
             <div class="config-field">
-                <div class="field-label">Timezone</div>
+                <div class="field-label">{{ t('trigger_panel.fields.timezone') }}</div>
                 <input
                     class="field-input"
                     :value="(triggerCfg.timezone as string) ?? 'UTC'"
@@ -678,11 +679,11 @@ function defaultConfig(type: string): Record<string, unknown> {
             </div>
         </AccordionSection>
 
-        <AccordionSection v-else-if="currentTrigger.type === 'webhook'" title="Webhook" default-open>
+        <AccordionSection v-else-if="currentTrigger.type === 'webhook'" :title="t('trigger_panel.sections.webhook')" default-open>
             <div v-if="webhookError" class="webhook-error" role="alert">{{ webhookError }}</div>
 
             <div class="config-field">
-                <div class="field-label">URL</div>
+                <div class="field-label">{{ t('trigger_panel.fields.url') }}</div>
                 <div v-if="endpoint" class="webhook-row">
                     <input class="field-input webhook-mono" type="text" readonly :value="endpoint.url" @focus="($event.target as HTMLInputElement).select()">
                     <button type="button" class="webhook-btn" @click="copyText('url', endpoint.url)">
@@ -857,7 +858,7 @@ function defaultConfig(type: string): Record<string, unknown> {
             </template>
         </AccordionSection>
 
-        <AccordionSection v-else-if="currentTrigger.type === 'api'" title="API" default-open>
+        <AccordionSection v-else-if="currentTrigger.type === 'api'" :title="t('trigger_panel.sections.api')" default-open>
             <div v-if="apiLegacy" class="field-hint webhook-status-warn" data-testid="api-legacy">
                 {{ t('api_trigger.legacy') }}
             </div>
@@ -908,15 +909,15 @@ function defaultConfig(type: string): Record<string, unknown> {
             </div>
         </AccordionSection>
 
-        <AccordionSection v-else-if="currentTrigger.type === 'event'" title="Event" default-open>
+        <AccordionSection v-else-if="currentTrigger.type === 'event'" :title="t('trigger_panel.sections.event')" default-open>
             <div class="config-field">
-                <div class="field-label">Event name</div>
+                <div class="field-label">{{ t('trigger_panel.fields.event_name') }}</div>
                 <div class="event-combo">
                     <input
                         type="text"
                         class="field-input"
                         :value="currentEventName"
-                        placeholder="Search or type an event name…"
+                        :placeholder="t('trigger_panel.placeholders.event_search')"
                         autocomplete="off"
                         @focus="eventDropdownOpen = true"
                         @input="setEventName(($event.target as HTMLInputElement).value)"
@@ -925,7 +926,7 @@ function defaultConfig(type: string): Record<string, unknown> {
                     >
                     <div v-if="eventDropdownOpen && filteredEvents.length" class="event-dropdown">
                         <template v-if="coreEvents.length">
-                            <div class="event-group" data-test="event-group-core">Core</div>
+                            <div class="event-group" data-test="event-group-core">{{ t('trigger_panel.events.group_core') }}</div>
                             <button
                                 v-for="eventName in coreEvents"
                                 :key="eventName"
@@ -936,7 +937,7 @@ function defaultConfig(type: string): Record<string, unknown> {
                             >{{ eventName }}</button>
                         </template>
                         <template v-if="flowEvents.length">
-                            <div v-if="coreEvents.length" class="event-group" data-test="event-group-flow">Flow events</div>
+                            <div v-if="coreEvents.length" class="event-group" data-test="event-group-flow">{{ t('trigger_panel.events.group_flow') }}</div>
                             <button
                                 v-for="eventName in flowEvents"
                                 :key="eventName"
@@ -951,35 +952,34 @@ function defaultConfig(type: string): Record<string, unknown> {
                         v-else-if="eventDropdownOpen && currentEventName.trim()"
                         class="event-empty"
                     >
-                        No matching event — it will be saved as a new event name.
+                        {{ t('trigger_panel.events.no_match') }}
                     </div>
                 </div>
                 <div v-if="isCoreEvent" class="field-hint" data-test="core-event-hint">
-                    A Core event starts the flow without a contact: the event's data is in flow.event.*, and nodes that
-                    need a contact cannot be published.
+                    {{ t('trigger_panel.events.core_hint') }}
                 </div>
                 <div v-else class="field-hint">
-                    Lists Core events and events from all assistants in this tenant. Pick one or type a new name.
+                    {{ t('trigger_panel.events.other_hint') }}
                 </div>
             </div>
             <div v-if="showsAssistantFilter" class="config-field" data-test="assistant-filter">
-                <div class="field-label">Only from assistants</div>
+                <div class="field-label">{{ t('trigger_panel.fields.assistant_filter') }}</div>
                 <SearchSelect
                     :model-value="assistantFilter"
                     :options="assistantFilterOptions"
                     multiple
-                    placeholder="Any assistant"
-                    empty-text="No assistants"
+                    :placeholder="t('trigger_panel.placeholders.any_assistant')"
+                    :empty-text="t('trigger_panel.placeholders.no_assistants')"
                     @update:model-value="setAssistantFilter"
                 />
                 <div class="field-hint">
-                    Start the flow only on events emitted by flows of these assistants. Leave empty for any assistant.
+                    {{ t('trigger_panel.events.assistant_filter_hint') }}
                 </div>
             </div>
         </AccordionSection>
 
-        <AccordionSection title="Danger zone">
-            <button type="button" class="delete-trigger-btn" @click="removeTrigger">Delete trigger</button>
+        <AccordionSection :title="t('trigger_panel.sections.danger_zone')">
+            <button type="button" class="delete-trigger-btn" @click="removeTrigger">{{ t('trigger_panel.delete.trigger') }}</button>
         </AccordionSection>
         </div>
     </div>

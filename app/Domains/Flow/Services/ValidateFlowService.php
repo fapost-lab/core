@@ -1407,7 +1407,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config." . (InvalidScheduleConfigException::INVALID_CRON === $exception->errorCode ? 'cron' : 'timezone'),
                 code: $exception->errorCode,
-                message: $exception->getMessage(),
+                message: (string) __('builder.validation.' . $exception->errorCode),
             );
 
             return;
