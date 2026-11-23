@@ -9,6 +9,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\BuilderMode;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Services\BuilderModePreference;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Analytics\Events\BuilderModeChanged;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
@@ -79,6 +80,18 @@ final class BuilderPreferenceTest extends FeatureTestCase
         $this->actingAs($onGraph)->putJson('/builder/preferences', ['builder_mode' => 'graph'])->assertOk();
 
         $this->assertSame(BuilderMode::Tree, $neverChose->fresh()->builder_mode, 'The explicit choice is still stored.');
+        Event::assertNotDispatched(BuilderModeChanged::class);
+    }
+
+    public function test_the_platform_support_users_choice_is_stored_but_not_announced(): void
+    {
+        Event::fake([BuilderModeChanged::class]);
+        $support = $this->userWithFlowPermissions();
+        $support->forceFill(['is_platform_support' => true])->save();
+
+        $this->app->make(BuilderModePreference::class)->choose($support, BuilderMode::Graph);
+
+        $this->assertSame(BuilderMode::Graph, $support->fresh()->builder_mode);
         Event::assertNotDispatched(BuilderModeChanged::class);
     }
 

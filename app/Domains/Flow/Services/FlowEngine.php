@@ -124,36 +124,26 @@ final readonly class FlowEngine implements FlowEngineInterface
         // An automation run's deadline is frozen at its start; a later change of the setting never moves it.
         $deadlineAt = FlowRunKind::Automation === $origin->kind ? $this->runDeadline->for(now()) : null;
 
-        $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
-            'tenant_id'          => null !== $contact ? $contact->tenant_id : $definition->tenant_id,
-            'assistant_id'       => $assistantId,
-            'contact_id'         => $contact?->getKey(),
-            'flow_definition_id' => $definition->getKey(),
-            'flow_version'       => $definition->version,
-            'current_node_id'    => $entry,
-            'state'              => $baseState,
-            'status'             => FlowSessionStatus::Active,
-            'run_kind'           => $origin->kind,
-            'trigger_id'         => $origin->triggerId,
-            'fire_key'           => $origin->fireKey,
-            // Kept as the trigger handed it over, apart from the state the flow may overwrite: a re-run starts from it.
-            'trigger_payload'   => null !== $origin->fireKey ? $initialState : null,
-            'deadline_at'       => $deadlineAt,
-            'event_chain_depth' => $origin->chainDepth,
-            'start_key'         => $origin->startKey,
-            'version'           => 1,
-        ]));
+        $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create(
+            $this->automationSessionRow(
+                $definition,
+                null !== $contact ? $contact->tenant_id : $definition->tenant_id,
+                $assistantId,
+                $contact?->getKey(),
+                $entry,
+                $baseState,
+                FlowSessionStatus::Active,
+                $origin,
+                $deadlineAt,
+                [
+                    // Kept as the trigger handed it over, apart from the state the flow may overwrite: a re-run starts from it.
+                    'trigger_payload' => null !== $origin->fireKey ? $initialState : null,
+                    'start_key'       => $origin->startKey,
+                ],
+            ),
+        ));
 
-        $this->afterCommit(function () use ($session): void {
-            $this->analyticsWriter->record(
-                new AnalyticsEvent(
-                    tenantId: (string)$session->tenant_id,
-                    eventType: AnalyticsEventType::FlowStarted,
-                    payload: ['session_id' => (string)$session->getKey()],
-                    occurredAt: new DateTimeImmutable(),
-                )
-            );
-        });
+        $this->recordFlowStarted($session);
 
         $this->executeLoop($definition, $session, null, $contact);
         $session->refresh();
@@ -170,22 +160,19 @@ final readonly class FlowEngine implements FlowEngineInterface
         $entry     = $this->graphResolver->resolveEntryNode($definition);
         $baseState = $this->buildBaseState($definition, null, $origin->assistantId, $initialState);
 
-        return $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
-            'tenant_id'          => $definition->tenant_id,
-            'assistant_id'       => $origin->assistantId,
-            'contact_id'         => null,
-            'flow_definition_id' => $definition->getKey(),
-            'flow_version'       => $definition->version,
-            'current_node_id'    => $entry,
-            'state'              => $baseState,
-            'status'             => FlowSessionStatus::Pending,
-            'run_kind'           => $origin->kind,
-            'trigger_id'         => $origin->triggerId,
-            'fire_key'           => $origin->fireKey,
-            'deadline_at'        => $this->runDeadline->for(now()),
-            'event_chain_depth'  => $origin->chainDepth,
-            'version'            => 1,
-        ]));
+        return $this->connection->transaction(fn (): FlowSession => $this->sessions->create(
+            $this->automationSessionRow(
+                $definition,
+                $definition->tenant_id,
+                $origin->assistantId,
+                null,
+                $entry,
+                $baseState,
+                FlowSessionStatus::Pending,
+                $origin,
+                $this->runDeadline->for(now()),
+            ),
+        ));
     }
 
     public function activate(FlowSession $session): bool
@@ -203,16 +190,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                 throw FlowConcurrencyException::forSession((string)$session->getKey(), $exception);
             }
 
-            $this->afterCommit(function () use ($session): void {
-                $this->analyticsWriter->record(
-                    new AnalyticsEvent(
-                        tenantId: (string)$session->tenant_id,
-                        eventType: AnalyticsEventType::FlowStarted,
-                        payload: ['session_id' => (string)$session->getKey()],
-                        occurredAt: new DateTimeImmutable(),
-                    )
-                );
-            });
+            $this->recordFlowStarted($session);
         });
 
         return true;
@@ -263,16 +241,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             'version'            => 1,
         ]));
 
-        $this->afterCommit(function () use ($session): void {
-            $this->analyticsWriter->record(
-                new AnalyticsEvent(
-                    tenantId: (string)$session->tenant_id,
-                    eventType: AnalyticsEventType::FlowStarted,
-                    payload: ['session_id' => (string)$session->getKey()],
-                    occurredAt: new DateTimeImmutable(),
-                )
-            );
-        });
+        $this->recordFlowStarted($session);
 
         if (null !== $nextNodeId) {
             $this->executeLoop($definition, $session, null, $contact);
@@ -341,6 +310,59 @@ final readonly class FlowEngine implements FlowEngineInterface
         $parent->refresh();
 
         return $parent;
+    }
+
+    /**
+     * The attributes of a new automation-kind session row; `$extra` carries what only some paths write.
+     *
+     * @param  array<string, mixed>  $baseState
+     * @param  array<string, mixed>  $extra
+     *
+     * @return array<string, mixed>
+     */
+    private function automationSessionRow(
+        FlowDefinition $definition,
+        mixed $tenantId,
+        mixed $assistantId,
+        mixed $contactId,
+        ?string $entry,
+        array $baseState,
+        FlowSessionStatus $status,
+        FlowRunOrigin $origin,
+        mixed $deadlineAt,
+        array $extra = [],
+    ): array {
+        return [
+            'tenant_id'          => $tenantId,
+            'assistant_id'       => $assistantId,
+            'contact_id'         => $contactId,
+            'flow_definition_id' => $definition->getKey(),
+            'flow_version'       => $definition->version,
+            'current_node_id'    => $entry,
+            'state'              => $baseState,
+            'status'             => $status,
+            'run_kind'           => $origin->kind,
+            'trigger_id'         => $origin->triggerId,
+            'fire_key'           => $origin->fireKey,
+            'deadline_at'        => $deadlineAt,
+            'event_chain_depth'  => $origin->chainDepth,
+            'version'            => 1,
+            ...$extra,
+        ];
+    }
+
+    private function recordFlowStarted(FlowSession $session): void
+    {
+        $this->afterCommit(function () use ($session): void {
+            $this->analyticsWriter->record(
+                new AnalyticsEvent(
+                    tenantId: (string)$session->tenant_id,
+                    eventType: AnalyticsEventType::FlowStarted,
+                    payload: ['session_id' => (string)$session->getKey()],
+                    occurredAt: new DateTimeImmutable(),
+                )
+            );
+        });
     }
 
     /**

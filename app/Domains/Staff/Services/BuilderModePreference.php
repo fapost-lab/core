@@ -16,7 +16,8 @@ use Illuminate\Contracts\Events\Dispatcher;
  * Foundation's {@see BuilderModeChanged}, so an operator package can follow how the two layouts are used.
  *
  * A user who never chose a mode (`null`) is on the tree, so choosing the tree then, or the mode one already has, is
- * stored but announces nothing. The event carries the tenant and the modes, never the user.
+ * stored but announces nothing. The event carries the tenant and the modes, never the user. The platform support user's
+ * choice is stored but never announced: the usage report leaves that user out, so the switch trend must too.
  */
 final readonly class BuilderModePreference
 {
@@ -32,7 +33,7 @@ final readonly class BuilderModePreference
 
         $user->forceFill(['builder_mode' => $mode])->save();
 
-        if ($previous === $mode) {
+        if ($previous === $mode || $user->isPlatformSupport()) {
             return;
         }
 

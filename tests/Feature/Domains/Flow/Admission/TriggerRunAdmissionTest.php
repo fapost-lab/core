@@ -484,7 +484,11 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
 
     private function refusals(CacheRepository $cache): TriggerRefusals
     {
-        return new TriggerRefusals($this->app->make(FlowTriggerStateRepositoryInterface::class), $cache);
+        return new TriggerRefusals(
+            $this->app->make(FlowTriggerStateRepositoryInterface::class),
+            $cache,
+            $this->app->make(ExceptionHandler::class),
+        );
     }
 
     private function setLimit(int $runs): void
@@ -525,11 +529,6 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
         $this->app->call([$job, 'handle']);
     }
 
-    /**
-     * A published flow whose one trigger is a schedule; its runs are started directly through the runner.
-     *
-     * @return array{FlowDraft, string}
-     */
     private function reachable(Contact $contact): void
     {
         $channel = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
@@ -568,6 +567,11 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
         return $session->refresh();
     }
 
+    /**
+     * A published flow whose one trigger is a schedule; its runs are started directly through the runner.
+     *
+     * @return array{FlowDraft, string}
+     */
     private function liveSchedule(string $cron = '0 9 * * *'): array
     {
         $triggerId = mb_strtolower(Str::ulid()->toRfc4122());

@@ -240,6 +240,24 @@ final class MediaApiTest extends FeatureTestCase
         $this->assertSame('/B/X', $moved->path_cache);
     }
 
+    public function test_move_of_a_stale_folder_model_to_the_parent_it_still_shows_is_written(): void
+    {
+        $service = $this->app->make(MediaFolderService::class);
+        $a       = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'A', 'path_cache' => '/A']);
+        $x       = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'X', 'path_cache' => '/X']);
+
+        // X is loaded at the root, then another request moves it under A; ours asks for the root again, the very
+        // value the stale model holds, so only a re-read of the folder makes the write happen.
+        $stale = MediaFolder::query()->findOrFail($x->id);
+        $service->move($x, $a);
+
+        $service->move($stale, null);
+
+        $moved = MediaFolder::query()->findOrFail($x->id);
+        $this->assertNull($moved->parent_id);
+        $this->assertSame('/X', $moved->path_cache);
+    }
+
     public function test_move_into_a_parent_deleted_since_it_was_loaded_is_a_field_error(): void
     {
         $a = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'A', 'path_cache' => '/A']);

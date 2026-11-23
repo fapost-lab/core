@@ -392,7 +392,10 @@ broken.
   schedule then gets its first slot after now). A republish by a template takes the list from the host's active
   definition, never its draft, and a `null` list leaves the rows alone. Nothing else writes a trigger's definition
   columns; its run state (`next_run_at`, `last_run_at`) is written only by this sync, by `ScheduleTriggerFirer`'s slot
-  claim and by flow deletion, which clears a schedule's slot (`adr-20261123-flow-schedule-trigger`). Flow deletion also
+  claim and by flow deletion, which clears a schedule's slot — all through `FlowTriggerRepositoryInterface`
+  (`syncForFlow`, `moveScheduleSlot`, `stopSchedules`; the due and next-run reads are `dueSchedules`, `nextScheduleRuns`),
+  and the comparison and by-id diff of trigger lists live in `Support/FlowTriggerComparison`, which also declares the
+  `Trigger` shape (`adr-20261123-flow-schedule-trigger`). Flow deletion also
   cancels the flow's root `pending` runs (a schedule's, not started yet) under their optimistic lock in its transaction,
   so a frequent schedule never makes its flow undeletable; a run that has started still refuses the delete. Why: a draft edit must not change what runs, and a live
   trigger must survive the release that introduced the list (`adr-20261119-flow-triggers-in-definition-live-on-publish`).

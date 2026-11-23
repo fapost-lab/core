@@ -10,6 +10,7 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\PlatformSupportUserService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Infrastructure\CoreBuilderModeUsage;
+use App\Domains\Tenancy\Infrastructure\ReportableTenants;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Database\Seeders\TenantAclSeeder;
@@ -120,6 +121,7 @@ final class CoreBuilderModeUsageTest extends FeatureTestCase
     {
         $usage = new CoreBuilderModeUsage(
             $this->app->make(TenantSwitcher::class),
+            $this->app->make(ReportableTenants::class),
             static fn (): array => throw new RuntimeException('count failed'),
         );
 

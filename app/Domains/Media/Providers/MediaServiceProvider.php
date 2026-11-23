@@ -8,6 +8,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Media\Contracts\MediaBlobRepositoryInterface;
 use App\Domains\Media\Contracts\MediaChannelRefRepositoryInterface;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
+use App\Domains\Media\Contracts\MediaFolderRepositoryInterface;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaReferenceExtractorInterface;
 use App\Domains\Media\Contracts\MediaReferenceTrackerInterface;
@@ -26,6 +27,7 @@ use App\Domains\Media\Registries\ChannelMediaLinkPolicyRegistry;
 use App\Domains\Media\Registries\ChannelMediaUploaderRegistry;
 use App\Domains\Media\Repositories\EloquentMediaBlobRepository;
 use App\Domains\Media\Repositories\EloquentMediaChannelRefRepository;
+use App\Domains\Media\Repositories\EloquentMediaFolderRepository;
 use App\Domains\Media\Services\ChannelLimitInspector;
 use App\Domains\Media\Services\MediaDispatcher;
 use App\Domains\Media\Services\MediaFolderService;
@@ -116,6 +118,7 @@ final class MediaServiceProvider extends ServiceProvider
 
         $this->app->singleton(MediaBlobRepositoryInterface::class, EloquentMediaBlobRepository::class);
         $this->app->singleton(MediaChannelRefRepositoryInterface::class, EloquentMediaChannelRefRepository::class);
+        $this->app->singleton(MediaFolderRepositoryInterface::class, EloquentMediaFolderRepository::class);
 
         $this->app->singleton(MediaReferenceExtractorInterface::class, FlowDefinitionMediaReferenceExtractor::class);
         $this->app->singleton(MediaReferenceTrackerInterface::class, MediaReferenceTracker::class);

@@ -30,6 +30,7 @@ use App\Domains\Tenancy\Infrastructure\CoreTenantReservations;
 use App\Domains\Tenancy\Infrastructure\CoreTenantUsage;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
 use App\Domains\Tenancy\Infrastructure\LandlordFlowScheduleRegistry;
+use App\Domains\Tenancy\Infrastructure\ReportableTenants;
 use App\Domains\Tenancy\Repositories\TenantDeletionRequestRepository;
 use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\AlwaysActiveAccessMode;
@@ -365,6 +366,7 @@ final class DomainServiceProvider extends ServiceProvider
         // does not import Staff.
         $this->app->bind(BuilderModeUsageInterface::class, fn ($app): CoreBuilderModeUsage => new CoreBuilderModeUsage(
             $app->make(TenantSwitcher::class),
+            $app->make(ReportableTenants::class),
             User::countByBuilderMode(...),
         ));
     }

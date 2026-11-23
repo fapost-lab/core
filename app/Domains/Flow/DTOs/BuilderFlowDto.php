@@ -6,9 +6,13 @@ namespace App\Domains\Flow\DTOs;
 
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Support\FlowTriggerComparison;
 use Illuminate\Support\Carbon;
 use Spatie\LaravelData\Data;
 
+/**
+ * @phpstan-import-type Trigger from FlowTriggerComparison
+ */
 final class BuilderFlowDto extends Data
 {
     public function __construct(
@@ -23,7 +27,7 @@ final class BuilderFlowDto extends Data
          * The flow's triggers as the author edits them: the draft's list, or the live ones while the draft carries
          * none. Each entry: `{id, type, is_active, priority, config}`.
          *
-         * @var list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>
+         * @var list<Trigger>
          */
         public readonly array $triggers,
         /** @var list<string> */
@@ -87,7 +91,7 @@ final class BuilderFlowDto extends Data
     }
 
     /**
-     * @param  list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>  $triggers
+     * @param  list<Trigger>  $triggers
      * @param  list<string>                                $availableEvents
      * @param  list<string>                                $availableLanguages
      * @param  list<array{id: string, name: string}>       $availableFlows

@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Models;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Enums\FlowKind;
+use App\Domains\Flow\Support\FlowTriggerComparison;
 use Database\Factories\FlowDraftFactory;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Fapost\Support\Models\BaseModel;
@@ -33,7 +34,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string                  $expression_engine  Engine id the author chose; snapshotted onto each published definition
  * @property array<array-key, mixed> $nodes
  * @property array<array-key, mixed> $edges
- * @property list<array{id: string, type: string, is_active: bool, priority: int, config: array<string, mixed>}>|null $triggers  The author's triggers; null until the draft carries them (the live rows count then)
+ * @property list<Trigger>|null $triggers  The author's triggers; null until the draft carries them (the live rows count then)
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read Assistant|null     $assistant
@@ -53,6 +54,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereTenantId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereUpdatedAt($value)
  * @mixin \Eloquent
+ *
+ * @phpstan-import-type Trigger from FlowTriggerComparison
  */
 final class FlowDraft extends BaseModel
 {

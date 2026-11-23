@@ -31,7 +31,7 @@ final class StaffGate
      * @param  list<string>  $operatorAbilities  the Gate abilities of the operator screens, decided by the operator
      *                                           access contract (the provider passes them: only it may know that class)
      */
-    public static function before(mixed $user, string $ability, array $arguments, array $operatorAbilities = []): ?bool
+    public static function before(mixed $user, string $ability, array $arguments, array $operatorAbilities): ?bool
     {
         if (PlatformSupportProtection::forbids($ability, $arguments)) {
             return false;

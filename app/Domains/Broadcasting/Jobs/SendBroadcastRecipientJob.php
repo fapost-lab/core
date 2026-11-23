@@ -115,13 +115,13 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
                 // A Failed run (its launching job crashed) skips its remaining recipients with its stop_reason too.
                 // Also the way a run stopped by a limit ends for everyone after the first refusal: no send
                 // is attempted, so the operator is not asked once per remaining recipient.
-                $this->finish($recipient, RecipientStatus::Skipped, 'skipped_count', $broadcast->stop_reason);
+                $this->finish($recipient, RecipientStatus::Skipped, $broadcast->stop_reason);
 
                 return;
             }
 
             if (null === $contact || null === $channel) {
-                $this->finish($recipient, RecipientStatus::Failed, 'failed_count', 'contact or channel missing');
+                $this->finish($recipient, RecipientStatus::Failed, 'contact or channel missing');
 
                 return;
             }
@@ -135,7 +135,7 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
             $text = $translator->resolveField($broadcast->message, $language);
 
             if ('' === mb_trim($text)) {
-                $this->finish($recipient, RecipientStatus::Skipped, 'skipped_count');
+                $this->finish($recipient, RecipientStatus::Skipped);
 
                 return;
             }
@@ -146,22 +146,22 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
                 // The limit holds until the period ends, so the whole run stops at the first refusal.
                 // Cancelled first: finish() completes a run that is still Running once all are processed.
                 $this->stopBroadcast($recipient->broadcast_id, BroadcastStatus::STOP_REASON_LIMIT_REACHED);
-                $this->finish($recipient, RecipientStatus::Skipped, 'skipped_count', $exception->getMessage());
+                $this->finish($recipient, RecipientStatus::Skipped, $exception->getMessage());
 
                 return;
             } catch (Throwable $exception) {
-                $this->finish($recipient, RecipientStatus::Failed, 'failed_count', $exception->getMessage());
+                $this->finish($recipient, RecipientStatus::Failed, $exception->getMessage());
 
                 return;
             }
 
             if ($result->sent || $result->duplicate) {
-                $this->finish($recipient, RecipientStatus::Sent, 'sent_count', providerMessageId: $result->providerMessageId);
+                $this->finish($recipient, RecipientStatus::Sent, providerMessageId: $result->providerMessageId);
 
                 return;
             }
 
-            $this->finish($recipient, RecipientStatus::Failed, 'failed_count', $result->error ?? 'delivery failed');
+            $this->finish($recipient, RecipientStatus::Failed, $result->error ?? 'delivery failed');
         });
     }
 
@@ -207,7 +207,6 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
     private function finish(
         BroadcastRecipient $recipient,
         RecipientStatus $status,
-        string $counter,
         ?string $error = null,
         ?string $providerMessageId = null,
     ): void {
@@ -215,7 +214,6 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
             (string) $recipient->broadcast_id,
             (string) $recipient->getKey(),
             $status,
-            $counter,
             $error,
             $providerMessageId,
         );

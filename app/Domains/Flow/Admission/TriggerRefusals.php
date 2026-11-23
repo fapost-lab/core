@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Admission;
 use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use DateTimeImmutable;
 use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use RuntimeException;
 use Throwable;
 
@@ -29,6 +30,7 @@ final readonly class TriggerRefusals
     public function __construct(
         private FlowTriggerStateRepositoryInterface $states,
         private Cache $cache,
+        private ExceptionHandler $exceptions,
     ) {
     }
 
@@ -46,7 +48,7 @@ final readonly class TriggerRefusals
             }
         } catch (Throwable $exception) {
             // Not counted in the cache: written directly, so it is not lost.
-            report($exception);
+            $this->exceptions->report($exception);
             $this->states->addRefusals($triggerId, 1, $reason, $at);
 
             return;
@@ -56,7 +58,7 @@ final readonly class TriggerRefusals
             $count = $this->takeIfDue($tenantId, $triggerId, $countKey, $reason, $at);
         } catch (Throwable $exception) {
             // Counted in the cache already: the next write takes it, so a direct write would count it twice.
-            report($exception);
+            $this->exceptions->report($exception);
             $count = 0;
         }
 
@@ -74,7 +76,7 @@ final readonly class TriggerRefusals
             $count = (int) $this->cache->get(self::countKey($tenantId, $triggerId), 0);
             $last  = $count > 0 ? $this->cache->get(self::lastKey($tenantId, $triggerId)) : null;
         } catch (Throwable $exception) {
-            report($exception);
+            $this->exceptions->report($exception);
 
             return ['count' => 0, 'last_refused_at' => null, 'last_refusal_reason' => null];
         }

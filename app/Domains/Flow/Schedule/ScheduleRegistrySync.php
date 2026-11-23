@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Schedule;
 
 use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
-use App\Domains\Flow\Enums\FlowTriggerType;
-use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Tenancy\Contracts\FlowScheduleRegistryInterface;
 use Carbon\CarbonImmutable;
-use DateTimeInterface;
 
 /**
  * Copies schedule triggers' next slots from the tenant's `flow_triggers` (the truth) into the landlord registry
@@ -23,6 +21,7 @@ final readonly class ScheduleRegistrySync
 {
     public function __construct(
         private FlowScheduleRegistryInterface $registry,
+        private FlowTriggerRepositoryInterface $triggers,
         private AfterCommitDispatcherInterface $afterCommitDispatcher,
     ) {
     }
@@ -40,7 +39,7 @@ final readonly class ScheduleRegistrySync
         }
 
         $this->afterCommitDispatcher->afterCommit(function () use ($tenantId, $triggerIds): void {
-            $due = $this->nextRuns($tenantId, $triggerIds);
+            $due = $this->triggers->nextScheduleRuns($tenantId, $triggerIds);
 
             foreach (array_unique(array_map(mb_strtolower(...), $triggerIds)) as $triggerId) {
                 if (isset($due[$triggerId])) {
@@ -61,38 +60,10 @@ final readonly class ScheduleRegistrySync
     public function rebuild(string $tenantId): int
     {
         $readAt = CarbonImmutable::now();
-        $due    = $this->nextRuns($tenantId, null);
+        $due    = $this->triggers->nextScheduleRuns($tenantId, null);
 
         $this->registry->replaceForTenant($tenantId, $due, $readAt);
 
         return count($due);
-    }
-
-    /**
-     * @param  list<string>|null  $triggerIds  null for all of the tenant's
-     *
-     * @return array<string, DateTimeInterface> lowercased trigger id => next slot
-     */
-    private function nextRuns(string $tenantId, ?array $triggerIds): array
-    {
-        $query = FlowTrigger::query()
-            ->where('tenant_id', $tenantId)
-            ->where('type', FlowTriggerType::Schedule->value)
-            ->where('is_active', true)
-            ->whereNotNull('next_run_at');
-
-        if (null !== $triggerIds) {
-            $query->whereIn('id', array_map(mb_strtolower(...), $triggerIds));
-        }
-
-        $due = [];
-
-        foreach ($query->get(['id', 'next_run_at']) as $trigger) {
-            if (null !== $trigger->next_run_at) {
-                $due[mb_strtolower($trigger->id)] = $trigger->next_run_at;
-            }
-        }
-
-        return $due;
     }
 }

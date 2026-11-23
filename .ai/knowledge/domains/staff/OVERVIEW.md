@@ -65,7 +65,8 @@ API tokens, their `api-token` guard and stack, and their screen.
 - Personal settings are one column each on `users`, written for the signed-in user only: `locale`,
   `pinned_applications`, `onboarding_checklist_hidden`, and `builder_mode` (enum `Enums/BuilderMode`, `tree`/`graph`,
   `null` read as tree; written by the builder's `PUT /builder/preferences` through `Services/BuilderModePreference`,
-  `adr-20261123-flow-builder-graph-mode`). A switch to the other mode dispatches Foundation's `BuilderModeChanged`, and
+  `adr-20261123-flow-builder-graph-mode`). A switch to the other mode dispatches Foundation's `BuilderModeChanged` (except the platform support user's,
+  which is stored but not announced, as the usage count leaves that user out), and
   `User::countByBuilderMode()` feeds the operator's `BuilderModeUsageInterface` (`adr-20261123-builder-mode-usage-for-operators`).
 - Admin UI: `app/Http/Controllers/Admin/{UserController,RoleController}.php`
   over `Services/StaffUserService.php` and `Services/StaffRoleService.php` (roles are written by

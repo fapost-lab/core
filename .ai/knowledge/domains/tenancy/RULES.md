@@ -256,7 +256,8 @@ broken.
   uncounted keys answer `null`. Enforced: `MediaStorageGateTest`, `ByteQuotaTest`, `CoreTenantUsageTest`.
   Foundation's `BuilderModeUsageInterface` follows the same shape in `CoreBuilderModeUsage`: plain `bind`, the count
   (Staff's `User::countByBuilderMode()`, the `staff` limit scope) handed in as a closure by `DomainServiceProvider` so
-  Tenancy imports no Staff class, run inside `runForTenant()`, null for unknown and Pending tenants
+  Tenancy imports no Staff class, run inside `runForTenant()`, null for unknown and Pending tenants (both reports
+  decide which tenant is reportable through one `Infrastructure/ReportableTenants`)
   (`adr-20261123-builder-mode-usage-for-operators`). Enforced: `CoreBuilderModeUsageTest`.
 
 - **The usage page asks the operator once per view, through `TenantUsageOverview`, and never breaks on it.**
