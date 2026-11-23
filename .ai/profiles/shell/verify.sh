@@ -6,6 +6,14 @@
 # Prints one line per check:
 # "shell: <check>: pass|fail|skip|incomplete (<reason>)".
 #
+# Checks by role (`checks:` in profile.yaml), the tool in the label: lint
+# (`lint (shellcheck)`) and tests (`tests (tests/run.sh)`). Every command line
+# comes from the profile's check table through jp_check_cmd
+# (schemas/profile.md, Check table): shellcheck checks one script per call,
+# tests/run.sh runs once in full or once per filter, so the table has no
+# `full` row for lint and every lint call is `narrowed`. The `shellcheck
+# --version` probe is not a check and is not in the table.
+#
 # Scope (ADR-0013): when JIG_VERIFY_SCOPE=changed, JIG_VERIFY_FILES names a
 # file listing the repo-relative paths that changed. shellcheck then lints
 # only those; tests are narrowed through the mapping in _shell_test_filters.
@@ -22,6 +30,25 @@ set -o pipefail
 # shellcheck source=../../scripts/lib/profile.sh
 . "$(dirname "$0")/../../scripts/lib/profile.sh"
 
+# This profile prints its own verdict lines and exits with its own status; the
+# library is used for the plan format, where-the-project-runs helpers and the
+# check table, whose fail line (jp_check_cmd) is folded into that status at
+# the end.
+jp_begin shell
+
+LINT_LABEL="lint (shellcheck)"
+TESTS_LABEL="tests (tests/run.sh)"
+
+# A check another profile took over (jp_covered) prints its own skip line --
+# the only line it prints -- and is left out of everything below: it is
+# neither run nor failed, and sets no state of its own (`ran_any`, `status`,
+# `incomplete`, JP_STATUS), so a run where everything is covered ends 2
+# ("nothing ran"). Asked before any tool is looked for.
+lint_covered=0
+tests_covered=0
+if jp_covered lint "$LINT_LABEL"; then lint_covered=1; fi
+if jp_covered tests "$TESTS_LABEL"; then tests_covered=1; fi
+
 status=0
 ran_any=0
 incomplete=0
@@ -35,19 +62,19 @@ incomplete=0
 _shell_tests_verdict() {
   local rc="$1" note="$2"
   if [ "$rc" -eq 0 ]; then
-    echo "shell: tests/run.sh: pass${note:+ ($note)}"
+    echo "shell: $TESTS_LABEL: pass${note:+ ($note)}"
     return 0
   fi
   if [ "$rc" -eq 3 ] || [ "$rc" -ge 128 ]; then
     incomplete=1
     if [ "$rc" -ge 128 ]; then
-      echo "shell: tests/run.sh: incomplete (killed by signal $((rc - 128))${note:+, $note})"
+      echo "shell: $TESTS_LABEL: incomplete (killed by signal $((rc - 128))${note:+, $note})"
     else
-      echo "shell: tests/run.sh: incomplete (a test did not finish${note:+, $note})"
+      echo "shell: $TESTS_LABEL: incomplete (a test did not finish${note:+, $note})"
     fi
     return 0
   fi
-  echo "shell: tests/run.sh: fail${note:+ ($note)}"
+  echo "shell: $TESTS_LABEL: fail${note:+ ($note)}"
   status=1
   return 0
 }
@@ -396,38 +423,43 @@ _shell_test_names() {
 if [ "${JIG_VERIFY_EXPLAIN:-}" = 1 ]; then
   # shell is older than the shared profile library: it uses the library's
   # plan format and where-the-project-runs helpers, while the ordinary
-  # verification path keeps its own verdicts.
-  jp_begin shell
-
-  if ! jp_have shellcheck; then
-    jp_plan shellcheck skip "shellcheck not found"
+  # verification path keeps its own verdicts. Every lint call is `narrowed`,
+  # one script each; the first script stands for the check here.
+  if [ "$lint_covered" = 1 ]; then
+    :
+  elif ! jp_have shellcheck; then
+    jp_plan "$LINT_LABEL" skip "shellcheck not found"
   elif [ "$scoped" = 1 ] && grep -qE '(^|/)\.shellcheckrc$' "$JIG_VERIFY_FILES"; then
     scripts=$(_shell_all_scripts)
     if [ -z "$scripts" ]; then
-      jp_plan shellcheck skip "no shell scripts found"
-    else
-      jp_plan_full shellcheck ".shellcheckrc changed; whole script set"
+      jp_plan "$LINT_LABEL" skip "no shell scripts found"
+    elif jp_check_cmd lint "$LINT_LABEL" narrowed shellcheck -- "${scripts%%$'\n'*}"; then
+      jp_plan_full "$LINT_LABEL" ".shellcheckrc changed; whole script set"
     fi
   elif [ "$scoped" = 1 ]; then
     scripts=$(_shell_changed_scripts)
     if [ -z "$scripts" ]; then
-      jp_plan shellcheck skip "no changed shell scripts"
-    else
-      jp_plan shellcheck filtered "changed scripts: $(printf '%s\n' "$scripts" | paste -sd, -)"
+      jp_plan "$LINT_LABEL" skip "no changed shell scripts"
+    elif jp_check_cmd lint "$LINT_LABEL" narrowed shellcheck -- "${scripts%%$'\n'*}"; then
+      jp_plan "$LINT_LABEL" filtered "changed scripts: $(printf '%s\n' "$scripts" | paste -sd, -)"
     fi
   else
     scripts=$(_shell_all_scripts)
     if [ -z "$scripts" ]; then
-      jp_plan shellcheck skip "no shell scripts found"
-    else
-      jp_plan shellcheck full "full script set"
+      jp_plan "$LINT_LABEL" skip "no shell scripts found"
+    elif jp_check_cmd lint "$LINT_LABEL" narrowed shellcheck -- "${scripts%%$'\n'*}"; then
+      jp_plan "$LINT_LABEL" full "full script set"
     fi
   fi
 
-  if [ ! -x tests/run.sh ]; then
-    jp_plan tests/run.sh skip "not found or not executable"
+  if [ "$tests_covered" = 1 ]; then
+    :
+  elif [ ! -x tests/run.sh ]; then
+    jp_plan "$TESTS_LABEL" skip "not found or not executable"
   elif [ "$scoped" = 0 ]; then
-    jp_plan tests/run.sh full "full scope"
+    if jp_check_cmd tests "$TESTS_LABEL" full tests/run.sh; then
+      jp_plan "$TESTS_LABEL" full "full scope"
+    fi
   else
     filters=$(_shell_test_filters | LC_ALL=C sort -u)
     _shell_trim_ci
@@ -442,17 +474,25 @@ $filters
 EOF
     fi
     if [ "$filters" = ALL ]; then
-      jp_plan_full tests/run.sh "changed paths require the full set"
-    elif [ "$ci_left" = 1 ]; then
-      jp_plan_selection tests/run.sh "$filters" "test filters, full set left to CI"
-    else
-      jp_plan_selection tests/run.sh "$filters" "test filters"
+      if jp_check_cmd tests "$TESTS_LABEL" full tests/run.sh; then
+        jp_plan_full "$TESTS_LABEL" "changed paths require the full set"
+      fi
+    elif [ -z "$filters" ]; then
+      jp_plan_selection "$TESTS_LABEL" "$filters" "test filters"
+    elif jp_check_cmd tests "$TESTS_LABEL" narrowed tests/run.sh -- "${filters%%$'\n'*}"; then
+      if [ "$ci_left" = 1 ]; then
+        jp_plan_selection "$TESTS_LABEL" "$filters" "test filters, full set left to CI"
+      else
+        jp_plan_selection "$TESTS_LABEL" "$filters" "test filters"
+      fi
     fi
   fi
   exit 0
 fi
 
-if jp_have shellcheck; then
+if [ "$lint_covered" = 1 ]; then
+  :
+elif jp_have shellcheck; then
   # Every shellcheck verdict names the version that produced it. Rule sets
   # move between releases — SC2015 fires in 0.10.0 and not in 0.11.0 — so the
   # same tree honestly passes on one machine and fails on another. That is
@@ -497,6 +537,9 @@ if jp_have shellcheck; then
 
   sc_checked=0
   sc_failed=0
+  # Set when the check table cannot build the lint command line: jp_check_cmd
+  # has printed the check's fail line, and no verdict follows it.
+  sc_table=0
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     sc_checked=$((sc_checked + 1))
@@ -505,41 +548,51 @@ if jp_have shellcheck; then
     # (e.g. `. "$LIB_DIR/foo.sh"`) rather than a literal, shellcheck-visible
     # path — jig's own .ai/scripts/lib/*.sh included (see .shellcheckrc at
     # the framework's own source root, which disables it the same way).
-    jp_exec shellcheck -s bash -e SC1091 "$f" || sc_failed=1
+    # The `-e SC1091` is in the table (checks.lint.narrowed).
+    if jp_check_cmd lint "$LINT_LABEL" narrowed shellcheck -- "$f"; then
+      jp_exec "${JP_CMD[@]}" || sc_failed=1
+    else
+      sc_table=1
+      break
+    fi
   done < "$list"
   rm -f "$list"
   trap - EXIT INT TERM
 
-  if [ "$sc_ci" = 1 ]; then
-    echo "shell: shellcheck: skip (scope: .shellcheckrc changed; whole script set, full set left to CI)"
+  if [ "$sc_table" = 1 ]; then
+    :
+  elif [ "$sc_ci" = 1 ]; then
+    echo "shell: $LINT_LABEL: skip (scope: .shellcheckrc changed; whole script set, full set left to CI)"
   elif [ "$sc_checked" -eq 0 ]; then
     if [ "$scoped" = 1 ] && [ "$sc_wide" = 0 ]; then
-      echo "shell: shellcheck: skip (scope: no changed shell scripts)"
+      echo "shell: $LINT_LABEL: skip (scope: no changed shell scripts)"
     else
-      echo "shell: shellcheck: skip (no shell scripts found)"
+      echo "shell: $LINT_LABEL: skip (no shell scripts found)"
     fi
   else
     ran_any=1
     if [ "$sc_failed" -eq 1 ]; then
-      echo "shell: shellcheck: fail (shellcheck $sc_version)"
+      echo "shell: $LINT_LABEL: fail (shellcheck $sc_version)"
       status=1
     else
       if [ "$sc_wide" = 1 ]; then
-        echo "shell: shellcheck: pass (shellcheck $sc_version, scope: .shellcheckrc changed, whole tree)"
+        echo "shell: $LINT_LABEL: pass (shellcheck $sc_version, scope: .shellcheckrc changed, whole tree)"
       elif [ "$scoped" = 1 ]; then
-        echo "shell: shellcheck: pass (shellcheck $sc_version, scope: $sc_checked files)"
+        echo "shell: $LINT_LABEL: pass (shellcheck $sc_version, scope: $sc_checked files)"
       else
-        echo "shell: shellcheck: pass (shellcheck $sc_version)"
+        echo "shell: $LINT_LABEL: pass (shellcheck $sc_version)"
       fi
     fi
   fi
 else
-  echo "shell: shellcheck: skip (shellcheck not found)"
+  echo "shell: $LINT_LABEL: skip (shellcheck not found)"
 fi
 
 # --- tests/run.sh ------------------------------------------------------------
 
-if [ -x tests/run.sh ]; then
+if [ "$tests_covered" = 1 ]; then
+  :
+elif [ -x tests/run.sh ]; then
   if [ "$scoped" = 1 ]; then
     filters=$(_shell_test_filters | LC_ALL=C sort -u)
     reason="not narrowable"
@@ -572,23 +625,33 @@ EOF
     fi
 
     if { [ "$filters" = ALL ] || [ "$has_all" = 1 ]; } && [ "$ci_full" = 1 ]; then
-      echo "shell: tests/run.sh: skip (scope: $reason, full set left to CI)"
+      echo "shell: $TESTS_LABEL: skip (scope: $reason, full set left to CI)"
     elif [ "$filters" = ALL ] || [ "$has_all" = 1 ]; then
       ran_any=1
       t_rc=0
-      jp_exec tests/run.sh || t_rc=$?
-      _shell_tests_verdict "$t_rc" "scope: $reason, ran full set"
+      if jp_check_cmd tests "$TESTS_LABEL" full tests/run.sh; then
+        jp_exec "${JP_CMD[@]}" || t_rc=$?
+        _shell_tests_verdict "$t_rc" "scope: $reason, ran full set"
+      fi
     elif [ -z "$filters" ]; then
-      echo "shell: tests/run.sh: skip (scope: no changed file maps to a test)"
+      echo "shell: $TESTS_LABEL: skip (scope: no changed file maps to a test)"
     else
       ran_any=1
       t_worst=0
       t_count=0
+      t_table=0
       while IFS= read -r filter; do
         [ -n "$filter" ] || continue
         t_count=$((t_count + 1))
         t_rc=0
-        jp_exec tests/run.sh "$filter" || t_rc=$?
+        # One narrowed command line per filter. A table that cannot build it
+        # has printed the check's fail line: stop, and print no verdict.
+        if jp_check_cmd tests "$TESTS_LABEL" narrowed tests/run.sh -- "$filter"; then
+          jp_exec "${JP_CMD[@]}" || t_rc=$?
+        else
+          t_table=1
+          break
+        fi
         # The worst answer of the filters decides, and "did not finish" is
         # worse than "failed": one filter killed makes the whole narrowed run
         # unfinished, whatever the others said.
@@ -600,7 +663,9 @@ EOF
       done <<EOF
 $filters
 EOF
-      if [ "$ci_left" = 1 ]; then
+      if [ "$t_table" = 1 ]; then
+        :
+      elif [ "$ci_left" = 1 ]; then
         _shell_tests_verdict "$t_worst" "scope: $t_count filters, full set left to CI"
       else
         _shell_tests_verdict "$t_worst" "scope: $t_count filters"
@@ -609,11 +674,19 @@ EOF
   else
     ran_any=1
     t_rc=0
-    jp_exec tests/run.sh || t_rc=$?
-    _shell_tests_verdict "$t_rc" ""
+    if jp_check_cmd tests "$TESTS_LABEL" full tests/run.sh; then
+      jp_exec "${JP_CMD[@]}" || t_rc=$?
+      _shell_tests_verdict "$t_rc" ""
+    fi
   fi
 else
-  echo "shell: tests/run.sh: skip (not found or not executable)"
+  echo "shell: $TESTS_LABEL: skip (not found or not executable)"
+fi
+
+# A check the table could not build was reported as a fail by jp_check_cmd.
+if [ "$JP_STATUS" -ne 0 ]; then
+  status=1
+  ran_any=1
 fi
 
 if [ "$incomplete" -eq 1 ]; then
