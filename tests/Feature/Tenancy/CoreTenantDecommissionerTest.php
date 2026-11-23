@@ -10,6 +10,7 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Services\ChannelProviderWebhookRemover;
 use App\Domains\Media\Services\TenantMediaPurger;
 use App\Domains\Media\Storage\TenantMediaDisk;
+use App\Domains\Tenancy\Contracts\FlowScheduleRegistryInterface;
 use App\Domains\Tenancy\Contracts\TenantCacheForgetterInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
@@ -447,6 +448,7 @@ final class CoreTenantDecommissionerTest extends FeatureTestCase
             new TenantCaches([...$this->extraForgetters, $this->app->make(TenantOwnCacheForgetter::class)]),
             $this->app->make('events'),
             $this->logger ?? $this->app->make(LoggerInterface::class),
+            $this->app->make(FlowScheduleRegistryInterface::class),
         );
 
         return new CoreTenantDecommissioner($repository, $removal);
@@ -473,6 +475,8 @@ final class CoreTenantDecommissionerTest extends FeatureTestCase
         $this->app->make(WebhookRegistryWriterInterface::class)->write($hash, $tenant, 'a1', 'c1', 'telegram', 'secret');
         $this->redisKeys[] = 'webhook:' . $hash;
 
+        $this->app->make(FlowScheduleRegistryInterface::class)->put($id, (string) Str::ulid()->toRfc4122(), now()->addHour());
+
         DB::connection('landlord')->table('support_access_tokens')->insert([
             'id'             => (string) Str::ulid()->toRfc4122(),
             'tenant_id'      => $id,
@@ -498,6 +502,7 @@ final class CoreTenantDecommissionerTest extends FeatureTestCase
         $this->assertNull(Tenant::on('landlord')->find($id));
         $this->assertSame(0, DB::connection('landlord')->table('webhook_registry')->where('tenant_id', $id)->count());
         $this->assertSame(0, Redis::exists('webhook:' . $hash));
+        $this->assertSame(0, DB::connection('landlord')->table('flow_schedule_registry')->where('tenant_id', $id)->count());
         $this->assertSame(0, DB::connection('landlord')->table('support_access_tokens')->where('tenant_id', $id)->count());
 
         $disk = $this->app->make(TenantMediaDisk::class)->installation();
@@ -513,6 +518,7 @@ final class CoreTenantDecommissionerTest extends FeatureTestCase
         $this->assertNotNull(Tenant::on('landlord')->find($id));
         $this->assertSame(1, DB::connection('landlord')->table('webhook_registry')->where('tenant_id', $id)->count());
         $this->assertSame(1, Redis::exists('webhook:hash-' . $tenant->slug));
+        $this->assertSame(1, DB::connection('landlord')->table('flow_schedule_registry')->where('tenant_id', $id)->count());
         $this->assertSame(1, DB::connection('landlord')->table('support_access_tokens')->where('tenant_id', $id)->count());
         $this->assertTrue($this->app->make(TenantMediaDisk::class)->installation()->exists("tenants/{$id}/image/2026-10/ab/blob.jpg"));
     }

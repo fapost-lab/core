@@ -23,8 +23,9 @@ use Illuminate\Support\Carbon;
  *
  * A Core event dispatches it ({@see DispatchFlowTriggerEventJob}), with the event id as the fire key and the event's
  * chain depth; the webhook trigger dispatches it ({@see \App\Domains\Flow\Webhook\FlowWebhookReceiver}), with the
- * delivery id as the fire key; the schedule trigger of spec `flow-automations` will too. The depth is read with a
- * fallback: a job queued before it existed unserializes without it.
+ * delivery id as the fire key; the schedule trigger dispatches it ({@see \App\Domains\Flow\Schedule\ScheduleTriggerFirer})
+ * after it created the run `pending` with the slot as the fire key, so this job only starts that run. The depth is read
+ * with a fallback: a job queued before it existed unserializes without it.
  *
  * A busy trigger lock — another run of the same trigger is executing a segment — puts the job back in the queue
  * instead of spending an attempt; {@see retryUntil()} bounds how long it waits. A stopped tenant drops the start: the

@@ -105,7 +105,9 @@ Graph-level checks (need `edges`):
 
 Trigger checks, per trigger of the list, at `triggers.<id>.…` (`triggers.<index>` for an entry without an id):
 `invalid_trigger`, `invalid_trigger_type`, `invalid_trigger_active_flag`, `invalid_trigger_priority`,
-`invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`), `duplicate_exact_trigger_keyword` (against other
+`invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`; a schedule's cron that is not five fields is
+`invalid_schedule_cron` at `triggers.<id>.config.cron`, a time zone outside the IANA list `invalid_schedule_timezone` at
+`triggers.<id>.config.timezone`, `adr-20261123-flow-schedule-trigger`), `duplicate_exact_trigger_keyword` (against other
 flows' live triggers), `missing_event_trigger_selection`, `unknown_event_trigger_selection`; the id — it becomes the
 `flow_triggers` primary key — `invalid_trigger_id` (not UUID-shaped), `duplicate_trigger_id` (twice in the list),
 `trigger_id_taken` (a live trigger of another flow); `duplicate_event_trigger` for two event triggers on one event

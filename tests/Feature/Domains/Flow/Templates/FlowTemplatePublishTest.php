@@ -256,7 +256,7 @@ final class FlowTemplatePublishTest extends FeatureTestCase
 
         $row = FlowTrigger::query()->where('flow_id', $host->flow_id)->sole();
         $this->assertSame($kept, mb_strtolower((string) $row->getKey()));
-        $row->update(['next_run_at' => '2026-12-01 10:00:00']);
+        $row->update(['last_run_at' => '2026-12-01 10:00:00']);
 
         // Unpublished trigger edits in the host's draft: another config, an extra trigger.
         $host->forceFill(['triggers' => [
@@ -282,7 +282,7 @@ final class FlowTemplatePublishTest extends FeatureTestCase
         $this->assertCount(1, $rows);
         $this->assertSame(['live'], $rows[0]->config['keywords']);
         $this->assertSame(100, $rows[0]->priority);
-        $this->assertSame('2026-12-01 10:00:00', $rows[0]->next_run_at?->format('Y-m-d H:i:s'), 'run state is untouched');
+        $this->assertSame('2026-12-01 10:00:00', $rows[0]->last_run_at?->format('Y-m-d H:i:s'), 'run state is untouched');
         $this->assertCount(2, $host->refresh()->triggers, 'the draft edits stay unpublished');
     }
 

@@ -14,12 +14,15 @@ use App\Domains\Flow\Contracts\FlowWebhookEndpointRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowLimitStatus;
 use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Exceptions\FlowHasLiveSessionsException;
 use App\Domains\Flow\Exceptions\FlowTemplateInUseException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Schedule\ScheduleRegistrySync;
 use App\Domains\Flow\Templates\TemplateUsageFinder;
 use App\Domains\Flow\Templates\TemplateUsageRepository;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -64,6 +67,7 @@ final readonly class FlowDraftService
         private TemplateUsageFinder $templateUsages,
         private TemplateUsageRepository $templateIndex,
         private FlowWebhookEndpointRepositoryInterface $webhookEndpoints,
+        private ScheduleRegistrySync $scheduleRegistry,
     ) {
     }
 
@@ -291,6 +295,20 @@ final readonly class FlowDraftService
             // The flow's live trigger rows stay (adr-20261119-flow-triggers-in-definition-live-on-publish), but a webhook
             // URL is a secret held by an outside system: with the draft gone nobody could rotate or revoke it.
             $this->webhookEndpoints->deleteForFlow($flow->flow_id);
+
+            // A schedule of a flow nobody can publish again would come due every minute for ever: it stops here, and
+            // leaves the landlord registry after the commit.
+            $schedules = FlowTrigger::query()
+                ->where('flow_id', $flow->flow_id)
+                ->where('type', FlowTriggerType::Schedule->value)
+                ->pluck('id')
+                ->map(static fn (mixed $id): string => (string) $id)
+                ->all();
+
+            if ([] !== $schedules) {
+                FlowTrigger::query()->whereKey($schedules)->toBase()->update(['next_run_at' => null, 'updated_at' => now()]);
+                $this->scheduleRegistry->syncAfterCommit((string) $flow->tenant_id, $schedules);
+            }
 
             $this->audit->record(new AuditRecord(
                 action: AuditAction::FlowDeleted,

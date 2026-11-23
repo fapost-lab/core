@@ -27,6 +27,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
+use App\Domains\Flow\Schedule\InvalidScheduleConfigException;
 use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Flow\Subflow\SubflowPin;
 use App\Domains\Flow\Subflow\SubflowStarterService;
@@ -1390,6 +1391,14 @@ final readonly class ValidateFlowService
 
         try {
             $this->triggerValidator->validate($type, $config);
+        } catch (InvalidScheduleConfigException $exception) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config." . (InvalidScheduleConfigException::INVALID_CRON === $exception->errorCode ? 'cron' : 'timezone'),
+                code: $exception->errorCode,
+                message: $exception->getMessage(),
+            );
+
+            return;
         } catch (InvalidArgumentException $exception) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config",
