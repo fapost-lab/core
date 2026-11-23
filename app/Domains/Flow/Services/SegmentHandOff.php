@@ -100,18 +100,39 @@ final readonly class SegmentHandOff
     }
 
     /**
-     * The top session of a subflow chain: the run a trigger started.
+     * The top session of a subflow chain: the run a trigger started. When a row of the chain is gone, the id the
+     * chain last names — the root a continuation is queued for — even though that row no longer exists.
      */
     public function rootIdOf(FlowSession $session): string
     {
+        return $this->chainOf($session)['root_id'];
+    }
+
+    /**
+     * The one walk up a subflow chain by `parent_session_id`, bounded by {@see self::MAX_CHAIN_DEPTH}: the id the chain
+     * names as its root ({@see rootIdOf()}), and the highest session of the chain that still exists — the root itself,
+     * or, when the root row is gone, the session that names it as its parent.
+     *
+     * @return array{root_id: string, top: FlowSession}
+     */
+    public function chainOf(FlowSession $session): array
+    {
         $rootId   = (string) $session->getKey();
+        $top      = $session;
         $parentId = $session->parent_session_id;
 
         for ($level = 0; $level < self::MAX_CHAIN_DEPTH && is_string($parentId) && '' !== $parentId; ++$level) {
-            $rootId   = $parentId;
-            $parentId = FlowSession::query()->whereKey($parentId)->value('parent_session_id');
+            $rootId = $parentId;
+            $parent = FlowSession::query()->find($parentId);
+
+            if (null === $parent) {
+                break;
+            }
+
+            $top      = $parent;
+            $parentId = $parent->parent_session_id;
         }
 
-        return $rootId;
+        return ['root_id' => $rootId, 'top' => $top];
     }
 }

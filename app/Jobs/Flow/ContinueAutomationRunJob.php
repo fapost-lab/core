@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Jobs\Flow;
 
-use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Orchestration\AutomationRunner;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
@@ -29,15 +28,16 @@ final class ContinueAutomationRunJob implements ShouldQueue, TenantAccessGatedJo
 {
     use Dispatchable;
     use Queueable;
-
-    public const int LOCK_BUSY_RELEASE_SECONDS = 10;
+    use ReleasesOnBusySessionLock;
 
     /** Below the `redis` connection's `retry_after` (90 s): a running segment is never reserved a second time. */
     public int $timeout = 60;
 
-    /** Real failures end the job after three; a busy lock only releases it, until {@see retryUntil()}. */
-    public int $maxExceptions = 3;
-
+    /**
+     * @param  string  $sessionId  the id of the run's root session, never of a subflow child: the root alone carries
+     *                             the `segment_id` (the scheduler port calls it `$rootSessionId`; the property keeps
+     *                             its name so a copy already queued still unserializes)
+     */
     public function __construct(
         public readonly string $tenantId,
         public readonly string $sessionId,
@@ -76,10 +76,8 @@ final class ContinueAutomationRunJob implements ShouldQueue, TenantAccessGatedJo
             return;
         }
 
-        try {
-            $switcher->runForTenant($tenant, fn () => $runner->continue($this->sessionId, $this->segmentId));
-        } catch (SessionLockTimeoutException) {
-            $this->release(self::LOCK_BUSY_RELEASE_SECONDS);
-        }
+        $this->releasingOnBusyLock(
+            fn () => $switcher->runForTenant($tenant, fn () => $runner->continue($this->sessionId, $this->segmentId)),
+        );
     }
 }

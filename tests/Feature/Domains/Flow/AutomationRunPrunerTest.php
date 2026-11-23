@@ -72,6 +72,12 @@ final class AutomationRunPrunerTest extends FeatureTestCase
         }
     }
 
+    public function test_retention_s_terminal_statuses_are_the_enum_s(): void
+    {
+        $this->assertSame(FlowSessionStatus::terminal(), AutomationRunRetention::TERMINAL);
+        $this->assertSame(FlowSessionStatus::terminalValues(), AutomationRunRetention::terminalValues());
+    }
+
     public function test_only_finished_automation_runs_past_the_cutoff_of_their_class_are_deleted(): void
     {
         $endStatuses = [null, EndStatus::Success->value, EndStatus::Failed->value, EndStatus::Cancelled->value];

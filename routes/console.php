@@ -10,7 +10,8 @@ Schedule::command('conversations:prune')->dailyAt('03:15');
 Schedule::command('logs:create-partition')->monthlyOn(1, '00:00');
 Schedule::job(new CleanupSoftDeletedMediaJob())->dailyAt('03:30');
 Schedule::command('flow:sweep-subflow-timeouts')->everyMinute()->withoutOverlapping();
-Schedule::command('flow:sweep-overdue-automation-runs')->everyMinute()->withoutOverlapping();
+// A pass killed mid-way must not silence the sweeper for the default 24 h mutex.
+Schedule::command('flow:sweep-overdue-automation-runs')->everyMinute()->withoutOverlapping(5);
 Schedule::command('flow:fire-scheduled-triggers')->everyMinute()->withoutOverlapping();
 Schedule::command('flow:rebuild-schedule-registry')->hourly()->withoutOverlapping();
 Schedule::command('support-access:prune')->dailyAt('03:45');

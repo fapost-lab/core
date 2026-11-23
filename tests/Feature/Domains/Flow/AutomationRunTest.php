@@ -7,8 +7,10 @@ namespace Tests\Feature\Domains\Flow;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Concurrency\LockScope;
 use App\Domains\Flow\Concurrency\SessionLockRegistry;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Enums\FlowRunKind;
@@ -24,18 +26,22 @@ use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Jobs\Flow\ContinueAutomationRunJob;
 use App\Jobs\Flow\ResumeDelayedFlowSessionJob;
 use App\Jobs\Flow\StartAutomationRunJob;
+use Closure;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use ReflectionProperty;
+use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -837,6 +843,114 @@ final class AutomationRunTest extends FeatureTestCase
         $this->assertSame(['p1' => 1, 'p2' => 1], AutomationProbeTestHandler::$runs);
     }
 
+    public function test_a_subflow_child_at_the_step_limit_over_its_segments_hands_its_parent_the_failed_exit(): void
+    {
+        config(['flow.execution.max_iterations' => 10, 'flow.automation.segment_steps' => 3]);
+        $childFlowId = $this->flow([
+            ['id' => 'k0', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'k1', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'k2', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+        ], [
+            ['id' => 'ke0', 'from' => 'k0', 'to' => 'k1', 'handle' => 'default'],
+            ['id' => 'ke1', 'from' => 'k1', 'to' => 'k2', 'handle' => 'default'],
+            ['id' => 'ke2', 'from' => 'k2', 'to' => 'k1', 'handle' => 'default'],
+        ]);
+        $parentFlowId = $this->flow([
+            ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H']],
+            ['id' => 'p-ok', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'p-fail', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'p-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [
+            ['id' => 'pe1', 'from' => 'p-sub', 'to' => 'p-ok', 'handle' => 'success'],
+            ['id' => 'pe2', 'from' => 'p-sub', 'to' => 'p-fail', 'handle' => 'failed'],
+            ['id' => 'pe3', 'from' => 'p-ok', 'to' => 'p-end', 'handle' => 'default'],
+            ['id' => 'pe4', 'from' => 'p-fail', 'to' => 'p-end', 'handle' => 'default'],
+        ]);
+
+        $this->start($parentFlowId, 'slot-1');
+        $continuations = $this->drain();
+
+        $parent = FlowSession::query()->whereNull('parent_session_id')->sole();
+        $child  = FlowSession::query()->whereNotNull('parent_session_id')->sole();
+        $this->assertGreaterThan(1, count($continuations), 'The child must reach its limit across several segments.');
+        $this->assertSame(FlowSessionStatus::Failed, $child->status);
+        $this->assertSame(10, $child->step_count);
+        $this->assertSame(FlowSessionStatus::Ended, $parent->status);
+        $this->assertSame(1, AutomationProbeTestHandler::$runs['p-fail'] ?? 0);
+        $this->assertArrayNotHasKey('p-ok', AutomationProbeTestHandler::$runs);
+    }
+
+    public function test_an_orphan_the_sweeper_expired_whose_hand_back_lost_the_lock_hands_its_parent_to_the_automation_queue(): void
+    {
+        config(['flow.automation.segment_steps' => 50]);
+        Log::spy();
+        $middleFlowId = $this->flow([
+            ['id' => 'm-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => (string) Str::uuid(), 'timeout' => 'PT1H']],
+        ]);
+        $topFlowId = $this->flow([
+            ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $middleFlowId, 'timeout' => 'PT1H']],
+            ['id' => 'p1', 'type' => 'automation_probe_test', 'version' => 1, 'config' => ['action' => 'lose_lock_once']],
+            ['id' => 'p2', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'p-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [
+            ['id' => 'pe1', 'from' => 'p-sub', 'to' => 'p1', 'handle' => 'failed'],
+            ['id' => 'pe2', 'from' => 'p1', 'to' => 'p2', 'handle' => 'default'],
+            ['id' => 'pe3', 'from' => 'p2', 'to' => 'p-end', 'handle' => 'default'],
+        ]);
+        $top    = $this->automationSession($topFlowId, 'p-sub', FlowSessionStatus::PausedSubflow, ['fire_key' => 'slot-1']);
+        $orphan = $this->automationSession($middleFlowId, 'm-sub', FlowSessionStatus::PausedSubflow, [
+            'parent_session_id'     => $top->getKey(),
+            'parent_resume_node_id' => 'p-sub',
+            'expires_at'            => Carbon::now()->subMinute(),
+        ]);
+
+        $this->app->make(SubflowTimeoutSweeper::class)->sweep();
+
+        $this->assertSame(FlowSessionStatus::Expired, $orphan->refresh()->status);
+        $this->assertSame(FlowSessionStatus::Active, $top->refresh()->status);
+        $this->assertSame('p2', $top->current_node_id);
+        $this->assertCount(1, $this->pushedContinuations());
+        Log::shouldHaveReceived('warning')->with('flow.subflow.timeout.orphan_hand_back_failed', Mockery::on(
+            static fn (array $context): bool => (string) $orphan->getKey() === $context['parent_id'],
+        ))->once();
+
+        $this->drain();
+
+        $this->assertSame(FlowSessionStatus::Ended, $top->refresh()->status);
+        $this->assertSame(['p1' => 1, 'p2' => 1], AutomationProbeTestHandler::$runs);
+    }
+
+    public function test_a_sweep_that_breaks_off_on_a_parent_whose_run_is_stranded_hands_the_run_to_the_automation_queue(): void
+    {
+        config(['flow.automation.segment_steps' => 50]);
+        Log::spy();
+        $childFlowId = $this->childOfProbes(1);
+        $parent      = $this->automationSession($this->subflowParent($childFlowId), 'p-sub', FlowSessionStatus::PausedSubflow, [
+            'fire_key'   => 'slot-1',
+            'expires_at' => Carbon::now()->subMinute(),
+        ]);
+        // A child moved on by a job that broke off before it queued the next one: `active`, with nothing queued.
+        $child = $this->automationSession($childFlowId, 'k1', FlowSessionStatus::Active, [
+            'parent_session_id'     => $parent->getKey(),
+            'parent_resume_node_id' => 'p-sub',
+        ]);
+        $this->failFirstLockAcquisition();
+
+        $this->app->make(SubflowTimeoutSweeper::class)->sweep();
+
+        $this->assertSame(FlowSessionStatus::PausedSubflow, $parent->refresh()->status);
+        $this->assertCount(1, $this->pushedContinuations());
+        Log::shouldHaveReceived('warning')->with('flow.subflow.timeout.parent_skipped', Mockery::on(
+            static fn (array $context): bool => (string) $parent->getKey() === $context['parent_id'],
+        ))->once();
+
+        $this->drain();
+
+        $this->assertSame(FlowSessionStatus::Ended, $child->refresh()->status);
+        $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
+        $this->assertSame(['k1' => 1, 'p1' => 1], AutomationProbeTestHandler::$runs);
+    }
+
     public function test_a_run_gets_its_deadline_at_its_start_and_its_subflow_child_carries_the_same(): void
     {
         Carbon::setTestNow('2026-11-19 12:00:00');
@@ -1071,6 +1185,60 @@ final class AutomationRunTest extends FeatureTestCase
             ['id' => 'pe3', 'from' => 'p-sub', 'to' => 'le', 'handle' => 'success'],
             ['id' => 'pe4', 'from' => 'loop', 'to' => 'p-end', 'handle' => 'default'],
         ]);
+    }
+
+    /**
+     * An automation session of this test's trigger on {@code $flowId}, written as a crashed or swept job left it.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function automationSession(string $flowId, string $nodeId, FlowSessionStatus $status, array $attributes = []): FlowSession
+    {
+        return FlowSession::query()->create([
+            'tenant_id'          => self::TENANT_ID,
+            'flow_definition_id' => FlowDefinition::query()->where('flow_id', $flowId)->sole()->getKey(),
+            'flow_version'       => 1,
+            'current_node_id'    => $nodeId,
+            'state'              => [],
+            'status'             => $status,
+            'run_kind'           => FlowRunKind::Automation,
+            'trigger_id'         => $this->triggerId,
+            'version'            => 1,
+            ...$attributes,
+        ]);
+    }
+
+    /**
+     * The first lock acquisition fails with an error that is not a busy lock (the lock store unreachable); every later
+     * one goes to the real guard.
+     */
+    private function failFirstLockAcquisition(): void
+    {
+        $real = $this->app->make(FlowExecutionGuardInterface::class);
+
+        $this->app->instance(FlowExecutionGuardInterface::class, new class ($real) implements FlowExecutionGuardInterface {
+            private bool $failed = false;
+
+            public function __construct(private readonly FlowExecutionGuardInterface $real)
+            {
+            }
+
+            public function run(string $tenantId, string $contactId, string $assistantId, Closure $callback): mixed
+            {
+                return $this->runInScope(new LockScope($tenantId, $contactId, $assistantId), $callback);
+            }
+
+            public function runInScope(LockScope $scope, Closure $callback): mixed
+            {
+                if (! $this->failed) {
+                    $this->failed = true;
+
+                    throw new RuntimeException('The lock store is unreachable.');
+                }
+
+                return $this->real->runInScope($scope, $callback);
+            }
+        });
     }
 
     private function stoppedTenantAction(StartAutomationRunJob|ContinueAutomationRunJob $job): string

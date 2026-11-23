@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Schema;
  *   collide. The index also serves lookups by trigger_id.
  * - step_count is the steps an automation session ran over all its segments; the engine's step limit applies to it,
  *   so a loop with no exit cannot keep dispatching itself.
- * - segment_id names the one continuation allowed to run the session next; any other continuation is stale.
+ * - segment_id is set only on a run's root session and names the one continuation allowed to run the run next;
+ *   any other continuation is stale.
  */
 return new class () extends Migration {
     public function up(): void

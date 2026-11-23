@@ -121,33 +121,17 @@ final readonly class AutomationRunDeadlineSweeper
      */
     private function overdueRunTops(string $tenantId, CarbonImmutable $now): array
     {
-        $candidates = $this->liveAutomationSessions($tenantId)
-            ->where(function (Builder $query) use ($now): void {
-                $query->where('deadline_at', '<', $now)
-                    ->orWhere(function (Builder $query) use ($now): void {
-                        $query->whereNull('deadline_at')
-                            ->where('created_at', '<', $this->deadline->fallbackCutoff($now));
-                    })
-                    ->orWhere(function (Builder $query) use ($now): void {
-                        $query->where('status', FlowSessionStatus::Pending->value)
-                            ->where('created_at', '<', $this->deadline->pendingLostCutoff($now));
-                    });
-            })
+        $candidates = $this->deadline
+            ->whereOverdue($this->liveAutomationSessions($tenantId), $now)
             ->orderBy('created_at')
             ->get();
 
         $tops = [];
 
         foreach ($candidates as $candidate) {
-            $rootId = $this->handOff->rootIdOf($candidate);
+            ['root_id' => $rootId, 'top' => $top] = $this->handOff->chainOf($candidate);
 
-            if (isset($tops[$rootId])) {
-                continue;
-            }
-
-            $tops[$rootId] = $rootId === (string) $candidate->getKey()
-                ? $candidate
-                : (FlowSession::query()->find($rootId) ?? $this->highestExisting($candidate));
+            $tops[$rootId] ??= $top;
         }
 
         return array_values($tops);
@@ -206,7 +190,7 @@ final readonly class AutomationRunDeadlineSweeper
             'root_id'     => (string) $top->getKey(),
             'trigger_id'  => $top->trigger_id,
             'reason'      => $reason->value,
-            'deadline_at' => $top->deadline_at?->toIso8601String(),
+            'deadline_at' => $this->deadline->effectiveFor($top)?->toIso8601String(),
             'sessions'    => count($live),
         ]);
 
@@ -253,19 +237,8 @@ final readonly class AutomationRunDeadlineSweeper
      */
     private function anyOverdue(array $sessions, CarbonImmutable $now): bool
     {
-        $fallbackCutoff    = $this->deadline->fallbackCutoff($now);
-        $pendingLostCutoff = $this->deadline->pendingLostCutoff($now);
-
         foreach ($sessions as $session) {
-            $overdue = null !== $session->deadline_at
-                ? $session->deadline_at->lt($now)
-                : null !== $session->created_at && $session->created_at->lt($fallbackCutoff);
-
-            $startLost = FlowSessionStatus::Pending === $session->status
-                && null !== $session->created_at
-                && $session->created_at->lt($pendingLostCutoff);
-
-            if ($overdue || $startLost) {
+            if ($this->deadline->isOverdue($session, $now)) {
                 return true;
             }
         }
@@ -292,26 +265,5 @@ final readonly class AutomationRunDeadlineSweeper
                 static fn (FlowSessionStatus $status): string => $status->value,
                 AutomationRunRetention::LIVE,
             ));
-    }
-
-    /**
-     * The highest session above {@code $session} that still exists, when the chain's root row is gone.
-     */
-    private function highestExisting(FlowSession $session): FlowSession
-    {
-        $top = $session;
-
-        for ($level = 0; $level < SegmentHandOff::MAX_CHAIN_DEPTH; ++$level) {
-            $parentId = $top->parent_session_id;
-            $parent   = is_string($parentId) && '' !== $parentId ? FlowSession::query()->find($parentId) : null;
-
-            if (null === $parent) {
-                return $top;
-            }
-
-            $top = $parent;
-        }
-
-        return $top;
     }
 }

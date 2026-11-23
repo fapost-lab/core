@@ -64,4 +64,14 @@ enum FlowSessionStatus: string
     {
         return [self::Completed, self::Ended, self::Failed, self::Cancelled, self::Expired, self::TerminatedByUser];
     }
+
+    /**
+     * The values of {@see self::terminal()}, for a query.
+     *
+     * @return list<string>
+     */
+    public static function terminalValues(): array
+    {
+        return array_map(static fn (self $status): string => $status->value, self::terminal());
+    }
 }

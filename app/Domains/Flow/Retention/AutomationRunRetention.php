@@ -30,7 +30,9 @@ final class AutomationRunRetention
     public const int MAX_DAYS = 3650;
 
     /**
-     * The statuses a session never leaves: the only ones retention may prune.
+     * The statuses a session never leaves: the only ones retention may prune. The same list as
+     * {@see FlowSessionStatus::terminal()}, restated because a constant cannot call it; a test holds the two equal, so
+     * a terminal status added to the enum must be added here too.
      *
      * @var list<FlowSessionStatus>
      */

@@ -227,10 +227,7 @@ final class SubflowNodeHandler extends AbstractVersionedHandler implements NodeC
     {
         return FlowSession::query()
             ->where('parent_session_id', $parentSessionId)
-            ->whereNotIn('status', array_map(
-                static fn (FlowSessionStatus $status): string => $status->value,
-                FlowSessionStatus::terminal(),
-            ))
+            ->whereNotIn('status', FlowSessionStatus::terminalValues())
             ->exists();
     }
 }
