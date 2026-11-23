@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {onMounted, ref} from 'vue'
+import {defineAsyncComponent, onMounted, ref} from 'vue'
 import {useEventListener} from '@vueuse/core'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useRegistryStore} from '@builder/store/registryStore'
@@ -22,6 +22,9 @@ import {useConfirm} from '@builder/composables/useConfirm'
 import {useTranslations} from '@builder/composables/useTranslations'
 
 import type {BuilderFlowPayload} from '@builder/dto/types'
+
+// The graph mode is a lazy chunk of its own: Vue Flow and ELK are large, and an author in the tree never needs them.
+const FlowGraph = defineAsyncComponent(() => import('@builder/components/editor/graph/FlowGraph.vue'))
 
 const props = defineProps({
     flow:    { type: Object as () => BuilderFlowPayload, required: true },
@@ -160,7 +163,9 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
             :used-by="builderStore.usedBy"
             :is-template="builderStore.isTemplate"
             :read-only="builderStore.readOnly"
+            :builder-mode="builderStore.builderMode"
             @tab-change="builderStore.setActiveTab"
+            @mode-change="builderStore.setBuilderMode"
             @save-draft="save"
             @undo="builderStore.undo"
             @redo="builderStore.redo"
@@ -174,8 +179,11 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
             class="editor-main"
             :class="{ 'editor-main--val-open': builderStore.validationOpen }"
         >
-            <FlowStructure />
-            <FlowSequence />
+            <FlowGraph v-if="builderStore.builderMode === 'graph'" />
+            <template v-else>
+                <FlowStructure />
+                <FlowSequence />
+            </template>
             <ConfigPanel />
         </div>
 

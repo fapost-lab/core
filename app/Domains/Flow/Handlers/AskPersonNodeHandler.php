@@ -14,7 +14,6 @@ use App\Domains\Flow\DTOs\FlowQuestionDraft;
 use App\Domains\Flow\Enums\FlowQuestionStatus;
 use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\SendMessageContentType;
-use App\Domains\Flow\Handlers\Support\AddresseeResolver;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Models\FlowQuestion;
 use App\Domains\Flow\Models\FlowSession;
@@ -22,6 +21,7 @@ use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use App\Domains\Flow\Support\AddresseeResolver;
 use App\Domains\Flow\Support\FlowQuestionButton;
 use Carbon\CarbonImmutable;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -85,6 +85,7 @@ final class AskPersonNodeHandler extends AbstractVersionedHandler implements Dec
         private readonly InlineKeyboardEditorInterface $keyboardEditor,
         private readonly ContentTranslatorInterface $translator,
         private readonly TemplateRenderer $templates,
+        private readonly AddresseeResolver $addressees,
         private readonly VariableResolverInterface $variables,
         private readonly AutomationRunDeadline $deadline,
         private readonly LoggerInterface $logger,
@@ -208,7 +209,7 @@ final class AskPersonNodeHandler extends AbstractVersionedHandler implements Dec
     {
         $config    = is_array($node['config'] ?? null) ? $node['config'] : [];
         $issues    = [];
-        $addressee = AddresseeResolver::named($config);
+        $addressee = AddresseeResolver::addresseeOf($config);
 
         if (null === $addressee['kind']) {
             $issues[] = NodeConfigIssue::error('addressee_required', 'Name the contact to ask: an expression that gives a contact id.', 'addressee.contact');
@@ -280,7 +281,7 @@ final class AskPersonNodeHandler extends AbstractVersionedHandler implements Dec
      */
     private function ask(array $config, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        $recipientId = AddresseeResolver::resolve(AddresseeResolver::named($config), $this->templates, $context, $state);
+        $recipientId = $this->addressees->resolve(AddresseeResolver::addresseeOf($config), $context, $state);
 
         if (null === $recipientId) {
             return $this->error('addressee_unresolved', 'the addressee gave no contact id.');

@@ -13,11 +13,11 @@ use App\Domains\Flow\Contracts\SendMessageTimeoutSchedulerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
-use App\Domains\Flow\Handlers\Support\AddresseeResolver;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use App\Domains\Flow\Support\AddresseeResolver;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use Carbon\Carbon;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -404,7 +404,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
     }
 
     /**
-     * The addressee a node's config names ({@see AddresseeResolver::named()}).
+     * The addressee a node's config names ({@see AddresseeResolver::addresseeOf()}).
      *
      * @param  array<array-key, mixed>  $config
      *
@@ -412,7 +412,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
      */
     private static function addresseeOf(array $config): array
     {
-        return AddresseeResolver::named($config);
+        return AddresseeResolver::addresseeOf($config);
     }
 
     /**
@@ -585,7 +585,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
      */
     private function resolveAddressee(array $addressee, array $state, NodeExecutionContext $context): ?string
     {
-        return AddresseeResolver::resolve($addressee, $this->templates, $context, $state);
+        return new AddresseeResolver($this->templates)->resolve($addressee, $context, $state);
     }
 
     /**

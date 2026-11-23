@@ -34,6 +34,8 @@ export function nodeMustBeLast(node: TerminalCheckInput): boolean {
 
     // Ask person is always terminal — continuation is only via its answer buttons, timeout or error.
     if (node.type === 'ask_person') return true
+    // Start flow is always terminal — continuation is only via started/busy/no_channel/error.
+    if (node.type === 'start_flow') return true
 
     // Request operator is always terminal — continuation is only via returned/cancelled/timeout.
     if (node.type === 'request_operator') return true

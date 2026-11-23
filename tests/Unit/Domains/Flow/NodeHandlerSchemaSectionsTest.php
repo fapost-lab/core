@@ -12,6 +12,7 @@ use App\Domains\Flow\Handlers\EmitEventNodeHandler;
 use App\Domains\Flow\Handlers\InputNodeHandler;
 use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
+use App\Domains\Flow\Handlers\StartFlowNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Handlers\WebhookResponseNodeHandler;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -41,6 +42,7 @@ final class NodeHandlerSchemaSectionsTest extends TestCase
             'input'            => [InputNodeHandler::class],
             'send'             => [SendMessageNodeHandler::class],
             'subflow'          => [SubflowNodeHandler::class],
+            'start_flow'       => [StartFlowNodeHandler::class],
             'webhook_response' => [WebhookResponseNodeHandler::class],
         ];
     }

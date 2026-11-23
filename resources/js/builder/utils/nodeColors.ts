@@ -58,6 +58,9 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     // Notify (staff / contacts)
     notify:        { bg: 'var(--blue-bg)',          color: 'var(--blue)',       icon: '🔔' },
 
+    // Starts another flow as a conversation of a contact
+    start_flow:    { bg: 'var(--indigo-bg)',          color: 'var(--indigo)',       icon: '🚀' },
+
     // Human handoff — waits for an operator
     request_operator: { bg: 'var(--blue-bg)',       color: 'var(--blue)',       icon: '🙋' },
 

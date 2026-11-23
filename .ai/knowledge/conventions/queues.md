@@ -10,7 +10,7 @@ paths:
   - "app/Domains/Broadcasting/**"
   - "app/Domains/Messaging/**"
 summary: Queues are split by purpose (flow.execution, messaging.*, scheduled.triggers, sync.external); rate limits and backpressure are preventive, not reactive.
-reviewed_at: 2026-11-18
+reviewed_at: 2026-11-23
 ---
 # Messaging and queues
 
@@ -67,7 +67,7 @@ Queue assignment by purpose, as it exists in the codebase today:
   most one job per assistant per 2 seconds otherwise (`FlowActivityNotifier`).
 - `messaging.logging`: `app/Domains/Conversation/Jobs/PersistConversationMessageJob.php`,
   `FetchConversationMediaJob.php`, `UpdateConversationDeliveryStatusJob.php`.
-- `scheduled.triggers`: `app/Jobs/Flow/StartFlowFromEventJob.php` and `DispatchFlowTriggerEventJob`
+- `scheduled.triggers`: `app/Jobs/Flow/StartFlowFromEventJob.php`, `DispatchFlowTriggerEventJob` and `StartFlowForContactJob`
   (queued through `app/Domains/Flow/Events/QueuedFlowTriggerEventPublisher.php`).
 - `flow.automations`: `app/Jobs/Flow/StartAutomationRunJob.php` and `ContinueAutomationRunJob.php` (an automation
   run's delay wake-up stays on `flow.execution` and runs at most one segment there), served by the

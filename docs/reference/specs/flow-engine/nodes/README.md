@@ -13,6 +13,7 @@ categories and classes, is `docs/platform/runtime/flow/10-registered-nodes-catal
 | [06-call](06-call.md) | `call` | `CallNodeHandler` |
 | [07-emit-event](07-emit-event.md) | `emit_event` | `EmitEventNodeHandler` |
 | [08-subflow](08-subflow.md) | `subflow` | `SubflowNodeHandler` |
+| [start-flow](start-flow.md) | `start_flow` | `StartFlowNodeHandler` |
 | [10-end](10-end.md) | `end` | `EndNodeHandler` |
 | [11-loop](11-loop.md) | `loop` and `loop_end` | `LoopNodeHandler`, `LoopEndNodeHandler` |
 | [set-tag](set-tag.md) | `set_tag` | `SetTagNodeHandler` |

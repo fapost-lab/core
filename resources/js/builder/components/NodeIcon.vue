@@ -95,6 +95,13 @@ const SHAPES: Record<string, string> = {
         <rect x="10" y="10" width="4" height="4" rx="0.6" fill="currentColor" stroke="none" />
     `,
 
+    // ── start_flow — arrow leading into a person ──
+    start_flow: `
+        <path d="M3 12h7M7 8.5l3.5 3.5L7 15.5" />
+        <circle cx="17" cy="8.5" r="3" />
+        <path d="M11.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+    `,
+
     // ── template — puzzle-like block with an output arrow ──
     template: `
         <rect x="4" y="4" width="16" height="16" rx="2" />
