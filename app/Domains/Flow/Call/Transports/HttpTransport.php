@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Call\Transports;
 
+use App\Domains\Credentials\Contracts\RejectedTokenAwareInterface;
 use App\Domains\Credentials\CredentialTypeRegistry;
 use App\Domains\Credentials\HostMatcher;
-use App\Domains\Credentials\OAuth2TokenCache;
 use App\Domains\Credentials\SecretRedactor;
-use App\Domains\Credentials\Types\OAuth2ClientCredentialsType;
 use App\Domains\Flow\Call\CallAttempt;
 use App\Domains\Flow\Call\CallSuccessStatuses;
 use App\Domains\Flow\Call\Egress\EgressDeniedException;
@@ -20,7 +19,6 @@ use Fapost\Foundation\Flow\Call\CallContext;
 use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Call\CallTransportInterface;
-use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use InvalidArgumentException;
@@ -63,11 +61,11 @@ use Psr\Log\LoggerInterface;
  *    refuses is `transport_failure`, not a thrown exception), has the credential's secret strings
  *    replaced by `***` ({@see SecretRedactor}), so what the ledger, the state and the logs get is already masked;
  *  - a type that cannot authorize (the OAuth2 endpoint did not give a token, a setting is missing) is
- *    `credential_unavailable`; a 401 from an OAuth2 target drops the cached token.
+ *    `credential_unavailable`; a 401 from the target tells a type that keeps a token
+ *    ({@see RejectedTokenAwareInterface}) to stop using it.
  *
- * The transport is a singleton and keeps no tenant state: the type registry is a singleton of classes, the
- * credential travels in the request, and the scoped OAuth2 token cache is resolved from the container only when
- * a 401 asks for it.
+ * The transport is a singleton and keeps no tenant state: the type registry is a singleton of classes that builds a
+ * type, with its scoped collaborators, on each `get()`, and the credential travels in the request.
  */
 final readonly class HttpTransport implements CallTransportInterface
 {
@@ -97,7 +95,6 @@ final readonly class HttpTransport implements CallTransportInterface
         private GuardedHttpClient $http,
         private LoggerInterface $logger,
         private CredentialTypeRegistry $credentialTypes,
-        private Container $container,
     ) {
     }
 
@@ -151,8 +148,13 @@ final readonly class HttpTransport implements CallTransportInterface
             $result = CallResult::error('transport_failure', metadata: ['exception' => $exception->getMessage()]);
         }
 
-        if (401 === ($result->metadata['status_code'] ?? null) && OAuth2ClientCredentialsType::ID === $credential->type) {
-            $this->container->make(OAuth2TokenCache::class)->forget($credential->tenantId, $credential->id);
+        if (401 === ($result->metadata['status_code'] ?? null)) {
+            // The registry builds the type for this call, so its tenant-bound storage is this job's.
+            $type = $this->credentialTypes->get($credential->type);
+
+            if ($type instanceof RejectedTokenAwareInterface) {
+                $type->tokenRejected($credential);
+            }
         }
 
         return $this->masked($result, $authorization);

@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\ApiTokenController as AdminApiTokenController;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\CredentialController as AdminCredentialController;
+use App\Http\Controllers\Admin\CredentialOAuthController as AdminCredentialOAuthController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
@@ -209,16 +210,19 @@ final class ConsoleRouteInterceptionTest extends FeatureTestCase
             // Support access log: never a Filament screen.
             'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
             // Credentials: a new screen, never a Filament one.
-            'admin credentials'         => ['console.admin.credentials.index', AdminCredentialController::class, 'index', 'GET', 'admin/credentials'],
-            'admin credentials create'  => ['console.admin.credentials.create', AdminCredentialController::class, 'create', 'GET', 'admin/credentials/create'],
-            'admin credentials edit'    => ['console.admin.credentials.edit', AdminCredentialController::class, 'edit', 'GET', 'admin/credentials/{record}/edit'],
-            'admin credentials store'   => ['console.admin.credentials.store', AdminCredentialController::class, 'store', 'POST', 'admin/credentials'],
-            'admin credentials update'  => ['console.admin.credentials.update', AdminCredentialController::class, 'update', 'PUT', 'admin/credentials/{record}'],
-            'admin credentials destroy' => ['console.admin.credentials.destroy', AdminCredentialController::class, 'destroy', 'DELETE', 'admin/credentials/{record}'],
-            'admin api tokens'          => ['console.admin.api-tokens.index', AdminApiTokenController::class, 'index', 'GET', 'admin/api-tokens'],
-            'admin api tokens store'    => ['console.admin.api-tokens.store', AdminApiTokenController::class, 'store', 'POST', 'admin/api-tokens'],
-            'admin api tokens rotate'   => ['console.admin.api-tokens.rotate', AdminApiTokenController::class, 'rotate', 'POST', 'admin/api-tokens/{record}/rotate'],
-            'admin api tokens destroy'  => ['console.admin.api-tokens.destroy', AdminApiTokenController::class, 'destroy', 'DELETE', 'admin/api-tokens/{record}'],
+            'admin credentials'                  => ['console.admin.credentials.index', AdminCredentialController::class, 'index', 'GET', 'admin/credentials'],
+            'admin credentials create'           => ['console.admin.credentials.create', AdminCredentialController::class, 'create', 'GET', 'admin/credentials/create'],
+            'admin credentials edit'             => ['console.admin.credentials.edit', AdminCredentialController::class, 'edit', 'GET', 'admin/credentials/{record}/edit'],
+            'admin credentials store'            => ['console.admin.credentials.store', AdminCredentialController::class, 'store', 'POST', 'admin/credentials'],
+            'admin credentials update'           => ['console.admin.credentials.update', AdminCredentialController::class, 'update', 'PUT', 'admin/credentials/{record}'],
+            'admin credentials destroy'          => ['console.admin.credentials.destroy', AdminCredentialController::class, 'destroy', 'DELETE', 'admin/credentials/{record}'],
+            'admin credentials oauth connect'    => ['console.admin.credentials.oauth.connect', AdminCredentialOAuthController::class, 'connect', 'POST', 'admin/credentials/{record}/oauth/connect'],
+            'admin credentials oauth callback'   => ['console.admin.credentials.oauth.callback', AdminCredentialOAuthController::class, 'callback', 'GET', 'admin/credentials/oauth/callback'],
+            'admin credentials oauth disconnect' => ['console.admin.credentials.oauth.disconnect', AdminCredentialOAuthController::class, 'disconnect', 'DELETE', 'admin/credentials/{record}/oauth'],
+            'admin api tokens'                   => ['console.admin.api-tokens.index', AdminApiTokenController::class, 'index', 'GET', 'admin/api-tokens'],
+            'admin api tokens store'             => ['console.admin.api-tokens.store', AdminApiTokenController::class, 'store', 'POST', 'admin/api-tokens'],
+            'admin api tokens rotate'            => ['console.admin.api-tokens.rotate', AdminApiTokenController::class, 'rotate', 'POST', 'admin/api-tokens/{record}/rotate'],
+            'admin api tokens destroy'           => ['console.admin.api-tokens.destroy', AdminApiTokenController::class, 'destroy', 'DELETE', 'admin/api-tokens/{record}'],
             // Usage and limits: a new screen, never a Filament one.
             'admin usage' => ['console.admin.usage.index', AdminUsageController::class, 'index', 'GET', 'admin/usage'],
             // Solutions: a new screen, never a Filament one.

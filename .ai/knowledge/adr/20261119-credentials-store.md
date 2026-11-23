@@ -9,8 +9,10 @@ paths:
   - "app/Domains/Credentials/**"
   - app/Domains/Flow/Call/Transports/HttpTransport.php
   - app/Http/Controllers/Admin/CredentialController.php
+  - app/Http/Controllers/Admin/CredentialOAuthController.php
+  - app/Console/Commands/Credentials/RefreshOAuth2GrantsCommand.php
 summary: Why a tenant's saved credentials live in their own Credentials domain, are bound to a mandatory list of allowed hosts, reach a call only as a masked, never-redirected, Foundation-contract secret
-reviewed_at: 2026-11-20
+reviewed_at: 2026-11-23
 ---
 # Saved credentials are a Credentials domain; a call applies one only to an allowed host and masks it on the way out
 
@@ -74,6 +76,51 @@ How the secret is kept and applied:
   the inline `auth.*` parameters, so a shared ingress cannot route an authorized request to another site
   behind an allowed host.
 
+## Amendment: authorization code grants (task `flow-credentials-oauth2`, 2026-11-23)
+
+The owner approved the design at the human gate ("all per the recommendations"). A credential type
+`oauth2_authorization_code` gets its tokens from a person's consent in the console.
+
+- **The grant lives in the database.** A tenant table `credential_oauth_grants`, one row per credential
+  (`credential_id` primary key, cascading with the credential), with the access and refresh tokens `encrypted`
+  with the application key and hidden in the model, their expiries, who connected it and when, and a status
+  (`connected`, `reconnect_needed`). The rejection of "a token in a database column" above stands for client
+  credentials; here the refresh token is the only copy of a person's consent, so losing it (a Redis eviction, a
+  flush) would mean reconnecting by hand. A refresh writes the row, but only when the access token ran out.
+- **Each tenant registers its own client** at the provider; client id and secret are the credential's fields. A
+  platform-wide OAuth application belongs to the SaaS layer, later.
+- **The callback is one URL per tenant host**, `GET /admin/credentials/oauth/callback` in the admin stack (tenant,
+  session, `auth`, `ManageCredentials`). The pending attempt (state, PKCE S256 verifier, redirect URI, credential
+  and its version, user, ten-minute expiry; at most five) is kept in the session and taken out once. The callback
+  removes its query from the request before the session records the "previous URL", so the code does not land in
+  the session. A stopped tenant is refused in the controller, since the callback is a GET.
+- **Refresh rotation is serialized by a lock.** A refresh takes a cache lock on the credential
+  (`credentials:oauth2-refresh:{tenant}:{credential}`, 30 s, waited for 5 s), reads the grant again and refreshes
+  only if it is still due; a busy lock is `credential_unavailable`, never a refresh without it. `invalid_grant`,
+  `invalid_client` or `unauthorized_client` mark the grant `reconnect_needed` with its failure code (shown in the
+  console) and a warning log; other failures change nothing. No audit entry is written for it: it is a status
+  change made by a call or a job, which `adr-20261111-audit-log-explicit-recording` keeps out of the audit trail
+  (the design's `credential.reconnect_needed` entry was dropped in review for that reason; adding it needs an
+  amendment of that ADR).
+- **Lazy refresh plus a daily keep-alive.** A call refreshes an access token within 60 s of its end; the command
+  `credentials:refresh-oauth2-grants` (daily 02:30, `withoutOverlapping`) refreshes connected grants idle for
+  7 days or whose refresh token ends within 3 days, in active tenants that are not stopped.
+- **Foundation does not change.** The type implements the Foundation interface; two Core interfaces carry what is
+  Core's: `RejectedTokenAwareInterface` (a 401 from the target tells the type to stop using its token, replacing
+  `HttpTransport`'s comparison with one type id) and `ValidatesOwnSettingsInterface` (the authorization URL must be
+  https but need not be on an allowed host, since the browser goes there and no secret is sent; the extra
+  authorization parameters may not set the ones the connection sets).
+- **A change to the client drops the grant.** `CredentialWriter::update` deletes it in the same transaction when a
+  setting of the client (authorization URL, token URL, client id, scope, extra parameters) or the secret changes,
+  and records `grant_dropped` in the `credential.updated` entry. Connecting and disconnecting are audited as
+  `credential.connected` and `credential.disconnected`, without a value.
+
+Residual risks: Redis unavailable means no refresh and `credential_unavailable` until it is back; the code passes
+through the callback URL and may reach a web server or proxy access log (single use, bound to PKCE); a renamed
+tenant slug changes the callback URL, so the redirect URI must be updated at the provider and the credential
+reconnected; `SESSION_SAME_SITE=strict` keeps the session cookie off the provider's redirect and breaks the
+callback; tokens are not revoked at the provider on disconnect.
+
 ## Alternatives
 
 - The transport resolves the credential by id itself. Rejected: the transport is a process-wide singleton, and
@@ -88,7 +135,10 @@ How the secret is kept and applied:
 - Mask in every sink (logger, ledger, persister). Rejected: sinks multiply, and one forgotten is a leak.
 - The code inside Flow (`app/Domains/Flow/Credentials`) or Tenancy. Rejected: Solutions and connectors are not
   Flow, and Tenancy takes no outward dependencies.
-- The OAuth2 token in a database column. Rejected: a write on the hot path and races between workers.
+- The OAuth2 token in a database column. Rejected for client credentials: a write on the hot path and races
+  between workers, for a token that can always be fetched again. An authorization code grant is stored in the
+  database all the same (see the amendment below): its refresh token comes from a person's consent and cannot be
+  fetched again.
 - `ManageCredentials` / `UseCredentials` now. Rejected: a separate roadmap item with a data migration for
   existing tenants.
 
