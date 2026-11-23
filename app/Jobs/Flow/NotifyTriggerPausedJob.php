@@ -6,6 +6,7 @@ namespace App\Jobs\Flow;
 
 use App\Domains\Flow\Admission\TriggerRateBreaker;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Notifications\Notifiers\InAppStaffNotifier;
@@ -15,21 +16,26 @@ use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Routing\UrlGenerator;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
- * Tells the people who manage automations that the run rate breaker paused a trigger: one in-app notification each,
- * with a link to the flow, where the trigger is resumed.
+ * Tells the people who can resume a trigger the run rate breaker paused that it was paused: one in-app notification
+ * each, with a path to the flow in the builder, where the trigger is resumed. A recipient holds the right to manage
+ * automations and passes the flow's `resumeTrigger` policy (editing it, with access to its assistant), so nobody is told
+ * about a flow they cannot open; a flow deleted since is announced to nobody.
  *
  * Queued after the commit by the one admission call that paused the trigger, so a pause is announced once. Runs on the
  * platform service queue (`messaging.system`) inside the tenant's switch, like a limit notice, and keeps running in a
  * stopped tenant: the message is about the tenant's own state. Sent with `notifyNow` (a queued notification would
- * restore the user outside the tenant), behind a guard set before delivery, so a retry never delivers twice; one failing
- * recipient does not stop the others.
+ * restore the user outside the tenant). A guard set after the recipients and the flow were read, right before delivery,
+ * keeps a retry from delivering twice, while a job that failed before it is retried in full; one failing recipient does
+ * not stop the others.
  */
 final class NotifyTriggerPausedJob implements ShouldQueue
 {
@@ -52,10 +58,6 @@ final class NotifyTriggerPausedJob implements ShouldQueue
         InAppStaffNotifier $notifier,
         LoggerInterface $logger,
     ): void {
-        if (! Cache::add('flow_trigger_paused_notice:' . $this->tenantId . ':' . $this->triggerId . ':' . $this->pausedAt, true, now()->addDay())) {
-            return;
-        }
-
         $tenant = $tenants->findById($this->tenantId);
 
         if (null === $tenant) {
@@ -63,7 +65,16 @@ final class NotifyTriggerPausedJob implements ShouldQueue
         }
 
         $switcher->runForTenant($tenant, function () use ($resolver, $notifier, $logger): void {
-            $recipients = $resolver->withPermission(Permission::ManageAutomations);
+            $draft = $this->draft();
+
+            if (null === $draft) {
+                $logger->info('flow.trigger.paused_notice_no_flow', ['tenant_id' => $this->tenantId, 'flow_id' => $this->flowId, 'trigger_id' => $this->triggerId]);
+
+                return;
+            }
+
+            $recipients = $resolver->withPermission(Permission::ManageAutomations)
+                ->filter(static fn (User $user): bool => Gate::forUser($user)->allows('resumeTrigger', $draft));
 
             if ($recipients->isEmpty()) {
                 $logger->info('flow.trigger.paused_notice_no_recipients', ['tenant_id' => $this->tenantId, 'trigger_id' => $this->triggerId]);
@@ -71,16 +82,22 @@ final class NotifyTriggerPausedJob implements ShouldQueue
                 return;
             }
 
-            $flowName = $this->flowName();
-            $limit    = max(1, app(PlatformSettingsReaderInterface::class)->integer(TriggerRateBreaker::SETTING));
+            $limit = max(1, app(PlatformSettingsReaderInterface::class)->integer(TriggerRateBreaker::SETTING));
+            $path  = app(UrlGenerator::class)->route('builder.flows.show', ['flow' => $this->flowId], false);
+
+            // Set once everything the notice needs was read, right before delivery: a job that failed before it is
+            // retried in full, and a retry after it delivers nothing twice.
+            if (! Cache::add('flow_trigger_paused_notice:' . $this->tenantId . ':' . $this->triggerId . ':' . $this->pausedAt, true, now()->addDay())) {
+                return;
+            }
 
             foreach ($recipients as $recipient) {
-                $this->notify($recipient, $notifier, $flowName, $limit, $logger);
+                $this->notify($recipient, $notifier, (string) $draft->name, $limit, $path, $logger);
             }
         });
     }
 
-    private function notify(User $recipient, InAppStaffNotifier $notifier, string $flowName, int $limit, LoggerInterface $logger): void
+    private function notify(User $recipient, InAppStaffNotifier $notifier, string $flowName, int $limit, string $path, LoggerInterface $logger): void
     {
         $locale = $recipient->preferredLocale();
 
@@ -91,7 +108,7 @@ final class NotifyTriggerPausedJob implements ShouldQueue
                     'flow'  => $flowName,
                     'limit' => $limit,
                 ], $locale),
-                url: '/builder/flows/' . $this->flowId,
+                url: $path,
                 actionLabel: __('builder.trigger_state.open_flow', [], $locale),
             ));
         } catch (Throwable $exception) {
@@ -102,12 +119,12 @@ final class NotifyTriggerPausedJob implements ShouldQueue
         }
     }
 
-    private function flowName(): string
+    private function draft(): ?FlowDraft
     {
         try {
-            return (string) app(FlowDraftRepositoryInterface::class)->findByFlowId($this->flowId)->name;
+            return app(FlowDraftRepositoryInterface::class)->findByFlowId($this->flowId);
         } catch (ModelNotFoundException) {
-            return $this->flowId;
+            return null;
         }
     }
 

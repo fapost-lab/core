@@ -16,7 +16,8 @@ use Throwable;
  * A stream of refusals — a paused trigger hit by a bulk import's events — would otherwise write the same row once per
  * run. Each refusal is counted in the cache; the refusal that finds the trigger's write window free adds everything
  * counted so far to the row in one statement. What a window left in the cache is added by the next refusal after it,
- * and {@see self::pending()} lets a screen show it before then. When the cache fails, the refusal is written directly.
+ * and {@see self::pending()} lets a screen show it before then. When the cache cannot count the refusal, it is written
+ * directly; once counted, a cache failure only delays its write to the next refusal.
  */
 final readonly class TriggerRefusals
 {
@@ -33,11 +34,30 @@ final readonly class TriggerRefusals
 
     public function record(string $tenantId, string $triggerId, RefusalReason $reason, DateTimeImmutable $at): void
     {
+        $countKey = self::countKey($tenantId, $triggerId);
+
         try {
-            $count = $this->countAndTakeIfDue($tenantId, $triggerId, $reason, $at);
+            // Made first with a lifetime: a store whose increment does not create a key (database, memcached) still
+            // counts, and on Redis the counter does not outlive its purpose.
+            $this->cache->add($countKey, 0, self::PENDING_TTL_SECONDS);
+
+            if (false === $this->cache->increment($countKey)) {
+                throw new RuntimeException('The cache did not count the refusal.');
+            }
         } catch (Throwable $exception) {
+            // Not counted in the cache: written directly, so it is not lost.
             report($exception);
-            $count = 1;
+            $this->states->addRefusals($triggerId, 1, $reason, $at);
+
+            return;
+        }
+
+        try {
+            $count = $this->takeIfDue($tenantId, $triggerId, $countKey, $reason, $at);
+        } catch (Throwable $exception) {
+            // Counted in the cache already: the next write takes it, so a direct write would count it twice.
+            report($exception);
+            $count = 0;
         }
 
         $this->states->addRefusals($triggerId, $count, $reason, $at);
@@ -82,21 +102,13 @@ final readonly class TriggerRefusals
     }
 
     /**
-     * Count the refusal; when the trigger's write window is free, take every refusal counted so far.
+     * Note the counted refusal as the last one; when the trigger's write window is free, take every refusal counted so
+     * far.
      *
      * @return int how many refusals to write now; 0 inside a window
      */
-    private function countAndTakeIfDue(string $tenantId, string $triggerId, RefusalReason $reason, DateTimeImmutable $at): int
+    private function takeIfDue(string $tenantId, string $triggerId, string $countKey, RefusalReason $reason, DateTimeImmutable $at): int
     {
-        $countKey = self::countKey($tenantId, $triggerId);
-
-        // Made first with a lifetime: a store whose increment does not create a key (database, memcached) still counts,
-        // and on Redis the counter does not outlive its purpose.
-        $this->cache->add($countKey, 0, self::PENDING_TTL_SECONDS);
-
-        if (false === $this->cache->increment($countKey)) {
-            throw new RuntimeException('The cache did not count the refusal.');
-        }
         $this->cache->put(
             self::lastKey($tenantId, $triggerId),
             ['at' => $at->format(DATE_ATOM), 'reason' => $reason->value],

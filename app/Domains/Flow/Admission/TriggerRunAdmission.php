@@ -10,6 +10,7 @@ use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Jobs\Flow\NotifyTriggerPausedJob;
 use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Contracts\Cache\Repository as Cache;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -33,12 +34,16 @@ use Throwable;
  * A cache that cannot count the breaker's window lets the run through, reported, as an operator outage does in
  * {@see PeriodQuota}: a broken counter must not stop every automation of the installation.
  *
- * Bound scoped: the quota reads the tenant context. Nothing is kept between calls.
+ * Bound scoped: the quota reads the tenant context. Nothing is kept in the object between calls; what
+ * {@see self::admitOnce()} remembers lives in the cache.
  */
 final readonly class TriggerRunAdmission
 {
     /** The plan limit on runs started by a trigger other than a message, per period. */
     public const string LIMIT_KEY = 'flow_runs';
+
+    /** How long {@see self::admitOnce()} remembers an allowed run for the retries of the job that asked. */
+    public const int ADMITTED_TTL_SECONDS = 3600;
 
     public function __construct(
         private FlowTriggerStateRepositoryInterface $states,
@@ -47,8 +52,41 @@ final readonly class TriggerRunAdmission
         private TriggerRefusals $refusals,
         private AfterCommitDispatcherInterface $afterCommit,
         private Dispatcher $dispatcher,
+        private Cache $cache,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * {@see self::admit()} for a start that is not created in the same step as its admission, so a failure between the
+     * two is retried by asking again — a flow event's start, which ends stale conversations first. An allowed run is
+     * remembered by its unit key for {@see self::ADMITTED_TTL_SECONDS}, and asking again for it lets it through without
+     * counting it in the breaker's minute or refusing it a second time: that could pause the trigger over a run it already
+     * counted. A cache that cannot remember or recall it only means asking again, as {@see self::admit()} does.
+     */
+    public function admitOnce(TriggerAdmissionRequest $request): AdmissionDecision
+    {
+        $key = 'flow-admission:admitted:' . mb_strtolower($request->tenantId) . ':' . $request->unitKey;
+
+        try {
+            if (true === $this->cache->get($key)) {
+                return AdmissionDecision::allowed();
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+        }
+
+        $decision = $this->admit($request);
+
+        if ($decision->isAllowed()) {
+            try {
+                $this->cache->put($key, true, self::ADMITTED_TTL_SECONDS);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        return $decision;
     }
 
     public function admit(TriggerAdmissionRequest $request): AdmissionDecision

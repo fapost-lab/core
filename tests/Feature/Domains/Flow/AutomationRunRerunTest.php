@@ -7,6 +7,8 @@ namespace Tests\Feature\Domains\Flow;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Admission\RefusalReason;
+use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Enums\RerunRefusal;
@@ -23,6 +25,7 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Jobs\Flow\StartAutomationRunJob;
+use Carbon\CarbonImmutable;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -190,6 +193,23 @@ final class AutomationRunRerunTest extends FeatureTestCase
         $this->assertSame(0, ActivityEntry::query()->where('description', 'flow.run_rerun')->count());
 
         FlowDraft::query()->where('flow_id', $flowId)->update(['is_active' => true]);
+
+        $this->assertFalse($this->service()->check($source)->isRefused());
+    }
+
+    public function test_a_run_whose_trigger_the_breaker_paused_is_refused_until_it_is_resumed(): void
+    {
+        [$flowId, $triggerId] = $this->automation([$this->end()]);
+        $source               = $this->failedRun($flowId, $triggerId);
+        $states               = $this->app->make(FlowTriggerStateRepositoryInterface::class);
+        $states->pause($triggerId, RefusalReason::RateBreaker, CarbonImmutable::now());
+
+        $this->assertRefused(RerunRefusal::TriggerPaused, $source);
+        $this->assertTrue($this->service()->rerun($source, 1)->isRefused(), 'The re-run is refused, not queued to be refused by admission.');
+        Queue::assertNotPushed(StartAutomationRunJob::class);
+        $this->assertSame(0, ActivityEntry::query()->where('description', 'flow.run_rerun')->count());
+
+        $states->resume($triggerId, CarbonImmutable::now());
 
         $this->assertFalse($this->service()->check($source)->isRefused());
     }

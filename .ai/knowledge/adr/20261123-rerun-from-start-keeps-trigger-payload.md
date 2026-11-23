@@ -38,7 +38,9 @@ somebody else's system. Approved at the design gate by the owner ("Да, всё 
   explicitly), flow and trigger, with the kept payload, the source's assistant and its `event_chain_depth`. The
   trigger's lock, the `flow.automations` queue, the run's deadline and segments apply as to any start, and it runs the
   flow's latest active version. It is refused, with a reason and no exception, while the trigger row is not active, of
-  another flow or tenant, or gone, the flow's draft is gone, or the flow has no active version.
+  another flow or tenant, or gone, the flow's draft is gone, or the flow has no active version. Since
+  `adr-20261123-flow-run-admission` it is refused too while the run rate breaker has the trigger paused
+  (`trigger_paused`): admission would refuse the queued run silently, after the person was told it was queued.
 - **The fire key.** `rerun:<source session id>:<n>` (`RerunFireKey`). `n` is offered by the page — the highest attempt
   among the source's re-runs that still have a row, plus one (not their count: retention deletes each re-run on its
   own status, so a lower attempt can be gone while a higher one is kept) — and sent back with the request, which is refused (`already_rerun`) unless

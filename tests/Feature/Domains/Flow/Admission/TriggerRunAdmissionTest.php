@@ -13,7 +13,9 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Admission\RefusalReason;
 use App\Domains\Flow\Admission\TriggerPauseService;
 use App\Domains\Flow\Admission\TriggerRateBreaker;
+use App\Domains\Flow\Admission\TriggerRefusals;
 use App\Domains\Flow\Admission\TriggerRunAdmission;
+use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
@@ -23,10 +25,12 @@ use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Models\FlowTriggerState;
 use App\Domains\Flow\Orchestration\AutomationRunner;
 use App\Domains\Flow\Orchestration\AutomationStartResult;
+use App\Domains\Flow\Routing\MessageRouter;
 use App\Domains\Flow\Schedule\ScheduleTriggerFirer;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Enums\RefusedWork;
@@ -35,10 +39,13 @@ use App\Jobs\Flow\NotifyTriggerPausedJob;
 use App\Jobs\Flow\StartFlowFromEventJob;
 use Carbon\CarbonImmutable;
 use Database\Seeders\TenantAclSeeder;
+use Fapost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Cache\RateLimiter;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Event;
@@ -82,6 +89,7 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
 
     public function test_a_retried_start_of_a_fire_that_has_a_run_is_not_asked_again(): void
     {
+        $this->setLimit(2);
         $meter               = $this->meter(FakeUsageMeter::allowing());
         [$draft, $triggerId] = $this->liveSchedule();
 
@@ -95,6 +103,7 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
         $this->assertSame(TriggerRunAdmission::LIMIT_KEY, $meter->units[0]->key);
         $this->assertSame(1, FlowSession::query()->count());
         $this->assertStringNotContainsString('fire-1', $meter->units[0]->unitKey, 'The fire key never reaches the meter as it is.');
+        $this->assertFalse($this->start($draft, $triggerId, 'fire-2')->isRefused(), 'The retry was not counted in the breaker\'s minute.');
     }
 
     public function test_a_run_over_the_plan_limit_does_not_start_and_is_counted_on_the_trigger(): void
@@ -220,6 +229,66 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
         $this->assertSame(RefusalReason::TriggerPaused, $this->state($triggerId)->last_refusal_reason);
     }
 
+    public function test_a_flow_events_start_retried_after_a_failure_that_followed_its_admission_is_not_counted_again(): void
+    {
+        $this->setLimit(1);
+        $meter               = $this->meter(FakeUsageMeter::allowing());
+        [$draft, $triggerId] = $this->liveSchedule();
+        $contact             = Contact::factory()->forTenant($this->tenantId)->create();
+        $this->reachable($contact);
+
+        $engine  = $this->app->make(FlowEngineInterface::class);
+        $failing = Mockery::mock(FlowEngineInterface::class);
+        $failing->shouldReceive('start')->once()->andThrow(new RuntimeException('engine down'));
+        $this->app->instance(FlowEngineInterface::class, $failing);
+
+        try {
+            $this->runEventJob($draft, $triggerId, $contact, 'event-1');
+            $this->fail('The first attempt fails after its admission.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('engine down', $exception->getMessage());
+        }
+
+        $this->app->instance(FlowEngineInterface::class, $engine);
+        $this->runEventJob($draft, $triggerId, $contact, 'event-1');
+
+        $this->assertSame(1, FlowSession::query()->where('contact_id', $contact->getKey())->count(), 'The retry starts the flow.');
+        $this->assertNull(FlowTriggerState::query()->where('trigger_id', $triggerId)->first(), 'The retry is neither refused nor pauses the trigger.');
+        $this->assertCount(1, $meter->units);
+        $this->assertSame(RefusalReason::RateBreaker, $this->start($draft, $triggerId, 'fire-2')->refusal, 'The event counted once in the minute.');
+    }
+
+    public function test_a_message_trigger_never_asks_admission(): void
+    {
+        $this->setLimit(1);
+        $meter     = $this->meter(FakeUsageMeter::allowing());
+        $triggerId = mb_strtolower(Str::ulid()->toRfc4122());
+        $draft     = FlowDraft::factory()->create([
+            'tenant_id'    => $this->tenantId,
+            'assistant_id' => $this->assistant->getKey(),
+            'nodes'        => [['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']]],
+            'edges'        => [],
+            'triggers'     => [[
+                'id'        => $triggerId,
+                'type'      => 'message',
+                'is_active' => true,
+                'priority'  => 100,
+                'config'    => ['keywords' => ['hello'], 'phrases' => []],
+            ]],
+        ]);
+        $this->app->make(PublishFlowService::class)->execute($draft->flow_id);
+        $router = $this->app->make(MessageRouter::class);
+
+        foreach (range(1, 2) as $ignored) {
+            $contact = Contact::factory()->forTenant($this->tenantId)->create();
+            $router->route(contact: $contact, message: $this->incoming('hello'), assistant: $this->assistant, channel: $this->inMemoryChannel());
+        }
+
+        $this->assertSame(2, FlowSession::query()->whereNotNull('contact_id')->count(), 'Both conversations started, over a breaker limit of one.');
+        $this->assertSame([], $meter->units, 'A conversation spends no unit of flow_runs.');
+        $this->assertSame(0, FlowTriggerState::query()->count(), 'Nothing is refused or counted on the trigger.');
+    }
+
     public function test_a_flow_events_start_skipped_for_a_busy_contact_is_not_metered(): void
     {
         $meter               = $this->meter(FakeUsageMeter::allowing());
@@ -300,6 +369,33 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
         $this->assertSame(4, $this->state($triggerId)->refused_count, 'The next window writes what the last one counted.');
     }
 
+    public function test_a_refusal_the_cache_counted_is_not_written_directly_when_the_cache_fails_after_it(): void
+    {
+        [, $triggerId] = $this->liveSchedule();
+        $cache         = Mockery::mock(CacheRepository::class);
+        $cache->shouldReceive('add')->once()->andReturn(true);
+        $cache->shouldReceive('increment')->once()->andReturn(1);
+        $cache->shouldReceive('put')->andThrow(new RuntimeException('cache lost'));
+        $this->app->instance(ExceptionHandler::class, Mockery::mock(ExceptionHandler::class)->shouldIgnoreMissing());
+
+        $this->refusals($cache)->record($this->tenantId, $triggerId, RefusalReason::PlanLimit, CarbonImmutable::now());
+
+        $this->assertNull(FlowTriggerState::query()->where('trigger_id', $triggerId)->first(), 'The counted refusal waits in the cache for the next write.');
+    }
+
+    public function test_a_refusal_the_cache_could_not_count_is_written_directly(): void
+    {
+        [, $triggerId] = $this->liveSchedule();
+        $cache         = Mockery::mock(CacheRepository::class);
+        $cache->shouldReceive('add')->once()->andReturn(true);
+        $cache->shouldReceive('increment')->once()->andReturn(false);
+        $this->app->instance(ExceptionHandler::class, Mockery::mock(ExceptionHandler::class)->shouldIgnoreMissing());
+
+        $this->refusals($cache)->record($this->tenantId, $triggerId, RefusalReason::PlanLimit, CarbonImmutable::now());
+
+        $this->assertSame(1, $this->state($triggerId)->refused_count);
+    }
+
     public function test_the_flow_runs_limit_is_registered_per_period(): void
     {
         $definition = $this->app->make(LimitRegistryInterface::class)->find(TriggerRunAdmission::LIMIT_KEY);
@@ -308,12 +404,15 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
         $this->assertSame(LimitKind::PerPeriod, $definition->kind);
     }
 
-    public function test_the_pause_notice_reaches_whoever_manages_automations_in_app(): void
+    public function test_the_pause_notice_reaches_whoever_can_resume_the_trigger_in_app(): void
     {
         $this->seed(TenantAclSeeder::class);
         [$draft, $triggerId] = $this->liveSchedule();
         $manager             = User::factory()->create();
-        $manager->givePermissionTo(Permission::ManageAutomations->value);
+        $manager->givePermissionTo([Permission::ManageAutomations->value, Permission::ManageFlowDefinitions->value]);
+        $manager->assistants()->attach($this->assistant->getKey());
+        $elsewhere = User::factory()->create();
+        $elsewhere->givePermissionTo([Permission::ManageAutomations->value, Permission::ManageFlowDefinitions->value]);
         $bystander = User::factory()->create();
 
         $job = new NotifyTriggerPausedJob($this->tenantId, $draft->flow_id, $triggerId, 'schedule', CarbonImmutable::now()->format(DATE_ATOM));
@@ -321,10 +420,71 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
         $this->app->call([$job, 'handle']);
 
         $this->assertSame(1, $manager->notifications()->count(), 'A retried notice is delivered once.');
+        $this->assertSame(0, $elsewhere->notifications()->count(), 'Managing automations without access to the flow\'s assistant is not enough.');
         $this->assertSame(0, $bystander->notifications()->count());
         $data = $manager->notifications()->sole()->data;
         $this->assertStringContainsString($draft->name, $data['title']);
-        $this->assertSame('/builder/flows/' . $draft->flow_id, $data['actions'][0]['url']);
+        $this->assertSame(route('builder.flows.show', ['flow' => $draft->flow_id], false), $data['actions'][0]['url']);
+    }
+
+    public function test_a_pause_notice_that_failed_before_delivery_is_delivered_on_its_retry(): void
+    {
+        $this->seed(TenantAclSeeder::class);
+        [$draft, $triggerId] = $this->liveSchedule();
+        $manager             = User::factory()->create();
+        $manager->givePermissionTo([Permission::ManageAutomations->value, Permission::ManageFlowDefinitions->value]);
+        $manager->assistants()->attach($this->assistant->getKey());
+
+        $settings = $this->app->make(PlatformSettingsReaderInterface::class);
+        $failing  = Mockery::mock(PlatformSettingsReaderInterface::class);
+        $failing->shouldReceive('integer')->once()->andThrow(new RuntimeException('settings down'));
+        $this->app->instance(PlatformSettingsReaderInterface::class, $failing);
+
+        $job = new NotifyTriggerPausedJob($this->tenantId, $draft->flow_id, $triggerId, 'schedule', CarbonImmutable::now()->format(DATE_ATOM));
+
+        try {
+            $this->app->call([$job, 'handle']);
+            $this->fail('The first attempt fails before delivery.');
+        } catch (RuntimeException) {
+            $this->assertSame(0, $manager->notifications()->count());
+        }
+
+        $this->app->instance(PlatformSettingsReaderInterface::class, $settings);
+        $this->app->call([$job, 'handle']);
+
+        $this->assertSame(1, $manager->notifications()->count(), 'The retry is not a no-op.');
+    }
+
+    private function inMemoryChannel(): Channel
+    {
+        // The router only reads the channel's type and token; a saved channel would call Telegram from its observer.
+        $channel = Channel::factory()->make([
+            'tenant_id'    => $this->tenantId,
+            'assistant_id' => $this->assistant->getKey(),
+            'type'         => ChannelTypeEnum::Telegram,
+            'token'        => 'noop-token',
+        ]);
+        $channel->id     = (string) Str::uuid();
+        $channel->exists = true;
+
+        return $channel;
+    }
+
+    private function incoming(string $text): IncomingMessage
+    {
+        return new IncomingMessage(
+            updateId: 'upd-' . Str::uuid()->toString(),
+            externalUserId: 'ext-user-' . Str::random(6),
+            externalChatId: 'ext-chat-' . Str::random(6),
+            text: $text,
+            type: IncomingMessageType::Text,
+            platform: 'telegram',
+        );
+    }
+
+    private function refusals(CacheRepository $cache): TriggerRefusals
+    {
+        return new TriggerRefusals($this->app->make(FlowTriggerStateRepositoryInterface::class), $cache);
     }
 
     private function setLimit(int $runs): void

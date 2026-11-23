@@ -73,6 +73,7 @@ export type RerunRefusal =
   | 'no_payload'
   | 'trigger_gone'
   | 'flow_off'
+  | 'trigger_paused'
   | 'no_active_version'
   | 'already_rerun'
 

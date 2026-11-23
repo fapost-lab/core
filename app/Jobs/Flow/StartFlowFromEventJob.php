@@ -58,7 +58,8 @@ use Throwable;
  *
  * Run admission ({@see TriggerRunAdmission}) is asked under the lock, after the contact proved free, so a start skipped
  * for a busy contact or a missing channel is neither metered nor counted by the breaker. Its unit key is the trigger id
- * and what fired it, as the start key. A refused start starts nothing and ends no conversation.
+ * and what fired it, as the start key. A refused start starts nothing and ends no conversation. An allowed start is
+ * remembered by that key for a while, so a retry after a later failure is not asked (and counted by the breaker) again.
  *
  * A job queued before the trigger, event and source session ids existed unserializes without them: it starts without
  * admission, its start key comes from the job's own id, and no conversation counts as the emitting one.
@@ -261,7 +262,9 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
     }
 
     /**
-     * Whether run admission lets this start through; always for a job queued before it carried its trigger.
+     * Whether run admission lets this start through; always for a job queued before it carried its trigger. Asked with
+     * {@see TriggerRunAdmission::admitOnce()}: a retry after a failure that followed an allowed admission (ending a stale
+     * conversation, the engine's start) is not counted by the breaker again.
      */
     private function admitted(TriggerRunAdmission $admission, string $fireIdentity): bool
     {
@@ -271,7 +274,7 @@ final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
             return true;
         }
 
-        return $admission->admit(new TriggerAdmissionRequest(
+        return $admission->admitOnce(new TriggerAdmissionRequest(
             tenantId: $this->tenantId,
             flowId: $this->flowId,
             triggerId: $triggerId,
