@@ -24,7 +24,7 @@ paths:
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
   - "app/Domains/Flow/Templates/**"
-reviewed_at: 2026-11-20
+reviewed_at: 2026-11-23
 ---
 # Flow
 
@@ -97,7 +97,9 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 - Automation runs: `AutomationRunner` starts a run once per `(trigger_id, fire_key)` under the trigger lock and runs
   it in execution segments (`Services/ExecutionSegment`); a segment that runs out is handed on by
   `Services/SegmentHandOff` (a new `segment_id` on the run's root, then `ContinueAutomationRunJob` on
-  `flow.automations`) (`adr-20261118-segmented-automation-runs`).
+  `flow.automations`) (`adr-20261118-segmented-automation-runs`). A failed root run is re-run from the start by
+  `Services/AutomationRunRerunService` from the sessions screen: the trigger payload kept on the row, the same start
+  job, a `rerun:` fire key (`Orchestration/RerunFireKey`) (`adr-20261123-rerun-from-start-keeps-trigger-payload`).
 - Engine navigation: `FlowSessionPersister::persist()` maps results to session columns (`Executed` →
   next node or completed, `Waiting` → `waiting_input`, `Delayed` → `paused` when it carries `resumeAt`, else `waiting_input`, `Failed`, `Finished`), `persistEnd()` closes
   the session with an `end_status`; all writes use the optimistic lock on `flow_sessions.version`.

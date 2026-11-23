@@ -11,8 +11,8 @@ role for it.
 
 | Role | Permissions | For |
 |---|---|---|
-| `admin` | 31 | Full access, including roles and settings |
-| `content_manager` | 19 | Building and running assistants and automations, without platform administration or managing credentials |
+| `admin` | 32 | Full access, including roles and settings |
+| `content_manager` | 20 | Building and running assistants and automations, without platform administration or managing credentials |
 | `analyst` | 3 | Reading — analytics and reports |
 
 All three are marked **System**. They exist on every tenant and are the sensible
@@ -35,7 +35,7 @@ granted or withheld at once.
 | **Conversations** | Reading transcripts, and replying to contacts |
 | **Analytics** | Reports |
 | **System** | Installation settings, and API tokens |
-| **Automations** | Automatic triggers, saved credentials, the full data of runs, and starting runs through the API |
+| **Automations** | Automatic triggers, saved credentials, the full data of runs, starting runs through the API, and running failed runs again |
 
 Two distinctions recur across the groups and are worth noticing, because they are
 what makes a useful role possible:
@@ -105,6 +105,11 @@ what they do is not obvious from the name.
 
   **View run payloads** shows the full input and output of each step of a run,
   including what outside services answered. No screen shows them yet.
+
+  **Re-run failed automation runs** starts a failed automation run again from the
+  start, with the data its trigger handed over (see
+  [Sessions](/using/sessions#running-a-failed-run-again)). Every request the flow
+  makes to outside systems and every message it sends goes out again.
 </Warning>
 
 **View conversations** and **Reply in conversations** are the ones most often handed out without thinking, because

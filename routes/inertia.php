@@ -305,11 +305,14 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('assistant/{assistant}/conversations/{record}/transfer', [ConversationController::class, 'transfer'])->name('console.conversations.transfer');
         Route::post('assistant/{assistant}/conversations/{record}/seize', [ConversationController::class, 'seize'])->name('console.conversations.seize');
 
-        // Flow sessions and the flow log: read-only, kept current live or by polling. Every log read is bounded in time.
+        // Flow sessions and the flow log: read-only but for a run's re-run, kept current live or by polling. Every log read is bounded in time.
         Route::get('assistant/{assistant}/flow-sessions', [FlowSessionController::class, 'index'])->name('console.flow-sessions.index');
         Route::get('assistant/{assistant}/flow-sessions/{record}', [FlowSessionController::class, 'show'])->name('console.flow-sessions.show');
         Route::get('assistant/{assistant}/flow-sessions/{record}/graph', [FlowSessionController::class, 'graph'])->name('console.flow-sessions.graph');
         Route::get('assistant/{assistant}/flow-sessions/{record}/graph/visits', [FlowSessionController::class, 'visits'])->middleware('throttle:120,1')->name('console.flow-sessions.visits');
+        // Re-running a failed automation run from the start sends its calls and messages again: throttled, and a
+        // repeated request before the new run exists starts it once (its fire key is the same).
+        Route::post('assistant/{assistant}/flow-sessions/{record}/rerun', [FlowSessionController::class, 'rerun'])->middleware('throttle:10,1')->name('console.flow-sessions.rerun');
         Route::get('assistant/{assistant}/flow-logs', [FlowLogController::class, 'index'])->name('console.flow-logs.index');
         Route::get('assistant/{assistant}/flow-logs/{record}', [FlowLogController::class, 'show'])->name('console.flow-logs.show');
         // Assistant settings: one form saved as a whole. A flow made from inside it is saved with the form and opens in the builder.

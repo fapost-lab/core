@@ -62,7 +62,52 @@ export interface FlowSessionsTranslations {
     graph: string
     empty_value: string
   }
+  rerun: RerunTranslations
   graph: RunGraphTranslations
+}
+
+export type RerunRefusal =
+  | 'not_an_automation'
+  | 'not_a_root'
+  | 'not_failed'
+  | 'no_payload'
+  | 'trigger_gone'
+  | 'no_active_version'
+  | 'already_rerun'
+
+export interface RerunTranslations {
+  action: string
+  confirm_title: string
+  confirm_description: string
+  version_changed: string
+  confirm: string
+  queued: string
+  refusals: Record<RerunRefusal, string>
+  reruns: string
+  reruns_description: string
+  rerun_of: string
+}
+
+/** What the page offers to re-run the session from the start; null for a user who may not. */
+export interface RerunOffer {
+  allowed: boolean
+  refusal: RerunRefusal | null
+  targetVersion: number | null
+  /** The re-run a request starts; sent back, so a repeated request starts no second run. */
+  attempt: number | null
+  url: string
+}
+
+export interface RerunRow {
+  id: string
+  status: FlowSessionStatus
+  createdAt: string | null
+  url: string
+}
+
+export interface RerunSource {
+  id: string
+  url: string
 }
 
 
@@ -140,3 +185,6 @@ export const END_STATUS_TONES: Record<string, 'success' | 'danger' | 'neutral'> 
   failed: 'danger',
   cancelled: 'neutral',
 }
+
+/** A run in one of these may still move soon: a page listing it keeps itself current (`paused` sleeps in a delay). */
+export const RUNNING_STATUSES: readonly FlowSessionStatus[] = ['pending', 'active', 'waiting_input', 'paused_subflow']

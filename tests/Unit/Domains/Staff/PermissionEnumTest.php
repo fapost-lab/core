@@ -33,6 +33,7 @@ final class PermissionEnumTest extends TestCase
                 'manage_roles',
                 'publish_flow',
                 'reply_conversations',
+                'rerun_flow',
                 'rotate_channel_token',
                 'start_flow_runs',
                 'use_credentials',
@@ -72,7 +73,7 @@ final class PermissionEnumTest extends TestCase
         $this->assertArrayHasKey('system', $groups);
         $this->assertArrayHasKey('automations', $groups);
         $this->assertSame(
-            [Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads, Permission::StartFlowRuns],
+            [Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads, Permission::StartFlowRuns, Permission::RerunFlow],
             $groups['automations'],
         );
     }
@@ -107,7 +108,7 @@ final class PermissionEnumTest extends TestCase
                 $this->assertNotSame("staff.permission_groups.{$group}", __("staff.permission_groups.{$group}", [], $locale));
             }
 
-            foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads, Permission::ManageApiTokens, Permission::StartFlowRuns] as $permission) {
+            foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads, Permission::ManageApiTokens, Permission::StartFlowRuns, Permission::RerunFlow] as $permission) {
                 $this->assertNotSame("staff.permissions.labels.{$permission->value}", __("staff.permissions.labels.{$permission->value}", [], $locale));
                 $this->assertNotSame("staff.permissions.descriptions.{$permission->value}", __("staff.permissions.descriptions.{$permission->value}", [], $locale));
             }
@@ -121,6 +122,7 @@ final class PermissionEnumTest extends TestCase
         $this->assertContains(Permission::ManageAutomations, $perms);
         $this->assertContains(Permission::UseCredentials, $perms);
         $this->assertContains(Permission::ViewRunPayloads, $perms);
+        $this->assertContains(Permission::RerunFlow, $perms);
         $this->assertNotContains(Permission::ManageCredentials, $perms);
     }
 
@@ -128,7 +130,7 @@ final class PermissionEnumTest extends TestCase
     {
         $perms = RoleEnum::Analyst->permissions();
 
-        foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads, Permission::ManageApiTokens, Permission::StartFlowRuns] as $permission) {
+        foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads, Permission::ManageApiTokens, Permission::StartFlowRuns, Permission::RerunFlow] as $permission) {
             $this->assertNotContains($permission, $perms);
         }
     }

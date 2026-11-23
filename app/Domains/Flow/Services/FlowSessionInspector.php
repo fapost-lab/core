@@ -13,6 +13,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
+use App\Domains\Flow\Orchestration\RerunFireKey;
 use App\Domains\Flow\Templates\TemplateNodeOrigins;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -190,6 +191,47 @@ final readonly class FlowSessionInspector
         }
 
         return $this->query($assistant, self::ALL_STATUSES)->where('flow_sessions.id', $id)->firstOrFail();
+    }
+
+    /**
+     * The re-runs from the start of a session the assistant has ({@see RerunFireKey}), oldest first: the runs its trigger
+     * started under a re-run key made from the session's id.
+     *
+     * @return list<FlowSession>
+     */
+    public function reruns(Assistant $assistant, FlowSession $session): array
+    {
+        if (null === $session->trigger_id) {
+            return [];
+        }
+
+        return FlowSession::query()
+            ->where('tenant_id', $this->tenantId())
+            ->where('assistant_id', (string) $assistant->getKey())
+            ->where('trigger_id', $session->trigger_id)
+            ->where('fire_key', 'like', RerunFireKey::prefixOf((string) $session->getKey()) . '%')
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get()
+            ->all();
+    }
+
+    /**
+     * The session a re-run was started from, when the session is a re-run and its source is still the assistant's.
+     */
+    public function rerunSource(Assistant $assistant, FlowSession $session): ?FlowSession
+    {
+        $sourceId = null === $session->fire_key ? null : RerunFireKey::sourceId($session->fire_key);
+
+        if (null === $sourceId || ! Str::isUuid($sourceId)) {
+            return null;
+        }
+
+        return FlowSession::query()
+            ->where('tenant_id', $this->tenantId())
+            ->where('assistant_id', (string) $assistant->getKey())
+            ->whereKey($sourceId)
+            ->first();
     }
 
     /**

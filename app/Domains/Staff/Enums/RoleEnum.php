@@ -77,6 +77,7 @@ enum RoleEnum: string
                 Permission::ManageAutomations,
                 Permission::UseCredentials,
                 Permission::ViewRunPayloads,
+                Permission::RerunFlow,
             ],
 
             self::Analyst => [

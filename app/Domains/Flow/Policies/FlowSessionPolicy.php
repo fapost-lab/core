@@ -15,7 +15,8 @@ use Illuminate\Foundation\Auth\User as AuthUser;
  *
  * Sessions are engine-owned and read-only in the UI — only
  * {@see Permission::ViewFlowSessions} is required; mutations are denied. The full node input and output of a run's
- * trace ({@see self::viewPayloads()}) needs {@see Permission::ViewRunPayloads} as well.
+ * trace ({@see self::viewPayloads()}) needs {@see Permission::ViewRunPayloads} as well, and re-running a run from the
+ * start ({@see self::rerun()}) needs {@see Permission::RerunFlow}: it starts a new run and leaves the session as it is.
  */
 final class FlowSessionPolicy
 {
@@ -39,6 +40,16 @@ final class FlowSessionPolicy
     {
         return $this->canView($authUser)
                && $authUser->can(Permission::ViewRunPayloads->value);
+    }
+
+    /**
+     * Whether the user may start the session's run again from the start, with the trigger payload it started with. Which
+     * runs can be re-run is the rerun service's to say; this asks only who may.
+     */
+    public function rerun(AuthUser $authUser, FlowSession $session): bool
+    {
+        return $this->canView($authUser)
+               && $authUser->can(Permission::RerunFlow->value);
     }
 
     public function create(AuthUser $authUser): bool

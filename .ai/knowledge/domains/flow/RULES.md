@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-11-20
+reviewed_at: 2026-11-23
 ---
 # Flow rules
 
@@ -332,6 +332,20 @@ broken.
   the config is copied into every version and template, and a URL held by an outside system must stop working when its
   flow cannot be managed (`adr-20261119-flow-webhook-trigger`). Enforced: `FlowWebhookTriggerTest`,
   `FlowWebhookEndpointTest`, `FlowWebhookHostModeTest`, `WebhookTriggerConfigTest`, `RedisWebhookDeliveryDedupRedisTest`.
+- **A run is re-run from the start only through its trigger's start job, with the payload it kept.** `FlowEngine::start()`
+  writes `flow_sessions.trigger_payload` = the `initialState` as handed over, only for a start with a fire key (a root
+  automation run); conversations and subflow children keep NULL. `AutomationRunRerunService` re-runs only a root
+  automation run in status `failed` with a trigger, a fire key and a kept payload, while its trigger row is active and
+  of the same flow and tenant, the flow's draft exists and the flow has an active version; anything else is a
+  `RerunRefusal`, never an exception. It queues `StartAutomationRunJob` with the kept payload (never rebuilt from the
+  trace or the final state), the source's tenant, assistant and `event_chain_depth`, under the fire key
+  `rerun:<source id>:<n>` (`RerunFireKey`; `n` is the attempt the page offered — the highest attempt among the source's re-runs with a row + 1, never their count —
+  and a request whose `n` is no longer the next one is refused as `already_rerun`), and records `flow.run_rerun` in the
+  audit log first. The source run is never changed. Why: the trace is masked and cut, the state is the flow's to
+  overwrite, a start outside the job would skip the trigger's lock and queue, and a deterministic key makes a repeated
+  request one run while never matching a webhook's `wh:` key, so no sender is answered
+  (`adr-20261123-rerun-from-start-keeps-trigger-payload`). Enforced: `AutomationRunRerunTest`,
+  `FlowSessionRerunConsoleTest`, `RerunFireKeyTest`.
 - **A webhook request waits for its flow only while it holds a wait slot, and never past 30 seconds.** A trigger in
   `response_mode: sync` holds the request through `WebhookSyncWait`, which first takes a slot of
   `WebhookWaitSlotsInterface` (`flow.webhook.sync_waiters_max` on the installation, `flow.webhook.sync_waiters_per_tenant`
