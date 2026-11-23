@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Jobs\Flow;
 
-use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Orchestration\FlowQuestionResumer;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
@@ -29,11 +28,7 @@ final class ContinueAfterFlowQuestionJob implements ShouldQueue, TenantAccessGat
 {
     use Dispatchable;
     use Queueable;
-
-    public const int LOCK_BUSY_RELEASE_SECONDS = 10;
-
-    /** Real failures end the job after three; a busy lock only releases it, until {@see retryUntil()}. */
-    public int $maxExceptions = 3;
+    use ReleasesOnBusySessionLock;
 
     public readonly string $queuedAt;
 
@@ -76,12 +71,8 @@ final class ContinueAfterFlowQuestionJob implements ShouldQueue, TenantAccessGat
             return;
         }
 
-        try {
-            $switcher->runForTenant($tenant, function () use ($resumer): void {
-                $resumer->continue($this->questionId);
-            });
-        } catch (SessionLockTimeoutException) {
-            $this->release(self::LOCK_BUSY_RELEASE_SECONDS);
-        }
+        $this->releasingOnBusyLock(fn () => $switcher->runForTenant($tenant, function () use ($resumer): void {
+            $resumer->continue($this->questionId);
+        }));
     }
 }

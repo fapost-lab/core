@@ -96,13 +96,14 @@ final class SweepOverdueAutomationRunsCommandTest extends FeatureTestCase
         $this->assertSame(FlowSessionStatus::Failed, $run->refresh()->status);
     }
 
-    public function test_it_is_scheduled_every_minute_without_overlapping(): void
+    public function test_it_is_scheduled_every_minute_without_overlapping_and_a_killed_pass_frees_it_in_minutes(): void
     {
         $event = collect($this->app->make(Schedule::class)->events())
             ->first(fn ($event): bool => str_contains((string) $event->command, 'flow:sweep-overdue-automation-runs'));
 
         $this->assertNotNull($event);
         $this->assertTrue($event->withoutOverlapping);
+        $this->assertSame(5, $event->expiresAt, 'A scheduler killed mid-pass must not silence the sweeper for a day.');
         $this->assertSame('* * * * *', $event->expression);
     }
 

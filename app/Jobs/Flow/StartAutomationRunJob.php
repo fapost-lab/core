@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Jobs\Flow;
 
-use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Orchestration\AutomationRunner;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
@@ -35,14 +34,10 @@ final class StartAutomationRunJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Dispatchable;
     use Queueable;
-
-    public const int LOCK_BUSY_RELEASE_SECONDS = 10;
+    use ReleasesOnBusySessionLock;
 
     /** Below the `redis` connection's `retry_after` (90 s): a running segment is never reserved a second time. */
     public int $timeout = 60;
-
-    /** Real failures end the job after three; a busy lock only releases it, until {@see retryUntil()}. */
-    public int $maxExceptions = 3;
 
     /**
      * @param  array<string, mixed>  $initialState  merged into the new session's state (the trigger payload)
@@ -91,18 +86,14 @@ final class StartAutomationRunJob implements ShouldQueue, TenantAccessGatedJob
             return;
         }
 
-        try {
-            $switcher->runForTenant($tenant, fn () => $runner->start(
-                $this->tenantId,
-                $this->flowId,
-                $this->triggerId,
-                $this->fireKey,
-                $this->initialState,
-                $this->assistantId,
-                $this->chainDepth ?? 0,
-            ));
-        } catch (SessionLockTimeoutException) {
-            $this->release(self::LOCK_BUSY_RELEASE_SECONDS);
-        }
+        $this->releasingOnBusyLock(fn () => $switcher->runForTenant($tenant, fn () => $runner->start(
+            $this->tenantId,
+            $this->flowId,
+            $this->triggerId,
+            $this->fireKey,
+            $this->initialState,
+            $this->assistantId,
+            $this->chainDepth ?? 0,
+        )));
     }
 }

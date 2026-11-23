@@ -15,6 +15,7 @@ use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\Orchestration\AutomationRunDeadlineSweeper;
 use App\Domains\Flow\Orchestration\AutomationRunner;
 use App\Domains\Flow\Orchestration\DelayedSessionResumer;
@@ -96,6 +97,7 @@ final class AutomationRunDeadlineSweeperTest extends FeatureTestCase
             fn (array $context): bool => (string) $run->getKey() === $context['root_id']
                 && $run->trigger_id === $context['trigger_id']
                 && 'deadline_exceeded' === $context['reason']
+                && $this->now->subMinute()->toIso8601String() === $context['deadline_at']
                 && 1 === $context['sessions'],
         ))->once();
         Queue::assertNothingPushed();
@@ -166,6 +168,7 @@ final class AutomationRunDeadlineSweeperTest extends FeatureTestCase
 
     public function test_a_run_without_a_deadline_is_measured_from_its_creation(): void
     {
+        Log::spy();
         $old   = $this->automation(FlowSessionStatus::Active, ['deadline_at' => null, 'created_at' => $this->now->subHours(24)->subSecond()]);
         $young = $this->automation(FlowSessionStatus::Active, ['deadline_at' => null, 'created_at' => $this->now->subHours(23)]);
 
@@ -173,6 +176,10 @@ final class AutomationRunDeadlineSweeperTest extends FeatureTestCase
 
         $this->assertSame(FlowSessionStatus::Failed, $old->refresh()->status);
         $this->assertSame(FlowSessionStatus::Active, $young->refresh()->status);
+        Log::shouldHaveReceived('warning')->with('flow.automation.run_overdue_failed', Mockery::on(
+            fn (array $context): bool => (string) $old->getKey() === $context['root_id']
+                && $this->now->subSecond()->toIso8601String() === $context['deadline_at'],
+        ))->once();
     }
 
     public function test_the_fallback_follows_the_setting(): void
@@ -221,6 +228,7 @@ final class AutomationRunDeadlineSweeperTest extends FeatureTestCase
 
     public function test_a_run_whose_lock_is_busy_is_skipped_and_the_others_are_still_swept(): void
     {
+        Log::spy();
         $busy = $this->automation(FlowSessionStatus::Active, ['deadline_at' => $this->now->subMinute()]);
         $free = $this->automation(FlowSessionStatus::Active, ['deadline_at' => $this->now->subMinute()]);
         $this->guardBusyFor($busy);
@@ -230,6 +238,9 @@ final class AutomationRunDeadlineSweeperTest extends FeatureTestCase
         $this->assertSame(['failed_runs' => 1, 'failed_sessions' => 1, 'skipped_busy' => 1], $report);
         $this->assertSame(FlowSessionStatus::Active, $busy->refresh()->status);
         $this->assertSame(FlowSessionStatus::Failed, $free->refresh()->status);
+        Log::shouldHaveReceived('info')->with('flow.automation.run_overdue_lock_busy', Mockery::on(
+            fn (array $context): bool => (string) $busy->getKey() === $context['root_id'],
+        ))->once();
     }
 
     public function test_a_run_that_cannot_be_handled_is_logged_and_the_pass_goes_on(): void
@@ -249,6 +260,7 @@ final class AutomationRunDeadlineSweeperTest extends FeatureTestCase
 
     public function test_a_conflicting_write_rolls_the_whole_run_back_for_the_next_pass(): void
     {
+        Log::spy();
         $root  = $this->automation(FlowSessionStatus::PausedSubflow, ['deadline_at' => $this->now->subMinute()]);
         $child = $this->automation(FlowSessionStatus::Active, ['deadline_at' => $this->now->subMinute(), 'parent_session_id' => $root->getKey()]);
 
@@ -266,6 +278,46 @@ final class AutomationRunDeadlineSweeperTest extends FeatureTestCase
         $this->assertNull($child->failure_reason);
         $this->assertSame(FlowSessionStatus::PausedSubflow, $root->refresh()->status);
         $this->assertSame([], $this->analytics);
+        Log::shouldHaveReceived('info')->with('flow.automation.run_overdue_conflict', Mockery::on(
+            fn (array $context): bool => (string) $root->getKey() === $context['root_id'],
+        ))->once();
+        Log::shouldNotHaveReceived('warning', ['flow.automation.run_overdue_skipped', Mockery::any()]);
+    }
+
+    public function test_the_query_and_the_re_check_under_the_lock_agree_on_what_is_overdue(): void
+    {
+        $sessions = [];
+
+        foreach ([-1, 0, 1] as $offset) {
+            $sessions[] = $this->automation(FlowSessionStatus::Active, ['deadline_at' => $this->now->addSeconds($offset)]);
+            $sessions[] = $this->automation(FlowSessionStatus::Active, [
+                'deadline_at' => null,
+                'created_at'  => $this->now->subHours(24)->addSeconds($offset),
+            ]);
+            $sessions[] = $this->automation(FlowSessionStatus::Pending, [
+                'deadline_at' => $this->now->addHours(20),
+                'created_at'  => $this->now->subSeconds(AutomationRunDeadline::PENDING_LOST_AFTER_SECONDS)->addSeconds($offset),
+            ]);
+        }
+
+        $deadline = $this->app->make(AutomationRunDeadline::class);
+        $ids      = array_map(static fn (FlowSession $session): string => (string) $session->getKey(), $sessions);
+
+        $selected = $deadline->whereOverdue(FlowSession::query()->whereIn('id', $ids), $this->now)
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->sort()
+            ->values()
+            ->all();
+        $rechecked = collect($sessions)
+            ->filter(fn (FlowSession $session): bool => $deadline->isOverdue($session->refresh(), $this->now))
+            ->map(static fn (FlowSession $session): string => (string) $session->getKey())
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertCount(3, $selected, 'One second past each threshold is overdue; on it and before it is not.');
+        $this->assertSame($selected, $rechecked);
     }
 
     public function test_nothing_runs_a_swept_run_again(): void

@@ -28,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int                 $step_count    steps of an automation session outside loop bodies, over all its segments (capped by flow.execution.max_iterations)
  * @property int                 $loop_step_count steps of an automation session inside loop bodies, over all its segments (with step_count, capped by StepBudget::ceiling())
  * @property int                 $loop_iteration_step_count steps of an automation session in its current loop iteration, since the last loop_end, over all its segments (capped by flow.execution.max_iterations); 0 outside a loop body
- * @property string|null         $segment_id    the one continuation allowed to run an automation session next
+ * @property string|null         $segment_id    set only on a run's root session: the one continuation allowed to run the run next
  * @property \Illuminate\Support\Carbon|null $deadline_at  when an automation run is failed if still live; frozen at its start
  * @property FlowRunFailureReason|null $failure_reason  why the run was failed from outside the engine
  * @property string              $flow_definition_id  FK to {@see FlowDefinition::$id} — immutable

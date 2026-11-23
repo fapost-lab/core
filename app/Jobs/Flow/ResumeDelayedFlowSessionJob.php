@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Jobs\Flow;
 
-use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Orchestration\DelayedSessionResumer;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
@@ -33,11 +32,7 @@ final class ResumeDelayedFlowSessionJob implements ShouldQueue, TenantAccessGate
 {
     use Dispatchable;
     use Queueable;
-
-    public const int LOCK_BUSY_RELEASE_SECONDS = 10;
-
-    /** Real failures end the job after three; a busy lock only releases it, until {@see retryUntil()}. */
-    public int $maxExceptions = 3;
+    use ReleasesOnBusySessionLock;
 
     public function __construct(
         public readonly string $tenantId,
@@ -84,12 +79,8 @@ final class ResumeDelayedFlowSessionJob implements ShouldQueue, TenantAccessGate
             return;
         }
 
-        try {
-            $switcher->runForTenant($tenant, function () use ($resumer): void {
-                $resumer->resume($this->sessionId, $this->nodeId, CarbonImmutable::parse($this->resumeAt));
-            });
-        } catch (SessionLockTimeoutException) {
-            $this->release(self::LOCK_BUSY_RELEASE_SECONDS);
-        }
+        $this->releasingOnBusyLock(fn () => $switcher->runForTenant($tenant, function () use ($resumer): void {
+            $resumer->resume($this->sessionId, $this->nodeId, CarbonImmutable::parse($this->resumeAt));
+        }));
     }
 }

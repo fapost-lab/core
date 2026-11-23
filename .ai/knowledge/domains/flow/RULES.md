@@ -190,9 +190,13 @@ broken.
   skipped) fails every live session of a run past its deadline, or still `pending` 3 h after it was created, bottom-up in
   one transaction under the root's `LockScope::ofSession()`: `status = failed`, `failure_reason` `deadline_exceeded` or
   `start_lost`, the root's `segment_id` cleared, `updated_at` written; no node runs and no parent takes its `failed`
-  handle. Conversations are never touched. A producer of `pending` rows must write their `deadline_at`. Why: a run
+  handle. Conversations are never touched. A producer of `pending` rows must write their `deadline_at`. What counts as
+  overdue is written once, in `AutomationRunDeadline` (`whereOverdue()` for the unlocked query, `isOverdue()` for the
+  re-check under the lock, `effectiveFor()` for the deadline the warning logs); a change to the rule edits both forms
+  there. Why: a run
   whose job was lost would keep its trigger and its flow for good, and a setting lowered later must not fail running
-  runs at once (`adr-20261119-automation-run-deadline`). Enforced: `AutomationRunDeadlineSweeperTest`,
+  runs at once (`adr-20261119-automation-run-deadline`). Enforced: `AutomationRunDeadlineSweeperTest` (including the
+  agreement of the two forms at each threshold),
   `AutomationRunDeadlineSweeperRedisTest`, `SweepOverdueAutomationRunsCommandTest`, `AutomationRunTest`.
 
 - **The node trace is always written, masked and limited before it is written, never inside a step's transaction,
@@ -284,8 +288,9 @@ broken.
 - **Running the engine outside `FlowOrchestrator` requires the session lock** through
   `FlowExecutionGuard`, keyed like `MessageRouter` (`contact->tenant_id`, contact, assistant) — or, for a contactless
   automation run, by `(tenant, trigger)` — with the session re-read under the lock; a busy lock throws
-  `SessionLockTimeoutException` and the queue retries (the automation jobs and `ResumeDelayedFlowSessionJob` release
-  themselves instead of spending an attempt). A caller that may hold a contactless session takes its scope from `LockScope::ofSession()`, never
+  `SessionLockTimeoutException` and the queue retries (the automation jobs, `ResumeDelayedFlowSessionJob` and
+  `ContinueAfterFlowQuestionJob` release themselves instead of spending an attempt, through the one policy in the trait
+  `App\Jobs\Flow\ReleasesOnBusySessionLock`; each keeps its own `retryUntil()`, since each window starts elsewhere). A caller that may hold a contactless session takes its scope from `LockScope::ofSession()`, never
   builds it from the session's columns (callers that only ever hold a contact's session — buttons, operator requests,
   event starts, `start_flow` starts — still pass the triple). `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
   `FlowQuestionResumer` (`ContinueAfterFlowQuestionJob`),
@@ -312,7 +317,8 @@ broken.
   cannot be undone, so a mistake may only keep too much — a new status is never deleted until it is classified, and a
   partly deleted chain would leave a run trace with a hole. Per install, not per tenant, follows audit and conversation
   retention while spec `data-lifecycle` leaves that question open. A new path that ends a session must write `updated_at`.
-  Enforced: `AutomationRunPrunerTest` (status × kind × end status × age matrix, enum completeness, chains, tenant),
+  Enforced: `AutomationRunPrunerTest` (status × kind × end status × age matrix, enum completeness, `TERMINAL` equal to
+  `FlowSessionStatus::terminal()`, chains, tenant),
   `PruneAutomationRunsCommandTest`.
 - **A node that needs a contact is never published into a flow whose trigger gives none.** A handler declares
   `contact`, `none` or `any` through Foundation's `DeclaresContextRequirementInterface` (Solutions too); one that
