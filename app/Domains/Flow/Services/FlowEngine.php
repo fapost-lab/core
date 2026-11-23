@@ -137,6 +137,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             'fire_key'           => $origin->fireKey,
             'deadline_at'        => $deadlineAt,
             'event_chain_depth'  => $origin->chainDepth,
+            'start_key'          => $origin->startKey,
             'version'            => 1,
         ]));
 

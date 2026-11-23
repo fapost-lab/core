@@ -8,6 +8,11 @@ describe('nodeMustBeLast', () => {
         expect(nodeMustBeLast({type: 'request_operator', config: {wait_seconds: 0}})).toBe(true)
     })
 
+    it('treats start_flow as always terminal', () => {
+        expect(nodeMustBeLast({type: 'start_flow'})).toBe(true)
+        expect(nodeMustBeLast({type: 'start_flow', config: {flow_id: 'f1'}})).toBe(true)
+    })
+
     it('keeps a plain notify node in the chain', () => {
         expect(nodeMustBeLast({type: 'notify'})).toBe(false)
     })

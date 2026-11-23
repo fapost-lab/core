@@ -190,8 +190,11 @@ Credentials' store) for a call's secret and uses Credentials' type registry, `Se
   (`resources/js/console/shell`, `resources/js/console/lib`, alias `@console`), not the kit; the
   theme helpers the console and the builder share are in `resources/js/shared/theme`. The console's run graph
   (`resources/js/console/run-graph`, a lazy chunk with `@vue-flow/core` and `elkjs`) is the one console code that
-  imports builder source — its presentational pieces `NodeIcon.vue`, `nodeColors.ts`, `nodeAvailability.ts` — and the
-  node palette `resources/css/node-palette.css`, so a run is drawn with the builder's node cards. The public site (`resources/css/app.css`) keeps its own
+  imports builder source — its presentational pieces `NodeIcon.vue`, `nodeColors.ts`, `nodeAvailability.ts`, the
+  shared drawing code `utils/graphFrames.ts` (branch frames) and `utils/graphLayout.ts` (ELK) — and the
+  node palette `resources/css/node-palette.css`, so a run is drawn with the builder's node cards. The builder's own
+  graph mode (`components/editor/graph/`, a lazy chunk with the same two libraries) uses that drawing code too; the
+  builder never imports the console (`adr-20261123-flow-builder-graph-mode`). The public site (`resources/css/app.css`) keeps its own
   palette by decision (D5, spec `ui-foundation`). The front-end build needs nothing from Composer's
   `vendor/`, so the image's `assets` stage and CI's front-end job build from `package.json` alone, with the kit
   from the public npm registry.

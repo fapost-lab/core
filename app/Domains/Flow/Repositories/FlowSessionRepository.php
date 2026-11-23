@@ -39,6 +39,13 @@ final class FlowSessionRepository implements FlowSessionRepositoryInterface
             ->first();
     }
 
+    public function findByStartKey(string $startKey): ?FlowSession
+    {
+        return FlowSession::query()
+            ->where('start_key', $startKey)
+            ->first();
+    }
+
     public function create(array $attributes): FlowSession
     {
         return FlowSession::query()->create($attributes);

@@ -1,4 +1,4 @@
-import type {BuilderTrigger, FlowDefinition, NodeGroup, NodeTypePayload, ReadOnlyNotice, StateNamespaceEntry, ValidationResult, WebhookEndpointInfo,} from '@builder/dto/types'
+import type {BuilderMode, BuilderTrigger, FlowDefinition, NodeGroup, NodeTypePayload, ReadOnlyNotice, StateNamespaceEntry, ValidationResult, WebhookEndpointInfo,} from '@builder/dto/types'
 import {xsrfHeaders} from '@shared/http'
 
 const BASE = '/builder'
@@ -137,3 +137,7 @@ export const setWebhookSecret = (flowId: string, triggerId: string, secret: stri
 
 export const generateWebhookSecret = (flowId: string, triggerId: string): Promise<WebhookSecretResult> =>
     setWebhookSecret(flowId, triggerId)
+
+/** Stores the layout the signed-in staff user works in, so every flow opens in it next time. */
+export const saveBuilderMode = (mode: BuilderMode): Promise<{ builder_mode: BuilderMode }> =>
+    request<{ builder_mode: BuilderMode }>('PUT', '/preferences', { builder_mode: mode })
