@@ -9,7 +9,7 @@ use App\Domains\Flow\Models\FlowSession;
 
 /**
  * What {@see AutomationRunner::start()} did with a trigger's fire: started a new run, went on with the run the fire
- * already had, found no active definition to start, or was refused by run admission.
+ * already had, found no active definition to start, found the flow switched off, or was refused by run admission.
  */
 final readonly class AutomationStartResult
 {
@@ -17,6 +17,7 @@ final readonly class AutomationStartResult
         public ?FlowSession $session,
         public bool $continued,
         public ?RefusalReason $refusal,
+        public bool $flowOff = false,
     ) {
     }
 
@@ -35,6 +36,14 @@ final readonly class AutomationStartResult
         return new self(null, false, null);
     }
 
+    /**
+     * The flow is switched off in the flows list: the fire starts no run, and run admission is not asked.
+     */
+    public static function flowOff(): self
+    {
+        return new self(null, false, null, true);
+    }
+
     public static function refused(RefusalReason $reason): self
     {
         return new self(null, false, $reason);
@@ -43,5 +52,10 @@ final readonly class AutomationStartResult
     public function isRefused(): bool
     {
         return null !== $this->refusal;
+    }
+
+    public function isFlowOff(): bool
+    {
+        return $this->flowOff;
     }
 }

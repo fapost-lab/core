@@ -38,6 +38,8 @@ use Throwable;
  *    and the missed slots are never caught up;
  *  - a flow that cannot run — no active runnable definition, or its draft or the draft's assistant is gone — starts
  *    nothing (`flow.schedule.tick_skipped`, `flow_not_live`);
+ *  - a flow switched off in the flows list starts nothing (`flow.schedule.tick_skipped`, `flow_off`): the slot is spent,
+ *    so turning the flow back on starts only its next slot, and run admission is not asked;
  *  - a previous run of the trigger still going — its root `pending` or in flight, waiting in a `delay` or for an answer
  *    included — starts nothing (`flow.schedule.tick_skipped`, `previous_run_live`);
  *  - run admission refuses the run ({@see TriggerRunAdmission}: the trigger is paused, the run rate breaker trips or the
@@ -61,6 +63,8 @@ final readonly class ScheduleTriggerFirer
     public const int MAX_PER_PASS = 500;
 
     public const string SKIP_FLOW_NOT_LIVE = 'flow_not_live';
+
+    public const string SKIP_FLOW_OFF = 'flow_off';
 
     public const string SKIP_PREVIOUS_RUN_LIVE = 'previous_run_live';
 
@@ -191,6 +195,12 @@ final readonly class ScheduleTriggerFirer
 
             if (null === $definition) {
                 $this->logger->warning('flow.schedule.tick_skipped', [...$context, 'reason' => self::SKIP_FLOW_NOT_LIVE]);
+
+                return 'skipped';
+            }
+
+            if ($this->drafts->isSwitchedOff($trigger->flow_id)) {
+                $this->logger->warning('flow.schedule.tick_skipped', [...$context, 'reason' => self::SKIP_FLOW_OFF]);
 
                 return 'skipped';
             }

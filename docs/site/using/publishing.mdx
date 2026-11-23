@@ -70,11 +70,20 @@ Two independent switches, and the combination is what confuses people:
 |---|---|---|
 | Yes | Yes | Running normally |
 | Yes | No | Ready to run, nothing to run — still being written |
-| No | Yes | A published version exists, but nothing starts it |
+| No | Yes | A published version exists; its automatic triggers start nothing, but messages and `/start` still do |
 | No | No | Neither |
 
-Deactivating stops new sessions starting. It does not unpublish, and it does not
-stop sessions already under way.
+Deactivating stops the flow's automatic triggers — schedule, webhook, API and event triggers, and trigger types a
+Solution adds — from starting new runs. It does not unpublish, and it does not stop runs or conversations already
+under way. Nothing is caught up when the flow is turned back on: a schedule skips the moments that passed while it was
+off, a webhook answers `404` to deliveries sent meanwhile (a sender that retries later gets through), events are not
+replayed, and a failed run cannot be run again until the flow is on.
+
+<Warning>
+  For now the switch does not stop conversations. A message that matches one of the flow's message triggers, a
+  `/start` command, the assistant's default flow, a subflow and a **Start flow** block still start the flow while it is
+  switched off. To stop those, remove the message trigger or unpublish the flow.
+</Warning>
 
 Turning on a flow that has a schedule, webhook, API or event trigger needs **Manage automations**, because it then
 starts runs on its own. Turning any flow off needs only the permission to edit it.

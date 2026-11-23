@@ -179,6 +179,21 @@ final class AutomationRunRerunTest extends FeatureTestCase
         $this->assertSame(0, ActivityEntry::query()->where('description', 'flow.run_rerun')->count());
     }
 
+    public function test_a_run_of_a_flow_switched_off_in_the_flows_list_is_refused_until_it_is_turned_on(): void
+    {
+        [$flowId, $triggerId] = $this->automation([$this->end()]);
+        $source               = $this->failedRun($flowId, $triggerId);
+        FlowDraft::query()->where('flow_id', $flowId)->update(['is_active' => false]);
+
+        $this->assertRefused(RerunRefusal::FlowOff, $source);
+        Queue::assertNotPushed(StartAutomationRunJob::class);
+        $this->assertSame(0, ActivityEntry::query()->where('description', 'flow.run_rerun')->count());
+
+        FlowDraft::query()->where('flow_id', $flowId)->update(['is_active' => true]);
+
+        $this->assertFalse($this->service()->check($source)->isRefused());
+    }
+
     public function test_only_a_failed_root_automation_run_with_a_kept_payload_is_re_run(): void
     {
         [$flowId, $triggerId] = $this->automation([$this->end()]);

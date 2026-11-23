@@ -28,6 +28,9 @@ enum RerunRefusal: string
     /** The trigger that fired the run is gone or turned off, or its flow was deleted. */
     case TriggerGone = 'trigger_gone';
 
+    /** The flow is switched off in the flows list: it starts no automatic run, a re-run included. */
+    case FlowOff = 'flow_off';
+
     /** The flow has no active version to run. */
     case NoActiveVersion = 'no_active_version';
 

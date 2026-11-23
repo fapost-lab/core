@@ -386,7 +386,7 @@ broken.
   `publish`; credentials and triggers are compared on the draft before template expansion, so a credential a template
   brings is checked when the template is published, while audience messages are compared after expansion (a template
   can bring one, and a host's parameter value rewrites its text; copies keep stable ids). Turning on a flow with a live automatic trigger needs `ManageAutomations`
-  (`FlowDraftPolicy::activate()`), turning it off does not; the builder's credential list and a call test with a
+  (`FlowDraftPolicy::activate()`), since its automatic triggers start runs only while it is on; turning it off does not; the builder's credential list and a call test with a
   credential need `UseCredentials` (`CredentialPolicy::use()`). Saving a draft checks neither: nothing saved runs.
   Why: `PublishFlow` alone would let an author start runs nobody asked for or spend a secret an administrator
   created for someone else. Enforced: `FlowAutomationPermissionsTest`, `BuilderAuthorizationTest`,
@@ -396,7 +396,8 @@ broken.
   in the answer that generated it, and never reaches the draft, a definition or a template: `WebhookTriggerConfig`
   refuses any key it does not know and a draft save drops `secret`. `FlowWebhookReceiver` serves a token only for a
   live, active webhook row of the endpoint's flow whose flow has an active runnable definition and still has its draft
-  and assistant; a timestamp check is accepted only inside the signed string. The flow never sees the request's
+  and assistant, and answers 404 after the signature when the flow is switched off in the flows list (the delivery not
+  claimed, the address not counted); a timestamp check is accepted only inside the signed string. The flow never sees the request's
   credentials, the signature or secret header, the signed timestamp or any header named `*signature*`
   (`WebhookTriggerConfig::isStrippedHeader()`), and a `delivery_id` may not name one of them: the id is logged, kept in
   the run's state and fire key, and sent back to the sender. A publish that deletes a live webhook
@@ -409,7 +410,8 @@ broken.
   writes `flow_sessions.trigger_payload` = the `initialState` as handed over, only for a start with a fire key (a root
   automation run); conversations and subflow children keep NULL. `AutomationRunRerunService` re-runs only a root
   automation run in status `failed` with a trigger, a fire key and a kept payload, while its trigger row is active and
-  of the same flow and tenant, the flow's draft exists and the flow has an active version; anything else is a
+  of the same flow and tenant, the flow's draft exists and is not switched off (`flow_off`) and the flow has an active
+  version; anything else is a
   `RerunRefusal`, never an exception. It queues `StartAutomationRunJob` with the kept payload (never rebuilt from the
   trace or the final state), the source's tenant, assistant and `event_chain_depth`, under the fire key
   `rerun:<source id>:<n>` (`RerunFireKey`; `n` is the attempt the page offered — the highest attempt among the source's re-runs with a row + 1, never their count —
@@ -423,7 +425,8 @@ broken.
   up.** `ScheduleTriggerFirer` moves `flow_triggers.next_run_at` from the slot it read to the next one by compare-and-set
   and, in the same transaction, creates the run `pending` (`FlowEngineInterface::prepare()`, fire key
   `schedule:<UTC minute>`, deadline written) or skips the slot: more than 5 minutes late (`flow.schedule.tick_missed`,
-  the next slot counted from now), the flow cannot run (`tick_skipped` `flow_not_live`), or a previous root run of the
+  the next slot counted from now), the flow cannot run (`tick_skipped` `flow_not_live`), the flow is switched off in the
+  flows list (`tick_skipped` `flow_off`), or a previous root run of the
   trigger is `pending` or in flight (`tick_skipped` `previous_run_live`), or run admission refuses it (`tick_skipped`
   `admission_refused`, `adr-20261123-flow-run-admission`). The start job is queued after the commit and
   `AutomationRunner` activates the `pending` run (`FlowEngineInterface::activate()`). `ScheduleClock` skips a local time a
@@ -434,6 +437,20 @@ broken.
   one. Why: no transaction spans landlord and a tenant schema, and a slot eaten without a run is a silent loss
   (`adr-20261123-flow-schedule-trigger`). Enforced: `ScheduleTriggerFirerTest`, `ScheduleClockTest`,
   `FireScheduledTriggersCommandTest`, `FlowTriggersPublishTest`.
+- **A flow switched off in the flows list starts no automatic run, and nothing is caught up when it is turned on.**
+  Every automatic start path asks `FlowDraftRepositoryInterface::isSwitchedOff()` (the draft exists and `is_active` is
+  false) after deduplication and before run admission: `AutomationRunner::start()` after `findByFireKey` (a fire that
+  already has a run, a schedule's `pending` one included, goes on; `flow.automation.start_skipped_flow_off`),
+  `ScheduleTriggerFirer`'s claim (the slot is spent, `tick_skipped` `flow_off`), `StartFlowFromEventJob` after its start
+  key and before its channel and collision checks (`flow.event.start_skipped_flow_off`), `FlowWebhookReceiver` after the signature (404, the delivery not claimed, the address not counted) and
+  `AutomationRunRerunService::check()` (`RerunRefusal::FlowOff`). A new automatic start path asks it too. Run admission
+  is not asked for a switched-off flow, so it spends no unit and counts no refusal. Conversations (message triggers,
+  `/start`, the default flow, subflows, `start_flow`) do not read the switch. Why: the switch and its
+  `ManageAutomations` check must mean what they say, without a refusal counted every minute on a flow a person turned
+  off (`adr-20261123-flow-switch-gates-automatic-starts`). Enforced: `FlowSwitchGatesAutomaticStartsTest`,
+  `ScheduleTriggerFirerTest`, `FlowWebhookTriggerTest`, `RegisteredTriggerTypesTest`, `AutomationRunRerunTest`,
+  `MessageRouterPipelineTest` (a message still starts). Not covered: that a future start path asks (review only).
+  *(proposed)*
 - **A trigger's new run passes run admission once, before it exists; a pause is lifted only by a person.** Every
   automatic start — `AutomationRunner::start()` for a fire with no run yet (webhook, Core event, a registered trigger
   type, a re-run), `StartFlowFromEventJob`, and

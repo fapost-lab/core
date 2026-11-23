@@ -92,7 +92,7 @@ The flow has no contact, so blocks that need one cannot be published in it; see
 | `200` | A repeat of a delivery already accepted; nothing new runs. In *Wait for the flow's answer* mode, a repeat that arrives while the answer is kept (a minute) gets that answer instead |
 | any | In *Wait for the flow's answer* mode: the status and body the flow answered (see below) |
 | `401` | The signature, the secret or the timestamp did not check out, or no secret is set yet |
-| `404` | No published, active webhook trigger behind this URL |
+| `404` | No published, active webhook trigger behind this URL, or its flow is switched off in the flows list; a delivery answered `404` is not kept, so the sender's retry after the flow is turned on runs |
 | `405` | A method other than `POST` |
 | `413` | The body is larger than 256 KB |
 | `415` | A `multipart/form-data` body: send JSON, a form (`application/x-www-form-urlencoded`) or text |

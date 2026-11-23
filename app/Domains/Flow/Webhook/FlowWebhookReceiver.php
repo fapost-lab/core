@@ -32,7 +32,9 @@ use Throwable;
  *
  * In order: a stopped tenant (503), a multipart body (415), the body size (413), the per-address limit on unknown tokens (429), the endpoint
  * behind the token and its live webhook trigger of a published flow whose draft and assistant still exist (404, one answer for every reason), the
- * per-token limit (429), the signature or secret header through Foundation's {@see IngressSpecExecutor} (401), a trigger
+ * per-token limit (429), the signature or secret header through Foundation's {@see IngressSpecExecutor} (401), a flow
+ * switched off in the flows list (404, after the signature so that only the secret's holder learns it, counted against
+ * no address and the delivery not claimed: nothing is caught up once the flow is turned back on), a trigger
  * the run rate breaker paused (503 with `Retry-After`, the delivery not claimed, so the sender's retry after a resume
  * runs), the delivery id and the fire key it makes, the dedup claim (200 duplicate), and finally {@see StartAutomationRunJob} with
  * the request under `flow.webhook` (202). Only an accepted request reaches the queue.
@@ -153,6 +155,14 @@ final readonly class FlowWebhookReceiver
             $this->logger->info('flow.webhook.rejected_signature', $context);
 
             return WebhookOutcome::of(WebhookOutcomeStatus::InvalidSignature);
+        }
+
+        // Not through liveTrigger(): that answer counts against the sender's address, and a busy sender of a flow switched
+        // off would be held back from the tenant's live flows too.
+        if ($this->drafts->isSwitchedOff($trigger->flow_id)) {
+            $this->logger->info('flow.webhook.flow_off', $context);
+
+            return WebhookOutcome::of(WebhookOutcomeStatus::NotFound);
         }
 
         // A cheap read, counted nowhere: run admission refuses the run anyway, but the sender should hear it and retry.

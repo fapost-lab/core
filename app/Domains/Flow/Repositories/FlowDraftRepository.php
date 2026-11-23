@@ -15,4 +15,12 @@ final class FlowDraftRepository implements FlowDraftRepositoryInterface
             ->where('flow_id', $flowId)
             ->firstOrFail();
     }
+
+    public function isSwitchedOff(string $flowId): bool
+    {
+        return FlowDraft::query()
+            ->where('flow_id', $flowId)
+            ->where('is_active', false)
+            ->exists();
+    }
 }
