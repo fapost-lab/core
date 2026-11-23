@@ -7,6 +7,7 @@ namespace Tests\Feature\Redis;
 use App\Domains\Flow\Webhook\RedisWebhookReplyStore;
 use App\Domains\Flow\Webhook\WebhookReply;
 use App\Domains\Flow\Webhook\WebhookReplyStoreInterface;
+use App\Domains\Flow\Webhook\WebhookReplyType;
 use App\Domains\Flow\Webhook\WebhookRunEnd;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
@@ -46,7 +47,7 @@ final class RedisWebhookReplyStoreRedisTest extends FeatureTestCase
         $store = $this->app->make(WebhookReplyStoreInterface::class);
         $this->assertInstanceOf(RedisWebhookReplyStore::class, $store);
 
-        $this->assertTrue($store->keep($this->tenant, 'TRIGGER-A', 'wh:1', new WebhookReply(201, '{"a":1}', WebhookReply::TYPE_JSON)));
+        $this->assertTrue($store->keep($this->tenant, 'TRIGGER-A', 'wh:1', new WebhookReply(201, '{"a":1}', WebhookReplyType::Json)));
         $this->assertFalse($store->keep($this->tenant, 'trigger-a', 'wh:1', WebhookReply::forRunEnd(WebhookRunEnd::Completed)));
 
         $started = microtime(true);
@@ -56,7 +57,7 @@ final class RedisWebhookReplyStoreRedisTest extends FeatureTestCase
         $this->assertNotNull($reply);
         $this->assertSame(201, $reply->status);
         $this->assertSame('{"a":1}', $reply->body);
-        $this->assertSame(WebhookReply::TYPE_JSON, $reply->type);
+        $this->assertSame(WebhookReplyType::Json, $reply->type);
 
         // Still kept for a repeated delivery, for at most a minute.
         $this->assertSame(201, $store->find($this->tenant, 'trigger-a', 'wh:1')?->status);

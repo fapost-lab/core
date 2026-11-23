@@ -512,7 +512,8 @@ broken.
   `webhook_response` node, else the run's end through `WebhookRunEndReply`, which never fails the engine's caller.
   Why: every waiting request holds a PHP-FPM worker, and an unbounded wait would take the console of every tenant
   down with it (`adr-20261119-flow-webhook-trigger`). Enforced: `FlowWebhookTriggerTest`, `WebhookRunReplyTest`,
-  `RedisWebhookWaitSlotsRedisTest`, `RedisWebhookReplyStoreRedisTest`, `PlatformSettingsTest` (the 30-second ceiling).
+  `FlowWebhookSyncReplyRedisTest` (the receiver's wait and the run's answer meet on one key), `RedisWebhookWaitSlotsRedisTest`,
+  `RedisWebhookReplyStoreRedisTest`, `PlatformSettingsTest` (the 30-second ceiling).
 - **A definition's expression engine is the flow's choice, written explicitly at publish and checked with.** The draft
   holds it (`flow_drafts.expression_engine`); `PublishFlowService` passes the engine on to `ValidateFlowService` and
   `TemplateExpander` and writes it onto the definition — the draft's on a publish, the active definition's on a

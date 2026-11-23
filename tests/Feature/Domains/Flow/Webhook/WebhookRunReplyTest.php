@@ -9,6 +9,8 @@ use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Webhook\RedisWebhookReplyStore;
 use App\Domains\Flow\Webhook\WebhookReply;
 use App\Domains\Flow\Webhook\WebhookReplyStoreInterface;
+use App\Domains\Flow\Webhook\WebhookReplyType;
+use App\Jobs\Flow\ResumeDelayedFlowSessionJob;
 use App\Jobs\Flow\StartAutomationRunJob;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -68,7 +70,7 @@ final class WebhookRunReplyTest extends FeatureTestCase
 
         $this->assertNotNull($reply);
         $this->assertSame(201, $reply->status);
-        $this->assertSame(WebhookReply::TYPE_JSON, $reply->type);
+        $this->assertSame(WebhookReplyType::Json, $reply->type);
         // jsonb on PostgreSQL reorders a definition's keys, so the body is compared without its key order.
         $body = json_decode($reply->body, true, 4, JSON_THROW_ON_ERROR);
         $this->assertIsArray($body);
@@ -86,7 +88,7 @@ final class WebhookRunReplyTest extends FeatureTestCase
         $reply = $this->startRun($flowId, 'wh:text');
 
         $this->assertSame(202, $reply?->status);
-        $this->assertSame(WebhookReply::TYPE_TEXT, $reply->type);
+        $this->assertSame(WebhookReplyType::Text, $reply->type);
         $this->assertSame('Thanks, Ann "the" <b>', $reply->body);
     }
 
@@ -151,6 +153,28 @@ final class WebhookRunReplyTest extends FeatureTestCase
 
         $this->assertSame(207, $reply?->status);
         $this->assertSame('from the child', $reply->body);
+    }
+
+    public function test_a_run_whose_subflow_node_has_no_edge_answers_completed_when_its_child_ends_later(): void
+    {
+        // The child waits, so the parent's own step is long over when the child's wake-up ends it.
+        $childId = $this->flow([
+            ['id' => 'wait', 'type' => 'delay', 'version' => 1, 'config' => ['seconds' => 60]],
+            $this->end('success'),
+        ]);
+
+        // The subflow node is the parent's last step: no edge leaves it, so the parent ends as the child returns.
+        $parentId = $this->flow([
+            ['id' => 'sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $childId, 'timeout' => 'PT1H']],
+        ], []);
+
+        $this->assertNull($this->startRun($parentId, 'wh:sub-no-edge'), 'Nothing is answered while the child waits.');
+
+        $wakeUp = Queue::pushed(ResumeDelayedFlowSessionJob::class)->sole();
+        $this->travel(61)->seconds();
+        $this->app->call([$wakeUp, 'handle']);
+
+        $this->assertSame([200, '{"status":"completed"}'], $this->statusAndBody($this->reply('wh:sub-no-edge')));
     }
 
     public function test_a_run_an_api_call_started_is_answered_by_the_node_and_by_its_end(): void

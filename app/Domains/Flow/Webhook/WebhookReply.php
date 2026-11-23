@@ -16,13 +16,13 @@ use JsonException;
  */
 final readonly class WebhookReply
 {
-    public const string TYPE_JSON = 'json';
-
-    public const string TYPE_TEXT = 'text';
-
     public const int MIN_STATUS = 200;
 
-    public const int MAX_STATUS = 499;
+    /** The highest status a `webhook_response` node may answer with: a flow answers success or a client error. */
+    public const int MAX_NODE_STATUS = 499;
+
+    /** The highest status of any reply: above the node's ceiling, the run's end answers a failed run with 500. */
+    public const int MAX_REPLY_STATUS = 599;
 
     /** The largest body a flow may answer with, rendered. */
     public const int MAX_BODY_BYTES = 65536;
@@ -30,14 +30,10 @@ final readonly class WebhookReply
     public function __construct(
         public int $status,
         public string $body,
-        public string $type,
+        public WebhookReplyType $type,
     ) {
-        if ($status < self::MIN_STATUS || $status > 599) {
-            throw new InvalidArgumentException("A webhook reply status must be 200 to 599, {$status} given.");
-        }
-
-        if (self::TYPE_JSON !== $type && self::TYPE_TEXT !== $type) {
-            throw new InvalidArgumentException("A webhook reply type must be json or text, '{$type}' given.");
+        if ($status < self::MIN_STATUS || $status > self::MAX_REPLY_STATUS) {
+            throw new InvalidArgumentException('A webhook reply status must be ' . self::MIN_STATUS . ' to ' . self::MAX_REPLY_STATUS . ", {$status} given.");
         }
     }
 
@@ -50,7 +46,7 @@ final readonly class WebhookReply
         return new self(
             WebhookRunEnd::Failed === $end ? 500 : 200,
             '{"status":"' . $end->value . '"}',
-            self::TYPE_JSON,
+            WebhookReplyType::Json,
         );
     }
 
@@ -63,12 +59,14 @@ final readonly class WebhookReply
             return null;
         }
 
-        if (! is_array($data) || ! is_int($data['status'] ?? null) || ! is_string($data['body'] ?? null) || ! is_string($data['type'] ?? null)) {
+        $type = is_array($data) ? WebhookReplyType::fromValue($data['type'] ?? null) : null;
+
+        if (null === $type || ! is_int($data['status'] ?? null) || ! is_string($data['body'] ?? null)) {
             return null;
         }
 
         try {
-            return new self($data['status'], $data['body'], $data['type']);
+            return new self($data['status'], $data['body'], $type);
         } catch (InvalidArgumentException) {
             return null;
         }
@@ -76,7 +74,7 @@ final readonly class WebhookReply
 
     public function contentType(): string
     {
-        return self::TYPE_JSON === $this->type ? 'application/json' : 'text/plain; charset=UTF-8';
+        return $this->type->contentType();
     }
 
     /**
@@ -84,6 +82,6 @@ final readonly class WebhookReply
      */
     public function toJson(): string
     {
-        return json_encode(['status' => $this->status, 'body' => $this->body, 'type' => $this->type], JSON_THROW_ON_ERROR);
+        return json_encode(['status' => $this->status, 'body' => $this->body, 'type' => $this->type->value], JSON_THROW_ON_ERROR);
     }
 }
