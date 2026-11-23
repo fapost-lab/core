@@ -205,6 +205,54 @@ final class CredentialOAuthConsoleTest extends CredentialsTestCase
         $this->assertSame(0, CredentialOAuthGrant::query()->count());
     }
 
+    public function test_a_client_change_or_a_delete_during_the_exchange_stores_no_grant(): void
+    {
+        $writer     = $this->app->make(CredentialWriter::class);
+        $credential = $this->oauthCredential();
+        $state      = $this->stateOf($this->connect($credential));
+
+        // The client is changed while the code is being exchanged: the grant would be for the old client.
+        Http::fake([self::TOKEN_URL => function () use ($writer, $credential) {
+            $this->travel(1)->seconds();
+            $writer->update($credential->fresh() ?? $credential, ['name' => $credential->name, 'settings' => [...$credential->settings, 'client_id' => 'client-2'], 'allowed_hosts' => ['api.example.com', 'auth.example.com']]);
+
+            return Http::response(['access_token' => self::ACCESS, 'refresh_token' => self::REFRESH]);
+        }]);
+
+        $this->get($this->callbackUrl(['state' => $state, 'code' => self::CODE]))->assertRedirect("/admin/credentials/{$credential->id}/edit");
+        $this->assertSame(trans('console.credentials.oauth.flash.stale'), $this->flashed('error'));
+        $this->assertSame(0, CredentialOAuthGrant::query()->count());
+
+        // The credential is deleted while the code is being exchanged: refused, not a foreign key error.
+        $deleted = $this->oauthCredential();
+        $state   = $this->stateOf($this->connect($deleted));
+
+        Http::fake([self::TOKEN_URL => function () use ($writer, $deleted) {
+            $writer->delete($deleted);
+
+            return Http::response(['access_token' => self::ACCESS, 'refresh_token' => self::REFRESH]);
+        }]);
+
+        $this->get($this->callbackUrl(['state' => $state, 'code' => self::CODE]))->assertRedirect('/admin/credentials');
+        $this->assertSame(trans('console.credentials.oauth.flash.stale'), $this->flashed('error'));
+        $this->assertSame(0, CredentialOAuthGrant::query()->count());
+        $this->assertSame(0, ActivityEntry::query()->where('description', 'credential.connected')->count());
+    }
+
+    public function test_a_guest_or_a_refused_callback_leaves_no_code_or_state_in_the_session(): void
+    {
+        $state = 'state-of-the-callback-' . str_repeat('s', 21);
+
+        $this->get($this->callbackUrl(['state' => $state, 'code' => self::CODE]))->assertRedirect(route('console.auth.login'));
+        $this->assertNotInSession([self::CODE, $state]);
+
+        $denied = User::factory()->create();
+        $denied->givePermissionTo(Permission::UseCredentials->value, Permission::ManageSettings->value);
+
+        $this->actingAs($denied)->get($this->callbackUrl(['state' => $state, 'code' => self::CODE]))->assertForbidden();
+        $this->assertNotInSession([self::CODE, $state]);
+    }
+
     public function test_a_provider_error_shows_its_code_and_nothing_of_its_description(): void
     {
         Http::fake();
@@ -361,6 +409,18 @@ final class CredentialOAuthConsoleTest extends CredentialsTestCase
         ])->assertSessionHasErrors(['settings.authorize_url', 'settings.authorize_params']);
 
         $this->assertSame(['Google'], Credential::query()->pluck('name')->all());
+    }
+
+    /**
+     * @param  list<string>  $values
+     */
+    private function assertNotInSession(array $values): void
+    {
+        $session = serialize(session()->all());
+
+        foreach ($values as $value) {
+            $this->assertStringNotContainsString($value, $session);
+        }
     }
 
     private function flashed(string $kind): mixed

@@ -52,6 +52,7 @@ use App\Http\Controllers\Console\TranslationController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\RefuseWritesWhenTenantStopped;
 use App\Http\Middleware\SetConsoleRootView;
+use App\Http\Middleware\TakeOAuthCallbackQuery;
 use App\Http\Shell\SolutionRoutes;
 use Illuminate\Support\Facades\Route;
 
@@ -170,7 +171,7 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::get('admin/credentials', [AdminCredentialController::class, 'index'])->name('console.admin.credentials.index');
         Route::get('admin/credentials/create', [AdminCredentialController::class, 'create'])->name('console.admin.credentials.create');
         // The OAuth2 consent callback: one URL per tenant host, registered at the provider; declared before `{record}` routes.
-        Route::get('admin/credentials/oauth/callback', [AdminCredentialOAuthController::class, 'callback'])->name('console.admin.credentials.oauth.callback');
+        Route::get('admin/credentials/oauth/callback', [AdminCredentialOAuthController::class, 'callback'])->middleware(TakeOAuthCallbackQuery::class)->name('console.admin.credentials.oauth.callback');
         Route::get('admin/credentials/{record}/edit', [AdminCredentialController::class, 'edit'])->name('console.admin.credentials.edit');
         Route::post('admin/credentials', [AdminCredentialController::class, 'store'])->name('console.admin.credentials.store');
         Route::put('admin/credentials/{record}', [AdminCredentialController::class, 'update'])->name('console.admin.credentials.update');

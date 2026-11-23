@@ -10,7 +10,7 @@ use RuntimeException;
  * A token request that gave no token. The message is the reason in English; it, the status and the provider's `error`
  * code are all it carries — never a response body, a token or a client secret, and never a previous exception.
  */
-final class OAuth2TokenRequestFailed extends RuntimeException
+final class OAuth2TokenRequestFailedException extends RuntimeException
 {
     /** The `error` codes that say the grant or the client is no longer accepted (RFC 6749 §5.2). */
     private const array REJECTIONS = ['invalid_grant', 'invalid_client', 'unauthorized_client'];

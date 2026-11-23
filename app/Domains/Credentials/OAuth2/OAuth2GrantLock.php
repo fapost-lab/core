@@ -7,6 +7,7 @@ namespace App\Domains\Credentials\OAuth2;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Cache\Repository;
+use Throwable;
 
 /**
  * One writer at a time for a credential's grant. Many providers rotate the refresh token on every use: two workers
@@ -33,22 +34,27 @@ final readonly class OAuth2GrantLock
      *
      * @return T
      *
-     * @throws OAuth2GrantLockBusy when the lock is not had in time, or the store has no locks
+     * @throws OAuth2GrantLockBusyException when the lock is not had in time, the store has no locks, or the store
+     *                                       failed while taking it (Redis down): no write of the grant without the lock
      */
     public function run(string $tenantId, string $credentialId, callable $callback): mixed
     {
         $store = $this->cache->getStore();
 
         if (!$store instanceof LockProvider) {
-            throw new OAuth2GrantLockBusy('The cache store offers no locks.');
+            throw new OAuth2GrantLockBusyException('The cache store offers no locks.');
         }
 
-        $lock = $store->lock("credentials:oauth2-refresh:{$tenantId}:{$credentialId}", self::TTL_SECONDS);
-
         try {
+            $lock = $store->lock("credentials:oauth2-refresh:{$tenantId}:{$credentialId}", self::TTL_SECONDS);
+
             $lock->block($this->waitSeconds);
         } catch (LockTimeoutException) {
-            throw new OAuth2GrantLockBusy('The grant of the credential is being refreshed elsewhere.');
+            throw new OAuth2GrantLockBusyException('The grant of the credential is being refreshed elsewhere.');
+        } catch (Throwable) {
+            // Only the taking of the lock is caught here, never the callback. The store's own message (a host, a
+            // connection error) is not carried on.
+            throw new OAuth2GrantLockBusyException('The lock of the grant could not be taken: the cache store failed.');
         }
 
         try {

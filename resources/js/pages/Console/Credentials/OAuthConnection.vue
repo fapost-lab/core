@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import { Check, Copy } from '@lucide/vue'
-import { Badge } from '@fapost/ui/components/badge'
+import { StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
 import { FormSection } from '@fapost/ui/components/form-section'
@@ -22,7 +22,7 @@ const t = computed(() => page.props.translations.console.credentials)
 const o = computed(() => t.value.oauth)
 const common = computed(() => page.props.translations.console.form)
 
-const badgeVariant = { connected: 'success', reconnect_needed: 'warning', not_connected: 'neutral' } as const
+const TONES = { connected: 'success', reconnect_needed: 'warning', not_connected: 'neutral' } as const satisfies Record<OAuthConnectionState['status'], string>
 
 const hasGrant = computed(() => props.oauth.status !== 'not_connected')
 
@@ -68,7 +68,7 @@ function disconnect(): void {
   <FormSection :title="o.title" :description="o.description">
     <div class="flex flex-col gap-1.5" data-testid="oauth-status">
       <div class="flex items-center gap-2">
-        <Badge :variant="badgeVariant[oauth.status]">{{ o.statuses[oauth.status] }}</Badge>
+        <StatusDot :tone="TONES[oauth.status]">{{ o.statuses[oauth.status] }}</StatusDot>
         <span v-if="connectedLine" class="text-muted-foreground text-[13px]">{{ connectedLine }}</span>
       </div>
       <p v-if="oauth.status === 'connected' && oauth.refreshed_at" class="text-muted-foreground text-[13px]">

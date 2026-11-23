@@ -8,7 +8,9 @@ use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Credentials\Models\Credential;
 use App\Domains\Credentials\Models\CredentialOAuthGrant;
 use App\Domains\Credentials\OAuth2\OAuth2GrantLock;
+use App\Domains\Credentials\OAuth2\OAuth2GrantLockBusyException;
 use App\Domains\Credentials\OAuth2\OAuth2GrantRefresher;
+use App\Domains\Credentials\OAuth2\OAuth2GrantRepository;
 use App\Domains\Credentials\OAuth2\OAuth2GrantStatus;
 use App\Domains\Credentials\Types\OAuth2AuthorizationCodeType;
 use App\Domains\Flow\Call\Egress\EgressGuardMiddleware;
@@ -16,9 +18,15 @@ use App\Domains\Flow\Call\Egress\GuardedHttpClient;
 use Fapost\Foundation\Credentials\Contracts\CredentialStoreInterface;
 use Fapost\Foundation\Credentials\DTO\CredentialSecret;
 use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\Repository;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Applying an `oauth2_authorization_code` credential: the stored access token as a bearer, a refresh under the lock
@@ -218,6 +226,79 @@ final class OAuth2AuthorizationCodeTypeTest extends CredentialsTestCase
         );
 
         $this->assertSame('access-token-2', $grant->access_token);
+        Http::assertNothingSent();
+    }
+
+    public function test_a_lock_store_that_fails_is_a_busy_lock_and_runs_nothing(): void
+    {
+        $store = new class () extends ArrayStore {
+            public function lock($name, $seconds = 0, $owner = null): Lock
+            {
+                throw new RuntimeException('Connection refused [tcp://redis.internal:6379]');
+            }
+        };
+        $lock = new OAuth2GrantLock(new Repository($store), 0);
+        $ran  = false;
+
+        try {
+            $lock->run($this->tenantId, (string) Str::ulid(), static function () use (&$ran): void {
+                $ran = true;
+            });
+            $this->fail('A lock store that fails must be a busy lock.');
+        } catch (OAuth2GrantLockBusyException $exception) {
+            $this->assertStringNotContainsString('redis.internal', $exception->getMessage());
+        }
+
+        $this->assertFalse($ran);
+    }
+
+    public function test_a_grant_whose_tokens_cannot_be_decrypted_is_unavailable_not_a_crash(): void
+    {
+        Http::fake();
+        $valid   = $this->oauthCredential();
+        $expired = $this->oauthCredential();
+        $this->grant($valid);
+        $this->grant($expired, ['access_expires_at' => now()->subMinute()]);
+        DB::table('credential_oauth_grants')->update(['access_token' => 'garbage', 'refresh_token' => 'garbage']);
+
+        foreach ([$valid, $expired] as $credential) {
+            try {
+                $this->type()->authorize($this->secretOf($credential));
+                $this->fail('A grant that cannot be decrypted must be unavailable.');
+            } catch (CredentialUnavailableException $exception) {
+                $this->assertStringContainsString('cannot be decrypted', $exception->getMessage());
+            }
+        }
+
+        Http::assertNothingSent();
+    }
+
+    public function test_the_grants_of_another_tenant_are_not_seen_refreshed_expired_or_deleted(): void
+    {
+        Http::fake();
+        $foreign = $this->oauthCredential(['tenant_id' => '00000000-0000-0000-0000-0000000000ff']);
+        $this->grant($foreign, ['refreshed_at' => now()->subDays(30), 'access_expires_at' => now()->addHour()]);
+        $grants = $this->app->make(OAuth2GrantRepository::class);
+
+        $this->assertNull($grants->find($foreign->id));
+        $this->assertNull($grants->credential($foreign->id));
+        $this->assertNull($grants->lockedCredential($foreign->id));
+        $this->assertSame([], $grants->dueForKeepAlive()->all());
+        $this->assertFalse($grants->delete($foreign->id));
+
+        $grants->markAccessExpired($foreign->id);
+        $this->assertTrue($this->storedGrant($foreign)->accessValidFor(0));
+
+        try {
+            $this->app->make(OAuth2GrantRefresher::class)->refreshIfDue(
+                new CredentialSecret(tenantId: $this->tenantId, id: $foreign->id, type: OAuth2AuthorizationCodeType::ID, version: 'v', values: [], settings: [], allowedHosts: []),
+                static fn (): bool => true,
+            );
+            $this->fail('Another tenant\'s grant must not be refreshed.');
+        } catch (CredentialUnavailableException) {
+        }
+
+        $this->assertSame('access-token-1', $this->storedGrant($foreign)->access_token);
         Http::assertNothingSent();
     }
 

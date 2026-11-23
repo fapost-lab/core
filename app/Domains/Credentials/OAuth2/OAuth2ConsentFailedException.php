@@ -11,7 +11,7 @@ use RuntimeException;
  * the provider's `error` code when it refused, and the only thing of its answer that is kept. Nothing here carries a
  * code, a token, a state or a secret.
  */
-final class OAuth2ConsentFailed extends RuntimeException
+final class OAuth2ConsentFailedException extends RuntimeException
 {
     /** The attempt is unknown, used, expired, another user's, or its credential changed or is gone. */
     public const string STALE = 'stale';

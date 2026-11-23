@@ -7,6 +7,7 @@ namespace App\Domains\Credentials\OAuth2;
 use App\Domains\Credentials\Models\CredentialOAuthGrant;
 use Fapost\Foundation\Credentials\DTO\CredentialSecret;
 use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -41,14 +42,18 @@ final readonly class OAuth2GrantRefresher
      *
      * @return CredentialOAuthGrant the connected grant, refreshed or not
      *
-     * @throws CredentialUnavailableException when there is no usable grant, the lock is busy or the refresh failed
+     * @throws CredentialUnavailableException when there is no usable grant, the lock is busy, the stored grant cannot be
+     *                                        decrypted or the refresh failed
      */
     public function refreshIfDue(CredentialSecret $secret, callable $isDue): CredentialOAuthGrant
     {
         try {
             return $this->lock->run($secret->tenantId, $secret->id, fn (): CredentialOAuthGrant => $this->refreshLocked($secret, $isDue));
-        } catch (OAuth2GrantLockBusy) {
+        } catch (OAuth2GrantLockBusyException) {
             throw CredentialUnavailableException::because($secret->id, 'the grant is being refreshed elsewhere');
+        } catch (DecryptException) {
+            // A token of the grant is read (decrypted) only here, under the lock: by `$isDue` or for the refresh.
+            throw CredentialUnavailableException::because($secret->id, 'the stored grant cannot be decrypted');
         }
     }
 
@@ -81,7 +86,7 @@ final readonly class OAuth2GrantRefresher
 
         try {
             $tokens = $this->endpoint->request($secret, ['grant_type' => 'refresh_token', 'refresh_token' => $refreshToken]);
-        } catch (OAuth2TokenRequestFailed $failure) {
+        } catch (OAuth2TokenRequestFailedException $failure) {
             if ($failure->isRejection()) {
                 $this->reconnectNeeded($secret, $grant, (string) $failure->errorCode);
             }
