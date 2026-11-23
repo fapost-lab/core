@@ -453,42 +453,49 @@ final readonly class FlowEngine implements FlowEngineInterface
         $maxSteps          = $this->platformSettings->integer(FlowEngineInterface::MAX_ITERATIONS_SETTING);
         $maxLoopIterations = $this->platformSettings->integer(FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING);
 
-        // An automation run counts over all its segments: a runaway would otherwise start a fresh count in every
-        // segment and dispatch itself forever. A conversation keeps one budget per session for the outermost call, so
-        // a parent resumed after its child ended — a nested call — keeps its loop's count and the call's clock.
-        $budget = $automation
-            ? StepBudget::forAutomationRun(
-                $maxSteps,
-                $maxLoopIterations,
-                (int) $session->step_count,
-                (int) $session->loop_step_count,
-                (int) $session->loop_iteration_step_count,
-                $definition->nodes ?? [],
-                $session->state ?? [],
-            )
-            : $this->segment->conversationBudget(
-                (string) $session->getKey(),
-                fn (): StepBudget => StepBudget::forConversation($maxSteps, $maxLoopIterations, $this->segment->startedAt()),
-            );
+        // An automation run counts over all its segments, from its persisted counts: a runaway would otherwise start a
+        // fresh count in every segment and dispatch itself forever. Either kind keeps one budget per session for the
+        // outermost call, so a parent resumed inside its subflow step after its child ended — a nested call — goes on
+        // from a count that already holds that step (and, in a conversation, the call's clock).
+        $budget = $this->segment->stepBudget(
+            (string) $session->getKey(),
+            fn (): StepBudget => $automation
+                ? StepBudget::forAutomationRun(
+                    maxSharedSteps: $maxSteps,
+                    maxLoopIterations: $maxLoopIterations,
+                    sharedSteps: (int) $session->step_count,
+                    loopSteps: (int) $session->loop_step_count,
+                    iterationSteps: (int) $session->loop_iteration_step_count,
+                    nodes: $definition->nodes ?? [],
+                    state: $session->state ?? [],
+                )
+                : StepBudget::forConversation($maxSteps, $maxLoopIterations, $this->segment->startedAt()),
+        );
         $incomingStep          = $incoming;
         $resumedAfterDelayStep = $resumedAfterDelay;
 
         while (true) {
+            // Before the step is charged: a step the segment does not run is not counted, so the budget a nested call
+            // shares with the frame that resumed it never holds a step nobody persisted.
+            if ($automation && $this->segmentRanOut($session)) {
+                $this->segment->stopAt($session);
+
+                break;
+            }
+
             $limit = $budget->charge((string) ($session->current_node_id ?? ''));
 
             if (null !== $limit) {
-                if ($this->failAtStepLimit($definition, $session, $limit)) {
+                if ($this->failAtStepLimit($definition, $session, $limit, $budget)) {
                     return;
                 }
 
                 throw $limit;
             }
 
-            if ($automation && $this->segmentRanOut($session)) {
-                $this->segment->stopAt($session);
-
-                break;
-            }
+            // Read now: a nested call that resumes this session inside its step (a subflow) charges its own steps to
+            // the same budget, and this step stays where it was charged.
+            $stepInLoop = $budget->lastStepInLoop();
 
             $currentNodeId = $session->current_node_id;
 
@@ -514,7 +521,7 @@ final readonly class FlowEngine implements FlowEngineInterface
 
             // The node trace (flow_session_history, always written, outside the step's transaction): the loops the node
             // runs in are read from the state it starts with.
-            $traceContext = new NodeTraceContext($session, $nodeId, $type, $version, LoopIterations::of($definition->nodes ?? [], $session->state ?? []));
+            $traceContext = new NodeTraceContext($session, $nodeId, $type, $version, LoopIterations::of($definition->nodes ?? [], $session->state ?? [], $budget->activeLoopNodeId()));
             $this->trace->entered($traceContext);
             $startedAt = hrtime(true);
 
@@ -628,7 +635,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             $limit = $budget->record($node, $result, $session->state ?? []);
 
             if (null !== $limit) {
-                if ($this->failAtStepLimit($definition, $session, $limit)) {
+                if ($this->failAtStepLimit($definition, $session, $limit, $budget)) {
                     return;
                 }
 
@@ -668,22 +675,17 @@ final readonly class FlowEngine implements FlowEngineInterface
             // the stale result here would either lose that progress or
             // raise an OptimisticLockConflict. Skip persistence in that scenario.
             $skipPersist = false;
-            // Whether a nested run of this session counted steps of its own while this step ran: the parent resumed
-            // by its child's end inside the subflow node. That run went on from here and wrote the iteration count
-            // that holds now, so this frame's count is stale.
-            $nestedRunCounted = false;
             if (SubflowNodeHandler::TYPE === $type) {
                 $latest = FlowSession::query()->find($session->getKey());
                 if (null !== $latest && $latest->version !== $session->version) {
-                    $skipPersist      = true;
-                    $nestedRunCounted = (int) $latest->step_count !== (int) $session->step_count
-                        || (int) $latest->loop_step_count !== (int) $session->loop_step_count;
+                    $skipPersist = true;
                     $session->setRawAttributes($latest->getAttributes(), true);
                 }
             }
 
-            $stepInLoop     = $budget->lastStepInLoop();
-            $iterationSteps = $nestedRunCounted ? null : $budget->iterationSteps();
+            // The iteration count after this step — after the steps of a nested call that resumed this session inside
+            // it, too, which charged the same budget and already wrote this value.
+            $iterationSteps = $budget->iterationSteps();
 
             $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId, $automation, $stepInLoop, $iterationSteps): void {
                 if ($automation) {
@@ -793,7 +795,7 @@ final readonly class FlowEngine implements FlowEngineInterface
      *
      * @return bool true when the session was a child and its parent was resumed
      */
-    private function failAtStepLimit(FlowDefinition $definition, FlowSession $session, FlowExecutionLimitExceededException $limit): bool
+    private function failAtStepLimit(FlowDefinition $definition, FlowSession $session, FlowExecutionLimitExceededException $limit, StepBudget $budget): bool
     {
         // Before the failure is persisted, so the trace keeps it even if the persist fails.
         $this->trace->failed(
@@ -802,7 +804,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                 (string) ($session->current_node_id ?? ''),
                 null,
                 null,
-                LoopIterations::of($definition->nodes ?? [], $session->state ?? []),
+                LoopIterations::of($definition->nodes ?? [], $session->state ?? [], $budget->activeLoopNodeId()),
             ),
             NodeTraceRecorder::STEP_LIMIT_ERROR,
             $limit->getMessage(),
@@ -875,24 +877,17 @@ final readonly class FlowEngine implements FlowEngineInterface
      * incremented, so the one step a killed segment repeats sets it again instead of counting twice. The columns are
      * not part of the optimistic lock: the step's own write bumps the version.
      *
-     * A null `$iterationSteps` leaves the iteration count as it is: a subflow step whose parent a nested run already
-     * took further wrote it there, and this frame's value predates that run. Such a run starts from the count before
-     * the subflow step, so until its next `loop_end` it counts that one step short — on the side that never fails a
-     * run early.
+     * A subflow step whose parent a nested call took further (its child ended in the same call) is counted here after
+     * that call's steps: the call shared this frame's budget, so its iteration count already held the subflow step and
+     * `$iterationSteps` is the value it wrote last.
      *
      * @param  'step_count'|'loop_step_count'  $column
      */
-    private function countRunStep(FlowSession $session, string $column, ?int $iterationSteps): void
+    private function countRunStep(FlowSession $session, string $column, int $iterationSteps): void
     {
-        $extra = null !== $iterationSteps ? ['loop_iteration_step_count' => $iterationSteps] : [];
-
-        $session->newQuery()->whereKey($session->getKey())->increment($column, 1, $extra);
+        $session->newQuery()->whereKey($session->getKey())->increment($column, 1, ['loop_iteration_step_count' => $iterationSteps]);
         $session->setAttribute($column, (int) $session->getAttribute($column) + 1);
-
-        if (null !== $iterationSteps) {
-            $session->setAttribute('loop_iteration_step_count', $iterationSteps);
-        }
-
+        $session->setAttribute('loop_iteration_step_count', $iterationSteps);
         $session->syncOriginalAttributes([$column, 'loop_iteration_step_count']);
     }
 

@@ -86,8 +86,7 @@ final readonly class LoopConfigChecker
      */
     private function iteratorConflicts(array $config, string $path, array $written, bool $counted): array
     {
-        $raw      = $config['iterator_name'] ?? null;
-        $iterator = is_string($raw) && '' !== $raw ? $raw : LoopNodeHandler::DEFAULT_ITERATOR_NAME;
+        $iterator = LoopNodeHandler::iteratorNameOf($config);
         $errors   = [];
 
         // Only a counted loop keeps a total.
@@ -152,8 +151,7 @@ final readonly class LoopConfigChecker
             return [];
         }
 
-        $raw      = $config['iterator_name'] ?? null;
-        $iterator = is_string($raw) && '' !== $raw ? $raw : LoopNodeHandler::DEFAULT_ITERATOR_NAME;
+        $iterator = LoopNodeHandler::iteratorNameOf($config);
 
         // loop_end advances the iterator, so a condition on it does change.
         if ('flow.' . $iterator === $watched) {

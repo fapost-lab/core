@@ -137,3 +137,15 @@ that iteration, as many as a runaway with no loop. Passing from one loop's body 
 leaving the first keeps the count rather than restarting it, so neither an escaped body nor a segment that guessed the
 wrong one of two loops sharing an iterator name gets a fresh allowance. Rejected: clearing the loop context when
 control leaves the body — it needs the body worked out from the graph, and the first runaway never leaves the body.
+
+## Amendment 2026-11-23: an automation's budget is shared with the nested call too
+
+The step budget of an automation session, like a conversation's, is one object per session per outermost engine call
+(`ExecutionSegment::stepBudget()`), built from the persisted counts on first use (task `flow-loop-step-budget-subflow`).
+A parent resumed in a nested call inside its subflow step (its child ended in the same call) used to build its own from
+the row, which did not hold the subflow step yet, so each such step was missing from `loop_iteration_step_count` and a
+runaway body with a subflow in it ran about twice `max_iterations` steps. Sharing the budget makes the nested call count
+on from the subflow step, and the frame of that step then writes the count the nested call reached. A segment now
+stops before it charges its next step, so a shared budget never holds a step that was not run. Rejected: writing the
+iteration count before the child starts — a write outside the step's transaction, which a killed segment would count
+twice on its retry.

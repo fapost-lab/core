@@ -10,8 +10,8 @@ use Closure;
 
 /**
  * What one outermost engine call shares with the calls nested in it: since when it runs, how many steps an
- * automation run took in it and which session stopped when that ran out, and the step budget of each conversation
- * session it runs ({@see conversationBudget()}).
+ * automation run took in it and which session stopped when that ran out, and the step budget of each session it runs
+ * ({@see stepBudget()}).
  *
  * One engine call nests others — a subflow child runs inside its parent's step, a parent resumes inside its child's
  * last step — and all of them share this, so a job never spends a budget once per level. The outermost call opens
@@ -30,8 +30,8 @@ final class ExecutionSegment
 
     private ?FlowSession $stoppedSession = null;
 
-    /** @var array<string, StepBudget> per conversation session id, its budget for this outermost call */
-    private array $conversationBudgets = [];
+    /** @var array<string, StepBudget> per session id, its budget for this outermost call */
+    private array $stepBudgets = [];
 
     /**
      * Enter an engine call; the outermost one starts the segment's clock.
@@ -91,15 +91,16 @@ final class ExecutionSegment
     }
 
     /**
-     * The step budget of a conversation session for this outermost call: built by {@code $make} on the first call
-     * that runs the session, the same object for every nested call that resumes it — a parent resumed after its
-     * child ended keeps its loop's iteration count and the call's clock instead of starting both afresh.
+     * The step budget of a session for this outermost call: built by {@code $make} on the first call that runs the
+     * session, the same object for every nested call that resumes it — a parent resumed inside its subflow step after
+     * its child ended goes on from a count that holds that step: a conversation keeps its loop's iteration count and
+     * the call's clock, an automation persists an iteration count that never misses the subflow step.
      *
      * @param  Closure(): StepBudget  $make
      */
-    public function conversationBudget(string $sessionId, Closure $make): StepBudget
+    public function stepBudget(string $sessionId, Closure $make): StepBudget
     {
-        return $this->conversationBudgets[$sessionId] ??= $make();
+        return $this->stepBudgets[$sessionId] ??= $make();
     }
 
     /**
@@ -112,9 +113,9 @@ final class ExecutionSegment
 
     private function reset(): void
     {
-        $this->startedAt           = null;
-        $this->steps               = 0;
-        $this->stoppedSession      = null;
-        $this->conversationBudgets = [];
+        $this->startedAt      = null;
+        $this->steps          = 0;
+        $this->stoppedSession = null;
+        $this->stepBudgets    = [];
     }
 }

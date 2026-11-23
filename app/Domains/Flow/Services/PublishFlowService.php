@@ -755,9 +755,7 @@ final readonly class PublishFlowService
 
             $id     = is_string($node['id'] ?? null) ? $node['id'] : null;
             $config = is_array($node['config'] ?? null) ? $node['config'] : [];
-            $name   = is_string($config['iterator_name'] ?? null) && '' !== $config['iterator_name']
-                ? $config['iterator_name']
-                : LoopNodeHandler::DEFAULT_ITERATOR_NAME;
+            $name   = LoopNodeHandler::iteratorNameOf($config);
 
             if (null !== $id) {
                 $iteratorNames[$id] = $name;
