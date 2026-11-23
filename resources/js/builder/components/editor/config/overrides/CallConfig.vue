@@ -46,9 +46,9 @@ const JSON_TYPE_OPTION = [{ value: 'json', label: 'JSON' }]
 
 const METHODS       = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 const SUCCESS_WHEN  = [
-    { value: '2xx',          label: '2xx only' },
-    { value: '2xx_or_4xx',   label: '2xx or 4xx' },
-    { value: 'any_response', label: 'Any response' },
+    { value: '2xx',          labelKey: 'call.options.when_2xx' },
+    { value: '2xx_or_4xx',   labelKey: 'call.options.when_2xx_or_4xx' },
+    { value: 'any_response', labelKey: 'call.options.when_any' },
 ]
 
 interface KvRow { field: string; value: string }
@@ -107,9 +107,9 @@ const form = reactive({
 })
 
 const RETRY_ON = [
-    { value: 'network', label: 'Network failure / timeout' },
-    { value: '5xx',     label: '5xx response' },
-    { value: '429',     label: '429 Too Many Requests' },
+    { value: 'network', labelKey: 'call.retry.on_network' },
+    { value: '5xx',     labelKey: 'call.retry.on_5xx' },
+    { value: '429',     labelKey: 'call.retry.on_429' },
 ]
 
 function clampInt(raw: string, min: number, max: number, fallback: number): number {
@@ -411,7 +411,7 @@ async function runTest() {
             sample,
         )
     } catch (e) {
-        testError.value = e instanceof Error ? e.message : 'Request failed'
+        testError.value = e instanceof Error ? e.message : t('call.test.request_failed')
         testResult.value = null
     } finally {
         testLoading.value = false
@@ -421,19 +421,19 @@ async function runTest() {
 
 <template>
     <div class="accordion">
-        <AccordionSection title="Transport" default-open>
+        <AccordionSection :title="t('call.transport.section')" default-open>
             <div class="config-field">
-                <div class="field-label">Transport</div>
+                <div class="field-label">{{ t('call.transport.label') }}</div>
                 <select class="field-input" :value="form.transport" @change="form.transport = ($event.target as HTMLSelectElement).value as 'http'|'handler'; commit()">
-                    <option value="http">HTTP request</option>
-                    <option value="handler">Handler (action)</option>
+                    <option value="http">{{ t('call.transport.http') }}</option>
+                    <option value="handler">{{ t('call.transport.handler') }}</option>
                 </select>
             </div>
         </AccordionSection>
 
         <!-- ───────────────── HTTP ───────────────── -->
         <template v-if="form.transport === 'http'">
-            <AccordionSection title="Request" default-open>
+            <AccordionSection :title="t('call.request.section')" default-open>
                 <div class="config-field row">
                     <select class="field-input method-sel" :value="form.method" @change="form.method = ($event.target as HTMLSelectElement).value; commit()">
                         <option v-for="m in METHODS" :key="m" :value="m">{{ m }}</option>
@@ -447,42 +447,42 @@ async function runTest() {
                 </div>
             </AccordionSection>
 
-            <AccordionSection title="Body">
+            <AccordionSection :title="t('call.body.section')">
                 <div class="config-field">
                     <div class="mode-toggle">
-                        <button :class="['mode-pill', { active: form.bodyMode === 'kv' }]"  @click="form.bodyMode = 'kv'; commit()">Key-value</button>
-                        <button :class="['mode-pill', { active: form.bodyMode === 'raw' }]" @click="form.bodyMode = 'raw'; commit()">Raw JSON</button>
+                        <button :class="['mode-pill', { active: form.bodyMode === 'kv' }]"  @click="form.bodyMode = 'kv'; commit()">{{ t('call.body.key_value') }}</button>
+                        <button :class="['mode-pill', { active: form.bodyMode === 'raw' }]" @click="form.bodyMode = 'raw'; commit()">{{ t('call.body.raw_json') }}</button>
                     </div>
                 </div>
                 <template v-if="form.bodyMode === 'kv'">
                     <div v-for="(r, i) in form.bodyRows" :key="i" class="config-field row">
-                        <input class="field-input kv-key" placeholder="field" :value="r.field" @input="r.field = ($event.target as HTMLInputElement).value; commit()">
-                        <TemplateInput v-model="r.value" placeholder="value" @update:model-value="commit" />
+                        <input class="field-input kv-key" :placeholder="t('call.request.field_placeholder')" :value="r.field" @input="r.field = ($event.target as HTMLInputElement).value; commit()">
+                        <TemplateInput v-model="r.value" :placeholder="t('call.request.value_placeholder')" @update:model-value="commit" />
                         <button class="del-btn" @click="removeRow(form.bodyRows, i)">×</button>
                     </div>
-                    <button class="add-btn" @click="addRow(form.bodyRows)">+ Add field</button>
+                    <button class="add-btn" @click="addRow(form.bodyRows)">{{ t('call.body.add_field') }}</button>
                 </template>
                 <template v-else>
                     <TemplateInput v-model="form.bodyRaw" multiline mono :rows="6" placeholder='{ "name": "{{contact.name}}" }' @update:model-value="commit" />
                 </template>
             </AccordionSection>
 
-            <AccordionSection title="Query params">
+            <AccordionSection :title="t('call.query.section')">
                 <div v-for="(r, i) in form.queryRows" :key="i" class="config-field row">
-                    <input class="field-input kv-key" placeholder="key" :value="r.field" @input="r.field = ($event.target as HTMLInputElement).value; commit()">
-                    <TemplateInput v-model="r.value" placeholder="value" @update:model-value="commit" />
+                    <input class="field-input kv-key" :placeholder="t('call.request.key_placeholder')" :value="r.field" @input="r.field = ($event.target as HTMLInputElement).value; commit()">
+                    <TemplateInput v-model="r.value" :placeholder="t('call.request.value_placeholder')" @update:model-value="commit" />
                     <button class="del-btn" @click="removeRow(form.queryRows, i)">×</button>
                 </div>
-                <button class="add-btn" @click="addRow(form.queryRows)">+ Add param</button>
+                <button class="add-btn" @click="addRow(form.queryRows)">{{ t('call.query.add') }}</button>
             </AccordionSection>
 
-            <AccordionSection title="Headers">
+            <AccordionSection :title="t('call.headers.section')">
                 <div v-for="(r, i) in form.headerRows" :key="i" class="config-field row">
-                    <input class="field-input kv-key" placeholder="Header" :value="r.field" @input="r.field = ($event.target as HTMLInputElement).value; commit()">
-                    <TemplateInput v-model="r.value" placeholder="value" @update:model-value="commit" />
+                    <input class="field-input kv-key" :placeholder="t('call.request.header_placeholder')" :value="r.field" @input="r.field = ($event.target as HTMLInputElement).value; commit()">
+                    <TemplateInput v-model="r.value" :placeholder="t('call.request.value_placeholder')" @update:model-value="commit" />
                     <button class="del-btn" @click="removeRow(form.headerRows, i)">×</button>
                 </div>
-                <button class="add-btn" @click="addRow(form.headerRows)">+ Add header</button>
+                <button class="add-btn" @click="addRow(form.headerRows)">{{ t('call.headers.add') }}</button>
             </AccordionSection>
 
             <AccordionSection :title="t('call.auth.section')" default-open>
@@ -535,111 +535,111 @@ async function runTest() {
                 </template>
             </AccordionSection>
 
-            <AccordionSection title="Options">
+            <AccordionSection :title="t('call.options.section')">
                 <div class="config-field">
-                    <div class="field-label">Timeout (seconds)</div>
+                    <div class="field-label">{{ t('call.options.timeout') }}</div>
                     <input class="field-input" style="width:100px" type="number" min="1" max="300" :value="form.timeout" @input="form.timeout = Number(($event.target as HTMLInputElement).value) || 10; commit()">
                 </div>
                 <div class="config-field">
-                    <div class="field-label">Success when</div>
+                    <div class="field-label">{{ t('call.options.success_when') }}</div>
                     <select class="field-input" :value="form.successWhen" @change="form.successWhen = ($event.target as HTMLSelectElement).value; commit()">
-                        <option v-for="s in SUCCESS_WHEN" :key="s.value" :value="s.value">{{ s.label }}</option>
+                        <option v-for="s in SUCCESS_WHEN" :key="s.value" :value="s.value">{{ t(s.labelKey) }}</option>
                     </select>
-                    <p class="field-help">Determines which responses route to <em>success</em> vs <em>error</em>. Transport failures always go to <em>error</em>.</p>
+                    <p class="field-help">{{ t('call.options.success_when_help') }}</p>
                 </div>
                 <div class="config-field">
-                    <div class="field-label">Success statuses (optional)</div>
+                    <div class="field-label">{{ t('call.options.success_statuses') }}</div>
                     <input class="field-input" placeholder="200, 3xx, 400-404" :value="form.successStatuses" @input="form.successStatuses = ($event.target as HTMLInputElement).value; commit()">
-                    <p class="field-help">Statuses that count as <em>success</em>: numbers, classes (<code>2xx</code>) or ranges (<code>200-299</code>). When set, it replaces “Success when”.</p>
+                    <p class="field-help">{{ t('call.options.success_statuses_help') }}</p>
                 </div>
             </AccordionSection>
         </template>
 
         <!-- ───────────────── HANDLER ───────────────── -->
         <template v-else>
-            <AccordionSection title="Action" default-open>
+            <AccordionSection :title="t('call.handler.section_action')" default-open>
                 <div class="config-field">
-                    <div class="field-label">Action id</div>
+                    <div class="field-label">{{ t('call.handler.action_id') }}</div>
                     <SearchableSelect
                         :model-value="form.actionId"
                         :options="availableActions"
                         placeholder="crm.create_deal"
-                        empty-text="No actions available"
+                        :empty-text="t('call.handler.no_actions')"
                         allow-custom
                         mono
                         @update:model-value="form.actionId = $event; commit()"
                     />
-                    <p class="field-help">Registered by an active Solution/Plugin. The list is empty until one provides an action handler — you can still type an id to wire it ahead of time.</p>
+                    <p class="field-help">{{ t('call.handler.action_help') }}</p>
                 </div>
             </AccordionSection>
-            <AccordionSection title="Parameters">
+            <AccordionSection :title="t('call.handler.section_params')">
                 <div v-for="(r, i) in form.handlerParams" :key="i" class="config-field row">
-                    <input class="field-input kv-key" placeholder="key" :value="r.field" @input="r.field = ($event.target as HTMLInputElement).value; commit()">
-                    <TemplateInput v-model="r.value" placeholder="value" @update:model-value="commit" />
+                    <input class="field-input kv-key" :placeholder="t('call.request.key_placeholder')" :value="r.field" @input="r.field = ($event.target as HTMLInputElement).value; commit()">
+                    <TemplateInput v-model="r.value" :placeholder="t('call.request.value_placeholder')" @update:model-value="commit" />
                     <button class="del-btn" @click="removeRow(form.handlerParams, i)">×</button>
                 </div>
-                <button class="add-btn" @click="addRow(form.handlerParams)">+ Add parameter</button>
+                <button class="add-btn" @click="addRow(form.handlerParams)">{{ t('call.handler.add_param') }}</button>
             </AccordionSection>
         </template>
 
         <!-- ───────────────── RETRY (shared) ───────────────── -->
-        <AccordionSection title="Retry">
+        <AccordionSection :title="t('call.retry.section')">
             <label class="field-help" style="display:flex;gap:6px;align-items:center">
                 <input type="checkbox" data-testid="retry-enabled" :checked="form.retryEnabled" @change="form.retryEnabled = ($event.target as HTMLInputElement).checked; commit()">
-                Retry failed calls
+                {{ t('call.retry.enabled') }}
             </label>
             <template v-if="form.retryEnabled">
                 <div class="config-field">
-                    <div class="field-label">Attempts (first send included)</div>
+                    <div class="field-label">{{ t('call.retry.attempts') }}</div>
                     <input class="field-input" data-testid="retry-attempts" style="width:100px" type="number" min="1" max="5" :value="form.retryAttempts" @change="form.retryAttempts = clampInt(($event.target as HTMLInputElement).value, 1, 5, 3); ($event.target as HTMLInputElement).value = String(form.retryAttempts); commit()">
                 </div>
                 <div class="config-field">
-                    <div class="field-label">Delay (ms)</div>
+                    <div class="field-label">{{ t('call.retry.delay') }}</div>
                     <input class="field-input" style="width:100px" type="number" min="100" max="5000" step="100" :value="form.retryDelay" @change="form.retryDelay = clampInt(($event.target as HTMLInputElement).value, 100, 5000, 500); ($event.target as HTMLInputElement).value = String(form.retryDelay); commit()">
                 </div>
                 <div class="config-field">
-                    <div class="field-label">Backoff</div>
+                    <div class="field-label">{{ t('call.retry.backoff') }}</div>
                     <select class="field-input" :value="form.retryBackoff" @change="form.retryBackoff = ($event.target as HTMLSelectElement).value as 'fixed'|'exponential'; commit()">
-                        <option value="fixed">Fixed</option>
-                        <option value="exponential">Exponential (doubles, capped at 5000 ms)</option>
+                        <option value="fixed">{{ t('call.retry.backoff_fixed') }}</option>
+                        <option value="exponential">{{ t('call.retry.backoff_exponential') }}</option>
                     </select>
                 </div>
                 <div class="config-field">
-                    <div class="field-label">Retry on</div>
+                    <div class="field-label">{{ t('call.retry.retry_on') }}</div>
                     <label v-for="o in RETRY_ON" :key="o.value" class="field-help" style="display:flex;gap:6px;align-items:center">
                         <input type="checkbox" :data-testid="`retry-on-${o.value}`" :checked="form.retryOn.includes(o.value)" @change="onRetryOn(o.value, ($event.target as HTMLInputElement))">
-                        {{ o.label }}
+                        {{ t(o.labelKey) }}
                     </label>
                 </div>
             </template>
-            <p class="field-help">Retries must fit in 18 seconds from the first send; lower the timeout to retry slow calls. A status listed as success is never retried.</p>
+            <p class="field-help">{{ t('call.retry.help') }}</p>
         </AccordionSection>
 
         <!-- ───────────────── TEST (shared) ───────────────── -->
-        <AccordionSection title="Test request" default-open>
+        <AccordionSection :title="t('call.test.section')" default-open>
             <div v-if="referencedVars.length > 0" class="config-field">
-                <div class="field-label">Test values</div>
+                <div class="field-label">{{ t('call.test.values') }}</div>
                 <div v-for="v in referencedVars" :key="v" class="config-field row">
                     <span class="test-var-key">{{ v }}</span>
                     <input
                         class="field-input"
                         :value="sampleValues[v] ?? ''"
-                        placeholder="sample value"
+                        :placeholder="t('call.test.sample_placeholder')"
                         @input="sampleValues[v] = ($event.target as HTMLInputElement).value"
                     >
                 </div>
-                <p class="field-help">No session at build time — these fill the <code>{{ PLACEHOLDER_HINT }}</code> placeholders for the test.</p>
+                <p class="field-help">{{ t('call.test.values_help').replace(':hint', PLACEHOLDER_HINT) }}</p>
             </div>
 
             <div v-if="needsWarning" class="test-warn">
-                ⚠ This sends a <strong>real</strong> {{ form.transport === 'handler' ? 'action invocation' : form.method + ' request' }} — it may create or modify data.
+                {{ t('call.test.warn').replace(':what', form.transport === 'handler' ? t('call.test.warn_action') : t('call.test.warn_request').replace(':method', form.method)) }}
             </div>
 
             <p v-if="testBlockedByCredential" class="field-help" data-testid="test-permission-hint">
                 {{ t('permission_hints.credential_test') }}
             </p>
             <button class="test-btn" data-testid="test-btn" :disabled="testLoading || testBlockedByCredential" @click="runTest">
-                {{ testLoading ? 'Sending…' : (needsWarning ? 'Send real request' : 'Send test request') }}
+                {{ testLoading ? t('call.test.sending') : (needsWarning ? t('call.test.send_real') : t('call.test.send_test')) }}
             </button>
 
             <div v-if="testError" class="test-error">{{ testError }}</div>
@@ -647,13 +647,13 @@ async function runTest() {
             <div v-if="testResult" class="test-result">
                 <div class="test-status-row">
                     <span class="test-badge" :class="testResult.success ? 'ok' : 'fail'">
-                        {{ testResult.success ? 'success' : 'error' }}
+                        {{ testResult.success ? t('call.test.success') : t('call.test.error') }}
                     </span>
                     <span v-if="testResult.status_code !== null" class="test-meta">HTTP {{ testResult.status_code }}</span>
                     <span v-if="testResult.error_code" class="test-meta">{{ testResult.error_code }}</span>
                     <span class="test-meta">{{ testResult.duration_ms }} ms</span>
                 </div>
-                <div class="test-tree-hint">Click a field to map it →</div>
+                <div class="test-tree-hint">{{ t('call.test.tree_hint') }}</div>
                 <div class="test-tree">
                     <JsonTree v-if="testBag" :value="testBag" @select="addMappingFrom" />
                 </div>
@@ -661,11 +661,8 @@ async function runTest() {
 
             <!-- Capture structure → picker autocomplete -->
             <div class="config-field structure-block">
-                <div class="field-label">Response structure for hints</div>
-                <p class="field-help">
-                    Remember the response shape so its fields autocomplete everywhere this variable is used
-                    (Assign, conditions, messages). Source: the last test above, or paste a sample below.
-                </p>
+                <div class="field-label">{{ t('call.test.structure_title') }}</div>
+                <p class="field-help">{{ t('call.test.structure_help') }}</p>
                 <textarea
                     class="field-input mono"
                     rows="3"
@@ -673,23 +670,23 @@ async function runTest() {
                     placeholder='{ "data": { "id": 1, "name": "..." } }'
                     @input="manualJson = ($event.target as HTMLTextAreaElement).value"
                 />
-                <div v-if="manualInvalid" class="test-error">Invalid JSON</div>
+                <div v-if="manualInvalid" class="test-error">{{ t('call.test.invalid_json') }}</div>
 
                 <button class="test-btn structure-btn" :disabled="!canRemember" @click="rememberStructure">
-                    Remember structure ({{ structurePaths.length }} fields)
+                    {{ t('call.test.remember').replace(':count', String(structurePaths.length)) }}
                 </button>
 
-                <p v-if="!form.saveTo?.name" class="field-help">Set “Save full response to” below first.</p>
+                <p v-if="!form.saveTo?.name" class="field-help">{{ t('call.test.set_save_first') }}</p>
                 <p v-else-if="savedStructureCount > 0" class="field-help structure-ok">
-                    ✓ {{ savedStructureCount }} fields available in the picker under <code>{{ saveToPath }}</code>.
+                    {{ t('call.test.structure_ok').replace(':count', String(savedStructureCount)).replace(':path', saveToPath) }}
                 </p>
             </div>
         </AccordionSection>
 
         <!-- ───────────────── RESPONSE (shared) ───────────────── -->
-        <AccordionSection title="Response">
+        <AccordionSection :title="t('call.response.section')">
             <div class="config-field">
-                <div class="field-label">Save full response to</div>
+                <div class="field-label">{{ t('call.response.save_to') }}</div>
                 <VariableStorageEditor
                     :model-value="form.saveTo"
                     :type-options="JSON_TYPE_OPTION"
@@ -700,26 +697,26 @@ async function runTest() {
                     show-group
                     @update:model-value="(v: Variable) => { form.saveTo = v; commit() }"
                 />
-                <p class="field-help">Writes <code>{ status, body, headers }</code>. Extract fields later with Assign — e.g. <code>{{ EXAMPLE_EXPR }}</code>.</p>
+                <p class="field-help">{{ t('call.response.save_help').replace(':example', EXAMPLE_EXPR) }}</p>
             </div>
         </AccordionSection>
 
-        <AccordionSection title="Field mapping (optional)">
+        <AccordionSection :title="t('call.response.mapping_section')">
             <div v-for="(m, i) in form.mappings" :key="i" class="map-row">
                 <div class="config-field">
-                    <div class="field-label">Response path</div>
+                    <div class="field-label">{{ t('call.response.response_path') }}</div>
                     <SearchableSelect
                         :model-value="m.from"
                         :options="responsePaths"
                         placeholder="body.data.id"
-                        empty-text="Run a test to suggest paths"
+                        :empty-text="t('call.response.paths_empty')"
                         allow-custom
                         mono
                         @update:model-value="m.from = $event; commit()"
                     />
                 </div>
                 <div class="config-field">
-                    <div class="field-label">→ Variable</div>
+                    <div class="field-label">{{ t('call.response.to_variable') }}</div>
                     <VariableStorageEditor
                         :model-value="m.to"
                         :known-groups="knownGroups"
@@ -729,19 +726,19 @@ async function runTest() {
                         @update:model-value="(v: Variable) => onMappingTo(i, v)"
                     />
                 </div>
-                <button class="del-btn map-del" @click="removeMapping(i)">× Remove mapping</button>
+                <button class="del-btn map-del" @click="removeMapping(i)">{{ t('call.response.remove_mapping') }}</button>
             </div>
-            <button class="add-btn" @click="addMapping">+ Add mapping</button>
-            <p class="field-help">Paths: <code>body.*</code>, <code>status</code>, <code>headers.*</code>, <code>metadata.*</code>. Missing path → empty.</p>
+            <button class="add-btn" @click="addMapping">{{ t('call.response.add_mapping') }}</button>
+            <p class="field-help">{{ t('call.response.mapping_help') }}</p>
             <label class="field-help" style="display:flex;gap:6px;align-items:center">
                 <input type="checkbox" :checked="form.strictMapping" @change="form.strictMapping = ($event.target as HTMLInputElement).checked; commit()">
-                Strict: a missing path on a successful call goes to <em>error</em> (<code>mapping_missing</code>) and writes no mapped variable.
+                {{ t('call.response.strict') }}
             </label>
         </AccordionSection>
 
-        <AccordionSection title="Meta">
+        <AccordionSection :title="t('call.meta.section')">
             <div class="config-field">
-                <div class="field-label">Node ID</div>
+                <div class="field-label">{{ t('call.meta.node_id') }}</div>
                 <input class="field-input mono" style="font-size:11.5px" :value="props.node.id" readonly>
             </div>
         </AccordionSection>

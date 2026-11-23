@@ -7,6 +7,7 @@
  * as a string[] — single mode just keeps it at length 0..1.
  */
 import {computed, nextTick, onUnmounted, ref, watch} from 'vue'
+import {useTranslations} from '@builder/composables/useTranslations'
 
 interface Option { value: string; label: string }
 
@@ -20,9 +21,11 @@ const props = withDefaults(defineProps<{
 }>(), {
     multiple: false,
     allowCreate: false,
-    placeholder: 'Select…',
-    emptyText: 'No options',
 })
+
+const {t} = useTranslations()
+const placeholderText = computed<string>(() => props.placeholder ?? t('search_select.placeholder'))
+const emptyLabel      = computed<string>(() => props.emptyText ?? t('search_select.empty'))
 
 const emit = defineEmits<{
     (e: 'update:modelValue', value: string[]): void
@@ -45,7 +48,7 @@ const selectedChips = computed<Option[]>(() => props.modelValue.map((v) => ({val
 
 const triggerLabel = computed<string>(() => {
     if (props.modelValue.length === 0) {
-        return props.placeholder
+        return placeholderText.value
     }
     return labelOf(props.modelValue[0]!)
 })
@@ -187,7 +190,7 @@ onUnmounted(() => {
                     v-model="query"
                     type="text"
                     class="ss-search"
-                    placeholder="Search…"
+                    :placeholder="t('search_select.search')"
                     @keydown.enter.prevent="commitCreate"
                 >
 
@@ -214,7 +217,7 @@ onUnmounted(() => {
                     <span class="ss-option-label">Create “{{ creatable }}”</span>
                 </button>
 
-                <div v-if="filtered.length === 0 && creatable === null" class="ss-empty">{{ emptyText }}</div>
+                <div v-if="filtered.length === 0 && creatable === null" class="ss-empty">{{ emptyLabel }}</div>
             </div>
         </Teleport>
     </div>

@@ -219,7 +219,7 @@ final readonly class ValidateFlowService
         $errors[] = new FlowValidationErrorDto(
             path: 'expression_engine',
             code: 'expression_engine_unknown',
-            message: "The flow's expression engine '{$engineId}' is not installed. Choose another expression engine for the flow.",
+            message: (string) __('builder.validation.expression_engine_unknown', ['engine' => $engineId]),
         );
     }
 
@@ -237,7 +237,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$key}",
                     code: 'invalid_node',
-                    message: 'Node payload must be an object.',
+                    message: (string) __('builder.validation.invalid_node'),
                 );
                 continue;
             }
@@ -247,7 +247,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$key}.id",
                     code: 'invalid_node_id',
-                    message: 'Node id is required.',
+                    message: (string) __('builder.validation.invalid_node_id'),
                 );
                 continue;
             }
@@ -271,7 +271,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.type",
                 code: 'invalid_handler_reference',
-                message: 'Node type/version is invalid.',
+                message: (string) __('builder.validation.invalid_handler_reference'),
             );
 
             return;
@@ -281,7 +281,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.type",
                 code: 'unknown_node_type',
-                message: "Node handler is not registered for {$type}@{$version}.",
+                message: (string) __('builder.validation.unknown_node_type', ['type' => $type, 'version' => $version]),
             );
         }
     }
@@ -316,7 +316,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: $path,
                 code: 'node_validator_failed',
-                message: "The validator of {$type} failed: {$exception->getMessage()}",
+                message: (string) __('builder.validation.node_validator_failed', ['type' => $type, 'error' => $exception->getMessage()]),
             );
 
             return;
@@ -372,7 +372,7 @@ final readonly class ValidateFlowService
             $warnings[] = new FlowValidationErrorDto(
                 path: "nodes.{$nodeId}",
                 code: 'solution_node_error_unhandled',
-                message: "Node {$nodeId} ({$type}) has no connection on its error exit: if its Solution is switched off for the tenant or the node fails, the flow ends there.",
+                message: (string) __('builder.validation.solution_node_error_unhandled', ['node_id' => $nodeId, 'type' => $type]),
             );
         }
     }
@@ -414,7 +414,7 @@ final readonly class ValidateFlowService
             $warnings[] = new FlowValidationErrorDto(
                 path: "nodes.{$nodeId}",
                 code: 'webhook_response_without_sync_trigger',
-                message: "Node {$nodeId} answers a webhook sender or an API caller, but the flow has no webhook or API trigger that waits for the answer (response mode sync): unless the flow runs as a subflow of one that has, the node does nothing.",
+                message: (string) __('builder.validation.webhook_response_without_sync_trigger', ['node_id' => $nodeId]),
             );
         }
     }
@@ -436,7 +436,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config",
                 code: 'invalid_config',
-                message: 'Node config must be an object.',
+                message: (string) __('builder.validation.invalid_config'),
             );
 
             return;
@@ -467,7 +467,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config.{$requiredField}",
                     code: 'missing_config_field',
-                    message: "Required config field '{$requiredField}' is missing.",
+                    message: (string) __('builder.validation.missing_config_field', ['field' => $requiredField]),
                 );
             }
         }
@@ -494,7 +494,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.outputs.{$handle}",
                     code: 'unknown_output_target',
-                    message: 'Output must reference an existing node id.',
+                    message: (string) __('builder.validation.unknown_output_target'),
                 );
             }
         }
@@ -520,7 +520,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.rules",
                 code: 'branch_rules_missing',
-                message: 'Branch nodes must define at least one condition.',
+                message: (string) __('builder.validation.branch_rules_missing'),
             );
         }
     }
@@ -546,7 +546,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config",
                     code: 'invalid_module_reference',
-                    message: "Invalid module reference '{$value}'.",
+                    message: (string) __('builder.validation.invalid_module_reference', ['reference' => $value]),
                 );
 
                 return;
@@ -557,7 +557,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config",
                     code: 'unknown_module_accessor',
-                    message: "Unknown module accessor '{$namespace}'.",
+                    message: (string) __('builder.validation.unknown_module_accessor', ['namespace' => $namespace]),
                 );
             }
         });
@@ -582,7 +582,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config",
                 code: 'legacy_media_field',
-                message: 'This node uses a legacy media_url/media_path field. Please re-attach the file using the media library (media_file_id).',
+                message: (string) __('builder.validation.legacy_media_field'),
             );
 
             return;
@@ -609,7 +609,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.media_file_id",
                 code: 'media_file_not_found',
-                message: 'The referenced media file does not exist or has been deleted. Please re-attach the file.',
+                message: (string) __('builder.validation.media_file_not_found'),
             );
         }
     }
@@ -637,7 +637,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.event_type",
                 code: 'emit_event_missing_type',
-                message: 'emit_event requires a non-empty event_type.',
+                message: (string) __('builder.validation.emit_event_missing_type'),
             );
 
             return;
@@ -647,7 +647,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.event_type",
                 code: 'emit_event_template_in_type',
-                message: 'event_type must be a literal value, not a template expression.',
+                message: (string) __('builder.validation.emit_event_template_in_type'),
             );
 
             return;
@@ -657,7 +657,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.event_type",
                 code: 'emit_event_invalid_type',
-                message: 'event_type must contain only alphanumerics, underscores and dots (e.g. "sales.order.created").',
+                message: (string) __('builder.validation.emit_event_invalid_type'),
             );
 
             return;
@@ -667,7 +667,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.event_type",
                 code: 'reserved_event_name',
-                message: sprintf('Event names starting with "%s" belong to Core; a flow cannot emit them.', CoreEventCatalog::RESERVED_PREFIX),
+                message: (string) __('builder.validation.reserved_event_name', ['prefix' => CoreEventCatalog::RESERVED_PREFIX]),
             );
         }
     }
@@ -699,7 +699,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.status",
                 code: 'end_invalid_status',
-                message: 'end.status must be one of: ' . implode(', ', $allowed) . '.',
+                message: (string) __('builder.validation.end_invalid_status', ['allowed' => implode(', ', $allowed)]),
             );
         }
     }
@@ -726,13 +726,13 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.knowledge_base_id",
                 code: 'rag_missing_knowledge_base_id',
-                message: 'rag_query requires a non-empty knowledge_base_id.',
+                message: (string) __('builder.validation.rag_missing_knowledge_base_id'),
             );
         } elseif (str_contains($kb, '{{')) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.knowledge_base_id",
                 code: 'rag_template_in_knowledge_base_id',
-                message: 'knowledge_base_id must be a literal value, not a template expression.',
+                message: (string) __('builder.validation.rag_template_in_knowledge_base_id'),
             );
         }
 
@@ -741,7 +741,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.provider",
                 code: 'rag_missing_provider',
-                message: 'rag_query requires a non-empty provider id.',
+                message: (string) __('builder.validation.rag_missing_provider'),
             );
         }
 
@@ -750,7 +750,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.query",
                 code: 'rag_missing_query',
-                message: 'rag_query requires a non-empty query template.',
+                message: (string) __('builder.validation.rag_missing_query'),
             );
         }
     }
@@ -797,7 +797,7 @@ final readonly class ValidateFlowService
         $errors[] = new FlowValidationErrorDto(
             path: "{$path}.config.variable.name",
             code: 'input_missing_save_target',
-            message: 'input requires a variable name to save the captured value into.',
+            message: (string) __('builder.validation.input_missing_save_target'),
         );
     }
 
@@ -814,13 +814,13 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.flow_id",
                 code: 'subflow_missing_flow_id',
-                message: 'subflow requires a non-empty flow_id.',
+                message: (string) __('builder.validation.subflow_missing_flow_id'),
             );
         } elseif (str_contains($flowId, '{{')) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.flow_id",
                 code: 'subflow_template_in_flow_id',
-                message: 'flow_id must be a literal value, not a template expression.',
+                message: (string) __('builder.validation.subflow_template_in_flow_id'),
             );
         }
 
@@ -828,7 +828,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.flow_version",
                 code: 'subflow_invalid_flow_version',
-                message: 'flow_version must be a positive whole number (a published version of the target flow) or empty.',
+                message: (string) __('builder.validation.subflow_invalid_flow_version'),
             );
         }
 
@@ -838,7 +838,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config.timeout",
                     code: 'subflow_invalid_timeout',
-                    message: 'timeout must be a non-empty ISO 8601 duration string (e.g. PT24H).',
+                    message: (string) __('builder.validation.subflow_invalid_timeout_format'),
                 );
             } else {
                 try {
@@ -847,7 +847,7 @@ final readonly class ValidateFlowService
                     $errors[] = new FlowValidationErrorDto(
                         path: "{$path}.config.timeout",
                         code: 'subflow_invalid_timeout',
-                        message: "timeout '{$timeout}' is not a valid ISO 8601 duration.",
+                        message: (string) __('builder.validation.subflow_invalid_timeout_value', ['timeout' => $timeout]),
                     );
                 }
             }
@@ -884,7 +884,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$nodeId}.config.flow_id",
                     code: 'start_flow_template_in_flow_id',
-                    message: 'flow_id must be a literal value, not a template expression.',
+                    message: (string) __('builder.validation.start_flow_template_in_flow_id'),
                 );
 
                 continue;
@@ -920,7 +920,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$nodeId}.config.flow_id",
                     code: 'start_flow_target_unknown',
-                    message: "start_flow target '{$target}' is not a flow of this flow's assistant.",
+                    message: (string) __('builder.validation.start_flow_target_unknown', ['target' => $target]),
                 );
             }
         }
@@ -970,7 +970,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$nodeId}.config.flow_id",
                     code: 'subflow_target_is_template',
-                    message: "Subflow target '{$target}' is a template: templates are placed with a template node, not called as a subflow.",
+                    message: (string) __('builder.validation.subflow_target_is_template', ['target' => $target]),
                 );
             }
         }
@@ -1026,7 +1026,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$nodeId}.config.flow_version",
                     code: 'subflow_pinned_version_missing',
-                    message: "Subflow target '{$target}' has no published version {$version}.",
+                    message: (string) __('builder.validation.subflow_pinned_version_missing', ['target' => $target, 'version' => $version]),
                 );
             }
         }
@@ -1097,7 +1097,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "nodes.{$sourceId}",
                 code: 'end_node_has_outgoing_edge',
-                message: 'end node must be terminal — outgoing edges are not allowed.',
+                message: (string) __('builder.validation.end_node_has_outgoing_edge'),
             );
         }
     }
@@ -1149,7 +1149,7 @@ final readonly class ValidateFlowService
                     $errors[] = new FlowValidationErrorDto(
                         path: "nodes.{$nodeId}",
                         code: 'keyboard_node_must_be_terminal',
-                        message: 'A send_message node with a keyboard cannot have a successor on the default output. It must be the last node in its branch.',
+                        message: (string) __('builder.validation.keyboard_node_must_be_terminal_default_output'),
                     );
                     break;
                 }
@@ -1163,7 +1163,7 @@ final readonly class ValidateFlowService
                     $errors[] = new FlowValidationErrorDto(
                         path: "nodes.{$nodeId}",
                         code: 'keyboard_node_must_be_terminal',
-                        message: 'A send_message node with a keyboard must be the last node in the sequence. Nodes placed after it are unreachable at runtime.',
+                        message: (string) __('builder.validation.keyboard_node_must_be_terminal_sequence'),
                     );
                 }
             }
@@ -1206,7 +1206,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$fromId}",
                     code: 'orphaned_button_edge',
-                    message: "Edge handle '{$handle}' does not match any button id on this node.",
+                    message: (string) __('builder.validation.orphaned_button_edge', ['handle' => $handle]),
                 );
             }
         }
@@ -1259,7 +1259,7 @@ final readonly class ValidateFlowService
                     $errors[] = new FlowValidationErrorDto(
                         path: "nodes.{$nodeId}.config.buttons.{$idx}.value",
                         code: 'button_value_type_mismatch',
-                        message: "Button value '{$value}' is not a valid {$saveToType}.",
+                        message: (string) __('builder.validation.button_value_type_mismatch', ['value' => $value, 'type' => $saveToType]),
                     );
                 }
             }
@@ -1294,7 +1294,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: $path,
                     code: 'invalid_trigger',
-                    message: 'Trigger must be an object.',
+                    message: (string) __('builder.validation.invalid_trigger'),
                 );
 
                 continue;
@@ -1304,13 +1304,13 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.id",
                     code: 'invalid_trigger_id',
-                    message: 'Trigger id must be a UUID.',
+                    message: (string) __('builder.validation.invalid_trigger_id'),
                 );
             } elseif (isset($idPaths[mb_strtolower($rawId)])) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.id",
                     code: 'duplicate_trigger_id',
-                    message: 'Two triggers of the flow have the same id.',
+                    message: (string) __('builder.validation.duplicate_trigger_id'),
                 );
             } else {
                 $idPaths[mb_strtolower($rawId)] = $path;
@@ -1327,7 +1327,7 @@ final readonly class ValidateFlowService
                     $errors[] = new FlowValidationErrorDto(
                         path: "{$path}.config.event_name",
                         code: 'duplicate_event_trigger',
-                        message: "Another trigger of the flow already starts it on the event '{$eventName}'.",
+                        message: (string) __('builder.validation.duplicate_event_trigger', ['event' => $eventName]),
                     );
                 } else {
                     $eventPaths[$eventName] = $path;
@@ -1349,7 +1349,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: ($idPaths[mb_strtolower((string) $id)] ?? 'triggers') . '.id',
                 code: 'trigger_id_taken',
-                message: 'Another flow already has a trigger with this id. Remove the trigger and add it again.',
+                message: (string) __('builder.validation.trigger_id_taken'),
             );
         }
     }
@@ -1366,7 +1366,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.type",
                 code: 'invalid_trigger_type',
-                message: 'Trigger type is required.',
+                message: (string) __('builder.validation.invalid_trigger_type'),
             );
 
             return;
@@ -1376,7 +1376,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.is_active",
                 code: 'invalid_trigger_active_flag',
-                message: 'Trigger active flag must be boolean.',
+                message: (string) __('builder.validation.invalid_trigger_active_flag'),
             );
         }
 
@@ -1385,7 +1385,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.priority",
                 code: 'invalid_trigger_priority',
-                message: 'Trigger priority must be a non-negative integer.',
+                message: (string) __('builder.validation.invalid_trigger_priority'),
             );
         }
 
@@ -1394,7 +1394,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config",
                 code: 'invalid_trigger_config',
-                message: 'Trigger config must be an object.',
+                message: (string) __('builder.validation.invalid_trigger_config_object'),
             );
 
             return;
@@ -1450,12 +1450,12 @@ final readonly class ValidateFlowService
                 ? new FlowValidationErrorDto(
                     path: "{$path}.type",
                     code: 'trigger_type_not_installed',
-                    message: sprintf('Trigger type %s belongs to the Solution "%s", which is not installed.', $type, mb_strstr($type, '.', true)),
+                    message: (string) __('builder.validation.trigger_type_not_installed', ['type' => $type, 'solution' => mb_strstr($type, '.', true)]),
                 )
                 : new FlowValidationErrorDto(
                     path: "{$path}.type",
                     code: 'unknown_trigger_type',
-                    message: "Unknown trigger type {$type}.",
+                    message: (string) __('builder.validation.unknown_trigger_type', ['type' => $type]),
                 );
 
             return;
@@ -1467,7 +1467,7 @@ final readonly class ValidateFlowService
             $warnings[] = new FlowValidationErrorDto(
                 path: "{$path}.type",
                 code: 'trigger_type_solution_inactive',
-                message: "The Solution \"{$owner}\" of trigger type {$type} is not active for the tenant: the trigger starts nothing until it is.",
+                message: (string) __('builder.validation.trigger_type_solution_inactive', ['solution' => $owner, 'type' => $type]),
             );
         }
 
@@ -1478,7 +1478,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config",
                 code: 'trigger_validator_failed',
-                message: "The validator of trigger type {$type} failed: {$exception->getMessage()}",
+                message: (string) __('builder.validation.trigger_validator_failed', ['type' => $type, 'error' => $exception->getMessage()]),
             );
 
             return;
@@ -1564,8 +1564,7 @@ final readonly class ValidateFlowService
         $errors[] = new FlowValidationErrorDto(
             path: "{$path}.config.keywords",
             code: 'duplicate_exact_trigger_keyword',
-            message: 'Exact message trigger keywords must be unique within the same scope: ' . implode(', ', $conflicts)
-                     . '.',
+            message: (string) __('builder.validation.duplicate_exact_trigger_keyword', ['keywords' => implode(', ', $conflicts)]),
         );
     }
 
@@ -1633,7 +1632,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.event_name",
                 code: 'missing_event_trigger_selection',
-                message: 'Event trigger requires selecting an existing event.',
+                message: (string) __('builder.validation.missing_event_trigger_selection'),
             );
 
             return;
@@ -1645,7 +1644,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.event_name",
                 code: 'unknown_event_trigger_selection',
-                message: 'Selected event must already exist in the tenant event registry.',
+                message: (string) __('builder.validation.unknown_event_trigger_selection'),
             );
         }
     }
@@ -1681,7 +1680,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: $filterPath,
                 code: 'assistant_filter_on_core_event',
-                message: 'A Core event has no source assistant: remove the assistant filter from its trigger.',
+                message: (string) __('builder.validation.assistant_filter_on_core_event'),
             );
 
             return;
@@ -1720,7 +1719,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: $filterPath,
                 code: 'unknown_assistant_filter',
-                message: "The assistant filter names an assistant that does not exist: '{$assistantId}'.",
+                message: (string) __('builder.validation.unknown_assistant_filter', ['assistant' => $assistantId]),
             );
         }
     }
@@ -1745,13 +1744,13 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config.iterator_name",
                     code: 'loop_invalid_iterator_name',
-                    message: "iterator_name '{$iteratorName}' must match identifier pattern (alphanumeric + underscore, not starting with digit).",
+                    message: (string) __('builder.validation.loop_invalid_iterator_name', ['name' => $iteratorName]),
                 );
             } elseif (in_array($iteratorName, ['id', 'language', 'meta', 'tenant_id', 'external_id'], true)) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config.iterator_name",
                     code: 'loop_reserved_iterator_name',
-                    message: "iterator_name '{$iteratorName}' is reserved and cannot be used.",
+                    message: (string) __('builder.validation.loop_reserved_iterator_name', ['name' => $iteratorName]),
                 );
             }
         }
@@ -1769,7 +1768,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config.count_source",
                     code: 'loop_count_exceeds_budget',
-                    message: "Static loop count {$literal} exceeds the maximum of {$budget} iterations per loop.",
+                    message: (string) __('builder.validation.loop_count_exceeds_budget', ['count' => $literal, 'budget' => $budget]),
                 );
             }
         }
@@ -1799,7 +1798,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.loop_node_id",
                 code: 'loop_end_missing_loop_node_id',
-                message: 'loop_end requires loop_node_id pointing to the parent loop node.',
+                message: (string) __('builder.validation.loop_end_missing_loop_node_id'),
             );
 
             return;
@@ -1811,7 +1810,7 @@ final readonly class ValidateFlowService
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.loop_node_id",
                 code: 'loop_end_invalid_loop_node_id',
-                message: "loop_node_id '{$loopNodeId}' does not reference an existing loop node.",
+                message: (string) __('builder.validation.loop_end_invalid_loop_node_id', ['id' => $loopNodeId]),
             );
         }
     }
@@ -1888,7 +1887,7 @@ final readonly class ValidateFlowService
                     $errors[] = new FlowValidationErrorDto(
                         path: "nodes.{$nodeId}",
                         code: 'loop_nested_not_allowed',
-                        message: "Loop body of node '{$nodeId}' contains a nested loop node '{$current}'. Nested loops are not supported.",
+                        message: (string) __('builder.validation.loop_nested_not_allowed', ['node_id' => $nodeId, 'nested_id' => $current]),
                     );
                     break;
                 }
@@ -2004,7 +2003,7 @@ final readonly class ValidateFlowService
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$nodeId}",
                     code: 'loop_missing_loop_end',
-                    message: "Loop node '{$nodeId}' has no reachable loop_end — the iteration would never complete.",
+                    message: (string) __('builder.validation.loop_missing_loop_end', ['node_id' => $nodeId]),
                 );
             }
         }
