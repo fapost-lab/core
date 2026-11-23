@@ -158,6 +158,7 @@ final class ConsoleRouteInterceptionTest extends FeatureTestCase
             'broadcast send'             => ['console.broadcasts.send', BroadcastController::class, 'send', 'POST', 'assistant/{assistant}/broadcasts/{record}/send'],
             'broadcast cancel'           => ['console.broadcasts.cancel', BroadcastController::class, 'cancel', 'POST', 'assistant/{assistant}/broadcasts/{record}/cancel'],
             'broadcast destroy'          => ['console.broadcasts.destroy', BroadcastController::class, 'destroy', 'DELETE', 'assistant/{assistant}/broadcasts/{record}'],
+            'flow session rerun'         => ['console.flow-sessions.rerun', FlowSessionController::class, 'rerun', 'POST', 'assistant/{assistant}/flow-sessions/{record}/rerun'],
             // Conversations.
             'conversation reply'    => ['console.conversations.reply', ConversationController::class, 'reply', 'POST', 'assistant/{assistant}/conversations/{record}/reply'],
             'conversation takeover' => ['console.conversations.takeover', ConversationController::class, 'takeOver', 'POST', 'assistant/{assistant}/conversations/{record}/takeover'],

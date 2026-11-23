@@ -155,14 +155,14 @@ describe('re-running a run from its page', () => {
 
     expect(live.options?.active()).toBe(true)
 
-    await wrapper.setProps({ reruns: [{ id: 'rerun-1', status: 'completed', createdAt: null, url: '/rerun-1' }] })
+    await wrapper.setProps({ reruns: [{ id: 'rerun-1', status: 'completed', isRunning: false, createdAt: null, url: '/rerun-1' }] })
     expect(live.options?.active()).toBe(false)
 
     vi.useRealTimers()
   })
 
   it('keeps reloading while a listed re-run is still running', () => {
-    mountPage(offer(), [{ id: 'rerun-1', status: 'active', createdAt: null, url: '/rerun-1' }])
+    mountPage(offer(), [{ id: 'rerun-1', status: 'active', isRunning: true, createdAt: null, url: '/rerun-1' }])
 
     expect(live.options?.active()).toBe(true)
   })
@@ -177,7 +177,7 @@ describe('re-running a run from its page', () => {
   })
 
   it('lists the re-runs of the run and links a re-run back to its source', () => {
-    const wrapper = mountPage(offer(), [{ id: 'rerun-1', status: 'completed', createdAt: null, url: '/rerun-1' }], { id: 'older-run', url: '/older' })
+    const wrapper = mountPage(offer(), [{ id: 'rerun-1', status: 'completed', isRunning: false, createdAt: null, url: '/rerun-1' }], { id: 'older-run', url: '/older' })
 
     expect(wrapper.get('[data-test="reruns"]').text()).toContain('rerun-1')
     expect(wrapper.get('[data-test="reruns"]').text()).toContain('Completed')

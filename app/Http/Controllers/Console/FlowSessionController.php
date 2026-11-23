@@ -19,6 +19,7 @@ use App\Domains\Flow\Templates\TemplateNodeOrigins;
 use App\Domains\Flow\Trace\RunGraphReader;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
+use App\Http\Requests\Console\RerunFlowSessionRequest;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -130,6 +131,7 @@ final class FlowSessionController extends Controller
             'reruns' => array_map(fn (FlowSession $rerun): array => [
                 'id'        => (string) $rerun->getKey(),
                 'status'    => $rerun->status->value,
+                'isRunning' => $this->isRunning($rerun),
                 'createdAt' => $rerun->created_at?->toIso8601String(),
                 'url'       => $this->url('flow-sessions.show', $assistant, ['record' => $rerun->getKey()]),
             ], $this->sessions->reruns($assistant, $session)),
@@ -155,17 +157,12 @@ final class FlowSessionController extends Controller
      * runs: a synchronous queue runs the job inside the request, and the tenant switch it makes resets the current
      * assistant.
      */
-    public function rerun(Request $request, string $assistantKey, string $record): RedirectResponse
+    public function rerun(RerunFlowSessionRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $assistant = $this->assistant->get();
         $session   = $this->sessions->findFor($assistant, $record);
-
-        Gate::authorize('rerun', $session);
-
-        // The attempt the person confirmed: a repeated or replayed request carries the same one and starts no second run.
-        $attempt = (int) $request->validate(['attempt' => ['required', 'integer', 'min:1']])['attempt'];
-        $page    = $this->url('flow-sessions.show', $assistant, ['record' => $session->getKey()]);
-        $outcome = $this->reruns->rerun($session, $attempt);
+        $page      = $this->url('flow-sessions.show', $assistant, ['record' => $session->getKey()]);
+        $outcome   = $this->reruns->rerun($session, $request->attempt());
 
         if (null !== $outcome->refusal) {
             Inertia::flash('error', trans('console.flow_sessions.rerun.refusals.' . $outcome->refusal->value));
@@ -289,6 +286,15 @@ final class FlowSessionController extends Controller
             'channel' => FlowActivityChannel::name((string) $assistant->tenant_id, (string) $assistant->getKey()),
             'event'   => FlowActivityChannel::EVENT,
         ];
+    }
+
+    /**
+     * Whether a run may still move soon, so a page listing it keeps itself current: a live one, or one still queued to
+     * start (`paused` sleeps in a delay and is not).
+     */
+    private function isRunning(FlowSession $session): bool
+    {
+        return FlowSessionStatus::Pending === $session->status || in_array($session->status, FlowSessionStatus::live(), true);
     }
 
     private function requestedFilter(Request $request, string $key): ?string

@@ -21,7 +21,6 @@ import CopyButton from '../Contacts/CopyButton.vue'
 import LiveHint from './LiveHint.vue'
 import {
   END_STATUS_TONES,
-  RUNNING_STATUSES,
   STATUS_TONES,
   type FlowSessionDetails,
   type FlowSessionsPageProps,
@@ -116,7 +115,7 @@ const { transport } = useLiveUpdates({
   live: () => props.live,
   only: ['session', 'state', 'history', 'rerun', 'reruns'],
   pollMs: POLL_MS,
-  active: () => props.session.isLive || awaitingRerun.value || props.reruns.some((row) => RUNNING_STATUSES.includes(row.status)),
+  active: () => props.session.isLive || awaitingRerun.value || props.reruns.some((row) => row.isRunning),
 })
 
 function when(value: string | null): string | null {

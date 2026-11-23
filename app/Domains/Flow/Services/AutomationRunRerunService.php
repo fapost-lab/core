@@ -37,9 +37,12 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  *
  * Only a root automation run that failed and kept its payload is re-run, and only while its trigger is still live and not
  * paused by the run rate breaker, its flow is not switched off in the flows list and has an active version; anything
- * else is a refusal with its reason, never an exception. The source run is not changed. Every queued re-run is recorded in the audit log, and the entry is committed before the job is queued:
- * a queue that refuses the job leaves an entry for a re-run the person is told failed, and asking again makes the same
- * key, so the run still starts once.
+ * else is a refusal with its reason, never an exception. The source run is not changed. Every queued re-run request is
+ * recorded in the audit log, and the entry is committed before the job is queued: a queue that refuses the job leaves an
+ * entry for a re-run the person is told failed, and asking again makes the same key, so the run still starts once. The
+ * entries are per request, not per run: two requests for the same attempt that arrive before its run has started (a
+ * double click, a second tab) both pass {@see check()} and both are recorded, while the trigger's unique key starts one
+ * run.
  *
  * The tenant is the source session's own, passed to the job explicitly.
  */

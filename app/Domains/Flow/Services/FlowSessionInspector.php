@@ -8,6 +8,7 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Enums\FlowActivityPeriod;
 use App\Domains\Flow\Enums\FlowKind;
+use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
@@ -195,13 +196,19 @@ final readonly class FlowSessionInspector
 
     /**
      * The re-runs from the start of a session the assistant has ({@see RerunFireKey}), oldest first: the runs its trigger
-     * started under a re-run key made from the session's id.
+     * started under a re-run key made from the session's id. Only a failed root automation run is ever re-run, so any
+     * other session has none and is not looked up: the key is matched by a prefix, which scans the trigger's runs.
      *
      * @return list<FlowSession>
      */
     public function reruns(Assistant $assistant, FlowSession $session): array
     {
-        if (null === $session->trigger_id) {
+        if (
+            null === $session->trigger_id
+            || FlowRunKind::Automation !== $session->run_kind
+            || FlowSessionStatus::Failed !== $session->status
+            || null !== $session->getAttribute('parent_session_id')
+        ) {
             return [];
         }
 

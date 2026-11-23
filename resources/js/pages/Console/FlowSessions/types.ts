@@ -103,6 +103,8 @@ export interface RerunOffer {
 export interface RerunRow {
   id: string
   status: FlowSessionStatus
+  /** The run may still move soon (live, or queued to start): a page listing it keeps itself current. */
+  isRunning: boolean
   createdAt: string | null
   url: string
 }
@@ -187,6 +189,3 @@ export const END_STATUS_TONES: Record<string, 'success' | 'danger' | 'neutral'> 
   failed: 'danger',
   cancelled: 'neutral',
 }
-
-/** A run in one of these may still move soon: a page listing it keeps itself current (`paused` sleeps in a delay). */
-export const RUNNING_STATUSES: readonly FlowSessionStatus[] = ['pending', 'active', 'waiting_input', 'paused_subflow']
