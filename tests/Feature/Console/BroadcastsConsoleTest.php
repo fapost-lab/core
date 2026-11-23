@@ -752,6 +752,28 @@ final class BroadcastsConsoleTest extends FeatureTestCase
         $this->assertSame(BroadcastStatus::Cancelled, $automated->refresh()->status);
     }
 
+    public function test_a_flow_of_another_assistant_is_not_named_on_the_row(): void
+    {
+        $foreign = FlowDraft::factory()->create([
+            'tenant_id'    => $this->assistant->tenant_id,
+            'assistant_id' => Assistant::factory()->create(['tenant_id' => $this->assistant->tenant_id])->getKey(),
+            'name'         => 'Somebody else',
+        ]);
+        $this->broadcast('From a foreign flow', [
+            'status'     => BroadcastStatus::Running->value,
+            'origin'     => 'automation',
+            'flow_id'    => $foreign->flow_id,
+            'origin_key' => 'key-foreign',
+        ]);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.flowName', null)
+                ->where('table.rows.0.flowUrl', null)
+                ->etc());
+    }
+
     public function test_only_a_running_broadcast_can_be_cancelled(): void
     {
         $this->actingAs($this->admin());

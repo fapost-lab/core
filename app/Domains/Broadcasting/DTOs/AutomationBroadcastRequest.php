@@ -10,8 +10,6 @@ use App\Domains\Broadcasting\Enums\BroadcastTarget;
  * A flow node's request to send one message to an audience, as {@see \App\Domains\Broadcasting\Services\AutomationBroadcasts}
  * takes it. The message is already rendered by the flow and is frozen as it is; a plain string is the base language's
  * text.
- *
- * @phpstan-type Message array<string, string>|string
  */
 final readonly class AutomationBroadcastRequest
 {

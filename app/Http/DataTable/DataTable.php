@@ -9,6 +9,7 @@ use Fapost\Foundation\Console\Enums\TableTarget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * The server side of a list screen: search, sort and pagination read from the query string, applied to an
@@ -78,6 +79,9 @@ final readonly class DataTable
      *
      * @param  Builder<TModel>                        $query
      * @param  Closure(TModel): array<string, mixed>  $map   turns a record into its row
+     * @param  Closure(Collection<int, TModel>): void|null  $beforeMap  called once with the page's records, before
+     *                                                      `$map` runs on them: lets a screen load what its rows need
+     *                                                      for the whole page in one query
      *
      * @return array{
      *     rows: list<array<string, mixed>>,
@@ -86,7 +90,7 @@ final readonly class DataTable
      *     defaults: array{sort: string, perPage: int, perPageOptions: list<int>, group?: string}
      * }
      */
-    public function respond(Request $request, Builder $query, Closure $map): array
+    public function respond(Request $request, Builder $query, Closure $map, ?Closure $beforeMap = null): array
     {
         $search  = $this->search($request);
         $sort    = $this->sort($request);
@@ -107,6 +111,10 @@ final readonly class DataTable
         // The page asked for is gone (the last rows of the last page were deleted): show the last one instead.
         if ($paginator->currentPage() > $paginator->lastPage() && $paginator->lastPage() > 0) {
             $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
+        }
+
+        if (null !== $beforeMap) {
+            $beforeMap($paginator->getCollection());
         }
 
         $rows = $paginator->getCollection()->map($map)->values()->all();

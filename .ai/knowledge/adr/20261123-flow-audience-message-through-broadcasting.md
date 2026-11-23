@@ -11,7 +11,9 @@ paths:
   - app/Infrastructure/Flow/BroadcastingAudienceBroadcaster.php
   - app/Domains/Flow/Contracts/AudienceBroadcasterInterface.php
   - app/Domains/Flow/Handlers/SendMessageNodeHandler.php
+  - app/Domains/Flow/Services/AudienceMessage.php
 summary: Why send_message to tags or a segment starts a broadcast of the flow's assistant through Broadcasting's automation entry (no revision, no audit), once per node execution (origin_key), one live per node, with the run's chain depth + 1, and publishing it needs ManageBroadcast
+reviewed_at: 2026-11-23
 ---
 # A flow's message to tags or a segment is a broadcast started through Broadcasting's automation entry
 

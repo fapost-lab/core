@@ -13,10 +13,16 @@ use App\Domains\Broadcasting\Enums\BroadcastTarget;
 use App\Domains\Broadcasting\Jobs\RunBroadcastJob;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Services\AutomationBroadcasts;
+use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
+use Closure;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Mockery;
+use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -95,6 +101,94 @@ final class AutomationBroadcastsTest extends FeatureTestCase
 
         $this->assertSame(AutomationBroadcastOutcome::AudienceMissing, $result->outcome);
         $this->assertSame(0, Broadcast::query()->count());
+    }
+
+    public function test_a_concurrent_request_of_the_same_node_execution_gets_the_winners_broadcast_back(): void
+    {
+        $competitor = null;
+
+        $this->competeOnTheLiveCheck(function () use (&$competitor): void {
+            $competitor = $this->competingBroadcast('key-1', BroadcastStatus::Running);
+        });
+
+        $result = $this->service()->start($this->request('key-1'));
+
+        $this->assertNotNull($competitor);
+        $this->assertSame(AutomationBroadcastOutcome::Replayed, $result->outcome);
+        $this->assertSame((string) $competitor->getKey(), $result->broadcastId);
+        $this->assertSame(1, Broadcast::query()->count());
+    }
+
+    public function test_a_concurrent_request_of_another_run_of_the_node_is_busy(): void
+    {
+        $this->competeOnTheLiveCheck(function (): void {
+            $this->competingBroadcast('key-other', BroadcastStatus::Running);
+        });
+
+        $result = $this->service()->start($this->request('key-1'));
+
+        $this->assertSame(AutomationBroadcastOutcome::Busy, $result->outcome);
+        $this->assertNull($result->broadcastId);
+        $this->assertSame(['key-other'], Broadcast::query()->pluck('origin_key')->all());
+    }
+
+    public function test_a_reach_that_cannot_be_counted_does_not_fail_a_started_broadcast(): void
+    {
+        $tags = Mockery::mock(ContactTagRepositoryInterface::class);
+        $tags->shouldReceive('contactIdsWithTag')->andThrow(new RuntimeException('count failed'));
+        $this->app->instance(ContactTagRepositoryInterface::class, $tags);
+
+        $result = $this->service()->start($this->request('key-1'));
+
+        $this->assertSame(AutomationBroadcastOutcome::Started, $result->outcome);
+        $this->assertSame(0, $result->recipientCount);
+        $this->assertSame(1, Broadcast::query()->count());
+    }
+
+    public function test_a_replay_reports_the_audience_the_run_fixed_instead_of_recounting(): void
+    {
+        $first = $this->service()->start($this->request('key-1'));
+        Broadcast::query()->update(['total_recipients' => 7, 'status' => BroadcastStatus::Completed->value]);
+
+        $again = $this->service()->start($this->request('key-1'));
+
+        $this->assertSame(AutomationBroadcastOutcome::Replayed, $again->outcome);
+        $this->assertSame($first->broadcastId, $again->broadcastId);
+        $this->assertSame(7, $again->recipientCount);
+    }
+
+    /**
+     * Runs the callback once, when the service first asks whether the node has a live broadcast: the moment between its
+     * checks and its insert, in which a concurrent request can win. Not a model event: that would sit in the
+     * insert's own transaction and be rolled back with it.
+     */
+    private function competeOnTheLiveCheck(Closure $competitor): void
+    {
+        $fired = false;
+
+        DB::listen(static function (QueryExecuted $query) use (&$fired, $competitor): void {
+            if (! $fired && str_contains($query->sql, '"broadcasts"') && str_contains($query->sql, 'flow_node_id') && str_starts_with($query->sql, 'select exists')) {
+                $fired = true;
+                $competitor();
+            }
+        });
+    }
+
+    private function competingBroadcast(string $originKey, BroadcastStatus $status): Broadcast
+    {
+        return Broadcast::query()->create([
+            'tenant_id'    => self::TENANT_ID,
+            'assistant_id' => (string) $this->assistant->getKey(),
+            'name'         => 'Competitor',
+            'message'      => ['ru' => 'Привет'],
+            'target_type'  => BroadcastTarget::Tags->value,
+            'target_tags'  => ['vip'],
+            'status'       => $status->value,
+            'origin'       => BroadcastOrigin::Automation->value,
+            'flow_id'      => '01938f3e-7c1a-7d2b-8e4f-123456789abc',
+            'flow_node_id' => 'tell',
+            'origin_key'   => $originKey,
+        ]);
     }
 
     private function service(): AutomationBroadcasts

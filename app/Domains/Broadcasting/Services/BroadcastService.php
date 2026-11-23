@@ -19,7 +19,7 @@ use App\Domains\Broadcasting\Exceptions\BroadcastNotSendableException;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Support\BroadcastMessage;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
-use App\Domains\Contact\Models\ContactSegment;
+use App\Domains\Contact\Services\ContactSegmentService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Illuminate\Database\Eloquent\Builder;
@@ -54,6 +54,7 @@ final readonly class BroadcastService
         private BroadcastDispatcher $dispatcher,
         private ContactTagRepositoryInterface $tags,
         private AuditTrailInterface $audit,
+        private ContactSegmentService $segments,
     ) {
     }
 
@@ -447,13 +448,7 @@ final readonly class BroadcastService
      */
     public function segmentOptions(): array
     {
-        return ContactSegment::query()
-            ->where('tenant_id', $this->tenants->get()->getId())
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(static fn (ContactSegment $segment): array => ['value' => (string) $segment->getKey(), 'label' => $segment->name])
-            ->values()
-            ->all();
+        return $this->segments->options();
     }
 
     /**
@@ -461,10 +456,7 @@ final readonly class BroadcastService
      */
     public function segmentExists(string $id): bool
     {
-        return Str::isUuid($id) && ContactSegment::query()
-            ->where('tenant_id', $this->tenants->get()->getId())
-            ->whereKey($id)
-            ->exists();
+        return $this->segments->existsForTenant((string) $this->tenants->get()->getId(), $id);
     }
 
     /**

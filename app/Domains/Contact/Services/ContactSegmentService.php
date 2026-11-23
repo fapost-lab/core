@@ -54,6 +54,36 @@ final readonly class ContactSegmentService
     }
 
     /**
+     * The current tenant's segments by name, as a picker takes them.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    public function options(): array
+    {
+        return $this->query()
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(static fn (ContactSegment $segment): array => [
+                'value' => (string) $segment->getKey(),
+                'label' => (string) $segment->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Whether the id is a segment of the given tenant. Takes the tenant explicitly: a flow's validation and a worker
+     * name it without a resolved request.
+     */
+    public function existsForTenant(string $tenantId, string $id): bool
+    {
+        return Str::isUuid($id) && ContactSegment::query()
+            ->where('tenant_id', $tenantId)
+            ->whereKey(mb_strtolower($id))
+            ->exists();
+    }
+
+    /**
      * @throws ModelNotFoundException when the id is not a segment of the current tenant
      */
     public function findForTenant(string $id): ContactSegment

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\DTOs;
 
+use App\Domains\Flow\Enums\AudienceKind;
+
 /**
  * A `send_message` node's request to broadcast one message to tags or a segment.
  *
@@ -12,11 +14,7 @@ namespace App\Domains\Flow\DTOs;
  */
 final readonly class AudienceBroadcastRequest
 {
-    public const string AUDIENCE_TAGS    = 'tags';
-    public const string AUDIENCE_SEGMENT = 'segment';
-
     /**
-     * @param  self::AUDIENCE_*               $audience
      * @param  list<string>                   $tags        the tags of a tags audience ("any of")
      * @param  array<string, string>|string   $message
      * @param  string                         $originKey   identifies the node execution: the same key never starts two
@@ -26,7 +24,7 @@ final readonly class AudienceBroadcastRequest
         public string $tenantId,
         public string $assistantId,
         public string $name,
-        public string $audience,
+        public AudienceKind $audience,
         public array $tags,
         public ?string $segmentId,
         public array|string $message,

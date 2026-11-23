@@ -124,6 +124,27 @@ final readonly class FlowDraftService
     }
 
     /**
+     * The names of the current assistant's flows with these ids, in one query, whatever their kind; a flow that is not
+     * the assistant's or is gone is missing from the answer.
+     *
+     * @param  list<string>  $flowIds
+     *
+     * @return array<string, string>  flow id => name
+     */
+    public function namesByFlowId(array $flowIds): array
+    {
+        if ([] === $flowIds) {
+            return [];
+        }
+
+        return $this->scoped()
+            ->whereIn('flow_drafts.flow_id', $flowIds)
+            ->pluck('flow_drafts.name', 'flow_drafts.flow_id')
+            ->map(static fn (mixed $name): string => (string) $name)
+            ->all();
+    }
+
+    /**
      * Keeps the flows of one group. Anything that is not a group id is no filter at all.
      *
      * @param  Builder<FlowDraft>  $query

@@ -12,10 +12,11 @@ use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\BroadcastTarget;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Support\BroadcastMessage;
-use App\Domains\Contact\Models\ContactSegment;
+use App\Domains\Contact\Services\ContactSegmentService;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Support\Str;
+use Psr\Log\LoggerInterface;
+use Throwable;
 
 /**
  * The automation's way into Broadcasting: a flow's `send_message` node to tags or a segment starts a broadcast here.
@@ -40,6 +41,8 @@ final readonly class AutomationBroadcasts
         private BroadcastDispatcher $dispatcher,
         private BroadcastRecipientResolver $recipients,
         private TenantSettings $settings,
+        private ContactSegmentService $segments,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -112,13 +115,15 @@ final readonly class AutomationBroadcasts
      */
     public function segmentExists(string $tenantId, string $segmentId): bool
     {
-        return Str::isUuid($segmentId) && ContactSegment::query()
-            ->where('tenant_id', $tenantId)
-            ->whereKey(mb_strtolower($segmentId))
-            ->exists();
+        return $this->segments->existsForTenant($tenantId, $segmentId);
     }
 
     /**
+     * Trims, drops empty and repeated tags. It repeats what Flow's {@see \App\Domains\Flow\Support\AddresseeResolver}
+     * does on its side on purpose: Broadcasting cleans what reaches its own entry and does not trust its caller, and the
+     * two sides are separated by the Flow port ({@see \App\Domains\Flow\Contracts\AudienceBroadcasterInterface}), so
+     * neither imports the other.
+     *
      * @param  array<array-key, mixed>  $tags
      *
      * @return list<string>
@@ -138,13 +143,41 @@ final readonly class AutomationBroadcasts
         return $clean;
     }
 
+    /**
+     * The result for a broadcast this request started or got back.
+     *
+     * The reach is an estimate, so a failed count must not turn a started broadcast into a failure: it is reported as
+     * 0 and logged. A started broadcast always counts the live audience. A replayed one (a retried step) reports what
+     * the run has fixed once it has, so a retry gives the same number as the first answer; before that, the live
+     * estimate.
+     */
     private function named(AutomationBroadcastOutcome $outcome, Broadcast $broadcast): AutomationBroadcastResult
     {
         return new AutomationBroadcastResult(
             outcome: $outcome,
             broadcastId: (string) $broadcast->getKey(),
-            recipientCount: $this->recipients->count($broadcast),
+            recipientCount: $this->reach($outcome, $broadcast),
         );
+    }
+
+    private function reach(AutomationBroadcastOutcome $outcome, Broadcast $broadcast): int
+    {
+        if (AutomationBroadcastOutcome::Replayed === $outcome
+            && ($broadcast->total_recipients > 0 || BroadcastStatus::Completed === $broadcast->status)) {
+            return (int) $broadcast->total_recipients;
+        }
+
+        try {
+            return $this->recipients->count($broadcast);
+        } catch (Throwable $exception) {
+            $this->logger->warning('broadcasting.automation_reach_count_failed', [
+                'tenant_id'    => $broadcast->tenant_id,
+                'broadcast_id' => (string) $broadcast->getKey(),
+                'exception'    => $exception,
+            ]);
+
+            return 0;
+        }
     }
 
     private function findByKey(string $originKey): ?Broadcast
