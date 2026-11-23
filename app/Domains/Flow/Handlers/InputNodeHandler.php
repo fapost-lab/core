@@ -306,7 +306,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
 
     /**
      * Resolve each button's localized label so the sender receives a
-     * language-flattened keyboard.
+     * language-flattened keyboard, without an author-set `callback_payload`.
      *
      * @param  array<string, mixed>  $config
      *
@@ -324,6 +324,10 @@ final class InputNodeHandler extends AbstractVersionedHandler
                     ? $this->translator->resolveField($labelRaw, $language)
                     : '';
                 $btn['type'] = is_string($btn['type'] ?? null) ? $btn['type'] : 'callback';
+
+                // A button's own payload is the sender's seam for `ask_person`; an author's input button never sets
+                // one, so its press keeps the session-and-button payload that brings it back to this node.
+                unset($btn['callback_payload']);
 
                 return $btn;
             },

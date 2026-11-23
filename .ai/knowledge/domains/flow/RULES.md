@@ -337,10 +337,12 @@ broken.
   known or not; `FlowQuestions::receivePress()` answers only for the question's contact, on its assistant, with an index
   of its buttons, and tells any other presser nothing. The question leaves `pending` by one conditional UPDATE; the run
   goes on only through `ContinueAfterFlowQuestionJob` under the run's own lock, never under the presser's. No other
-  payload may start with `q1`, and `send_message` drops an author's `callback_payload`. Why: a press decides for a run
+  payload may start with `q1`: `send_message` and `input` drop an author's `callback_payload`. A button's id is kept
+  as authored, since it becomes the branch's source handle and edges are matched exactly; two ids that differ only
+  in case are refused as duplicates. Why: a press decides for a run
   with side effects elsewhere, and an answer to someone else's run must not become input to the presser's own
   conversation (`adr-20261123-ask-person-question-outside-the-run`). Enforced: `AskPersonNodeTest`,
-  `MessageRouterTest`, `FlowQuestionResumerRedisTest`.
+  `MessageRouterTest`, `FlowQuestionResumerRedisTest`, `FlowTelegramMarkupCharacterizationTest` (`input`).
 - **A message to tags or a segment is a broadcast, started once per node execution through Flow's port.**
   `send_message` with `addressee.kind` `tags` or `segment` (static values; `AddresseeResolver` reads every kind) calls
   `AudienceBroadcasterInterface`, implemented in `app/Infrastructure/Flow`, so the runtime never imports Broadcasting.

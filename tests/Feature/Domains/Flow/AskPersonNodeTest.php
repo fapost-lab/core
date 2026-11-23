@@ -130,6 +130,23 @@ final class AskPersonNodeTest extends FeatureTestCase
         Http::assertSent(static fn (Request $request): bool => str_contains($request->url(), 'editMessageReplyMarkup'));
     }
 
+    public function test_a_button_id_in_upper_case_answers_into_the_edge_authored_with_it(): void
+    {
+        $approve  = mb_strtoupper(self::APPROVE);
+        $session  = $this->startRun(approveId: $approve);
+        $question = $this->soleQuestion();
+
+        $this->press($question, 0);
+        $this->assertSame($approve, $question->refresh()->answer_button_id);
+
+        $this->runContinuation();
+
+        $session->refresh();
+        $this->assertSame(FlowSessionStatus::Ended, $session->status);
+        $this->assertSame('success', $session->end_status);
+        $this->assertSame('approve', data_get($session->state, 'flow.decision'));
+    }
+
     public function test_a_repeated_continuation_does_not_move_the_run_twice(): void
     {
         $session  = $this->startRun();
@@ -325,6 +342,48 @@ final class AskPersonNodeTest extends FeatureTestCase
         Queue::assertPushed(ContinueAfterFlowQuestionJob::class, 1);
     }
 
+    public function test_a_conversation_parked_on_a_question_is_busy_for_its_own_contact_until_reset_and_a_late_press_gets_the_text(): void
+    {
+        $customer   = $this->contactOn($this->assistant, 'chat-customer');
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $this->tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Ask in a conversation',
+            'nodes'     => [
+                $this->askNode(),
+                ['id' => 'ok', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            'edges'     => [['id' => 'e1', 'from' => 'ask', 'to' => 'ok', 'handle' => self::APPROVE]],
+            'is_active' => true,
+        ]);
+
+        $this->app->make(\App\Domains\Assistant\Contracts\CurrentAssistantInterface::class)->set($this->assistant);
+        $session = $this->app->make(FlowEngineInterface::class)
+            ->start($definition, $customer, ['flow' => ['manager_id' => (string) $this->manager->getKey(), 'order_id' => '42']]);
+        $question = $this->soleQuestion();
+
+        $this->assertSame(FlowSessionStatus::Paused, $session->refresh()->status);
+        $this->assertSame((string) $this->manager->getKey(), $question->contact_id);
+
+        $router  = $this->app->make(\App\Domains\Flow\Routing\MessageRouter::class);
+        $channel = Channel::query()->where('assistant_id', $this->assistant->getKey())->sole();
+
+        $busy = $router->route($customer, $this->textFrom('chat-customer', 'hello', 'c1'), $this->assistant, $channel);
+        $this->assertSame('drop_busy', $busy->reason);
+        $this->assertSame(FlowSessionStatus::Paused, $session->refresh()->status);
+
+        $reset = $router->route($customer, $this->textFrom('chat-customer', '/reset', 'c2'), $this->assistant, $channel);
+        $this->assertSame('/reset', $reset->command);
+        $this->assertSame(FlowSessionStatus::TerminatedByUser, $session->refresh()->status);
+
+        $late = $router->route($this->manager, $this->buttonPress(FlowQuestionButton::encode($question->token, 0), 'm1'), $this->assistant, $channel);
+        $this->assertSame('flow_question_answer', $late->reason);
+        $this->assertSame(FlowQuestionStatus::Closed, $question->refresh()->status);
+        Queue::assertNotPushed(ContinueAfterFlowQuestionJob::class);
+        Http::assertSent(static fn (Request $request): bool => 'This has already been decided.' === ($request['text'] ?? null));
+    }
+
     public function test_an_authors_send_message_button_cannot_carry_a_question_payload(): void
     {
         $definition = FlowDefinition::query()->create([
@@ -362,7 +421,19 @@ final class AskPersonNodeTest extends FeatureTestCase
         );
     }
 
-    private function startRun(int $timeoutSeconds = 3600, ?string $managerId = null): FlowSession
+    private function textFrom(string $chatId, string $text, string $updateId): \Fapost\Foundation\DTO\IncomingMessage
+    {
+        return new \Fapost\Foundation\DTO\IncomingMessage(
+            updateId: $updateId,
+            externalUserId: $chatId,
+            externalChatId: $chatId,
+            text: $text,
+            type: \Fapost\Foundation\DTO\IncomingMessageType::Text,
+            platform: 'telegram',
+        );
+    }
+
+    private function startRun(int $timeoutSeconds = 3600, ?string $managerId = null, string $approveId = self::APPROVE): FlowSession
     {
         $definition = FlowDefinition::query()->create([
             'tenant_id' => $this->tenantId,
@@ -370,13 +441,13 @@ final class AskPersonNodeTest extends FeatureTestCase
             'version'   => 1,
             'name'      => 'Approval',
             'nodes'     => [
-                $this->askNode($timeoutSeconds),
+                $this->askNode($timeoutSeconds, $approveId),
                 ['id' => 'ok', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
                 ['id' => 'no', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'failed']],
                 ['id' => 'late', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'cancelled']],
             ],
             'edges' => [
-                ['id' => 'e1', 'from' => 'ask', 'to' => 'ok', 'handle' => self::APPROVE],
+                ['id' => 'e1', 'from' => 'ask', 'to' => 'ok', 'handle' => $approveId],
                 ['id' => 'e2', 'from' => 'ask', 'to' => 'no', 'handle' => self::REJECT],
                 ['id' => 'e3', 'from' => 'ask', 'to' => 'late', 'handle' => 'timeout'],
             ],
@@ -412,13 +483,13 @@ final class AskPersonNodeTest extends FeatureTestCase
     /**
      * @return array<string, mixed>
      */
-    private function askNode(int $timeoutSeconds = 3600): array
+    private function askNode(int $timeoutSeconds = 3600, string $approveId = self::APPROVE): array
     {
         return ['id' => 'ask', 'type' => 'ask_person', 'version' => 1, 'config' => [
             'addressee' => ['kind' => 'contact', 'contact' => '{{flow.manager_id}}'],
             'text'      => 'Refund order {{flow.order_id}}?',
             'buttons'   => [
-                ['id' => self::APPROVE, 'label' => 'Approve', 'value' => 'approve'],
+                ['id' => $approveId, 'label' => 'Approve', 'value' => 'approve'],
                 ['id' => self::REJECT, 'label' => 'Reject', 'value' => 'reject'],
             ],
             'timeout_seconds'  => $timeoutSeconds,

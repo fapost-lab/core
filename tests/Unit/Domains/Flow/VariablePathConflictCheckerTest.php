@@ -63,6 +63,17 @@ final class VariablePathConflictCheckerTest extends TestCase
         $this->assertSame(['variable_path_conflict'], array_map(static fn (FlowValidationErrorDto $e): string => $e->code, $errors));
     }
 
+    public function test_an_ask_person_answer_is_a_write_too(): void
+    {
+        $errors = $this->check([
+            $this->input('a', ['name' => 'decision', 'storage' => 'contact']),
+            ['id' => 'b', 'type' => 'ask_person', 'config' => ['save_to_variable' => ['name' => 'by', 'group' => 'decision', 'storage' => 'contact']]],
+        ]);
+
+        $this->assertSame(['variable_path_conflict'], array_map(static fn (FlowValidationErrorDto $e): string => $e->code, $errors));
+        $this->assertStringContainsString('"contact.decision.by" (node b)', $errors[0]->message);
+    }
+
     public function test_a_legacy_assign_and_a_call_mapping_are_writes_too(): void
     {
         $errors = $this->check([

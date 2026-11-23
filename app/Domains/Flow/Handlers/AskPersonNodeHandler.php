@@ -8,7 +8,6 @@ use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\FlowQuestionsInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
-use App\Domains\Flow\Contracts\NamesOwnRecipientInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\DTOs\FlowQuestionDraft;
 use App\Domains\Flow\Enums\FlowQuestionStatus;
@@ -61,7 +60,7 @@ use Throwable;
  * run the wait ends a minute before the run's deadline at the latest; with less than that left, the node times out at
  * once and asks nothing.
  */
-final class AskPersonNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface, NamesOwnRecipientInterface, NodeConfigValidatorInterface
+final class AskPersonNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface, NodeConfigValidatorInterface
 {
     final public const string TYPE = 'ask_person';
 
@@ -110,11 +109,6 @@ final class AskPersonNodeHandler extends AbstractVersionedHandler implements Dec
     public function contextRequirement(): NodeContextRequirement
     {
         return NodeContextRequirement::Any;
-    }
-
-    public function namesRecipient(array $config): bool
-    {
-        return true;
     }
 
     /**
@@ -232,6 +226,7 @@ final class AskPersonNodeHandler extends AbstractVersionedHandler implements Dec
         $seen = [];
 
         foreach ($buttons as $index => $button) {
+            // Two ids that differ only in case are one uuid: refused as a duplicate.
             $id = is_array($button) && is_string($button['id'] ?? null) ? mb_strtolower($button['id']) : '';
 
             if (! Uuid::isValid($id)) {
@@ -538,7 +533,8 @@ final class AskPersonNodeHandler extends AbstractVersionedHandler implements Dec
         $buttons = [];
 
         foreach (is_array($config['buttons'] ?? null) ? array_values($config['buttons']) : [] as $button) {
-            $id = is_array($button) && is_string($button['id'] ?? null) ? mb_strtolower($button['id']) : '';
+            // Kept as authored: the id is the branch's source handle, which the engine matches to an edge exactly.
+            $id = is_array($button) && is_string($button['id'] ?? null) ? $button['id'] : '';
 
             if (! Uuid::isValid($id)) {
                 return [];

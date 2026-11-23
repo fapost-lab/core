@@ -308,6 +308,21 @@ final class FlowGraphStructureValidatorTest extends TestCase
         $this->assertSame(['variable_contract_invalid'], $this->codes($errors));
     }
 
+    public function test_an_ask_person_answer_variable_has_the_same_contract(): void
+    {
+        $errors = $this->validate(
+            [
+                $this->node('a', 'ask_person', ['save_to_variable' => ['name' => 'decision']]),
+                $this->node('b', 'ask_person', ['save_to_variable' => ['type' => 'text', 'storage' => 'session']]),
+                $this->node('c', 'ask_person', ['save_to_variable' => ['name' => 'decision', 'type' => 'text', 'storage' => 'session']]),
+            ],
+            [$this->edge('a', 'b'), $this->edge('b', 'c')],
+        );
+
+        $this->assertSame(['variable_contract_invalid'], $this->codes($errors));
+        $this->assertSame('nodes.a.config.save_to_variable', $errors[0]->path);
+    }
+
     public function test_variable_without_storage_is_invalid(): void
     {
         $errors = $this->validate(

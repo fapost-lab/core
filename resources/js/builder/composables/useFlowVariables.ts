@@ -202,8 +202,8 @@ export function useFlowVariables() {
                 continue
             }
 
-            // SendMessage — save_to_variable (new) or save_to (legacy)
-            if (node.type === 'send_message') {
+            // SendMessage — save_to_variable (new) or save_to (legacy); AskPerson — save_to_variable only
+            if (node.type === 'send_message' || node.type === 'ask_person') {
                 const v = cfg.save_to_variable as Record<string, unknown> | undefined
                 if (v && typeof v === 'object' && typeof v.name === 'string') {
                     const storage = v.storage === 'session' ? 'session' : 'contact'
@@ -220,7 +220,7 @@ export function useFlowVariables() {
                     ))
                     continue
                 }
-                if (typeof cfg.save_to === 'string') {
+                if (node.type === 'send_message' && typeof cfg.save_to === 'string') {
                     push(fromLegacyPath(cfg.save_to, nodeLabel, node.id))
                 }
                 continue

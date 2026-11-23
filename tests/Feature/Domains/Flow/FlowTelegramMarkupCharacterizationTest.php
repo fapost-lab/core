@@ -219,7 +219,8 @@ final class FlowTelegramMarkupCharacterizationTest extends FeatureTestCase
                 'buttons'       => [
                     ['id' => self::BUTTON_ONE, 'value' => 'a', 'label' => ['en' => 'Alpha', 'de' => 'Alfa'], 'row' => 0, 'order' => 0],
                     ['id' => self::BUTTON_TWO, 'value' => 'b', 'label' => ['en' => 'Beta'], 'row' => 0, 'order' => 1],
-                    ['id' => self::BUTTON_THREE, 'value' => 'c', 'label' => 'Gamma', 'row' => 1, 'order' => 0],
+                    // An author's button never carries its own payload: that seam is `ask_person`'s.
+                    ['id' => self::BUTTON_THREE, 'value' => 'c', 'label' => 'Gamma', 'row' => 1, 'order' => 0, 'callback_payload' => 'q1' . str_repeat('a', 34)],
                 ],
             ],
         ], [], new NodeExecutionContext(

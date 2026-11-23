@@ -95,7 +95,9 @@ final readonly class ChannelCapabilityChecker
             'send_message' => $this->sendMessageCapabilities($config),
             'input'        => $this->inputCapabilities($config),
             'auth_request' => $this->authRequestCapabilities($config),
-            default        => [],
+            // A question always goes out as an inline keyboard, and the answer or the timeout takes it away.
+            'ask_person' => [ChannelCapability::CallbackButtons, ChannelCapability::RemoveButtons],
+            default      => [],
         };
     }
 
