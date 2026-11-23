@@ -6,6 +6,7 @@ namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Models\FlowDefinition;
@@ -386,6 +387,7 @@ final class FlowTriggersPublishTest extends FeatureTestCase
 
         $this->assertSame(0, FlowTrigger::query()->count());
         $this->assertSame(0, FlowDefinition::query()->where('flow_id', $draft->flow_id)->count());
+        $this->assertSame(0, ActivityEntry::query()->count(), 'a refused publish records nothing');
     }
 
     public function test_an_id_that_is_not_a_uuid_is_refused_at_publish(): void
@@ -506,6 +508,95 @@ final class FlowTriggersPublishTest extends FeatureTestCase
             ->assertJsonFragment(['code' => 'duplicate_trigger_id']);
 
         $this->assertSame(0, FlowTrigger::query()->count());
+    }
+
+    public function test_a_publish_records_each_trigger_it_adds_with_its_values_and_never_its_config(): void
+    {
+        $draft    = $this->draft();
+        $message  = (string) Str::uuid();
+        $schedule = (string) Str::uuid();
+        $this->storeDraftTriggers($draft, [
+            $this->message($message, ['keywords' => ['secret-word']]),
+            $this->schedule($schedule, priority: 5, active: false),
+        ]);
+
+        $this->publish($draft->flow_id);
+
+        $added = ActivityEntry::query()->where('description', 'flow.trigger_added')->get()
+            ->keyBy(fn (ActivityEntry $entry): string => (string) $entry->properties['trigger_id']);
+
+        $this->assertEqualsCanonicalizing([$message, $schedule], $added->keys()->all());
+        $this->assertTrue($added->every(fn (ActivityEntry $entry): bool => 'flows' === $entry->log_name
+            && (string) $draft->getKey() === $entry->subject_id
+            && $draft->name === $entry->subject_label
+            && (string) $draft->assistant_id === $entry->assistant_id
+            && 1 === $entry->properties['version']));
+        $this->assertSame('schedule', $added[$schedule]->properties['trigger_type']);
+        // jsonb keeps its own key order, so the values are compared as a map.
+        $this->assertSame(
+            $this->sortedKeys(['type' => 'schedule', 'is_active' => false, 'priority' => 5]),
+            $this->sortedKeys($added[$schedule]->attribute_changes?->toArray()['attributes']),
+        );
+        $this->assertSame(1, ActivityEntry::query()->where('description', 'flow.published')->count());
+
+        $logged = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
+        $this->assertStringNotContainsString('secret-word', $logged);
+        $this->assertStringNotContainsString('0 9 * * *', $logged);
+    }
+
+    public function test_a_publish_records_a_changed_trigger_by_its_values_and_a_config_marker_and_a_removed_one(): void
+    {
+        $draft = $this->draft();
+        $kept  = (string) Str::uuid();
+        $gone  = (string) Str::uuid();
+        $this->storeDraftTriggers($draft, [$this->schedule($kept), $this->message($gone, ['keywords' => ['bye']])]);
+        $this->publish($draft->flow_id);
+        ActivityEntry::query()->delete();
+
+        $this->storeDraftTriggers($draft, [$this->schedule($kept, ['cron' => '0 10 * * *', 'timezone' => 'UTC'], priority: 7)]);
+        $this->publish($draft->flow_id);
+
+        $this->assertEqualsCanonicalizing(
+            ['flow.published', 'flow.trigger_changed', 'flow.trigger_removed'],
+            ActivityEntry::query()->pluck('description')->all(),
+        );
+
+        $changed = ActivityEntry::query()->where('description', 'flow.trigger_changed')->sole();
+        $this->assertSame($kept, $changed->properties['trigger_id']);
+        $this->assertSame(2, $changed->properties['version']);
+        $this->assertSame(['priority' => 7], $changed->attribute_changes?->toArray()['attributes']);
+        $this->assertSame(['priority' => 100], $changed->attribute_changes?->toArray()['old']);
+        $this->assertSame(['config'], $changed->attribute_changes?->toArray()['changed']);
+        $this->assertStringNotContainsString('0 10 * * *', (string) json_encode($changed->getAttributes()));
+
+        $removed = ActivityEntry::query()->where('description', 'flow.trigger_removed')->sole();
+        $this->assertSame($gone, $removed->properties['trigger_id']);
+        $this->assertSame('message', $removed->properties['trigger_type']);
+    }
+
+    public function test_a_publish_that_changes_no_trigger_records_only_the_publish(): void
+    {
+        $draft = $this->draft();
+        $id    = (string) Str::uuid();
+        $this->storeDraftTriggers($draft, [$this->schedule($id)]);
+        $this->publish($draft->flow_id);
+        ActivityEntry::query()->delete();
+
+        // The same config with its keys in another order, an upper-case id: the same trigger.
+        $this->storeDraftTriggers($draft, [$this->schedule(mb_strtoupper($id), ['timezone' => 'UTC', 'cron' => '0 9 * * *'])]);
+        $this->publish($draft->flow_id);
+
+        $this->assertSame(['flow.published'], ActivityEntry::query()->pluck('description')->all());
+    }
+
+    public function test_a_draft_that_never_carried_triggers_records_no_trigger_change(): void
+    {
+        $draft = $this->draft();
+        $this->liveRow($draft, 'message', ['keywords' => ['stay'], 'phrases' => []], id: Str::ulid()->toRfc4122());
+
+        $this->publish($draft->flow_id);
+
+        $this->assertSame(['flow.published'], ActivityEntry::query()->pluck('description')->all());
     }
 
     /**

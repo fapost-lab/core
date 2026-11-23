@@ -42,6 +42,9 @@ return [
             'webhook_secret_rotated' => 'Секрет webhook-триггера заменён',
             'run_rerun'              => 'Прогон автоматизации запущен заново',
             'trigger_resumed'        => 'Триггер снят с паузы',
+            'trigger_added'          => 'Триггер добавлен при публикации',
+            'trigger_changed'        => 'Триггер изменён при публикации',
+            'trigger_removed'        => 'Триггер удалён при публикации',
         ],
         'flow_group' => [
             'created' => 'Группа сценариев создана',
