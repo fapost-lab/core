@@ -17,6 +17,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
@@ -29,6 +30,7 @@ use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
+use Tests\Fixtures\Solution\Triggers\FeedbackSubmittedTrigger;
 use Tests\Support\ComparesJsonColumns;
 
 /**
@@ -155,6 +157,22 @@ final class FlowsConsoleTest extends FeatureTestCase
                 ->where('table.rows.0.name', 'Looping')
                 ->where('table.rows.0.triggerPaused', true)
                 ->where('table.rows.1.triggerPaused', false)
+                ->etc());
+    }
+
+    public function test_a_registered_trigger_type_shows_its_label_and_a_type_nobody_registers_its_name(): void
+    {
+        $this->app->make(TriggerTypeRegistry::class)->register(FeedbackSubmittedTrigger::class, 'feedback');
+        $this->trigger($this->flow('A feedback'), FeedbackSubmittedTrigger::TYPE, ['min_score' => 3]);
+        // A row left behind by a Solution that is gone: the list still renders.
+        $this->trigger($this->flow('B gone'), 'gone.thing', []);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.trigger', ['type' => 'feedback.submitted', 'text' => 'Feedback submitted'])
+                ->where('table.rows.1.trigger', ['type' => 'gone.thing', 'text' => 'gone.thing'])
                 ->etc());
     }
 
@@ -873,7 +891,7 @@ final class FlowsConsoleTest extends FeatureTestCase
     /**
      * @param  array<string, mixed>  $config
      */
-    private function trigger(FlowDraft $flow, FlowTriggerType $type, array $config): FlowTrigger
+    private function trigger(FlowDraft $flow, FlowTriggerType|string $type, array $config): FlowTrigger
     {
         return FlowTrigger::query()->create([
             'tenant_id'    => $flow->tenant_id,

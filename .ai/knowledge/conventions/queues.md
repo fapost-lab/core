@@ -70,7 +70,8 @@ Queue assignment by purpose, as it exists in the codebase today:
 - `messaging.logging`: `app/Domains/Conversation/Jobs/PersistConversationMessageJob.php`,
   `FetchConversationMediaJob.php`, `UpdateConversationDeliveryStatusJob.php`.
 - `scheduled.triggers`: `app/Jobs/Flow/StartFlowFromEventJob.php`, `DispatchFlowTriggerEventJob` and `StartFlowForContactJob`
-  (queued through `app/Domains/Flow/Events/QueuedFlowTriggerEventPublisher.php`).
+  (queued through `app/Domains/Flow/Events/QueuedFlowTriggerEventPublisher.php`), and `FireRegisteredTriggerJob`
+  (queued through `app/Domains/Flow/TriggerTypes/QueuedTriggerFirer.php`).
 - `flow.automations`: `app/Jobs/Flow/StartAutomationRunJob.php` and `ContinueAutomationRunJob.php` (an automation
   run's delay wake-up stays on `flow.execution` and runs at most one segment there), served by the
   `automations` supervisor on `redis`. Their 60 s timeout stays below the connection's `retry_after` (90 s) — a

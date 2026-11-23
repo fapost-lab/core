@@ -6,10 +6,12 @@ namespace Tests\Unit\Infrastructure\Solution;
 
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
 use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
+use App\Infrastructure\Flow\ContainerTriggerTypeFactory;
 use App\Infrastructure\Solution\SolutionCoreRegistrar;
 use App\Infrastructure\Solution\SolutionCoreRegistrarFactory;
 use Fapost\Foundation\Action\ActionHandlerInterface;
@@ -20,6 +22,7 @@ use stdClass;
 use Tests\Fixtures\Solution\Actions\FeedbackScoreAction;
 use Tests\Fixtures\Solution\Actions\FeedbackSubmitAction;
 use Tests\Fixtures\Solution\Nodes\FeedbackCollectNode;
+use Tests\Fixtures\Solution\Triggers\FeedbackSubmittedTrigger;
 use Tests\TestCase;
 
 final class SolutionCoreRegistrarTest extends TestCase
@@ -30,13 +33,16 @@ final class SolutionCoreRegistrarTest extends TestCase
 
     private StateNamespaceRegistry $namespaces;
 
+    private TriggerTypeRegistry $triggerTypes;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->registry   = new ActionHandlerRegistry(new ContainerActionHandlerFactory($this->app));
-        $this->nodes      = new NodeHandlerRegistry(new ContainerNodeHandlerFactory($this->app));
-        $this->namespaces = new StateNamespaceRegistry();
+        $this->registry     = new ActionHandlerRegistry(new ContainerActionHandlerFactory($this->app));
+        $this->nodes        = new NodeHandlerRegistry(new ContainerNodeHandlerFactory($this->app));
+        $this->namespaces   = new StateNamespaceRegistry();
+        $this->triggerTypes = new TriggerTypeRegistry(new ContainerTriggerTypeFactory($this->app));
     }
 
     /**
@@ -195,6 +201,33 @@ final class SolutionCoreRegistrarTest extends TestCase
         $this->assertSame('feedback', $this->namespaces->ownerOf('feedback'));
     }
 
+    public function test_a_declared_trigger_type_is_registered_under_the_solution(): void
+    {
+        $this->registrar()->registerTriggerType(FeedbackSubmittedTrigger::class);
+
+        $this->assertSame(['feedback.submitted'], $this->triggerTypes->types());
+        $this->assertSame('feedback', $this->triggerTypes->ownerOf('feedback.submitted'));
+    }
+
+    public function test_an_undeclared_trigger_type_names_the_solution_the_type_and_the_class(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage(
+            'Solution "hr" (acme/fapost-hr) registers trigger type "feedback.submitted" ('
+            . FeedbackSubmittedTrigger::class . '), which extra.fapost.triggers does not declare.',
+        );
+
+        $this->registrar('hr')->registerTriggerType(FeedbackSubmittedTrigger::class);
+    }
+
+    public function test_a_class_that_is_not_a_trigger_type_is_rejected(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('which is not a trigger type');
+
+        $this->registrar()->registerTriggerType(stdClass::class);
+    }
+
     /**
      * @param  callable(SolutionCoreRegistrar): void  $call
      *
@@ -222,9 +255,10 @@ final class SolutionCoreRegistrarTest extends TestCase
             composerPath: null,
             nodes: [$id . '.collect', $id . '.rate', $id . '.stray'],
             state: $state,
+            triggers: [$id . '.submitted'],
         );
 
-        $registrar = (new SolutionCoreRegistrarFactory($this->registry, $this->nodes, new ContainerNodeHandlerFactory($this->app), $this->namespaces))->forSolution($solution);
+        $registrar = (new SolutionCoreRegistrarFactory($this->registry, $this->nodes, new ContainerNodeHandlerFactory($this->app), $this->namespaces, $this->triggerTypes, new ContainerTriggerTypeFactory($this->app)))->forSolution($solution);
         $this->assertInstanceOf(SolutionCoreRegistrar::class, $registrar);
 
         return $registrar;

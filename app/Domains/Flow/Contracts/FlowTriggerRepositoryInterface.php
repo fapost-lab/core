@@ -37,6 +37,14 @@ interface FlowTriggerRepositoryInterface
     public function syncForFlow(FlowDraft $draft, array $triggers): void;
 
     /**
+     * The tenant's active triggers of one type, whatever their assistant, in routing order (priority, then id): what
+     * a fire of a registered trigger type is matched against.
+     *
+     * @return iterable<FlowTrigger>
+     */
+    public function getActiveOfType(string $tenantId, string $type): iterable;
+
+    /**
      * @return iterable<FlowTrigger>
      */
     public function getActiveEventTriggers(string $tenantId, string $eventName): iterable;

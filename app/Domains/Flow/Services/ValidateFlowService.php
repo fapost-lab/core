@@ -9,6 +9,7 @@ use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\DTOs\FlowValidationResultDto;
@@ -27,6 +28,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Flow\Schedule\InvalidScheduleConfigException;
 use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Flow\Subflow\SubflowPin;
@@ -71,6 +73,8 @@ final readonly class ValidateFlowService
         private ?ListSizeChecker $listSize = null,
         private ?VariablePathConflictChecker $variablePaths = null,
         private ?ExpressionEngineRegistry $expressionEngines = null,
+        private ?TriggerTypeRegistry $triggerTypes = null,
+        private ?SolutionAvailabilityInterface $solutions = null,
     ) {
     }
 
@@ -136,7 +140,7 @@ final readonly class ValidateFlowService
         $this->validateInlineKeyboardIsTerminal($nodeMap, $edges, $errors);
         $this->validateButtonEdgesMatchExistingButtons($nodeMap, $edges, $errors);
         $this->validateButtonValueTypes($nodeMap, $errors);
-        $this->validateTriggers($triggers, $errors, $flowId);
+        $this->validateTriggers($triggers, $errors, $warnings, $flowId);
 
         // Annotation nodes are stripped inside, so a draft and an already stripped publish are checked alike.
         // Skipped when the validator was not injected (legacy unit tests that build the service by hand).
@@ -1265,8 +1269,9 @@ final readonly class ValidateFlowService
      *
      * @param  list<mixed>|null              $triggers
      * @param  list<FlowValidationErrorDto>  $errors
+     * @param  list<FlowValidationErrorDto>  $warnings
      */
-    private function validateTriggers(?array $triggers, array &$errors, ?string $flowId): void
+    private function validateTriggers(?array $triggers, array &$errors, array &$warnings, ?string $flowId): void
     {
         if (null === $triggers) {
             return;
@@ -1306,7 +1311,7 @@ final readonly class ValidateFlowService
                 $idPaths[mb_strtolower($rawId)] = $path;
             }
 
-            $this->validateTrigger($trigger, $path, $errors, $flowId);
+            $this->validateTrigger($trigger, $path, $errors, $warnings, $flowId);
 
             $eventName = FlowTriggerType::Event->value === ($trigger['type'] ?? null) && is_array($trigger['config'] ?? null)
                 ? ($trigger['config']['event_name'] ?? null)
@@ -1347,8 +1352,9 @@ final readonly class ValidateFlowService
     /**
      * @param  array<array-key, mixed>       $trigger
      * @param  list<FlowValidationErrorDto>  $errors
+     * @param  list<FlowValidationErrorDto>  $warnings
      */
-    private function validateTrigger(array $trigger, string $path, array &$errors, ?string $flowId): void
+    private function validateTrigger(array $trigger, string $path, array &$errors, array &$warnings, ?string $flowId): void
     {
         $type = $trigger['type'] ?? null;
         if (! is_string($type) || '' === $type) {
@@ -1389,6 +1395,12 @@ final readonly class ValidateFlowService
             return;
         }
 
+        if (null === FlowTriggerType::tryFrom($type)) {
+            $this->validateRegisteredTrigger($type, $config, $path, $errors, $warnings);
+
+            return;
+        }
+
         try {
             $this->triggerValidator->validate($type, $config);
         } catch (InvalidScheduleConfigException $exception) {
@@ -1412,6 +1424,76 @@ final readonly class ValidateFlowService
         $this->validateUniqueMessageTriggerNeedles($type, $config, $path, $flowId, $errors);
         $this->validateExistingEventTriggerSelection($type, $config, $path, $flowId, $errors);
         $this->validateEventTriggerAssistantFilter($type, $config, $path, $flowId, $errors);
+    }
+
+    /**
+     * A trigger whose type is not built in: a type an extension registered checks its own config
+     * ({@see \Fapost\Foundation\Flow\Contracts\TriggerTypeInterface::validateConfig()}, an error blocks, a warning
+     * is shown); a dotted type nobody registers belongs to a Solution that is not installed
+     * (`trigger_type_not_installed`); any other is `unknown_trigger_type`. A registered type of a Solution the tenant
+     * has not activated is published with a warning, as its nodes are: publishing never depends on activation, and
+     * the trigger starts nothing until the Solution is active.
+     *
+     * @param  array<array-key, mixed>       $config
+     * @param  list<FlowValidationErrorDto>  $errors
+     * @param  list<FlowValidationErrorDto>  $warnings
+     */
+    private function validateRegisteredTrigger(string $type, array $config, string $path, array &$errors, array &$warnings): void
+    {
+        if (null === $this->triggerTypes || ! $this->triggerTypes->has($type)) {
+            $errors[] = str_contains($type, '.')
+                ? new FlowValidationErrorDto(
+                    path: "{$path}.type",
+                    code: 'trigger_type_not_installed',
+                    message: sprintf('Trigger type %s belongs to the Solution "%s", which is not installed.', $type, mb_strstr($type, '.', true)),
+                )
+                : new FlowValidationErrorDto(
+                    path: "{$path}.type",
+                    code: 'unknown_trigger_type',
+                    message: "Unknown trigger type {$type}.",
+                );
+
+            return;
+        }
+
+        $owner = $this->triggerTypes->ownerOf($type);
+
+        if (null !== $owner && null !== $this->solutions && ! $this->solutions->isAvailable($owner)) {
+            $warnings[] = new FlowValidationErrorDto(
+                path: "{$path}.type",
+                code: 'trigger_type_solution_inactive',
+                message: "The Solution \"{$owner}\" of trigger type {$type} is not active for the tenant: the trigger starts nothing until it is.",
+            );
+        }
+
+        try {
+            /** @var array<string, mixed> $config */
+            $issues = $this->triggerTypes->get($type)->validateConfig($config);
+        } catch (Throwable $exception) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config",
+                code: 'trigger_validator_failed',
+                message: "The validator of trigger type {$type} failed: {$exception->getMessage()}",
+            );
+
+            return;
+        }
+
+        foreach ($issues as $issue) {
+            $dto = new FlowValidationErrorDto(
+                path: null !== $issue->field && '' !== $issue->field ? "{$path}.config.{$issue->field}" : "{$path}.config",
+                code: $issue->code,
+                message: $issue->message,
+            );
+
+            if (NodeConfigIssueSeverity::Warning === $issue->severity) {
+                $warnings[] = $dto;
+
+                continue;
+            }
+
+            $errors[] = $dto;
+        }
     }
 
     /**

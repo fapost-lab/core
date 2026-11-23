@@ -101,16 +101,17 @@ Credentials' OAuth2 types fetch their tokens through Flow's `GuardedHttpClient`,
   block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
   domain). A tenant's Solution activation is stored in its schema and read only through `ActiveSolutions`
   (`adr-20261014-solution-activation-in-tenant-schema`). Core implements `CoreRegistrarInterface` for
-  Solutions, per Solution and for action handlers only (`App\Infrastructure\Solution`), registered once per
-  process and checked against the tenant's activation at call time
-  (`adr-20261014-solution-actions-registered-per-process`). The console extension contract is built
+  Solutions, per Solution, for action handlers, node types and trigger types (`App\Infrastructure\Solution`),
+  registered once per process and checked against the tenant's activation at call time
+  (`adr-20261014-solution-actions-registered-per-process`, `adr-20261113-solution-node-types-and-state-namespace`,
+  `adr-20261123-solution-trigger-types`). The console extension contract is built
   (`adr-20261014-solution-console-ui`, experimental): Foundation's `ConsoleExtensionsInterface` is
   implemented by `ConsoleExtensionRegistry` in the `solution` domain, filtered per request and
   rendered by `app/Http/Shell` (`SolutionExtensions`, `SolutionRoutes`, `SolutionImportMap`,
   `SolutionUi`) and `resources/js/console/solutions/`, and `platform:update` publishes the
   prebuilt bundles; its rules are `conventions/solution-console-ui.md`. The activation screen
   (`admin/solutions`) and the operator's entitlement (grants, allowed, the storefront) are in the Solution domain's
-  overview. Absent: the other registrar methods, and the author's half of Solution UI (the Vite preset and the derived-image
+  overview. Absent: the other registrar methods (data accessors, RAG adapters, routes, schedule), and the author's half of Solution UI (the Vite preset and the derived-image
   recipe — `first-solution` phase 0). The kit-range check is built: on activation, and for an active Solution
   after a Core upgrade (its UI is not served and the switcher marks it).
 - **Landlord data is reached only through Tenancy.** Other domains depend on
@@ -152,7 +153,9 @@ Credentials' OAuth2 types fetch their tokens through Flow's `GuardedHttpClient`,
   through `PeriodQuota`; `adr-20261123-flow-run-admission`). A flow's webhook trigger is a second inbound HTTP path,
    owned by `flow`, not `channel-ingress`: `POST /hooks/flow/{token}` on the tenant's host, checked with Foundation's
    `IngressSpec`, deduplicated by delivery id, answered 202 once `StartAutomationRunJob` is queued
-   (`adr-20261119-flow-webhook-trigger`).
+   (`adr-20261119-flow-webhook-trigger`). A trigger type an extension registered is fired by the extension's own code
+   (Foundation's `TriggerFirerInterface`): `FireRegisteredTriggerJob` on `scheduled.triggers` fans out one
+   `StartAutomationRunJob` per matching active trigger (`adr-20261123-solution-trigger-types`).
 3. **Broadcast fan-out.** `BroadcastDispatcher` → `RunBroadcastJob` → `SendBroadcastRecipientJob`
    on `messaging.broadcast`, throttled by backpressure before the provider limit is hit.
 

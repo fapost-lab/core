@@ -7,15 +7,34 @@ namespace App\Domains\Flow\Validation;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Events\EventTriggerAssistantFilter;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Flow\Schedule\ScheduleTriggerConfig;
 use App\Domains\Flow\Webhook\WebhookTriggerConfig;
+use Fapost\Foundation\Flow\Enums\NodeConfigIssueSeverity;
 use InvalidArgumentException;
 
-final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInterface
+/**
+ * A built-in type's config is checked here; a registered type's by the type itself ({@see TriggerTypeRegistry}), its
+ * first error refusing the config. A dotted type nobody registers passes: it is a Solution's type, and its row may
+ * outlive the Solution (publishing refuses it with `trigger_type_not_installed` before anything is saved). Any other
+ * type is unknown and refused.
+ */
+final readonly class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInterface
 {
+    public function __construct(
+        private TriggerTypeRegistry $triggerTypes,
+    ) {
+    }
+
     public function validate(string $type, array $config): void
     {
-        $triggerType = FlowTriggerType::from($type);
+        $triggerType = FlowTriggerType::tryFrom($type);
+
+        if (null === $triggerType) {
+            $this->validateRegisteredConfig($type, $config);
+
+            return;
+        }
 
         match ($triggerType) {
             FlowTriggerType::Message  => $this->validateMessageConfig($config),
@@ -24,6 +43,26 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
             FlowTriggerType::Api      => $this->validateApiConfig($config),
             FlowTriggerType::Event    => $this->validateEventConfig($config),
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function validateRegisteredConfig(string $type, array $config): void
+    {
+        if (! $this->triggerTypes->has($type)) {
+            if (str_contains($type, '.')) {
+                return;
+            }
+
+            throw new InvalidArgumentException("Unknown trigger type \"{$type}\".");
+        }
+
+        foreach ($this->triggerTypes->get($type)->validateConfig($config) as $issue) {
+            if (NodeConfigIssueSeverity::Error === $issue->severity) {
+                throw new InvalidArgumentException($issue->message);
+            }
+        }
     }
 
     /**

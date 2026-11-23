@@ -59,6 +59,27 @@ export interface NodeTypesResponse {
 export const fetchNodeTypes = (): Promise<NodeTypesResponse> =>
     request<NodeTypesResponse>('GET', '/node-types')
 
+/** One trigger type the flow editor can offer: a built-in one, or one a Solution registered. */
+export interface TriggerTypeEntry {
+    type: string
+    label: string
+    builtin: boolean
+    /** Same schema language as a node's config_schema; null for built-in types (the builder has their forms). */
+    config_schema: Record<string, unknown> | null
+    /** Keys the run reads as `flow.trigger.<key>`. */
+    payload_fields: string[]
+    /** False when the type's Solution is not active for the tenant. */
+    available: boolean
+    solution: { id: string, name: string } | null
+}
+
+export interface TriggerTypesResponse {
+    data: TriggerTypeEntry[]
+}
+
+export const fetchTriggerTypes = (): Promise<TriggerTypesResponse> =>
+    request<TriggerTypesResponse>('GET', '/trigger-types')
+
 /** Distinct contact tags already used in this tenant — powers set_tag autocomplete. */
 export const fetchKnownTags = (): Promise<string[]> =>
     request<{ data: string[] }>('GET', '/tags').then((r) => r.data)
