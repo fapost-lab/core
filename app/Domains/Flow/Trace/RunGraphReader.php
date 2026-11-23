@@ -248,6 +248,10 @@ final readonly class RunGraphReader
      * for the subflow node. Once its child has finished, the node is done and took the exit the child's end maps to
      * (as `DefaultSubflowResumer` routes it).
      *
+     * When the child ends in the same run, that `waiting` row is written after the rows of the nodes the parent went on
+     * to, and its duration covers them ({@see NodeTraceRecorder}). The fold is per node, so the other nodes' statuses do
+     * not depend on it; only this node's own duration reads longer than the subflow call itself.
+     *
      * @param  NodeRun|null  $run
      *
      * @return NodeRun|null

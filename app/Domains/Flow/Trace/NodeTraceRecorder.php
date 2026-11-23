@@ -27,6 +27,12 @@ use Throwable;
  * statuses only: the run graph ({@see RunGraphReader}) selects a whitelist of envelope fields and never `input`,
  * `output` or the error message, which wait for `ViewRunPayloads`. The session page's history
  * ({@see \App\Domains\Flow\Services\FlowSessionInspector}) filters out {@see self::EVENT_TYPES}.
+ *
+ * Rows are written in the order the engine runs, with one exception: a `subflow` node whose child ends in the same run.
+ * The child's end resumes the parent from inside the subflow handler ({@see \App\Domains\Flow\Subflow\DefaultSubflowResumer}),
+ * so the parent's following nodes write their rows first, and the subflow node's `node_completed` (status `waiting`)
+ * comes after them, its `duration_ms` covering that continuation. A reader must not take `created_at` across nodes as
+ * the execution order of a subflow node.
  */
 final readonly class NodeTraceRecorder
 {
@@ -54,51 +60,38 @@ final readonly class NodeTraceRecorder
     ) {
     }
 
-    /**
-     * @param  array<string, int>  $iterations  {@see LoopIterations::of()}
-     */
-    public function entered(FlowSession $session, string $nodeId, string $type, int $version, array $iterations): void
+    public function entered(NodeTraceContext $context): void
     {
-        $this->record(HistoryEventType::NodeEntered, $session, $nodeId, fn (): array => self::withIterations(['type' => $type, 'version' => $version], $iterations));
+        $this->record(HistoryEventType::NodeEntered, $context, fn (): array => self::withIterations(['type' => $context->type, 'version' => $context->version], $context->iterations));
     }
 
-    /**
-     * @param  array<string, int>  $iterations
-     */
     public function completed(
-        FlowSession $session,
-        string $nodeId,
-        string $type,
-        int $version,
+        NodeTraceContext $context,
         NodeExecutionResult $result,
         ?string $nextNodeId,
         float $durationMs,
         ?IncomingMessage $incoming,
         bool $resumedAfterDelay,
-        array $iterations,
     ): void {
-        $this->record(HistoryEventType::NodeCompleted, $session, $nodeId, function () use (
-            $session,
-            $type,
-            $version,
+        $this->record(HistoryEventType::NodeCompleted, $context, function () use (
+            $context,
             $result,
             $nextNodeId,
             $durationMs,
             $incoming,
             $resumedAfterDelay,
-            $iterations,
         ): array {
             $envelope = self::withIterations([
-                'type'        => $type,
-                'version'     => $version,
+                'type'        => $context->type,
+                'version'     => $context->version,
                 'status'      => $result->status->value,
                 'handle'      => $result->sourceHandle,
                 'next'        => $nextNodeId,
                 'duration_ms' => round($durationMs, 3),
-            ], $iterations);
+            ], $context->iterations);
 
-            if ($this->carriesPayloads($session)) {
-                $envelope['input']  = $this->masker->mask($this->input($type, $result, $incoming, $resumedAfterDelay));
+            if ($this->carriesPayloads($context->session)) {
+                $envelope['input']  = $this->masker->mask($this->input((string) $context->type, $result, $incoming, $resumedAfterDelay));
                 $envelope['output'] = $this->masker->mask($this->output($result));
             }
 
@@ -112,33 +105,17 @@ final readonly class NodeTraceRecorder
 
     /**
      * @param  string  $errorClass  the exception class, or {@see self::STEP_LIMIT_ERROR}
-     * @param  array<string, int>  $iterations
      */
-    public function failed(
-        FlowSession $session,
-        string $nodeId,
-        ?string $type,
-        ?int $version,
-        string $errorClass,
-        string $message,
-        ?float $durationMs,
-        array $iterations,
-    ): void {
-        $this->record(HistoryEventType::NodeFailed, $session, $nodeId, function () use (
-            $type,
-            $version,
-            $errorClass,
-            $message,
-            $durationMs,
-            $iterations,
-        ): array {
+    public function failed(NodeTraceContext $context, string $errorClass, string $message, ?float $durationMs): void
+    {
+        $this->record(HistoryEventType::NodeFailed, $context, function () use ($context, $errorClass, $message, $durationMs): array {
             $envelope = array_filter([
-                'type'        => $type,
-                'version'     => $version,
+                'type'        => $context->type,
+                'version'     => $context->version,
                 'duration_ms' => null === $durationMs ? null : round($durationMs, 3),
             ], static fn (mixed $value): bool => null !== $value);
 
-            $envelope          = self::withIterations($envelope, $iterations);
+            $envelope          = self::withIterations($envelope, $context->iterations);
             $envelope['error'] = ['class' => $errorClass, 'message' => $this->masker->mask($message)];
 
             return $envelope;
@@ -163,8 +140,10 @@ final readonly class NodeTraceRecorder
     /**
      * @param  callable(): array<string, mixed>  $envelope
      */
-    private function record(HistoryEventType $eventType, FlowSession $session, string $nodeId, callable $envelope): void
+    private function record(HistoryEventType $eventType, NodeTraceContext $context, callable $envelope): void
     {
+        $session   = $context->session;
+        $nodeId    = $context->nodeId;
         $sessionId = (string) $session->getKey();
 
         try {
