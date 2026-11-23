@@ -10,6 +10,7 @@ use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Flow\Services\FlowDraftService;
 use App\Domains\Flow\Services\FlowGroupService;
 use App\Domains\Flow\Services\FlowTriggerHint;
@@ -41,6 +42,7 @@ final class FlowController extends Controller
         private readonly FlowGroupService $groups,
         private readonly CurrentAssistantInterface $assistant,
         private readonly ExpressionEngineRegistry $expressionEngines,
+        private readonly TriggerTypeRegistry $triggerTypes,
     ) {
     }
 
@@ -77,7 +79,7 @@ final class FlowController extends Controller
                     'groupName'        => $flow->getAttribute('group_name'),
                     'publishedVersion' => null === $flow->getAttribute('published_version') ? null : (int) $flow->getAttribute('published_version'),
                     // The live triggers: the first one's summary and how many more the flow has.
-                    'trigger'      => FlowTriggerHint::for($flow->triggerRows->first()),
+                    'trigger'      => FlowTriggerHint::for($flow->triggerRows->first(), $this->triggerTypes),
                     'moreTriggers' => max(0, $flow->triggerRows->count() - 1),
                     'editUrl'      => $this->url('edit', ['record' => $flow->getKey()]),
                     'deleteUrl'    => $this->url('destroy', ['record' => $flow->getKey()]),

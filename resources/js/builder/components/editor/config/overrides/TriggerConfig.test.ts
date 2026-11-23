@@ -5,12 +5,26 @@ import {flushPromises, mount} from '@vue/test-utils'
 vi.mock('@builder/api/builderApi', async (importOriginal) => ({
     ...(await importOriginal<typeof import('@builder/api/builderApi')>()),
     fetchAssistantOptions: vi.fn(async () => [{value: 'a-sales', label: 'Sales'}, {value: 'a-support', label: 'Support'}]),
+    fetchTriggerTypes:     vi.fn(async () => ({data: triggerTypeEntries})),
 }))
 
 
+const triggerTypeEntries = vi.hoisted(() => [
+    {type: 'message', label: 'Message', builtin: true, config_schema: null, payload_fields: [], available: true, solution: null},
+    {
+        type: 'feedback.submitted', label: 'Feedback submitted', builtin: false, available: true,
+        config_schema: {min_score: {type: 'number', label: 'Minimum score'}}, payload_fields: ['score', 'comment'],
+        solution: {id: 'feedback', name: 'Feedback'},
+    },
+    {
+        type: 'crm.deal_won', label: 'Deal won', builtin: false, available: false,
+        config_schema: {stage: {type: 'string', label: 'Stage'}}, payload_fields: [], solution: {id: 'crm', name: 'CRM'},
+    },
+])
+
 const {pageProps} = vi.hoisted(() => ({pageProps: {
     auth:         {permissions: [] as string[]},
-    translations: {builder: {webhook_trigger: {get_url: 'Get URL', response_async: 'Accept at once (202)'}}},
+    translations: {builder: {trigger_types: {payload_hint: 'Available in the flow as :fields'}, webhook_trigger: {get_url: 'Get URL', response_async: 'Accept at once (202)'}}},
 }}))
 
 vi.mock('@inertiajs/vue3', () => ({usePage: () => ({props: pageProps})}))
@@ -20,6 +34,7 @@ function grant(permissions: string[]): void {
 }
 
 import TriggerConfig from './TriggerConfig.vue'
+import {resetTriggerTypes} from '@builder/composables/useTriggerTypes'
 import SearchSelect from '../SearchSelect.vue'
 
 function mountEventTrigger(eventName: string, extra: Record<string, unknown> = {}) {
@@ -131,16 +146,17 @@ describe('TriggerConfig webhook response mode', () => {
 describe('TriggerConfig automation permission', () => {
     beforeEach(() => grant([]))
 
-    it('keeps a message trigger fully editable but offers no automatic types', () => {
+    it('keeps a message trigger fully editable but offers no automatic types', async () => {
         const wrapper = mount(TriggerConfig, {
             props: {trigger: {type: 'message', is_active: true, priority: 0, config: {keywords: [], phrases: []}}},
         })
+        await flushPromises()
 
         expect(wrapper.get('[data-testid="automation-lock"]').attributes('inert')).toBeUndefined()
         expect(wrapper.find('[data-testid="automation-lock-hint"]').exists()).toBe(false)
 
         const disabled = wrapper.findAll('select option').filter((o) => o.attributes('disabled') !== undefined).map((o) => o.text())
-        expect(disabled).toEqual(['Schedule', 'Webhook', 'API', 'Event'])
+        expect(disabled).toEqual(['Schedule', 'Webhook', 'API', 'Event', 'Feedback submitted (Feedback)'])
     })
 
     it('shows an existing automatic trigger read-only with a hint', () => {
@@ -156,5 +172,66 @@ describe('TriggerConfig automation permission', () => {
 
         expect(wrapper.get('[data-testid="automation-lock"]').attributes('inert')).toBeUndefined()
         expect(wrapper.findAll('select option').some((o) => o.attributes('disabled') !== undefined)).toBe(false)
+    })
+})
+
+describe('TriggerConfig registered trigger types', () => {
+    beforeEach(() => {
+        grant(['manage_automations'])
+        resetTriggerTypes()
+    })
+
+    function mountTrigger(type: string, config: Record<string, unknown> = {}) {
+        return mount(TriggerConfig, {props: {trigger: {id: 't1', type, is_active: true, priority: 0, config}}})
+    }
+
+    it('offers an available registered type after the built-in ones, and leaves out an inactive one', async () => {
+        const wrapper = mountTrigger('message')
+        await flushPromises()
+
+        const options = wrapper.findAll('select option').map((option) => option.attributes('value'))
+        expect(options).toEqual(['message', 'schedule', 'webhook', 'api', 'event', 'feedback.submitted'])
+    })
+
+    it('renders the form from the config schema, merges its edits into the config and hints the payload', async () => {
+        const wrapper = mountTrigger('feedback.submitted', {min_score: 3, extra: 'kept'})
+        await flushPromises()
+
+        expect(wrapper.find('[data-testid=trigger-payload-hint]').text()).toContain('flow.trigger.score, flow.trigger.comment')
+
+        await wrapper.find('input[type=number]:not([min])').setValue('4')
+
+        const emitted = wrapper.emitted('update:trigger')?.at(-1)?.[0] as {type: string, config: Record<string, unknown>}
+        expect(emitted.type).toBe('feedback.submitted')
+        expect(emitted.config).toEqual({min_score: 4, extra: 'kept'})
+    })
+
+    it('switching to a registered type starts from an empty config', async () => {
+        const wrapper = mountTrigger('event', {event_name: 'orders.paid'})
+        await flushPromises()
+
+        await wrapper.find('select').setValue('feedback.submitted')
+
+        const emitted = wrapper.emitted('update:trigger')?.at(-1)?.[0] as {type: string, config: Record<string, unknown>}
+        expect(emitted).toMatchObject({type: 'feedback.submitted', config: {}})
+    })
+
+    it('shows an unknown dotted type as read-only with a notice, keeping its type selectable value', async () => {
+        const wrapper = mountTrigger('gone.vanished', {a: 1})
+        await flushPromises()
+
+        expect(wrapper.find('[data-testid=trigger-unavailable]').exists()).toBe(true)
+        expect(wrapper.get('[data-testid=trigger-general]').attributes('inert')).toBeDefined()
+        expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('gone.vanished')
+        expect(wrapper.emitted('update:trigger')).toBeUndefined()
+    })
+
+    it('shows a registered type of an inactive Solution as read-only', async () => {
+        const wrapper = mountTrigger('crm.deal_won', {stage: 'won'})
+        await flushPromises()
+
+        expect(wrapper.find('[data-testid=trigger-unavailable]').exists()).toBe(true)
+        expect(wrapper.find('[data-testid=trigger-payload-hint]').exists()).toBe(false)
+        expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('crm.deal_won')
     })
 })

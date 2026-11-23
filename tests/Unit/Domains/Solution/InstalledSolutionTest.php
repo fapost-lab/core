@@ -19,6 +19,7 @@ final class InstalledSolutionTest extends TestCase
         yield 'migrations' => ['migrations'];
         yield 'latestMigration' => ['latestMigration'];
         yield 'migrationsDigest' => ['migrationsDigest'];
+        yield 'triggers' => ['triggers'];
     }
 
     /**
@@ -109,6 +110,7 @@ final class InstalledSolutionTest extends TestCase
             migrations: $migrations,
             latestMigration: $latestMigration,
             migrationsDigest: $migrationsDigest,
+            triggers: ['feedback.submitted'],
         );
     }
 }

@@ -93,7 +93,7 @@ final readonly class FlowTriggerRepository implements FlowTriggerRepositoryInter
                 'priority'     => $trigger['priority'],
             ]);
 
-            if ($row->type->value !== $trigger['type'] || ! FlowTriggerSet::sameConfig($row->config, $trigger['config'])) {
+            if ($row->typeName() !== $trigger['type'] || ! FlowTriggerSet::sameConfig($row->config, $trigger['config'])) {
                 $row->fill([
                     'type'        => $trigger['type'],
                     'config'      => $trigger['config'],
@@ -113,6 +113,17 @@ final readonly class FlowTriggerRepository implements FlowTriggerRepositoryInter
         foreach ($existing as $gone) {
             $gone->delete();
         }
+    }
+
+    public function getActiveOfType(string $tenantId, string $type): iterable
+    {
+        return FlowTrigger::query()
+            ->where('tenant_id', $tenantId)
+            ->where('type', $type)
+            ->where('is_active', true)
+            ->orderBy('priority')
+            ->orderBy('id')
+            ->get();
     }
 
     public function getActiveEventTriggers(string $tenantId, string $eventName): iterable

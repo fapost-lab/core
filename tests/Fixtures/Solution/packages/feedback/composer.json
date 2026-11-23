@@ -19,6 +19,7 @@
             "provider": "Tests\\Fixtures\\Solution\\FeedbackServiceProvider",
             "actions": ["feedback.submit", "feedback.score"],
             "nodes": ["feedback.collect"],
+            "triggers": ["feedback.submitted"],
             "state": true
         }
     }

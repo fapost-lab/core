@@ -7,6 +7,8 @@ namespace App\Infrastructure\Solution;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\TriggerTypeFactoryInterface;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Solution\Contracts\SolutionRegistrarFactoryInterface;
 use App\Domains\Solution\DTO\InstalledSolution;
@@ -19,6 +21,8 @@ final readonly class SolutionCoreRegistrarFactory implements SolutionRegistrarFa
         private NodeHandlerRegistryInterface $nodes,
         private NodeHandlerFactoryInterface $nodeFactory,
         private StateNamespaceRegistry $namespaces,
+        private TriggerTypeRegistry $triggerTypes,
+        private TriggerTypeFactoryInterface $triggerTypeFactory,
     ) {
     }
 
@@ -30,6 +34,6 @@ final readonly class SolutionCoreRegistrarFactory implements SolutionRegistrarFa
             $this->namespaces->registerSolutionNamespace($solution->id);
         }
 
-        return new SolutionCoreRegistrar($solution, $this->actions, $this->nodes, $this->nodeFactory);
+        return new SolutionCoreRegistrar($solution, $this->actions, $this->nodes, $this->nodeFactory, $this->triggerTypes, $this->triggerTypeFactory);
     }
 }

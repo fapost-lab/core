@@ -9,7 +9,6 @@ use App\Domains\Flow\Contracts\NamesOwnRecipientInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Enums\AssignTarget;
-use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Models\FlowTrigger;
@@ -75,7 +74,7 @@ final readonly class ContactContextChecker
             return [];
         }
 
-        $triggerNames = implode(', ', array_map(static fn (FlowTriggerType $type): string => $type->value, $contactless));
+        $triggerNames = implode(', ', $contactless);
         $triggerNoun  = 1 === count($contactless) ? 'trigger starts' : 'triggers start';
 
         $engineId ??= TemplateEngine::ID;
@@ -107,7 +106,7 @@ final readonly class ContactContextChecker
      *
      * @param  list<mixed>|null  $triggers
      *
-     * @return list<FlowTriggerType>
+     * @return list<string>
      */
     private function contactlessTriggerTypes(?array $triggers, ?string $flowId): array
     {
@@ -117,7 +116,7 @@ final readonly class ContactContextChecker
             }
 
             $triggers = array_map(
-                static fn (FlowTrigger $row): array => ['type' => $row->type->value, 'config' => $row->config],
+                static fn (FlowTrigger $row): array => ['type' => $row->typeName(), 'config' => $row->config],
                 $this->triggers->getByFlowId($flowId),
             );
         }
@@ -126,7 +125,7 @@ final readonly class ContactContextChecker
 
         foreach ($triggers as $trigger) {
             $raw  = is_array($trigger) ? ($trigger['type'] ?? null) : null;
-            $type = is_string($raw) ? FlowTriggerType::tryFrom($raw) : null;
+            $type = is_string($raw) && '' !== $raw ? $raw : null;
 
             $config = is_array($trigger) && is_array($trigger['config'] ?? null) ? $trigger['config'] : [];
 

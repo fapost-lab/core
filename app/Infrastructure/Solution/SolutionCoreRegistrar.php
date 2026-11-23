@@ -7,21 +7,24 @@ namespace App\Infrastructure\Solution;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\TriggerTypeFactoryInterface;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Solution\DTO\InstalledSolution;
 use Closure;
 use Fapost\Foundation\Action\ActionHandlerInterface;
 use Fapost\Foundation\Contracts\CoreRegistrarInterface;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
+use Fapost\Foundation\Flow\Contracts\TriggerTypeInterface;
 use Fapost\Foundation\Flow\Enums\NodeCategory;
 use LogicException;
 
 /**
  * The Core side of {@see CoreRegistrarInterface} for one Solution.
  *
- * A Solution registers action handlers and node handlers and nothing else for now. Every other call fails
+ * A Solution registers action handlers, node handlers and trigger types and nothing else for now. Every other call fails
  * at once with a message naming the Solution, because a quiet no-op would show up at a client, not on the
  * author's first run. An action must be declared in the Solution's manifest (`extra.fapost.actions`), a node
- * type in `extra.fapost.nodes`; that, together with the manifest rule that both start with the Solution id,
+ * type in `extra.fapost.nodes`, a trigger type in `extra.fapost.triggers`; that, together with the manifest rule that both start with the Solution id,
  * is what keeps one Solution out of another's (or Core's) namespace.
  */
 final readonly class SolutionCoreRegistrar implements CoreRegistrarInterface
@@ -31,6 +34,8 @@ final readonly class SolutionCoreRegistrar implements CoreRegistrarInterface
         private ActionHandlerRegistry $actions,
         private NodeHandlerRegistryInterface $nodes,
         private NodeHandlerFactoryInterface $nodeFactory,
+        private TriggerTypeRegistry $triggerTypes,
+        private TriggerTypeFactoryInterface $triggerTypeFactory,
     ) {
     }
 
@@ -96,6 +101,32 @@ final readonly class SolutionCoreRegistrar implements CoreRegistrarInterface
         }
 
         $this->nodes->register($handlerClass, $this->solution->id);
+    }
+
+    public function registerTriggerType(string $triggerTypeClass): void
+    {
+        if (!is_a($triggerTypeClass, TriggerTypeInterface::class, true)) {
+            throw new LogicException(sprintf(
+                '%s registers %s, which is not a trigger type: it must implement %s.',
+                $this->label(),
+                $triggerTypeClass,
+                TriggerTypeInterface::class,
+            ));
+        }
+
+        // The registry keeps the class; this throwaway instance only reads the type.
+        $type = $this->triggerTypeFactory->make($triggerTypeClass)->type();
+
+        if (!in_array($type, $this->solution->triggers, true)) {
+            throw new LogicException(sprintf(
+                '%s registers trigger type "%s" (%s), which extra.fapost.triggers does not declare.',
+                $this->label(),
+                $type,
+                $triggerTypeClass,
+            ));
+        }
+
+        $this->triggerTypes->register($triggerTypeClass, $this->solution->id);
     }
 
     public function registerDataAccessor(string $namespace, string $accessorClass): void

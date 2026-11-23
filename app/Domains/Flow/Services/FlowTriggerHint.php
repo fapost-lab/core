@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Registry\TriggerTypeRegistry;
 use App\Domains\Flow\Webhook\WebhookTriggerConfig;
 use Illuminate\Support\Str;
 
@@ -24,17 +25,27 @@ final class FlowTriggerHint
     private const int MESSAGE_LENGTH = 80;
 
     /**
+     * A type an extension registered is summed up by its label; a type nobody registers any more (its Solution was
+     * removed) by its own name, so the list never fails on such a row.
+     *
      * @return array{type: string, text: string}|null null when the flow has no trigger or its trigger says nothing
      */
-    public static function for(?FlowTrigger $trigger): ?array
+    public static function for(?FlowTrigger $trigger, ?TriggerTypeRegistry $types = null): ?array
     {
         if (null === $trigger) {
             return null;
         }
 
         $config = is_array($trigger->config) ? $trigger->config : [];
+        $type   = $trigger->builtInType();
 
-        $text = match ($trigger->type) {
+        if (null === $type) {
+            $name = $trigger->typeName();
+
+            return ['type' => $name, 'text' => null !== $types && $types->has($name) ? $types->get($name)->label() : $name];
+        }
+
+        $text = match ($type) {
             FlowTriggerType::Message  => self::messageText($config),
             FlowTriggerType::Schedule => self::nonEmpty($config['cron'] ?? null),
             FlowTriggerType::Webhook  => self::webhookText($config),
@@ -42,7 +53,7 @@ final class FlowTriggerHint
             FlowTriggerType::Api      => self::nonEmpty($config['route_key'] ?? null),
         };
 
-        return null === $text ? null : ['type' => $trigger->type->value, 'text' => $text];
+        return null === $text ? null : ['type' => $type->value, 'text' => $text];
     }
 
     /**

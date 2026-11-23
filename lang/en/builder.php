@@ -445,4 +445,10 @@ return [
         'not_found'                 => 'This flow has no webhook trigger with this id. Save the flow and try again.',
         'secret_invalid'            => 'A secret is :min to :max characters, without spaces.',
     ],
+
+    'trigger_types' => [
+        'inactive'     => 'The Solution of this trigger (:solution) is not active, so the trigger is read-only and will not start the flow.',
+        'unknown'      => 'The trigger type \':type\' is not installed. The trigger is kept as it is, read-only, and will not start the flow.',
+        'payload_hint' => 'Available in the flow as :fields',
+    ],
 ];

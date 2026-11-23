@@ -10,10 +10,11 @@ use Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider;
 use Tests\Fixtures\Solution\Actions\FeedbackScoreAction;
 use Tests\Fixtures\Solution\Actions\FeedbackSubmitAction;
 use Tests\Fixtures\Solution\Nodes\FeedbackCollectNode;
+use Tests\Fixtures\Solution\Triggers\FeedbackSubmittedTrigger;
 
 /**
  * The provider of the fixture Solution in tests/Fixtures/Solution/packages/feedback. It registers both
- * actions and the node type its manifest declares and, when a test binds a log under {@see self::LOG}, writes its lifecycle there.
+ * actions, the node type and the trigger type its manifest declares and, when a test binds a log under {@see self::LOG}, writes its lifecycle there.
  */
 final class FeedbackServiceProvider extends AbstractSolutionServiceProvider
 {
@@ -26,6 +27,7 @@ final class FeedbackServiceProvider extends AbstractSolutionServiceProvider
         $registrar->registerActionHandler(FeedbackSubmitAction::class);
         $registrar->registerActionHandler(FeedbackScoreAction::class);
         $registrar->registerNodeHandler(FeedbackCollectNode::class);
+        $registrar->registerTriggerType(FeedbackSubmittedTrigger::class);
     }
 
     protected function bootSolution(): void

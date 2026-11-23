@@ -200,7 +200,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler` and `registerNodeHandler` (`registerMigrations` stays refused: migrations are declared in the manifest), per-phase rollback of `platform:update`, chained or batched Solution jobs.
+- Not here yet: registrar methods other than `registerActionHandler`, `registerNodeHandler` and `registerTriggerType` (`registerMigrations` stays refused: migrations are declared in the manifest), per-phase rollback of `platform:update`, chained or batched Solution jobs.
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not
