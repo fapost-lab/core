@@ -61,16 +61,27 @@ const isUnary = computed<boolean>(() => UNARY_OPS.has(operator.value))
 
 const METHODS = ['basic', 'phone', 'sms_code', 'email_code'] as const
 
-// Mirrors AuthRequestV2NodeHandler::BOUNDS: [min, max, default].
-const BOUNDS = {
-    code_length:             [4, 8, 6],
-    ttl_minutes:             [1, 30, 10],
-    max_attempts:            [1, 10, 5],
-    max_sends:               [1, 5, 3],
-    resend_cooldown_seconds: [30, 600, 60],
-} as const
+type BoundedField = 'code_length' | 'ttl_minutes' | 'max_attempts' | 'max_sends' | 'resend_cooldown_seconds'
 
-type BoundedField = keyof typeof BOUNDS
+const CODE_LIMITS = ['code_length', 'ttl_minutes', 'max_attempts', 'max_sends', 'resend_cooldown_seconds'] as const
+
+/**
+ * A limit's min, max or default as the handler's config schema declares it (`AuthRequestV2NodeHandler::BOUNDS`
+ * through each NumberField), so the builder never offers a range publish refuses. Undefined when the schema does
+ * not say: `max_attempts` has no default there, since the phone method and the code methods default differently.
+ */
+function bound(key: BoundedField, attribute: 'min' | 'max' | 'default'): number | undefined {
+    const field = props.schema?.[key]
+    const value = field !== null && typeof field === 'object' ? (field as Record<string, unknown>)[attribute] : undefined
+
+    return typeof value === 'number' ? value : undefined
+}
+
+function boundPlaceholder(key: BoundedField): string {
+    const value = bound(key, 'default')
+
+    return value === undefined ? '' : String(value)
+}
 
 const isV2 = computed<boolean>(() => props.node.version === 2)
 
@@ -211,8 +222,9 @@ function onValue(e: Event) {
                     <input
                         type="number"
                         class="field-input num-input"
-                        :min="BOUNDS.max_attempts[0]"
-                        :max="BOUNDS.max_attempts[1]"
+                        data-testid="phone-max-attempts"
+                        :min="bound('max_attempts', 'min')"
+                        :max="bound('max_attempts', 'max')"
                         :placeholder="'3'"
                         :value="numberValue('max_attempts')"
                         @input="onNumber('max_attempts', $event)"
@@ -266,14 +278,15 @@ function onValue(e: Event) {
                         @input="onLocalized('on_invalid_message', $event)"
                     >
                 </div>
-                <div v-for="key in (['code_length', 'ttl_minutes', 'max_attempts', 'max_sends', 'resend_cooldown_seconds'] as const)" :key="key" class="config-field">
+                <div v-for="key in CODE_LIMITS" :key="key" class="config-field">
                     <div class="field-label">{{ t(`nodes.auth_request.${key}`) }}</div>
                     <input
                         type="number"
                         class="field-input num-input"
-                        :min="BOUNDS[key][0]"
-                        :max="BOUNDS[key][1]"
-                        :placeholder="String(BOUNDS[key][2])"
+                        :data-testid="`limit-${key}`"
+                        :min="bound(key, 'min')"
+                        :max="bound(key, 'max')"
+                        :placeholder="boundPlaceholder(key)"
                         :value="numberValue(key)"
                         @input="onNumber(key, $event)"
                     >

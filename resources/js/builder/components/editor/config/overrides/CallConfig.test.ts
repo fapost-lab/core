@@ -133,3 +133,61 @@ describe('CallConfig without the Use credentials permission', () => {
         expect(free.get('[data-testid="test-btn"]').attributes('disabled')).toBeUndefined()
     })
 })
+
+describe('CallConfig retry', () => {
+    const http = {transport: 'http', target: 'GET https://api.example.com/x', parameters: {}}
+
+    beforeEach(() => {
+        setActivePinia(createPinia())
+        grant(['use_credentials'])
+        fetchCredentialOptions.mockReset()
+        fetchCredentialOptions.mockResolvedValue([])
+    })
+
+    it('shows a stored retry and writes it back in the same shape', async () => {
+        const retry = {max_attempts: 4, delay_ms: 1000, backoff: 'fixed', on: ['5xx']}
+        const wrapper = await mountConfig({...http, retry})
+
+        expect((wrapper.get('[data-testid="retry-enabled"]').element as HTMLInputElement).checked).toBe(true)
+        expect((wrapper.get('[data-testid="retry-attempts"]').element as HTMLInputElement).value).toBe('4')
+        expect((wrapper.get('[data-testid="retry-on-5xx"]').element as HTMLInputElement).checked).toBe(true)
+        expect((wrapper.get('[data-testid="retry-on-network"]').element as HTMLInputElement).checked).toBe(false)
+
+        await wrapper.get('[data-testid="retry-on-429"]').setValue(true)
+
+        expect(lastPatch(wrapper).retry).toEqual({max_attempts: 4, delay_ms: 1000, backoff: 'fixed', on: ['5xx', '429']})
+    })
+
+    it('writes the defaults when retry is switched on and no retry key while it is off', async () => {
+        const wrapper = await mountConfig(http)
+
+        expect(wrapper.find('[data-testid="retry-attempts"]').exists()).toBe(false)
+
+        await wrapper.get('[data-testid="retry-enabled"]').setValue(true)
+        expect(lastPatch(wrapper).retry).toEqual({max_attempts: 3, delay_ms: 500, backoff: 'exponential', on: ['network', '5xx', '429']})
+
+        await wrapper.get('[data-testid="retry-enabled"]').setValue(false)
+        const patch = lastPatch(wrapper)
+        expect('retry' in patch).toBe(true)
+        expect(patch.retry).toBeUndefined()
+    })
+
+    it('clamps the attempts to the allowed range', async () => {
+        const wrapper = await mountConfig({...http, retry: {max_attempts: 3, delay_ms: 500, backoff: 'exponential', on: ['network']}})
+
+        await wrapper.get('[data-testid="retry-attempts"]').setValue('9')
+
+        expect((lastPatch(wrapper).retry as Record<string, unknown>).max_attempts).toBe(5)
+        expect((wrapper.get('[data-testid="retry-attempts"]').element as HTMLInputElement).value).toBe('5')
+    })
+
+    it('keeps the last checked status: it cannot be cleared', async () => {
+        const wrapper = await mountConfig({...http, retry: {max_attempts: 3, delay_ms: 500, backoff: 'exponential', on: ['network']}})
+        const emittedBefore = (wrapper.emitted('update:config') ?? []).length
+
+        await wrapper.get('[data-testid="retry-on-network"]').setValue(false)
+
+        expect((wrapper.get('[data-testid="retry-on-network"]').element as HTMLInputElement).checked).toBe(true)
+        expect((wrapper.emitted('update:config') ?? []).length).toBe(emittedBefore)
+    })
+})

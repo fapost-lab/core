@@ -15,7 +15,7 @@ paths:
   - app/Http/Requests/Console/FlowRequest.php
   - "resources/js/pages/Console/Flows/**"
 summary: Why the expression engine is chosen per flow on its draft and snapshotted explicitly at publish (republish keeps the host's snapshot), checked with that engine (expression_engine_unknown, template_engine_mismatch), instead of ADR-08's tenant setting
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-23
 ---
 # The expression engine is chosen by the author of each flow and snapshotted onto its definition at publish
 
@@ -35,6 +35,9 @@ reaches every future publish of every flow at once, while two languages cannot l
    author chose for the flow or template. It is set on the console flow form (`FlowRequest`: an id of
    `ExpressionEngineRegistry`, optional — absent keeps the engine). The select is shown only while more than one
    engine is registered, and a hidden select sends nothing. Templates keep the default for now (no edit form).
+   Amended 2026-11-23 (task `builder-ui-fixes`): the select is also shown while the flow's own engine is not
+   registered (point 4), else nothing could choose another; it still sends nothing until an installed engine is
+   picked (`resources/js/pages/Console/Flows/expressionEngine.ts`).
 2. **Publishing snapshots it explicitly.** `PublishFlowService::createDefinition()` always writes
    `flow_definitions.expression_engine`: the draft's choice on a publish, the active definition's snapshot on a
    republish by a template (`$source`), so unpublished work in a host's draft — a changed engine included — is never

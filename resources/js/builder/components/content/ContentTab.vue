@@ -47,7 +47,8 @@ const contentEntries = computed(() => {
             })
         }
 
-        if (type === 'send_message') {
+        // Answer button labels are content: a message's keyboard and the buttons of a question to a person.
+        if (type === 'send_message' || type === 'ask_person') {
             const buttons = Array.isArray(config.buttons) ? config.buttons as Array<Record<string, unknown>> : []
             buttons.forEach((btn: Record<string, unknown>, idx: number) => {
                 const raw = btn.label ?? ''

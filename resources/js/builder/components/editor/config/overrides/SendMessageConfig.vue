@@ -268,12 +268,14 @@ onMounted(async () => {
 })
 
 // A message to an addressee cannot wait for an answer, so the controls that make it wait are cleared.
+// The buttons stay: they carry the edges of the wired branches, which the store prunes for every button a patch
+// drops (as switchKeyboardType avoids too). Plain text ignores them, and switching back to a keyboard after the
+// addressee is cleared brings the branches back.
 function waitingControlsPatch(): Record<string, unknown> {
     const patch: Record<string, unknown> = {}
     if (contentType.value === 'text_with_keyboard') {
         patch.content_type = 'text'
         patch.keyboard_mode = null
-        patch.buttons = []
         patch.dynamic_buttons = null
     }
     patch.timeout_seconds = null
@@ -286,13 +288,13 @@ function waitingControlsPatch(): Record<string, unknown> {
     return patch
 }
 
-// A broadcast is plain text: media, caption and keyboard are dropped along with the waiting controls.
+// A broadcast is plain text: media, caption and keyboard are dropped along with the waiting controls (the buttons
+// stay, as in waitingControlsPatch, so their branches stay wired).
 function audiencePatch(addresseeValue: Record<string, unknown>): Record<string, unknown> {
     const patch = waitingControlsPatch()
     patch.addressee = addresseeValue
     patch.content_type = 'text'
     patch.keyboard_mode = null
-    patch.buttons = []
     patch.dynamic_buttons = null
     patch.media_file = null
     patch.media_file_id = undefined

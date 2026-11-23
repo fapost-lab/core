@@ -44,7 +44,7 @@ async function jumpToNode(error: { path?: string; message?: string }) {
     const triggerId = triggerIdOf(error?.path)
     if (triggerId !== null) {
         // Select (never toggle off) the trigger the error points at.
-        selectionStore.select(`__trigger__:${triggerId}`)
+        selectionStore.selectTriggerById(triggerId)
         return
     }
 

@@ -37,6 +37,7 @@ export interface FlowsTranslations {
   visibility: { public: string; private: string }
   no_version: string
   trigger_types: Record<string, string>
+  more_triggers: string
   builder: string
   builder_named: string
   actions_for: string

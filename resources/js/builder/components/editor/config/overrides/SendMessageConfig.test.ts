@@ -19,6 +19,7 @@ vi.mock('@builder/api/builderApi', async (importOriginal) => ({
 }))
 
 import SendMessageConfig from './SendMessageConfig.vue'
+import {useBuilderStore} from '@builder/store/builderStore'
 
 function mountConfig(config: Record<string, unknown>) {
     return mount(SendMessageConfig, {props: {node: {id: 'n1', type: 'send_message', version: 1, config}, schema: {}}})
@@ -57,8 +58,41 @@ describe('SendMessageConfig addressee', () => {
         await wrapper.find('[data-test=addressee-contact]').setValue('{{flow.manager_id}}')
 
         const patch = lastPatch(wrapper)
-        expect(patch).toMatchObject({content_type: 'text', buttons: [], timeout_seconds: null})
+        expect(patch).toMatchObject({content_type: 'text', timeout_seconds: null})
+        expect('buttons' in patch).toBe(false)
         expect(patch.save_to_variable).toBeUndefined()
+    })
+
+    it('keeps the wired branches of the buttons through an addressee and back to a keyboard', async () => {
+        const builder = useBuilderStore()
+        builder.init({
+            flowId: 'f1', name: 'F', draftVersion: 1, readOnly: false, triggers: [],
+            definition: {
+                nodes: [
+                    {id: 'n1', type: 'send_message', version: 1, config: {content_type: 'text_with_keyboard', keyboard_mode: 'inline', text: 'Approve?', buttons: [{id: 'b1', label: 'Yes', value: 'yes'}]}},
+                    {id: 'y', type: 'set_tag', version: 1, config: {}},
+                ],
+                edges: [{id: 'e1', from: 'n1', to: 'y', handle: 'b1'}],
+            },
+        } as never)
+        const node = () => builder.definition.nodes[0]
+        const wrapper = mount(SendMessageConfig, {props: {node: node(), schema: {}}})
+        const apply = async () => {
+            builder.updateNodeConfig('n1', lastPatch(wrapper) as never)
+            await wrapper.setProps({node: {...node()}})
+        }
+
+        await wrapper.find('[data-test=addressee-contact]').setValue('{{flow.manager_id}}')
+        await apply()
+        expect(builder.definition.edges.map((edge) => edge.handle)).toContain('b1')
+
+        await wrapper.find('[data-test=addressee-contact]').setValue('')
+        await apply()
+        await wrapper.find('select').setValue('text_with_keyboard')
+        await apply()
+
+        expect(node().config).toMatchObject({content_type: 'text_with_keyboard', buttons: [{id: 'b1', label: 'Yes', value: 'yes'}]})
+        expect(builder.definition.edges.map((edge) => edge.handle)).toContain('b1')
     })
 
     it('removes the addressee when the expression is cleared and offers no keyboard while one is set', async () => {
@@ -87,7 +121,8 @@ describe('SendMessageConfig audience addressee', () => {
         await wrapper.find('[data-test=addressee-kind-tags]').trigger('click')
 
         const patch = lastPatch(wrapper)
-        expect(patch).toMatchObject({addressee: {kind: 'tags', tags: []}, content_type: 'text', buttons: [], timeout_seconds: null})
+        expect(patch).toMatchObject({addressee: {kind: 'tags', tags: []}, content_type: 'text', timeout_seconds: null})
+        expect('buttons' in patch).toBe(false)
         expect(patch.media_file_id).toBeUndefined()
     })
 

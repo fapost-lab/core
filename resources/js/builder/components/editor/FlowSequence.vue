@@ -327,7 +327,7 @@ const triggerCards = computed(() =>
 function addTrigger() {
     const id = builderStore.addTrigger()
     if (id !== '') {
-        selectionStore.select(`__trigger__:${id}`)
+        selectionStore.selectTriggerById(id)
     }
 }
 

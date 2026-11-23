@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@fapost/ui/components/switch'
 import { Textarea } from '@fapost/ui/components/textarea'
 import NewGroupDialog from './NewGroupDialog.vue'
+import { engineToSend, offersEngineChoice } from './expressionEngine'
 import type { FlowGroupOption, FlowsPageProps } from './types'
 
 /** The fields of a flow, shared by the create and the edit screen. The server validates; its errors show under the fields. */
@@ -19,7 +20,10 @@ const props = defineProps<{
   submitUrl: string
   cancelUrl: string
   groups: FlowGroupOption[]
-  /** The installed expression engines; with only one there is nothing to choose, and the field is neither shown nor sent. */
+  /**
+   * The installed expression engines; with only one, which is the flow's own, there is nothing to choose, and the
+   * field is neither shown nor sent.
+   */
   expressionEngines: string[]
   canCreateGroup: boolean
   storeGroupUrl: string
@@ -42,17 +46,16 @@ const form = useForm({
   expression_engine: props.initial.expressionEngine,
 })
 
-const chooseEngine = computed(() => props.expressionEngines.length > 1)
+// Decided by the engine the flow had on load, so picking an installed one does not hide the select again.
+const chooseEngine = computed(() => offersEngineChoice(props.expressionEngines, props.initial.expressionEngine))
 
-// Absent, the flow keeps its engine: a hidden field must not be validated against the installed engines.
+// Absent, the flow keeps its engine: a hidden field, or one still on an engine that is gone, must not be validated
+// against the installed engines.
 form.transform((data) => {
-  if (chooseEngine.value) {
-    return data
-  }
-
+  const engine = engineToSend(props.expressionEngines, props.initial.expressionEngine, data.expression_engine)
   const { expression_engine: _omitted, ...rest } = data
 
-  return rest
+  return engine === undefined ? rest : { ...rest, expression_engine: engine }
 })
 
 const groupValue = computed({

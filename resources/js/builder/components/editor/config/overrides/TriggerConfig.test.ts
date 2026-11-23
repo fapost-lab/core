@@ -18,6 +18,15 @@ const triggerTypeEntries = vi.hoisted(() => [
         solution: {id: 'feedback', name: 'Feedback'},
     },
     {
+        type: 'shop.order_paid', label: 'Order paid', builtin: false, available: true,
+        config_schema: {
+            sections:  [{key: 'filter', label: 'Filter', fields: ['min_total']}, {key: 'advanced', label: 'Advanced', collapsed: true, fields: ['max_total']}],
+            min_total: {type: 'number', label: 'Minimum total'},
+            max_total: {type: 'number', label: 'Maximum total'},
+        },
+        payload_fields: ['total'], solution: {id: 'shop', name: 'Shop'},
+    },
+    {
         type: 'crm.deal_won', label: 'Deal won', builtin: false, available: false,
         config_schema: {stage: {type: 'string', label: 'Stage'}}, payload_fields: [], solution: {id: 'crm', name: 'CRM'},
     },
@@ -207,7 +216,7 @@ describe('TriggerConfig automation permission', () => {
         expect(wrapper.find('[data-testid="automation-lock-hint"]').exists()).toBe(false)
 
         const disabled = wrapper.findAll('select option').filter((o) => o.attributes('disabled') !== undefined).map((o) => o.text())
-        expect(disabled).toEqual(['Schedule', 'Webhook', 'API', 'Event', 'Feedback submitted (Feedback)'])
+        expect(disabled).toEqual(['Schedule', 'Webhook', 'API', 'Event', 'Feedback submitted (Feedback)', 'Order paid (Shop)'])
     })
 
     it('shows an existing automatic trigger read-only with a hint', () => {
@@ -286,7 +295,7 @@ describe('TriggerConfig registered trigger types', () => {
         await flushPromises()
 
         const options = wrapper.findAll('select option').map((option) => option.attributes('value'))
-        expect(options).toEqual(['message', 'schedule', 'webhook', 'api', 'event', 'feedback.submitted'])
+        expect(options).toEqual(['message', 'schedule', 'webhook', 'api', 'event', 'feedback.submitted', 'shop.order_paid'])
     })
 
     it('renders the form from the config schema, merges its edits into the config and hints the payload', async () => {
@@ -300,6 +309,17 @@ describe('TriggerConfig registered trigger types', () => {
         const emitted = wrapper.emitted('update:trigger')?.at(-1)?.[0] as {type: string, config: Record<string, unknown>}
         expect(emitted.type).toBe('feedback.submitted')
         expect(emitted.config).toEqual({min_score: 4, extra: 'kept'})
+    })
+
+    it('renders the sections a registered schema declares, the payload hint in the first', async () => {
+        const wrapper = mountTrigger('shop.order_paid', {min_total: 10})
+        await flushPromises()
+
+        const titles = wrapper.findAll('.acc-title').map((title) => title.text())
+        expect(titles).toContain('Filter')
+        expect(titles).toContain('Advanced')
+        expect(titles).not.toContain('Order paid')
+        expect(wrapper.findAll('[data-testid=trigger-payload-hint]')).toHaveLength(1)
     })
 
     it('switching to a registered type starts from an empty config', async () => {
@@ -329,5 +349,31 @@ describe('TriggerConfig registered trigger types', () => {
         expect(wrapper.find('[data-testid=trigger-unavailable]').exists()).toBe(true)
         expect(wrapper.find('[data-testid=trigger-payload-hint]').exists()).toBe(false)
         expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('crm.deal_won')
+    })
+})
+
+describe('TriggerConfig priority', () => {
+    beforeEach(() => grant(['manage_automations']))
+
+    function mountPriority(priority: number) {
+        return mount(TriggerConfig, {props: {trigger: {id: 't1', type: 'message', is_active: true, priority, config: {keywords: [], phrases: []}}}})
+    }
+
+    it('stores and shows a negative priority as 0', async () => {
+        const wrapper = mountPriority(0)
+        const input = wrapper.get('[data-testid=trigger-priority]')
+
+        await input.setValue('-5')
+
+        expect((wrapper.emitted('update:trigger')?.at(-1)?.[0] as {priority: number}).priority).toBe(0)
+        expect((input.element as HTMLInputElement).value).toBe('0')
+    })
+
+    it('stores a positive priority as typed', async () => {
+        const wrapper = mountPriority(0)
+
+        await wrapper.get('[data-testid=trigger-priority]').setValue('7')
+
+        expect((wrapper.emitted('update:trigger')?.at(-1)?.[0] as {priority: number}).priority).toBe(7)
     })
 })

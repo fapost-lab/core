@@ -89,6 +89,15 @@ function defaultTriggerConfig(type: TriggerType): Record<string, unknown> {
     return type === 'message' ? { keywords: [], phrases: [] } : {}
 }
 
+/**
+ * Node types whose answer buttons are exits of their own (handle = button id), with the exits that are not buttons:
+ * an edit that drops a button prunes its edge, never one of these. A handle-less edge counts as `default`.
+ */
+const BUTTON_NODE_FIXED_HANDLES: Record<string, string[]> = {
+    send_message: ['default'],
+    ask_person:   ['default', 'timeout', 'error'],
+}
+
 export const useBuilderStore = defineStore('builder', () => {
     const flowId = ref<string | null>(null)
     const flowName = ref('')
@@ -1147,14 +1156,16 @@ export const useBuilderStore = defineStore('builder', () => {
         }
         node.config = merged
 
-        if (node.type === 'send_message' && Array.isArray(patch.buttons)) {
+        // A removed button takes its branch along; the node's fixed exits stay wired.
+        const fixedHandles = BUTTON_NODE_FIXED_HANDLES[node.type]
+        if (fixedHandles !== undefined && Array.isArray(patch.buttons)) {
             const validHandles = new Set(
                 (patch.buttons as Array<{ id?: string }>).map((b) => b.id).filter(Boolean),
             )
             definition.value.edges = definition.value.edges.filter((edge) => {
                 if (edge.from !== nodeId) return true
                 const handle = edge.handle ?? 'default'
-                return handle === 'default' || validHandles.has(handle)
+                return fixedHandles.includes(handle) || validHandles.has(handle)
             })
         }
 

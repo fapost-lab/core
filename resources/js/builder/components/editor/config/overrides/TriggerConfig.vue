@@ -4,13 +4,14 @@ import AccordionSection from '../AccordionSection.vue'
 import SearchSelect from '../SearchSelect.vue'
 import {createWebhookEndpoint, fetchAssistantOptions, generateWebhookSecret, resumeTrigger, setWebhookSecret} from '@builder/api/builderApi'
 import SchemaFields from '../SchemaFields.vue'
-import type {FieldEntry} from '../SchemaFields.vue'
+import {type SchemaSection, schemaSections} from '../schemaSections'
 import type {ApiError, SelectOption} from '@builder/api/builderApi'
 import type {ApiTriggerInfo, TriggerStateInfo, WebhookEndpointInfo} from '@builder/dto/types'
 import {useConfirm} from '@builder/composables/useConfirm'
 import {usePermissions} from '@builder/composables/usePermissions'
 import {useTranslations} from '@builder/composables/useTranslations'
 import {useTriggerTypes} from '@builder/composables/useTriggerTypes'
+import {isAutomaticTrigger} from '@builder/utils/automaticTrigger'
 import {
     WEBHOOK_PRESETS,
     defaultWebhookConfig,
@@ -40,19 +41,6 @@ const emit = defineEmits(['update:trigger', 'delete:trigger', 'webhook-endpoint'
 
 const { confirm } = useConfirm()
 const { t } = useTranslations()
-
-const webhookPresetLabelKeys: Record<string, string> = {
-    hmac: 'webhook_trigger.preset_hmac',
-    hmac_timestamp: 'webhook_trigger.preset_hmac_timestamp',
-    github: 'webhook_trigger.preset_github',
-    header: 'webhook_trigger.preset_header',
-}
-
-function webhookPresetLabel(value: string, fallback: string): string {
-    const key = webhookPresetLabelKeys[value]
-
-    return key === undefined ? fallback : t(key)
-}
 
 const { can } = usePermissions()
 const canManageAutomations = computed(() => can('manage_automations'))
@@ -109,20 +97,12 @@ const registeredForm = computed(() => {
     return entry !== undefined && entry.available && entry.config_schema !== null ? entry : null
 })
 
-const SCHEMA_RESERVED_KEYS = new Set(['required', 'sections'])
-
-const registeredFields = computed<FieldEntry[]>(() => {
-    const raw = registeredForm.value?.config_schema ?? {}
-    const requiredList = Array.isArray(raw.required) ? (raw.required as string[]) : []
-
-    return Object.entries(raw)
-        .filter(([key, value]) => !SCHEMA_RESERVED_KEYS.has(key) && typeof value === 'object' && value !== null && 'type' in value)
-        .map(([key, value]) => ({
-            key,
-            schema: value as Record<string, unknown>,
-            required: Boolean((value as Record<string, unknown>).required) || requiredList.includes(key),
-        }))
-})
+/** The registered type's form in the schema language of a node's `configSchema()`, declared sections included. */
+const registeredSections = computed<SchemaSection[]>(() =>
+    registeredForm.value === null
+        ? []
+        : schemaSections(registeredForm.value.config_schema, {key: 'configuration', label: registeredForm.value.label}),
+)
 
 const payloadHint = computed(() => {
     const fields = registeredForm.value?.payload_fields ?? []
@@ -138,8 +118,23 @@ const currentTrigger = computed(() =>
 
 /** An automatic trigger (anything but a message) is read-only for a user without the Manage automations permission. */
 const automationLocked = computed(() =>
-    !canManageAutomations.value && currentTrigger.value.type !== 'message'
+    !canManageAutomations.value && isAutomaticTrigger(currentTrigger.value.type)
 )
+
+/**
+ * Priority is never negative (save refuses it, and every autosave would fail until the field is fixed), and
+ * `min="0"` does not stop typing a minus: a negative value is stored and shown as 0.
+ */
+function onPriorityInput(el: HTMLInputElement): void {
+    const typed = Number.parseInt(el.value || '0', 10) || 0
+    const priority = Math.max(0, typed)
+
+    if (typed < 0) {
+        el.value = String(priority)
+    }
+
+    update({ priority })
+}
 
 const triggerCfg = computed((): Record<string, unknown> =>
     (currentTrigger.value.config as Record<string, unknown>) ?? {}
@@ -289,7 +284,7 @@ const endpoint = computed<WebhookEndpointInfo | null>(() => props.webhookEndpoin
 
 /** Shown for a live trigger other than a message that was paused or had a run refused. */
 const triggerState = computed<TriggerStateInfo | null>(() =>
-    currentTrigger.value.type === 'message' ? null : (props.triggerStates[triggerId.value.toLowerCase()] ?? null)
+    !isAutomaticTrigger(currentTrigger.value.type) ? null : (props.triggerStates[triggerId.value.toLowerCase()] ?? null)
 )
 const resumeBusy = ref(false)
 const resumeError = ref<string | null>(null)
@@ -562,7 +557,7 @@ function defaultConfig(type: string): Record<string, unknown> {
                         v-for="option in triggerTypes"
                         :key="option.value"
                         :value="option.value"
-                        :disabled="option.value !== 'message' && !canManageAutomations"
+                        :disabled="isAutomaticTrigger(option.value) && !canManageAutomations"
                     >{{ option.label }}</option>
                     <option
                         v-for="entry in registeredOptions"
@@ -585,7 +580,8 @@ function defaultConfig(type: string): Record<string, unknown> {
                     type="number"
                     min="0"
                     :value="currentTrigger.priority"
-                    @input="update({ priority: Number.parseInt(($event.target as HTMLInputElement).value || '0', 10) || 0 })"
+                    data-testid="trigger-priority"
+                    @input="onPriorityInput($event.target as HTMLInputElement)"
                 >
             </div>
 
@@ -606,11 +602,17 @@ function defaultConfig(type: string): Record<string, unknown> {
                 : t('trigger_types.unknown').replace(':type', currentType) }}
         </p>
 
-        <AccordionSection v-if="registeredForm !== null" :title="registeredForm.label" default-open>
-            <p v-if="payloadHint" class="field-hint" data-testid="trigger-payload-hint">{{ payloadHint }}</p>
+        <AccordionSection
+            v-for="(section, index) in registeredSections"
+            :key="`registered-${section.key}`"
+            :title="section.label"
+            :icon="section.icon"
+            :default-open="!section.collapsed"
+        >
+            <p v-if="index === 0 && payloadHint" class="field-hint" data-testid="trigger-payload-hint">{{ payloadHint }}</p>
             <SchemaFields
                 :config="triggerCfg"
-                :fields="registeredFields"
+                :fields="section.fields"
                 :root-config="triggerCfg"
                 @update:config="(patch: Record<string, unknown>) => update({ config: patch })"
             />
@@ -740,7 +742,7 @@ function defaultConfig(type: string): Record<string, unknown> {
                     @change="applyWebhookPreset(($event.target as HTMLSelectElement).value)"
                 >
                     <option value="">{{ t('webhook_trigger.preset_choose') }}</option>
-                    <option v-for="preset in WEBHOOK_PRESETS" :key="preset.value" :value="preset.value">{{ webhookPresetLabel(preset.value, preset.label) }}</option>
+                    <option v-for="preset in WEBHOOK_PRESETS" :key="preset.value" :value="preset.value">{{ t(preset.labelKey) }}</option>
                 </select>
                 <div class="field-hint">{{ t('webhook_trigger.preset_hint') }}</div>
             </div>
