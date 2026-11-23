@@ -7,10 +7,11 @@ namespace App\Http\Controllers\Admin;
 use App\Domains\Credentials\CredentialWriter;
 use App\Domains\Credentials\Models\Credential;
 use App\Domains\Credentials\OAuth2\OAuth2Consent;
-use App\Domains\Credentials\OAuth2\OAuth2ConsentFailed;
+use App\Domains\Credentials\OAuth2\OAuth2ConsentFailedException;
 use App\Domains\Credentials\Types\OAuth2AuthorizationCodeType;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\RefuseWritesWhenTenantStopped;
+use App\Http\Middleware\TakeOAuthCallbackQuery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -24,8 +25,8 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * The callback is a GET, so the stopped-tenant middleware lets it through: it is refused here, since it writes the
  * grant. It answers with a redirect and a flash chosen from a fixed list; the query it got (code, state, the
- * provider's error description) is passed on to the consent and written nowhere — not even into the session's
- * previous URL.
+ * provider's error description) is taken off the request by {@see TakeOAuthCallbackQuery} before `auth` and the
+ * session see it, passed on to the consent and written nowhere — not into the session's intended or previous URL.
  */
 final class CredentialOAuthController extends Controller
 {
@@ -57,12 +58,9 @@ final class CredentialOAuthController extends Controller
     {
         Gate::authorize('update', new Credential());
 
-        $query = $request->query();
-
-        // The session remembers the URL of every GET as the "previous" one, query included: the code and the state
-        // would stay in it. The query is taken here and dropped from the request before the session sees it.
-        $request->query->replace([]);
-        $request->server->set('QUERY_STRING', '');
+        // The query (code, state) was taken off the request before `auth` and the session saw it.
+        $query = $request->attributes->get(TakeOAuthCallbackQuery::ATTRIBUTE);
+        $query = is_array($query) ? $query : [];
 
         if ($this->writes->refusesWritesFor($request->user())) {
             return $this->back(null, 'error', trans('console.credentials.oauth.flash.tenant_stopped'));
@@ -70,7 +68,7 @@ final class CredentialOAuthController extends Controller
 
         try {
             $credential = $this->consent->complete($query, (string) $request->user()?->getAuthIdentifier(), $request->session());
-        } catch (OAuth2ConsentFailed $failure) {
+        } catch (OAuth2ConsentFailedException $failure) {
             return $this->back($failure->credentialId, 'error', trans("console.credentials.oauth.flash.{$failure->reason}", ['code' => $failure->providerCode ?? '']));
         }
 

@@ -27,7 +27,8 @@ use Illuminate\Support\Str;
  * provider's authorization URL. {@see self::complete()} takes the attempt out of the session by its state (once: a
  * replayed callback finds nothing), checks that it is the same person's, not expired, and that the credential is still
  * there unchanged, exchanges the code with the same redirect URI and verifier, and stores the grant under the
- * credential's lock with its audit entry. No code, token, verifier or state reaches a log, the audit or an exception.
+ * credential's lock with its audit entry, after checking once more, on the credential's row locked for update, that it
+ * is still there unchanged. No code, token, verifier or state reaches a log, the audit or an exception.
  */
 final readonly class OAuth2Consent
 {
@@ -108,35 +109,35 @@ final readonly class OAuth2Consent
     /**
      * @param  array<string, mixed>  $query  the callback's query: `state`, and `code` or `error`
      *
-     * @throws OAuth2ConsentFailed
+     * @throws OAuth2ConsentFailedException
      */
     public function complete(array $query, string $userId, Session $session): Credential
     {
         $attempt = $this->takeAttempt($query['state'] ?? null, $session);
 
         if (null === $attempt || $attempt['user_id'] !== $userId || $attempt['tenant_id'] !== $this->tenants->get()->getId()) {
-            throw OAuth2ConsentFailed::stale();
+            throw OAuth2ConsentFailedException::stale();
         }
 
         $credentialId = $attempt['credential_id'];
         $credential   = $this->grants->credential($credentialId);
 
         if (null === $credential) {
-            throw OAuth2ConsentFailed::stale();
+            throw OAuth2ConsentFailedException::stale();
         }
 
         if (OAuth2AuthorizationCodeType::ID !== $credential->type || EloquentCredentialStore::versionOf($credential) !== $attempt['version']) {
-            throw OAuth2ConsentFailed::stale($credentialId);
+            throw OAuth2ConsentFailedException::stale($credentialId);
         }
 
         if (isset($query['error'])) {
-            throw OAuth2ConsentFailed::providerError($credentialId, OAuth2TokenEndpoint::errorCode($query['error']));
+            throw OAuth2ConsentFailedException::providerError($credentialId, OAuth2TokenEndpoint::errorCode($query['error']));
         }
 
         $code = $query['code'] ?? null;
 
         if (!is_string($code) || '' === $code) {
-            throw OAuth2ConsentFailed::exchangeFailed($credentialId);
+            throw OAuth2ConsentFailedException::exchangeFailed($credentialId);
         }
 
         try {
@@ -146,23 +147,34 @@ final readonly class OAuth2Consent
                 'redirect_uri'  => $attempt['redirect_uri'],
                 'code_verifier' => $attempt['code_verifier'],
             ]);
-        } catch (OAuth2TokenRequestFailed|CredentialUnavailableException|CredentialNotFoundException) {
-            throw OAuth2ConsentFailed::exchangeFailed($credentialId);
+        } catch (OAuth2TokenRequestFailedException|CredentialUnavailableException|CredentialNotFoundException) {
+            throw OAuth2ConsentFailedException::exchangeFailed($credentialId);
         }
 
         try {
-            $this->lock->run($attempt['tenant_id'], $credentialId, function () use ($credential, $credentialId, $tokens, $userId): void {
-                DB::transaction(function () use ($credential, $credentialId, $tokens, $userId): void {
-                    $grant = $this->grants->connect($credentialId, $tokens, $userId);
+            return $this->lock->run($attempt['tenant_id'], $credentialId, fn (): Credential => DB::transaction(function () use ($attempt, $credentialId, $tokens, $userId): Credential {
+                // The code exchange took time: an edit of the client (which drops the grant) or a delete may have
+                // committed meanwhile. Read the credential again under a row lock, so the grant is written only for
+                // the client the person consented to, and never for a credential that is gone.
+                $current = $this->grants->lockedCredential($credentialId);
 
-                    $this->record(AuditAction::CredentialConnected, $credential, ['granted_scope' => $grant->granted_scope]);
-                });
-            });
-        } catch (OAuth2GrantLockBusy) {
-            throw OAuth2ConsentFailed::lockBusy($credentialId);
+                if (null === $current) {
+                    throw OAuth2ConsentFailedException::stale();
+                }
+
+                if (OAuth2AuthorizationCodeType::ID !== $current->type || EloquentCredentialStore::versionOf($current) !== $attempt['version']) {
+                    throw OAuth2ConsentFailedException::stale($credentialId);
+                }
+
+                $grant = $this->grants->connect($credentialId, $tokens, $userId);
+
+                $this->record(AuditAction::CredentialConnected, $current, ['granted_scope' => $grant->granted_scope]);
+
+                return $current;
+            }));
+        } catch (OAuth2GrantLockBusyException) {
+            throw OAuth2ConsentFailedException::lockBusy($credentialId);
         }
-
-        return $credential;
     }
 
     /**

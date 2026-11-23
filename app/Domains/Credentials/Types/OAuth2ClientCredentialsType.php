@@ -6,7 +6,7 @@ namespace App\Domains\Credentials\Types;
 
 use App\Domains\Credentials\Contracts\RejectedTokenAwareInterface;
 use App\Domains\Credentials\OAuth2\OAuth2TokenEndpoint;
-use App\Domains\Credentials\OAuth2\OAuth2TokenRequestFailed;
+use App\Domains\Credentials\OAuth2\OAuth2TokenRequestFailedException;
 use App\Domains\Credentials\OAuth2TokenCache;
 use Fapost\Foundation\Credentials\Contracts\HttpCredentialTypeInterface;
 use Fapost\Foundation\Credentials\DTO\CredentialField;
@@ -101,7 +101,7 @@ final readonly class OAuth2ClientCredentialsType implements HttpCredentialTypeIn
 
         try {
             $response = $this->endpoint->request($secret, $form);
-        } catch (OAuth2TokenRequestFailed $failure) {
+        } catch (OAuth2TokenRequestFailedException $failure) {
             throw CredentialUnavailableException::because($secret->id, $failure->getMessage());
         }
 

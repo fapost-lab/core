@@ -10,6 +10,6 @@ use RuntimeException;
  * The lock of a credential's grant could not be taken in time (another worker is refreshing it), or the cache store
  * offers no locks. A grant is never refreshed without the lock.
  */
-final class OAuth2GrantLockBusy extends RuntimeException
+final class OAuth2GrantLockBusyException extends RuntimeException
 {
 }

@@ -77,7 +77,7 @@ final readonly class OAuth2TokenEndpoint
      * @param  array<string, string>  $form  the grant's own parameters
      *
      * @throws CredentialUnavailableException when the token URL, the client or its authentication method is not usable
-     * @throws OAuth2TokenRequestFailed when the endpoint gave no token
+     * @throws OAuth2TokenRequestFailedException when the endpoint gave no token
      */
     public function request(CredentialSecret $secret, #[SensitiveParameter] array $form): OAuth2TokenResponse
     {
@@ -108,11 +108,11 @@ final readonly class OAuth2TokenEndpoint
         } catch (EgressDeniedException) {
             $this->warn($secret, 'refused by the egress guard');
 
-            throw new OAuth2TokenRequestFailed('the token endpoint was refused by the egress guard');
+            throw new OAuth2TokenRequestFailedException('the token endpoint was refused by the egress guard');
         } catch (ConnectionException) {
             $this->warn($secret, 'no answer');
 
-            throw new OAuth2TokenRequestFailed('the token endpoint did not answer');
+            throw new OAuth2TokenRequestFailedException('the token endpoint did not answer');
         }
 
         if (!$response->successful()) {
@@ -120,7 +120,7 @@ final readonly class OAuth2TokenEndpoint
 
             $this->warn($secret, 'status ' . $response->status() . (null === $errorCode ? '' : ' ' . $errorCode));
 
-            throw new OAuth2TokenRequestFailed('the token endpoint answered with status ' . $response->status(), $response->status(), $errorCode);
+            throw new OAuth2TokenRequestFailedException('the token endpoint answered with status ' . $response->status(), $response->status(), $errorCode);
         }
 
         $accessToken = $response->json('access_token');
@@ -128,7 +128,7 @@ final readonly class OAuth2TokenEndpoint
         if (!is_string($accessToken) || '' === $accessToken) {
             $this->warn($secret, 'no access token in a ' . $response->status() . ' answer');
 
-            throw new OAuth2TokenRequestFailed('the token endpoint gave no access token', $response->status());
+            throw new OAuth2TokenRequestFailedException('the token endpoint gave no access token', $response->status());
         }
 
         $refreshToken = $response->json('refresh_token');

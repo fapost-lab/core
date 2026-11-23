@@ -24,6 +24,7 @@ use App\Http\Middleware\ResolveCurrentAssistant;
 use App\Http\Middleware\ResolveTenantContext;
 use App\Http\Middleware\SetConsoleRootView;
 use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\TakeOAuthCallbackQuery;
 use App\Http\Middleware\TenancyMiddleware;
 use App\Http\Middleware\TmaAuthMiddleware;
 use Illuminate\Auth\AuthenticationException;
@@ -86,6 +87,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // forgotten before anything asks the guard for the user: on PostgreSQL a non-uuid id is a query error.
         // Unlisted middleware sorts after the listed ones, which put `auth` ahead of it in the console stacks.
         $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: ForgetInvalidAuthenticatedSession::class);
+
+        // The OAuth2 consent callback's query (the code, the state) comes off the request before `auth` can keep the
+        // full URL of a guest as the intended one, or a refusal leaves it as the session's previous URL.
+        $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: TakeOAuthCallbackQuery::class);
 
         // Stacks of the console (routes/inertia.php): the tenant first (sessions live in the tenant schema), then the
         // session, authentication and the account checks repeated on every request, then the hold of a tenant that is

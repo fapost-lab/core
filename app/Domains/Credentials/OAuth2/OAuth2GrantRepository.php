@@ -68,6 +68,20 @@ final readonly class OAuth2GrantRepository
     }
 
     /**
+     * The credential a grant belongs to, read again and locked for update until the caller's transaction ends: a
+     * concurrent edit or delete of the credential waits for it, and one committed before is seen. Null when there is
+     * none in the current tenant.
+     */
+    public function lockedCredential(string $credentialId): ?Credential
+    {
+        if (!Str::isUuid($credentialId)) {
+            return null;
+        }
+
+        return Credential::query()->where('tenant_id', $this->tenantId())->whereKey($credentialId)->lockForUpdate()->first();
+    }
+
+    /**
      * Stores the grant a consent gave, over any grant the credential had.
      */
     public function connect(string $credentialId, OAuth2TokenResponse $tokens, ?string $connectedBy): CredentialOAuthGrant

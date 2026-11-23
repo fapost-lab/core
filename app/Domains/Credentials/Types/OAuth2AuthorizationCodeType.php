@@ -17,6 +17,7 @@ use Fapost\Foundation\Credentials\DTO\CredentialSecret;
 use Fapost\Foundation\Credentials\DTO\HttpAuthorization;
 use Fapost\Foundation\Credentials\Enums\CredentialFieldKind;
 use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
+use Illuminate\Contracts\Encryption\DecryptException;
 
 /**
  * OAuth2 authorization code grant: a person consents once at the provider (from the credential's console page, see
@@ -134,10 +135,17 @@ final readonly class OAuth2AuthorizationCodeType implements HttpCredentialTypeIn
         $clientId     = (string) $secret->setting('client_id');
         $clientSecret = (string) $secret->value('client_secret');
 
+        try {
+            $accessToken  = $grant->access_token;
+            $refreshToken = $grant->refresh_token;
+        } catch (DecryptException) {
+            throw CredentialUnavailableException::because($secret->id, 'the stored grant cannot be decrypted');
+        }
+
         return new HttpAuthorization(
-            headers: ['Authorization' => 'Bearer ' . $grant->access_token],
+            headers: ['Authorization' => 'Bearer ' . $accessToken],
             secrets: array_values(array_filter(
-                [$clientSecret, $grant->access_token, $grant->refresh_token, base64_encode($clientId . ':' . $clientSecret)],
+                [$clientSecret, $accessToken, $refreshToken, base64_encode($clientId . ':' . $clientSecret)],
                 static fn (?string $value): bool => null !== $value && '' !== $value,
             )),
         );
