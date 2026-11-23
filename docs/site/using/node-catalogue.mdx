@@ -50,7 +50,8 @@ with `broadcast_running`; a segment that was deleted gives `audience_missing`, a
 with nothing in the base language `message_empty`. An audience nobody is in still
 starts a broadcast, which completes with no recipients. Publishing a flow that adds
 such a block, or changes its audience or text, needs the **Manage broadcasts**
-permission. To act when the broadcast is done, start a flow on the
+permission. The check looks at the block itself: changing the flow variables its
+text reads, or the blocks and links that lead to it, does not need that permission. To act when the broadcast is done, start a flow on the
 `core.broadcast.completed` event.
 
 If the send fails, the flow leaves through the block's **error** exit, and the flow log

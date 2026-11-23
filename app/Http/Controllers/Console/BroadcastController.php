@@ -15,7 +15,7 @@ use App\Domains\Broadcasting\Exceptions\BroadcastNotSendableException;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Services\BroadcastRecipientResolver;
 use App\Domains\Broadcasting\Services\BroadcastService;
-use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Services\FlowDraftService;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Console\BroadcastReachRequest;
@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -42,18 +43,11 @@ use Inertia\Response;
  */
 final class BroadcastController extends Controller
 {
-    /**
-     * The flows that started the broadcasts on this page, by flow id (null when the flow is gone): one query per flow,
-     * not per row. The controller lives for one request.
-     *
-     * @var array<string, FlowDraft|null>
-     */
-    private array $flows = [];
-
     public function __construct(
         private readonly BroadcastService $broadcasts,
         private readonly BroadcastRecipientResolver $resolver,
         private readonly CurrentAssistantInterface $assistant,
+        private readonly FlowDraftService $flowDrafts,
     ) {
     }
 
@@ -89,11 +83,27 @@ final class BroadcastController extends Controller
             ],
         );
 
+        $canOpenFlows = Gate::allows('view', $this->flowDrafts->abilityProbe());
+        $flowNames    = [];
+
         return Inertia::render('Console/Broadcasts/Index', [
             'table' => $table->respond(
                 $request,
                 $this->broadcasts->query(),
-                fn (Broadcast $broadcast): array => $this->row($broadcast, $can),
+                function (Broadcast $broadcast) use ($can, $canOpenFlows, &$flowNames): array {
+                    return $this->row($broadcast, $can, $canOpenFlows, $flowNames);
+                },
+                function (Collection $page) use (&$flowNames): void {
+                    $flowIds = $page
+                        ->filter(static fn (Broadcast $broadcast): bool => BroadcastOrigin::Automation === $broadcast->origin)
+                        ->pluck('flow_id')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    $flowNames = $this->flowDrafts->namesByFlowId($flowIds);
+                },
             ),
             'statuses' => array_map(static fn (BroadcastStatus $status): string => $status->value, BroadcastStatus::cases()),
             // Names for the confirmation dialog, which shows the audience of the draft about to be sent.
@@ -230,11 +240,15 @@ final class BroadcastController extends Controller
      * one the server would refuse; the server checks again.
      *
      * @param  array{create: bool, update: bool, delete: bool, send: bool, cancel: bool}  $can
+     * @param  array<string, string>                                                      $flowNames  the page's flows, by flow id
      *
      * @return array<string, mixed>
      */
-    private function row(Broadcast $broadcast, array $can): array
+    private function row(Broadcast $broadcast, array $can, bool $canOpenFlows, array $flowNames): array
     {
+        $flowId   = BroadcastOrigin::Automation === $broadcast->origin ? $broadcast->flow_id : null;
+        $flowName = null !== $flowId ? ($flowNames[$flowId] ?? null) : null;
+
         $id      = $broadcast->getKey();
         $isDraft = BroadcastStatus::Draft === $broadcast->status;
 
@@ -245,8 +259,8 @@ final class BroadcastController extends Controller
             'status' => $broadcast->status->value,
             // A flow's node started it: the row says so and names the flow, linked to the builder while it exists.
             'origin'   => $broadcast->origin->value,
-            'flowName' => $this->flow($broadcast)?->name,
-            'flowUrl'  => $this->flowUrl($broadcast),
+            'flowName' => $flowName,
+            'flowUrl'  => null !== $flowName && $canOpenFlows ? route('builder.flows.show', ['flow' => $flowId]) : null,
             // Why a failed or stopped run ended; the row shows it next to the status.
             'stopReason' => $broadcast->stop_reason,
             'sent'       => $broadcast->sent_count,
@@ -266,29 +280,6 @@ final class BroadcastController extends Controller
             'cancelUrl'       => BroadcastStatus::Running === $broadcast->status && $can['cancel'] ? $this->url('cancel', ['record' => $id]) : null,
             'deleteUrl'       => BroadcastStatus::Running !== $broadcast->status && $can['delete'] ? $this->url('destroy', ['record' => $id]) : null,
         ];
-    }
-
-    private function flow(Broadcast $broadcast): ?FlowDraft
-    {
-        if (BroadcastOrigin::Automation !== $broadcast->origin || null === $broadcast->flow_id) {
-            return null;
-        }
-
-        if (! array_key_exists($broadcast->flow_id, $this->flows)) {
-            $this->flows[$broadcast->flow_id] = FlowDraft::query()->where('flow_id', $broadcast->flow_id)->first(['id', 'flow_id', 'name', 'assistant_id']);
-        }
-
-        return $this->flows[$broadcast->flow_id];
-    }
-
-    /**
-     * The builder's page of the flow that started the broadcast, for someone who may open it; null otherwise.
-     */
-    private function flowUrl(Broadcast $broadcast): ?string
-    {
-        $flow = $this->flow($broadcast);
-
-        return null !== $flow && Gate::allows('view', $flow) ? route('builder.flows.show', ['flow' => $flow->flow_id]) : null;
     }
 
     /**

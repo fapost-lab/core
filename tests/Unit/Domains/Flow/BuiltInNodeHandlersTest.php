@@ -28,6 +28,7 @@ use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
+use App\Domains\Flow\Services\AudienceMessage;
 use App\Domains\Flow\Services\EventChainContext;
 use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\State\SystemStateKeys;
@@ -936,10 +937,14 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
             new NullLogger(),
-            Mockery::mock(AudienceBroadcasterInterface::class),
-            new EventChainContext(),
-            Mockery::mock(FlowDefinitionRepositoryInterface::class),
-            Mockery::mock(FlowDraftRepositoryInterface::class),
+            new AudienceMessage(
+                Mockery::mock(AudienceBroadcasterInterface::class),
+                new EventChainContext(),
+                Mockery::mock(FlowDefinitionRepositoryInterface::class),
+                Mockery::mock(FlowDraftRepositoryInterface::class),
+                new TemplateRenderer(),
+                new NullLogger(),
+            ),
         );
 
         $context = new NodeExecutionContext(
@@ -999,10 +1004,14 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
             new NullLogger(),
-            Mockery::mock(AudienceBroadcasterInterface::class),
-            new EventChainContext(),
-            Mockery::mock(FlowDefinitionRepositoryInterface::class),
-            Mockery::mock(FlowDraftRepositoryInterface::class),
+            new AudienceMessage(
+                Mockery::mock(AudienceBroadcasterInterface::class),
+                new EventChainContext(),
+                Mockery::mock(FlowDefinitionRepositoryInterface::class),
+                Mockery::mock(FlowDraftRepositoryInterface::class),
+                new TemplateRenderer(),
+                new NullLogger(),
+            ),
         );
 
         $context = new NodeExecutionContext(
@@ -1710,10 +1719,14 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
             new NullLogger(),
-            Mockery::mock(AudienceBroadcasterInterface::class),
-            new EventChainContext(),
-            Mockery::mock(FlowDefinitionRepositoryInterface::class),
-            Mockery::mock(FlowDraftRepositoryInterface::class),
+            new AudienceMessage(
+                Mockery::mock(AudienceBroadcasterInterface::class),
+                new EventChainContext(),
+                Mockery::mock(FlowDefinitionRepositoryInterface::class),
+                Mockery::mock(FlowDraftRepositoryInterface::class),
+                new TemplateRenderer(),
+                new NullLogger(),
+            ),
         );
 
         $persistedButtons = [
@@ -1817,10 +1830,14 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             $timeouts ?? Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
             $logger ?? new NullLogger(),
-            $broadcaster ?? Mockery::mock(AudienceBroadcasterInterface::class),
-            new EventChainContext(),
-            Mockery::mock(FlowDefinitionRepositoryInterface::class),
-            Mockery::mock(FlowDraftRepositoryInterface::class),
+            new AudienceMessage(
+                $broadcaster ?? Mockery::mock(AudienceBroadcasterInterface::class),
+                new EventChainContext(),
+                Mockery::mock(FlowDefinitionRepositoryInterface::class),
+                Mockery::mock(FlowDraftRepositoryInterface::class),
+                new TemplateRenderer(),
+                $logger ?? new NullLogger(),
+            ),
         );
     }
 

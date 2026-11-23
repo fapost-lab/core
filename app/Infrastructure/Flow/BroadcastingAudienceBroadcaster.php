@@ -12,6 +12,7 @@ use App\Domains\Flow\Contracts\AudienceBroadcasterInterface;
 use App\Domains\Flow\DTOs\AudienceBroadcastRequest;
 use App\Domains\Flow\DTOs\AudienceBroadcastResult;
 use App\Domains\Flow\Enums\AudienceBroadcastOutcome;
+use App\Domains\Flow\Enums\AudienceKind;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 
 /**
@@ -34,7 +35,10 @@ final readonly class BroadcastingAudienceBroadcaster implements AudienceBroadcas
             tenantId: $request->tenantId,
             assistantId: $request->assistantId,
             name: $request->name,
-            target: AudienceBroadcastRequest::AUDIENCE_SEGMENT === $request->audience ? BroadcastTarget::Segment : BroadcastTarget::Tags,
+            target: match ($request->audience) {
+                AudienceKind::Tags    => BroadcastTarget::Tags,
+                AudienceKind::Segment => BroadcastTarget::Segment,
+            },
             tags: $request->tags,
             segmentId: $request->segmentId,
             message: $request->message,

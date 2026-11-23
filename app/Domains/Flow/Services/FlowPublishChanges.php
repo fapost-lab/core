@@ -61,6 +61,11 @@ final readonly class FlowPublishChanges
      * template can bring such a node, and a host's parameter values can rewrite its text. The copies' ids are stable
      * (UUIDv5 of the reference and the template node), and the published definition is stored expanded, so the two
      * compare by node id. A draft whose expansion fails is compared as it is: its publish is refused anyway.
+     *
+     * The comparison covers the node's own fields only. What its `{{flow.*}}` placeholders read (set by an `assign` or
+     * an `input` node upstream) and the edges, loops and `call` nodes leading to it are not compared, so a publisher
+     * without `ManageBroadcast` can still change what an approved broadcast says and how often it goes out that way.
+     * Whether the right should reach that far is an open authorization decision, not an oversight here.
      */
     public function changesAudienceMessages(FlowDraft $draft): bool
     {
