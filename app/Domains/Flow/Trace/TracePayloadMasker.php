@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Trace;
 
-use App\Domains\Flow\Support\SecretRedactor;
+use App\Domains\Credentials\SecretRedactor;
 
 /**
  * Masks what must not reach a node trace, before it is truncated and written.

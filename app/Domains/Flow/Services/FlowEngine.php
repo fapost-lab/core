@@ -37,6 +37,7 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\Trace\LoopIterations;
+use App\Domains\Flow\Trace\NodeTraceContext;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Flow\Webhook\WebhookRunEndReply;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
@@ -513,8 +514,8 @@ final readonly class FlowEngine implements FlowEngineInterface
 
             // The node trace (flow_session_history, always written, outside the step's transaction): the loops the node
             // runs in are read from the state it starts with.
-            $iterations = LoopIterations::of($definition->nodes ?? [], $session->state ?? []);
-            $this->trace->entered($session, $nodeId, $type, $version, $iterations);
+            $traceContext = new NodeTraceContext($session, $nodeId, $type, $version, LoopIterations::of($definition->nodes ?? [], $session->state ?? []));
+            $this->trace->entered($traceContext);
             $startedAt = hrtime(true);
 
             // A node of a Solution that is switched off for this tenant, or whose package is gone, does not
@@ -527,7 +528,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                     $handler = $this->registry->resolve($type, $version);
                 } catch (LogicException $exception) {
                     $notFound = HandlerNotFoundException::forTypeAndVersion($type, $version, $exception);
-                    $this->trace->failed($session, $nodeId, $type, $version, $notFound::class, $notFound->getMessage(), null, $iterations);
+                    $this->trace->failed($traceContext, $notFound::class, $notFound->getMessage(), null);
 
                     throw $notFound;
                 }
@@ -594,7 +595,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                 try {
                     $result = $handler->execute($node, $session->state ?? [], $handlerContext);
                 } catch (VolumeLimitReachedException $limitReached) {
-                    $this->traceFailure($session, $nodeId, $type, $version, $limitReached, $startedAt, $iterations);
+                    $this->traceFailure($traceContext, $limitReached, $startedAt);
 
                     // The node has no `error` exit to take (those catch this themselves). Retrying the job
                     // would only ask the operator again, so the session stops here and the job succeeds.
@@ -606,7 +607,7 @@ final readonly class FlowEngine implements FlowEngineInterface
 
                     return;
                 } catch (Throwable $handlerException) {
-                    $this->traceFailure($session, $nodeId, $type, $version, $handlerException, $startedAt, $iterations);
+                    $this->traceFailure($traceContext, $handlerException, $startedAt);
 
                     // Hand back only when the failure was recorded: if another worker moved the session on,
                     // the parent is theirs to resume. A child that handed back is dealt with and does not
@@ -730,18 +731,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             // telemetry failure bubble up would fail the job, retry it, and
             // deliver the message again.
             $this->writeLogSafely($this->buildLogEntry($session, $node, $result, $nextNodeId));
-            $this->trace->completed(
-                $session,
-                $nodeId,
-                $type,
-                $version,
-                $result,
-                $nextNodeId,
-                $durationMs,
-                $incomingStep,
-                $resumedAfterDelayStep,
-                $iterations,
-            );
+            $this->trace->completed($traceContext, $result, $nextNodeId, $durationMs, $incomingStep, $resumedAfterDelayStep);
 
             if (null !== $endStatus) {
                 $this->subflowResumer->resumeIfChild($session, $endStatus);
@@ -807,14 +797,16 @@ final readonly class FlowEngine implements FlowEngineInterface
     {
         // Before the failure is persisted, so the trace keeps it even if the persist fails.
         $this->trace->failed(
-            $session,
-            (string) ($session->current_node_id ?? ''),
-            null,
-            null,
+            new NodeTraceContext(
+                $session,
+                (string) ($session->current_node_id ?? ''),
+                null,
+                null,
+                LoopIterations::of($definition->nodes ?? [], $session->state ?? []),
+            ),
             NodeTraceRecorder::STEP_LIMIT_ERROR,
             $limit->getMessage(),
             null,
-            LoopIterations::of($definition->nodes ?? [], $session->state ?? []),
         );
 
         $this->persistStepLimitFailure($session);
@@ -968,28 +960,10 @@ final readonly class FlowEngine implements FlowEngineInterface
     /**
      * Records the node a handler failed at, before the failure is persisted, so the trace keeps it even if the persist
      * fails.
-     *
-     * @param  array<string, int>  $iterations
      */
-    private function traceFailure(
-        FlowSession $session,
-        string $nodeId,
-        string $type,
-        int $version,
-        Throwable $exception,
-        int|float $startedAt,
-        array $iterations,
-    ): void {
-        $this->trace->failed(
-            $session,
-            $nodeId,
-            $type,
-            $version,
-            $exception::class,
-            $exception->getMessage(),
-            (hrtime(true) - $startedAt) / 1_000_000,
-            $iterations,
-        );
+    private function traceFailure(NodeTraceContext $context, Throwable $exception, int|float $startedAt): void
+    {
+        $this->trace->failed($context, $exception::class, $exception->getMessage(), (hrtime(true) - $startedAt) / 1_000_000);
     }
 
     /**
