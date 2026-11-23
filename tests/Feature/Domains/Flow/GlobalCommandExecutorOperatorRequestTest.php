@@ -17,6 +17,7 @@ use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Services\FlowSessionTerminator;
 use Illuminate\Support\Str;
 use Mockery;
 use Mockery\MockInterface;
@@ -147,11 +148,11 @@ final class GlobalCommandExecutorOperatorRequestTest extends FeatureTestCase
         $messenger->shouldIgnoreMissing();
 
         return $this->app->make(GlobalCommandExecutor::class, [
-            'sessions'         => $this->sessions,
-            'definitions'      => $this->definitions,
-            'engine'           => $this->engine,
-            'messenger'        => $messenger,
-            'operatorRequests' => $this->operatorRequests,
+            'sessions'    => $this->sessions,
+            'definitions' => $this->definitions,
+            'engine'      => $this->engine,
+            'messenger'   => $messenger,
+            'terminator'  => $this->app->make(FlowSessionTerminator::class, ['operatorRequests' => $this->operatorRequests]),
         ]);
     }
 

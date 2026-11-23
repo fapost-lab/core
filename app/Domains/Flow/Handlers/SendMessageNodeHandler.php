@@ -17,6 +17,7 @@ use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use App\Domains\Flow\Support\AddresseeResolver;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use Carbon\Carbon;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -56,7 +57,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
     final public const string TYPE = 'send_message';
 
     /** The one addressee kind so far; tags and segments come as further kinds of the same field. */
-    final public const string ADDRESSEE_KIND_CONTACT = 'contact';
+    final public const string ADDRESSEE_KIND_CONTACT = AddresseeResolver::KIND_CONTACT;
 
     private const string EXTERNAL_MESSAGE_ID_META = 'external_message_id';
     private const string NO_RESPONSE_HANDLE       = 'no_response';
@@ -403,10 +404,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
     }
 
     /**
-     * The addressee a node's config names: its kind (null when the config names none) and its contact expression.
-     *
-     * No `addressee`, an empty one, or the builder's untouched default (kind `contact`, no expression) names none; a
-     * kind other than `contact` is named even without an expression, so validation can refuse it.
+     * The addressee a node's config names ({@see AddresseeResolver::addresseeOf()}).
      *
      * @param  array<array-key, mixed>  $config
      *
@@ -414,21 +412,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
      */
     private static function addresseeOf(array $config): array
     {
-        $addressee = $config['addressee'] ?? null;
-
-        if (! is_array($addressee)) {
-            return ['kind' => null, 'contact' => ''];
-        }
-
-        $rawKind = $addressee['kind'] ?? null;
-        $kind    = is_string($rawKind) && '' !== mb_trim($rawKind) ? mb_trim($rawKind) : self::ADDRESSEE_KIND_CONTACT;
-        $contact = is_string($addressee['contact'] ?? null) ? mb_trim($addressee['contact']) : '';
-
-        if (self::ADDRESSEE_KIND_CONTACT === $kind && '' === $contact) {
-            return ['kind' => null, 'contact' => ''];
-        }
-
-        return ['kind' => $kind, 'contact' => $contact];
+        return AddresseeResolver::addresseeOf($config);
     }
 
     /**
@@ -598,14 +582,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
      */
     private function resolveAddressee(array $addressee, array $state, NodeExecutionContext $context): ?string
     {
-        if (self::ADDRESSEE_KIND_CONTACT !== $addressee['kind']) {
-            return null;
-        }
-
-        $rendered = $this->templates->render($addressee['contact'], $context, $state);
-        $id       = is_scalar($rendered) ? mb_trim((string) $rendered) : '';
-
-        return Uuid::isValid($id) ? mb_strtolower($id) : null;
+        return new AddresseeResolver($this->templates)->resolve($addressee, $context, $state);
     }
 
     /**
