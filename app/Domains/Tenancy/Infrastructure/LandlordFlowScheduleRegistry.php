@@ -38,20 +38,70 @@ final class LandlordFlowScheduleRegistry implements FlowScheduleRegistryInterfac
         return $this->table()->where('tenant_id', $tenantId)->delete();
     }
 
-    public function replaceForTenant(string $tenantId, array $nextRuns): void
+    /**
+     * Only rows written before {@code $readAt} are changed: the list was read then, so a row written since (a publish's
+     * {@see put()} that committed while the tenant was being read) is newer than it. Times are compared at the second,
+     * the precision `updated_at` keeps, so a row of the very second of the read is kept too; a row kept that way is at
+     * worst one useless visit, and the next rebuild puts it right.
+     */
+    public function replaceForTenant(string $tenantId, array $nextRuns, DateTimeInterface $readAt): void
     {
-        DB::connection('landlord')->transaction(function () use ($tenantId, $nextRuns): void {
-            $this->table()->where('tenant_id', $tenantId)->delete();
+        $before = $this->format($readAt);
 
+        DB::connection('landlord')->transaction(function () use ($tenantId, $nextRuns, $before): void {
             $rows = [];
 
             foreach ($nextRuns as $triggerId => $nextRunAt) {
-                $rows[] = $this->row($tenantId, (string) $triggerId, $nextRunAt);
+                $row                      = $this->row($tenantId, (string) $triggerId, $nextRunAt);
+                $rows[$row['trigger_id']] = $row;
             }
 
-            foreach (array_chunk($rows, 500) as $chunk) {
-                // An upsert, not an insert: a trigger id another tenant's rows still claim (a stale copy) moves here.
-                $this->table()->upsert($chunk, ['trigger_id'], ['tenant_id', 'next_run_at', 'updated_at']);
+            $stored = $this->table()
+                ->where('tenant_id', $tenantId)
+                ->pluck('trigger_id')
+                ->map(static fn (mixed $id): string => (string) $id)
+                ->all();
+
+            $gone = array_values(array_diff($stored, array_keys($rows)));
+
+            foreach (array_chunk($gone, 500) as $chunk) {
+                $this->table()
+                    ->where('tenant_id', $tenantId)
+                    ->whereIn('trigger_id', $chunk)
+                    ->where('updated_at', '<', $before)
+                    ->delete();
+            }
+
+            foreach (array_chunk($rows, 500, true) as $chunk) {
+                $existing = $this->table()
+                    ->whereIn('trigger_id', array_keys($chunk))
+                    ->get(['trigger_id', 'tenant_id', 'next_run_at'])
+                    ->keyBy(static fn (object $row): string => (string) $row->trigger_id);
+
+                $new = [];
+
+                foreach ($chunk as $triggerId => $row) {
+                    $current = $existing->get($triggerId);
+
+                    if (null === $current) {
+                        $new[] = $row;
+
+                        continue;
+                    }
+
+                    if ($tenantId === (string) $current->tenant_id && $this->sameMoment($current->next_run_at, $row['next_run_at'])) {
+                        continue;
+                    }
+
+                    // A changed slot, or a trigger id another tenant's row still claims (a stale copy) moving here.
+                    $this->table()
+                        ->where('trigger_id', $triggerId)
+                        ->where('updated_at', '<', $before)
+                        ->update(['tenant_id' => $tenantId, 'next_run_at' => $row['next_run_at'], 'updated_at' => $row['updated_at']]);
+                }
+
+                // A row another write added since the tenant was read is newer: it stays.
+                $this->table()->insertOrIgnore($new);
             }
         });
     }
@@ -84,6 +134,15 @@ final class LandlordFlowScheduleRegistry implements FlowScheduleRegistryInterfac
             'next_run_at' => $this->format($nextRunAt),
             'updated_at'  => $this->format(CarbonImmutable::now()),
         ];
+    }
+
+    /**
+     * Whether a stored `next_run_at` is the moment {@code $formatted}; the driver may return it with or without
+     * fractions.
+     */
+    private function sameMoment(mixed $stored, string $formatted): bool
+    {
+        return null !== $stored && CarbonImmutable::parse((string) $stored, 'UTC')->format('Y-m-d H:i:s') === $formatted;
     }
 
     private function format(DateTimeInterface $moment): string

@@ -62,7 +62,6 @@ final class FlowsConsoleTest extends FeatureTestCase
     public static function liveStatuses(): array
     {
         return [
-            'pending'        => [FlowSessionStatus::Pending],
             'active'         => [FlowSessionStatus::Active],
             'waiting input'  => [FlowSessionStatus::WaitingInput],
             'paused'         => [FlowSessionStatus::Paused],
@@ -673,6 +672,19 @@ final class FlowsConsoleTest extends FeatureTestCase
             ->assertInertiaFlash('error');
 
         $this->assertModelExists($flow);
+    }
+
+    public function test_a_run_that_has_not_started_yet_is_cancelled_and_does_not_hold_a_flow_back(): void
+    {
+        $flow    = $this->flow('Every minute');
+        $pending = $this->sessionOn($this->publish($flow, 1), FlowSessionStatus::Pending);
+
+        $this->actingAs($this->admin())
+            ->delete($this->listUrl("/{$flow->getKey()}"))
+            ->assertInertiaFlash('success');
+
+        $this->assertModelMissing($flow);
+        $this->assertSame(FlowSessionStatus::Cancelled, $pending->refresh()->status);
     }
 
     public function test_finished_sessions_do_not_hold_a_flow_back(): void

@@ -181,7 +181,8 @@ broken.
   Anything in Redis can be rebuilt by `WebhookRegistryHealthChecker`.
 - **The schedule registry is derived; the tenant's `flow_triggers` is the truth.** `flow_schedule_registry` is read and
   written only by `LandlordFlowScheduleRegistry` (`FlowScheduleRegistryInterface`), has no foreign key, is written after
-  the tenant's commit, rebuilt hourly from the tenants, and its rows go with a decommissioned tenant
+  the tenant's commit, rebuilt hourly from the tenants (a rebuild leaves the rows written after it read the tenant), and
+  its rows go with a decommissioned tenant
   (`adr-20261123-flow-schedule-trigger`). Enforced: `FireScheduledTriggersCommandTest`, `CoreTenantDecommissionerTest`.
 
 - **Core's default for an operator-replaceable contract is bound with `bindIf`.** Package service

@@ -15,6 +15,7 @@ use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Jobs\Flow\StartAutomationRunJob;
+use Carbon\CarbonImmutable;
 use Closure;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Illuminate\Console\Scheduling\Schedule;
@@ -59,7 +60,7 @@ final class FireScheduledTriggersCommandTest extends FeatureTestCase
 
     public function test_a_tenant_the_registry_names_fires_and_its_registry_row_moves_to_the_next_slot(): void
     {
-        $this->registry()->put($this->tenantId, $this->triggerId, now());
+        $this->putEarlier($this->tenantId, $this->triggerId, now());
 
         $this->artisan('flow:fire-scheduled-triggers')->assertExitCode(0);
 
@@ -91,7 +92,7 @@ final class FireScheduledTriggersCommandTest extends FeatureTestCase
     public function test_the_pass_rewrites_a_stale_registry_from_the_truth(): void
     {
         $gone = mb_strtolower(Str::ulid()->toRfc4122());
-        $this->registry()->put($this->tenantId, $gone, now()->subMinute());
+        $this->putEarlier($this->tenantId, $gone, now()->subMinute());
 
         $this->artisan('flow:fire-scheduled-triggers')->assertExitCode(0);
 
@@ -148,6 +149,66 @@ final class FireScheduledTriggersCommandTest extends FeatureTestCase
         $this->assertSame([$this->triggerId => '2026-11-20 09:00:00'], $this->registryRows());
     }
 
+    public function test_the_registry_writes_of_one_tenant_leave_another_tenants_rows_alone(): void
+    {
+        $other      = (string) Str::uuid();
+        $otherDue   = mb_strtolower(Str::ulid()->toRfc4122());
+        $otherLater = mb_strtolower(Str::ulid()->toRfc4122());
+        $ownGone    = mb_strtolower(Str::ulid()->toRfc4122());
+        $this->registry()->put($other, $otherDue, now()->subMinute());
+        $this->registry()->put($other, $otherLater, now()->addHour());
+        $this->registry()->put($this->tenantId, $ownGone, now()->addDay());
+
+        Carbon::setTestNow('2026-11-20 09:00:10');
+        $this->registry()->replaceForTenant($this->tenantId, [$this->triggerId => now()->subSeconds(10)], now());
+
+        $this->assertSame([$this->triggerId => '2026-11-20 09:00:00'], $this->registryRows());
+        $this->assertSame(2, DB::connection('landlord')->table('flow_schedule_registry')->where('tenant_id', $other)->count());
+        $this->assertEqualsCanonicalizing([$this->tenantId, $other], $this->registry()->dueTenantIds(now(), 10));
+
+        DB::connection('landlord')->table('flow_schedule_registry')->where('trigger_id', $otherDue)->delete();
+
+        $this->assertSame([$this->tenantId], $this->registry()->dueTenantIds(now(), 10), 'A tenant whose rows are all later is not due.');
+        $this->assertSame(1, $this->registry()->forgetTenant($this->tenantId));
+        $this->assertSame([$otherLater], DB::connection('landlord')->table('flow_schedule_registry')->pluck('trigger_id')->all());
+    }
+
+    public function test_a_rebuild_keeps_the_rows_written_after_it_read_the_tenant(): void
+    {
+        $published = mb_strtolower(Str::ulid()->toRfc4122());
+        $leftOver  = mb_strtolower(Str::ulid()->toRfc4122());
+        $this->putEarlier($this->tenantId, $leftOver, now()->addHour());
+        $this->putEarlier($this->tenantId, $this->triggerId, now()->addDay());
+
+        // The rebuild reads the tenant at 09:00:00; a publish commits at 09:00:01 and puts a new schedule and a changed
+        // slot of the one the rebuild read; the rebuild writes what it read at 09:00:02.
+        $readAt = CarbonImmutable::parse('2026-11-20 09:00:00');
+        Carbon::setTestNow('2026-11-20 09:00:01');
+        $this->registry()->put($this->tenantId, $published, CarbonImmutable::parse('2026-11-20 09:05:00'));
+        $this->registry()->put($this->tenantId, $this->triggerId, CarbonImmutable::parse('2026-11-20 10:00:00'));
+        Carbon::setTestNow('2026-11-20 09:00:02');
+
+        $this->registry()->replaceForTenant($this->tenantId, [$this->triggerId => CarbonImmutable::parse('2026-11-20 09:30:00')], $readAt);
+
+        // Compared by key: the order the rows come back in is the database's.
+        $this->assertEquals([
+            $published       => '2026-11-20 09:05:00',
+            $this->triggerId => '2026-11-20 10:00:00',
+        ], $this->registryRows(), 'The left-over row written before the read is gone; the newer writes stay as they are.');
+    }
+
+    public function test_a_rebuild_moves_a_trigger_id_a_stale_row_of_another_tenant_still_claims(): void
+    {
+        $other = (string) Str::uuid();
+        $this->registry()->put($other, $this->triggerId, now()->subDay());
+        Carbon::setTestNow('2026-11-20 09:00:05');
+
+        $this->registry()->replaceForTenant($this->tenantId, [$this->triggerId => CarbonImmutable::parse('2026-11-20 09:00:00')], now());
+
+        $this->assertSame([$this->triggerId => '2026-11-20 09:00:00'], $this->registryRows());
+        $this->assertSame(0, DB::connection('landlord')->table('flow_schedule_registry')->where('tenant_id', $other)->count());
+    }
+
     public function test_both_passes_are_scheduled_without_overlapping(): void
     {
         $events = collect($this->app->make(Schedule::class)->events());
@@ -178,6 +239,17 @@ final class FireScheduledTriggersCommandTest extends FeatureTestCase
             ->pluck('next_run_at', 'trigger_id')
             ->map(static fn (mixed $at): string => Carbon::parse((string) $at)->format('Y-m-d H:i:s'))
             ->all();
+    }
+
+    /**
+     * A registry row as a write a minute ago left it: the rebuild of this minute reads the tenant after it.
+     */
+    private function putEarlier(string $tenantId, string $triggerId, CarbonImmutable|Carbon $nextRunAt): void
+    {
+        $now = now()->toImmutable();
+        Carbon::setTestNow($now->subMinute());
+        $this->registry()->put($tenantId, $triggerId, $nextRunAt);
+        Carbon::setTestNow($now);
     }
 
     /**

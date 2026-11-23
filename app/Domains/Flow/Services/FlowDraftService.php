@@ -17,6 +17,7 @@ use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Exceptions\FlowHasLiveSessionsException;
 use App\Domains\Flow\Exceptions\FlowTemplateInUseException;
+use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
@@ -283,6 +284,10 @@ final readonly class FlowDraftService
      * A deleted flow no longer counts as a user of the templates it carries, so they can be deleted and are not
      * republished into it.
      *
+     * A run that has not started yet — a schedule's `pending` run, waiting for its start job — does not hold the delete
+     * back: it is cancelled in the same transaction, so a frequent schedule never makes its flow undeletable and the
+     * start job finds nothing to start. A run that has started does hold it back.
+     *
      * @throws FlowHasLiveSessionsException when a session of the flow is still going
      * @throws FlowTemplateInUseException when the flow is a template placed in another flow (published or draft)
      */
@@ -292,11 +297,15 @@ final readonly class FlowDraftService
             throw new FlowTemplateInUseException($flow->flow_id);
         }
 
-        if ($this->hasLiveSessions($flow)) {
-            throw new FlowHasLiveSessionsException($flow->flow_id);
-        }
-
         DB::transaction(function () use ($flow): void {
+            $this->cancelRunsNotStarted($flow);
+
+            // Checked after the cancel, in its transaction: a run whose start won the race is live and refuses the
+            // delete, and the refusal rolls the cancel back.
+            if ($this->hasLiveSessions($flow)) {
+                throw new FlowHasLiveSessionsException($flow->flow_id);
+            }
+
             $flow->delete();
 
             $this->templateIndex->forgetHost($flow->flow_id);
@@ -367,6 +376,31 @@ final readonly class FlowDraftService
             'flow_group_id' => $flow->flow_group_id,
             'is_public'     => $flow->is_public,
         ];
+    }
+
+    /**
+     * Cancels the flow's runs still `pending` (only a schedule creates one). Each is written under its optimistic lock,
+     * so a start job that activates it at the same moment either sees it cancelled and starts nothing, or wins and
+     * leaves it live.
+     *
+     * @throws FlowHasLiveSessionsException when a run's start got there first
+     */
+    private function cancelRunsNotStarted(FlowDraft $flow): void
+    {
+        $pending = FlowSession::query()
+            ->where('tenant_id', $flow->tenant_id)
+            ->where('status', FlowSessionStatus::Pending->value)
+            ->whereNull('parent_session_id')
+            ->whereIn('flow_definition_id', FlowDefinition::query()->select('id')->where('flow_id', $flow->flow_id))
+            ->get();
+
+        foreach ($pending as $run) {
+            try {
+                $run->saveWithOptimisticLock(['status' => FlowSessionStatus::Cancelled, 'segment_id' => null]);
+            } catch (OptimisticLockConflictException) {
+                throw new FlowHasLiveSessionsException($flow->flow_id);
+            }
+        }
     }
 
     /**

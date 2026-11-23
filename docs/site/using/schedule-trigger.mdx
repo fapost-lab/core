@@ -28,7 +28,10 @@ name (`invalid_schedule_timezone`).
 
 The first run is the first moment of the schedule after the publish. Publishing again without changing the cron or the
 time zone keeps the schedule where it is; changing either one, or switching the trigger off and on again, starts it
-afresh from the moment of the publish. Switching the trigger off, deleting it or deleting the flow stops it.
+afresh from the moment of the publish. Switching the trigger off, deleting it or deleting the flow stops it; deleting
+the flow also cancels a run of the schedule that is waiting to start within its minute, while a run that has already
+started keeps the flow from being deleted until it ends. Deleting the assistant the flow belongs to stops the schedule
+too, at its next moment.
 
 <Note>
   A schedule published before your installation was upgraded to the release that runs schedules does not run until
@@ -43,6 +46,10 @@ afresh from the moment of the publish. Switching the trigger off, deleting it or
 - **No catching up.** Moments that pass while the platform or the workspace is down (or stopped) are not run
   afterwards. A moment is still run if it is picked up up to five minutes late; after a longer outage the schedule logs
   `flow.schedule.tick_missed` once and continues with its next moment.
+- **One run per pass.** Each pass runs at most one moment of a trigger, the earliest one due. When a pass comes late
+  and more moments of a frequent schedule have come due meanwhile (`* * * * *` picked up at 09:02 runs 09:00), the
+  later ones are not run; they are logged as one `flow.schedule.tick_missed` line with their count, `missed_slots`.
+  Such lines without an outage mean the passes take longer than a minute.
 - **Daylight saving time.** A time that does not exist on the day clocks go forward (02:30 in Berlin on the last
   Sunday of March) does not run that day. A time that happens twice on the day clocks go back runs once, the first
   time.
@@ -50,7 +57,7 @@ afresh from the moment of the publish. Switching the trigger off, deleting it or
   seconds after the full minute; each trigger always gets the same offset.
 - A flow that is not published, or whose published version is switched off, does not run; the moment is skipped and
   logged.
-- A flow switched off in the flows list does not run either; the moment is skipped and logged as
+- A flow switched off in the flows list does not run either; the moment is skipped and logged (at the info level) as
   `flow.schedule.tick_skipped` with the reason `flow_off`. Turning the flow back on starts its next moment, never the
   ones it skipped.
 - A paused trigger, or a workspace whose plan has no runs left, does not run either; the moment is skipped and counted

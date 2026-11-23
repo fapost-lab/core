@@ -13,7 +13,6 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
-use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Jobs\Flow\StartAutomationRunJob;
@@ -33,13 +32,20 @@ use Throwable;
  * to its next slot only if it still holds the one this pass read — and, in the same transaction of the tenant
  * connection, the slot's fate is decided and written:
  *
+ *  - a flow nobody can manage any more — its draft or the draft's assistant is gone — starts nothing
+ *    (`flow.schedule.tick_skipped`, `flow_not_live`) and its schedule stops: the row moves to no slot, as when the flow
+ *    is deleted, since nobody is left to switch it off;
  *  - a slot claimed more than {@see self::LATE_AFTER_SECONDS} after it came due (the platform or the tenant was down)
  *    starts nothing and logs `flow.schedule.tick_missed`; the next slot is counted from now, so a downtime is one line
  *    and the missed slots are never caught up;
- *  - a flow that cannot run — no active runnable definition, or its draft or the draft's assistant is gone — starts
- *    nothing (`flow.schedule.tick_skipped`, `flow_not_live`);
- *  - a flow switched off in the flows list starts nothing (`flow.schedule.tick_skipped`, `flow_off`): the slot is spent,
- *    so turning the flow back on starts only its next slot, and run admission is not asked;
+ *  - a slot claimed late, but within that bound, is run, and the slots that came due after it before the pass are
+ *    missed: a pass runs one slot per trigger, and the ones it passes over are logged as one
+ *    `flow.schedule.tick_missed` with their count — late passes without a downtime are the signal that the pass
+ *    outgrows the minute;
+ *  - a flow without an active runnable definition starts nothing (`flow.schedule.tick_skipped`, `flow_not_live`);
+ *  - a flow switched off in the flows list starts nothing (`flow.schedule.tick_skipped`, `flow_off`, at info: the
+ *    owner chose it): the slot is spent, so turning the flow back on starts only its next slot, and run admission is
+ *    not asked;
  *  - a previous run of the trigger still going — its root `pending` or in flight, waiting in a `delay` or for an answer
  *    included — starts nothing (`flow.schedule.tick_skipped`, `previous_run_live`);
  *  - run admission refuses the run ({@see TriggerRunAdmission}: the trigger is paused, the run rate breaker trips or the
@@ -69,6 +75,9 @@ final readonly class ScheduleTriggerFirer
     public const string SKIP_PREVIOUS_RUN_LIVE = 'previous_run_live';
 
     public const string SKIP_ADMISSION_REFUSED = 'admission_refused';
+
+    /** The most passed-over slots one claim counts; a minutely schedule passes over at most five within the bound. */
+    private const int MAX_PASSED_OVER = 10;
 
     public function __construct(
         private ConnectionInterface $connection,
@@ -175,15 +184,27 @@ final readonly class ScheduleTriggerFirer
             return null;
         }
 
+        $context = [...$this->context($tenantId, $trigger), 'slot' => $slot->toIso8601String()];
+
+        if (! $this->isManageable($trigger->flow_id)) {
+            // Nobody can switch this schedule off any more: it stops, as it does when its flow is deleted.
+            if (! $this->moveSlot($trigger, $readSlot, null, $slot, $now)) {
+                return null;
+            }
+
+            $this->logger->warning('flow.schedule.tick_skipped', [...$context, 'reason' => self::SKIP_FLOW_NOT_LIVE]);
+
+            return 'skipped';
+        }
+
         $next = $this->clock->nextSlotAfter($config, $slot->greaterThan($now) ? $slot : $now);
 
-        return $this->connection->transaction(function () use ($tenantId, $trigger, $readSlot, $slot, $next, $now, $config): ?string {
+        return $this->connection->transaction(function () use ($tenantId, $trigger, $readSlot, $slot, $next, $now, $config, $context): ?string {
             if (! $this->moveSlot($trigger, $readSlot, $next, $slot, $now)) {
                 return null;
             }
 
-            $context = [...$this->context($tenantId, $trigger), 'slot' => $slot->toIso8601String()];
-            $late    = $now->getTimestamp() - $slot->getTimestamp();
+            $late = $now->getTimestamp() - $slot->getTimestamp();
 
             if ($late > self::LATE_AFTER_SECONDS) {
                 $this->logger->warning('flow.schedule.tick_missed', [...$context, 'late_seconds' => $late]);
@@ -191,7 +212,9 @@ final readonly class ScheduleTriggerFirer
                 return 'missed';
             }
 
-            $definition = $this->liveDefinition($trigger->flow_id);
+            $this->logPassedOver($config, $slot, $next, $now, $context);
+
+            $definition = $this->definitions->findLatestActiveByFlowId($trigger->flow_id);
 
             if (null === $definition) {
                 $this->logger->warning('flow.schedule.tick_skipped', [...$context, 'reason' => self::SKIP_FLOW_NOT_LIVE]);
@@ -200,7 +223,8 @@ final readonly class ScheduleTriggerFirer
             }
 
             if ($this->drafts->isSwitchedOff($trigger->flow_id)) {
-                $this->logger->warning('flow.schedule.tick_skipped', [...$context, 'reason' => self::SKIP_FLOW_OFF]);
+                // The owner switched the flow off on purpose: as for the other automatic triggers, this is not a warning.
+                $this->logger->info('flow.schedule.tick_skipped', [...$context, 'reason' => self::SKIP_FLOW_OFF]);
 
                 return 'skipped';
             }
@@ -273,20 +297,52 @@ final readonly class ScheduleTriggerFirer
     }
 
     /**
-     * The definition a run of the flow starts with, when the flow can run at all: someone can still manage it (its
-     * draft and the draft's assistant exist, as for a webhook) and it has an active runnable definition.
+     * Whether someone can still manage the flow: its draft and the draft's assistant exist, as for a webhook.
      */
-    private function liveDefinition(string $flowId): ?FlowDefinition
+    private function isManageable(string $flowId): bool
     {
         try {
-            if (null === $this->drafts->findByFlowId($flowId)->assistant) {
-                return null;
-            }
+            return null !== $this->drafts->findByFlowId($flowId)->assistant;
         } catch (ModelNotFoundException) {
-            return null;
+            return false;
+        }
+    }
+
+    /**
+     * Log the slots that came due after {@code $slot} and before this pass: this claim runs only {@code $slot}, and the
+     * next slot is counted from now, so they are missed. One line, with their count and the first of them.
+     *
+     * @param  array<string, string>  $context
+     */
+    private function logPassedOver(ScheduleTriggerConfig $config, CarbonImmutable $slot, ?CarbonImmutable $next, CarbonImmutable $now, array $context): void
+    {
+        $first  = null;
+        $count  = 0;
+        $cursor = $slot;
+
+        while ($count < self::MAX_PASSED_OVER) {
+            $candidate = $this->clock->nextSlotAfter($config, $cursor);
+
+            if (null === $candidate || $candidate->greaterThan($now) || (null !== $next && $candidate->greaterThanOrEqualTo($next))) {
+                break;
+            }
+
+            $first ??= $candidate;
+            ++$count;
+            $cursor = $candidate;
         }
 
-        return $this->definitions->findLatestActiveByFlowId($flowId);
+        if (null === $first) {
+            return;
+        }
+
+        $this->logger->warning('flow.schedule.tick_missed', [
+            ...$context,
+            'slot'         => $first->toIso8601String(),
+            'late_seconds' => $now->getTimestamp() - $first->getTimestamp(),
+            'missed_slots' => $count,
+            'run_slot'     => $slot->toIso8601String(),
+        ]);
     }
 
     /**

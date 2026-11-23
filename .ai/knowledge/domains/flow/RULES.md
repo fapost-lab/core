@@ -377,7 +377,9 @@ broken.
   schedule then gets its first slot after now). A republish by a template takes the list from the host's active
   definition, never its draft, and a `null` list leaves the rows alone. Nothing else writes a trigger's definition
   columns; its run state (`next_run_at`, `last_run_at`) is written only by this sync, by `ScheduleTriggerFirer`'s slot
-  claim and by flow deletion, which clears a schedule's slot (`adr-20261123-flow-schedule-trigger`). Why: a draft edit must not change what runs, and a live
+  claim and by flow deletion, which clears a schedule's slot (`adr-20261123-flow-schedule-trigger`). Flow deletion also
+  cancels the flow's root `pending` runs (a schedule's, not started yet) under their optimistic lock in its transaction,
+  so a frequent schedule never makes its flow undeletable; a run that has started still refuses the delete. Why: a draft edit must not change what runs, and a live
   trigger must survive the release that introduced the list (`adr-20261119-flow-triggers-in-definition-live-on-publish`).
   Enforced: `FlowTriggersPublishTest`, `SaveDraftServiceTest`, `FlowTemplatePublishTest`, `FlowTriggerSetTest`.
 - **An automatic trigger or a new credential reference goes live only with its own right.** Publishing a draft that
@@ -443,12 +445,18 @@ broken.
 - **A schedule claims its slot in the tenant, creates its run `pending` in the same transaction, and never catches
   up.** `ScheduleTriggerFirer` moves `flow_triggers.next_run_at` from the slot it read to the next one by compare-and-set
   and, in the same transaction, creates the run `pending` (`FlowEngineInterface::prepare()`, fire key
-  `schedule:<UTC minute>`, deadline written) or skips the slot: more than 5 minutes late (`flow.schedule.tick_missed`,
-  the next slot counted from now), the flow cannot run (`tick_skipped` `flow_not_live`), the flow is switched off in the
-  flows list (`tick_skipped` `flow_off`), or a previous root run of the
+  `schedule:<UTC minute>`, deadline written) or skips the slot: the flow's draft or the draft's assistant is gone
+  (`tick_skipped` `flow_not_live`, and the row moves to no slot: nobody is left to switch the schedule off), more than
+  5 minutes late (`flow.schedule.tick_missed`, the next slot counted from now), no active runnable definition
+  (`tick_skipped` `flow_not_live`, the next slot kept), the flow is switched off in the flows list (`tick_skipped`
+  `flow_off`, logged at info: the owner chose it), or a previous root run of the
   trigger is `pending` or in flight (`tick_skipped` `previous_run_live`), or run admission refuses it (`tick_skipped`
   `admission_refused`, `adr-20261123-flow-run-admission`). The start job is queued after the commit and
-  `AutomationRunner` activates the `pending` run (`FlowEngineInterface::activate()`). `ScheduleClock` skips a local time a
+  `AutomationRunner` activates the `pending` run (`FlowEngineInterface::activate()`). A pass runs at most one slot of a
+  trigger, the earliest due; the later slots a pass within the 5 minutes passed over are logged as one `tick_missed`
+  with `missed_slots` — such lines without a downtime are the signal that the pass outgrows the minute. A rebuild of a
+  tenant's registry rows changes or deletes only rows written before it read the tenant, so a publish's row written
+  meanwhile survives it. `ScheduleClock` skips a local time a
   daylight saving change removes and fires a repeated one once; a cron is five valid fields or a macro (`@hourly`, `@daily`, ...) in an IANA zone
   (`invalid_schedule_cron`, `invalid_schedule_timezone`). The landlord `flow_schedule_registry` is only an index of whom
   to visit, written after the tenant's commit through `ScheduleRegistrySync` and rebuilt hourly
