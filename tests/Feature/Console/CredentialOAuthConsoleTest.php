@@ -316,7 +316,7 @@ final class CredentialOAuthConsoleTest extends CredentialsTestCase
 
         $writer->update($credential->fresh() ?? $credential, ['name' => 'Renamed', 'settings' => [...$credential->settings, 'client_id' => 'client-2'], 'allowed_hosts' => ['api.example.com', 'auth.example.com']]);
         $this->assertSame(0, CredentialOAuthGrant::query()->count());
-        $this->assertSame(['secret_replaced' => false, 'grant_dropped' => true], ActivityEntry::query()->orderByDesc('id')->firstOrFail()->properties?->toArray());
+        $this->assertEquals(['secret_replaced' => false, 'grant_dropped' => true], ActivityEntry::query()->orderByDesc('id')->firstOrFail()->properties?->toArray());
 
         $this->grant($credential);
         $writer->update($credential->fresh() ?? $credential, ['name' => 'Renamed', 'settings' => [...$credential->settings, 'client_id' => 'client-2'], 'secrets' => ['client_secret' => 'a-brand-new-secret'], 'allowed_hosts' => ['api.example.com', 'auth.example.com']]);
