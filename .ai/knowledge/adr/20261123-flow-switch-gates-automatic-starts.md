@@ -1,7 +1,7 @@
 ---
 id: adr-20261123-flow-switch-gates-automatic-starts
 type: adr
-status: proposed
+status: accepted
 date: 2026-11-23
 domains:
   - flow

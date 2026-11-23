@@ -1,7 +1,7 @@
 ---
 id: adr-20261119-expression-engine-chosen-per-flow
 type: adr
-status: proposed
+status: accepted
 date: 2026-11-19
 domains:
   - flow

@@ -1,7 +1,7 @@
 ---
 id: adr-20261118-contactless-runs-in-flow-sessions
 type: adr
-status: proposed
+status: accepted
 date: 2026-11-18
 domains:
   - flow

@@ -1,7 +1,7 @@
 ---
 id: adr-20261123-ask-person-question-outside-the-run
 type: adr
-status: proposed
+status: accepted
 date: 2026-11-23
 domains:
   - flow

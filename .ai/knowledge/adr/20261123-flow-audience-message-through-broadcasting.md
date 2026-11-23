@@ -1,7 +1,7 @@
 ---
 id: adr-20261123-flow-audience-message-through-broadcasting
 type: adr
-status: proposed
+status: accepted
 date: 2026-11-23
 domains:
   - flow
