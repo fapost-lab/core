@@ -152,6 +152,13 @@ channels gets none. Annotation nodes are skipped.
 | same, `keyboard_mode` `reply` | `ReplyButtons`; a button with `special` `request_contact` / `request_location` needs `ShareContact` / `ShareLocation` instead |
 | `input` expecting `select` or `confirm` | `CallbackButtons` |
 | `input` expecting `contact` / `location` | `ShareContact` / `ShareLocation` |
+| `auth_request` method `phone` | `ShareContact` |
+| `auth_request` method `sms_code` / `email_code` with a `resend_label` | `CallbackButtons` |
+
+`auth_request@2` checks its own config at validate and publish (`NodeConfigValidatorInterface`): errors
+`auth_method_unknown`, `auth_prompt_required`, `auth_button_label_required` (phone), `auth_limit_out_of_range`,
+`auth_destination_required` (email), `auth_sender_missing` (no sender for the channel: SMS without a connector, email
+while the platform mailer only logs); warning `auth_destination_from_flow` (the destination reads `flow.*`).
 
 `LoopConfigChecker` emits `loop_while_condition_unchanged` (path `nodes.{loop}.config.condition`) for a `while` loop whose
 condition reads a session or contact variable (or `flow.*` / `contact.*` source) that no node of the loop body writes.

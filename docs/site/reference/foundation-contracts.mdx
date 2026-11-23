@@ -76,6 +76,19 @@ and is null when there is none. A transport that supports credentials applies it
 the parameters, the options and the result. A request that holds
 a credential cannot be serialized.
 
+### One-time codes
+
+Experimental, since foundation 0.45. How the one-time codes of the `auth_request` node reach a contact.
+
+| Contract | Role |
+|---|---|
+| `Auth\Contracts\OneTimeCodeSenderInterface` | Delivers one code over its channel (`Auth\Enums\OneTimeCodeChannel`: `sms`, `email`) and reports `Auth\DTO\OneTimeCodeDelivery`. Core ships the email sender; an SMS connector or an operator package implements its own. It sends a fixed text of its own, never logs or stores the code, and reports a provider refusal as a failed delivery rather than throwing |
+| `Auth\Contracts\OneTimeCodeSenderRegistryInterface` | Implemented by Core. A package registers its sender from `boot()`; a registered sender replaces Core's default for the channel, and a second package claiming the channel is a boot error |
+| `Auth\DTO\OneTimeCodeMessage` | The code to deliver, with the destination, the contact's locale, the assistant's name and the code's lifetime. The code is private (`code()`), masked in dumps and refuses serialization |
+
+Core generates the code, keeps only its keyed hash, counts the attempts, limits the sends and calls the
+sender from an encrypted queued job inside the tenant.
+
 ## Channels and ingress
 
 | Contract | Role |
@@ -592,13 +605,14 @@ Core fails open: if your implementation throws, Core reports the exception and l
 through, because an outage of the operator must not stop every tenant's bots at once. A key that is
 unregistered or not `PerPeriod` is a `LogicException`.
 
-Core registers three keys of kind `PerPeriod`:
+Core registers five keys of kind `PerPeriod`:
 
 | Key | What counts |
 |---|---|
 | `monthly_active_contacts` | Distinct contacts that sent at least one inbound message in the period. The unit key is `contact:` followed by the SHA-256 of `tenantId`, platform and the sender's id, so it is the same before and after the contact is created. The hash keeps messenger ids out of the operator's tables and the logs, and does not link one person across tenants by casual comparison; it is pseudonymous, not anonymous, because numeric messenger ids can be brute-forced by anyone who knows the tenant id. Core asks on every inbound message, including button presses; the implementation counts a contact once per period and answers allowed for one it has counted |
 | `outbound_messages` | Every message delivered to a contact: flow replies and prompts, broadcasts, notifications, staff replies and fallback messages. The unit key is `msg:` followed by the message's idempotency key (or `msg:` and its SHA-256 when the key would not fit), so a retry or a duplicate is the same unit. Edits of a sent message (such as removing a keyboard) and typing indicators do not count. A message with a stable time, such as a broadcast recipient's creation, is counted at that time; any other at the moment it is sent |
 | `call_executions` | Every run of a `call` node over any transport, and every "Test call" in the builder. The unit key is `call:` followed by the engine's execution key and the node id, which differs on each pass of a loop and repeats when the queue retries the step (a step replayed from the call record is not asked again); a test call is `call_test:` and a fresh ID |
+| `auth_code_sms`, `auth_code_email` | Every one-time code an `auth_request` node sends by SMS or by email. The unit key is `auth_code:` followed by the session, the node, the challenge number (each entry into the node is a new challenge) and the send number within it, which repeats when the step is retried. A refused code is not sent and the node takes its `failed` output |
 
 Core asks before the message is delivered or the call is made, so a refusal means nothing was sent.
 Outbound messages go through `MessageSenderInterface::send()`, which throws

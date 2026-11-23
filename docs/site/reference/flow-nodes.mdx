@@ -4,7 +4,9 @@ description: "Type, version, and category for each node Core registers."
 ---
 
 Nodes registered by Core. A handler is resolved by the pair `(type, version)`;
-every Core node is currently at version 1.
+every Core node is at version 1, except `auth_request`, at version 2 (the ownership
+checks and the `authenticated`/`failed` outputs); nodes published as `auth_request@1`
+keep running on version 1.
 
 | Category | Type | Label |
 |---|---|---|

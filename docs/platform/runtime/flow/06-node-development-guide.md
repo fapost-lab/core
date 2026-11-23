@@ -224,7 +224,7 @@ The canonical list is the enum `Fapost\Foundation\Flow\Enums\StateNamespace`: `s
 - `flow.*`, `call.*` - writable by any handler (user variables).
 - `system.*`, `rag.*` - only whitelisted node types; the whitelist is `SystemStateNamespacePolicy`
   (`app/Domains/Flow/State/SystemStateNamespacePolicy.php`), applied in `FlowSessionPersister`.
-  Today `system.*`: `send_message`, `input`, `delay`, `notify`, `set_tag`; `rag.*`: `rag_query`. A new
+  Today `system.*`: `send_message`, `input`, `delay`, `notify`, `set_tag`, `request_operator`, `auth_request`; `rag.*`: `rag_query`. A new
   writer is a deliberate whitelist edit. A violation throws `StateNamespaceViolationException`.
 - `module.*` - read-only, read through `DataAccessorInterface`; never appears in `stateChanges`.
 - `contact.*` - a derived projection, also not written through `stateChanges`: contact mutations go

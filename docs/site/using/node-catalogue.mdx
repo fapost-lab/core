@@ -382,11 +382,44 @@ including what to do when nothing relevant was found.
 
 ### Auth request
 
-Checks that the contact is who they claim to be before continuing.
+Checks that the contact is who they claim to be before continuing. A passed check
+marks the contact authenticated, which opens [private flows](/using/flows) to them and
+can be read later by a Branch block. Use it to gate anything that should not be
+available to a stranger who found the bot.
 
-It compares an answer against an expected value and records the result on the
-session, so later blocks can require it. Use it to gate anything that should not
-be available to a stranger who found the bot.
+Pick a **method**:
+
+- **Basic** compares an answer the flow already has (a variable) with an expected value.
+- **Phone number** asks the contact to share their own number with a button. A contact
+  card someone forwarded, or a typed number, is not accepted. Set an **expected phone
+  number** (for example one your CRM returned to a Call block) to accept only that
+  number; without it the block proves only that the contact owns a Telegram account with
+  a phone number. Needs a channel that can ask for a contact.
+- **Code by email** sends a one-time code to the address you set (usually a contact
+  attribute) and waits for the contact to type it back. The email has a fixed text in the
+  contact's language, signed with the assistant's name; you write only the chat message
+  that asks for the code. Name the **new code** button to let the contact ask for another
+  one after a pause.
+- **Code by SMS** works the same way over SMS, once an SMS connector is installed;
+  publishing is refused without one.
+
+The block has two outcomes: **Authenticated** and **Failed**. A failed check says why in
+the flow log: too many wrong answers (`attempts_exhausted`), an expired code
+(`expired`), a code that could not be delivered (`delivery_failed`) or too many codes
+(`rate_limited`). For a phone check that ran out of attempts, the last refusal is given
+as the detail: a forwarded contact card (`foreign_contact`) or a different number
+(`phone_mismatch`). The code itself never appears in the flow, its variables or the flow
+log, and is not accepted again once used.
+
+Limits protect the address you send to: a code is 4 to 8 digits (6 by default) and works
+for up to 30 minutes (10 by default), the contact has up to 10 attempts (5 by default) and
+up to 5 codes per check (3 by default), and one address or number gets at most 5 codes an
+hour in your workspace. A code sent by email or SMS counts against the workspace's
+verification codes for the period, where the operator sets such a limit. An address taken
+from what the contact typed is allowed, but publishing warns about it: anyone could have
+codes sent to any address.
+
+Blocks added before this version keep their single outcome and the Basic method.
 
 ### Notify
 

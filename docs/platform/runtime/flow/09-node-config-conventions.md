@@ -42,7 +42,7 @@ placeholder for a hypothetical vendor node.
     - `no_response`
 
 The Core handlers use `default`, `success`, `error`, `invalid`, `no_response`, `not_found`, `failed`,
-`cancelled` and `loop`.
+`cancelled`, `authenticated` and `loop`.
 
 ---
 

@@ -48,6 +48,14 @@ export function nodeHandles(node: FlowNodeLike): NodeHandle[] {
     return inputHandles(node)
   }
 
+  if (node.type === 'auth_request' && node.version === 2) {
+    const {t} = useTranslations()
+    return [
+      {handle: 'authenticated', label: t('nodes.auth_request.outputs_authenticated')},
+      {handle: 'failed',        label: t('nodes.auth_request.outputs_failed')},
+    ]
+  }
+
   if (node.type === 'subflow') {
     return [
       {handle: 'success',   label: 'Success'},
