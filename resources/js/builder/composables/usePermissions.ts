@@ -20,5 +20,13 @@ export function usePermissions() {
         return granted.value.includes(permission)
     }
 
-    return { can }
+    /**
+     * Whether a trigger of this type may be removed in the builder: a message trigger always, an automatic one
+     * (anything else) only with the Manage automations permission. The tree and the graph both ask here.
+     */
+    function canRemoveTrigger(type: string): boolean {
+        return type === 'message' || can('manage_automations')
+    }
+
+    return { can, canRemoveTrigger }
 }
