@@ -8,10 +8,12 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Enums\FlowActivityPeriod;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Enums\RerunRefusal;
 use App\Domains\Flow\Live\FlowActivityChannel;
 use App\Domains\Flow\Live\FlowActivityWatchers;
 use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Services\AutomationRunRerunService;
 use App\Domains\Flow\Services\FlowSessionInspector;
 use App\Domains\Flow\Templates\TemplateNodeOrigins;
 use App\Domains\Flow\Trace\RunGraphReader;
@@ -21,6 +23,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -28,7 +31,9 @@ use Inertia\Response;
 
 /**
  * Flow sessions on the Inertia console: the assistant's sessions, live ones by default, and one session's details, state
- * and audit history. Read-only, like the Filament resource it replaces: sessions are the engine's.
+ * and audit history. Read-only, like the Filament resource it replaces: sessions are the engine's. The one write is a
+ * re-run from the start of a failed automation run ({@see rerun()}), which starts a new run and leaves the session as
+ * it is.
  *
  * Both pages stay current through the live channel of the assistant's flow activity ({@see FlowActivityChannel}), or by
  * polling when no broadcaster is configured.
@@ -41,6 +46,7 @@ final class FlowSessionController extends Controller
         private readonly FlowActivityWatchers $watchers,
         private readonly TemplateNodeOrigins $origins,
         private readonly RunGraphReader $graphs,
+        private readonly AutomationRunRerunService $reruns,
     ) {
     }
 
@@ -120,6 +126,14 @@ final class FlowSessionController extends Controller
                 'expiresAt'          => $session->expires_at?->toIso8601String(),
                 'isLive'             => in_array($session->status, FlowSessionStatus::live(), true),
             ],
+            'rerun'  => $this->rerunOffer($assistant, $session),
+            'reruns' => array_map(fn (FlowSession $rerun): array => [
+                'id'        => (string) $rerun->getKey(),
+                'status'    => $rerun->status->value,
+                'createdAt' => $rerun->created_at?->toIso8601String(),
+                'url'       => $this->url('flow-sessions.show', $assistant, ['record' => $rerun->getKey()]),
+            ], $this->sessions->reruns($assistant, $session)),
+            'rerunOf' => $this->rerunOf($assistant, $session),
             'state'   => $this->sessions->flattenState(is_array($session->state) ? $session->state : []),
             'history' => $this->sessions->hasHistory($session) ? $this->sessions->history($session) : null,
             'live'    => $this->live($assistant),
@@ -133,6 +147,33 @@ final class FlowSessionController extends Controller
                 ])] : []),
             ],
         ]);
+    }
+
+    /**
+     * Re-runs a failed automation run from the start, with the trigger payload it started with: queues the attempt the
+     * page offered and goes back to the session's page, which lists the new run once it has started. The page's URL is fixed before the service
+     * runs: a synchronous queue runs the job inside the request, and the tenant switch it makes resets the current
+     * assistant.
+     */
+    public function rerun(Request $request, string $assistantKey, string $record): RedirectResponse
+    {
+        $assistant = $this->assistant->get();
+        $session   = $this->sessions->findFor($assistant, $record);
+
+        Gate::authorize('rerun', $session);
+
+        // The attempt the person confirmed: a repeated or replayed request carries the same one and starts no second run.
+        $attempt = (int) $request->validate(['attempt' => ['required', 'integer', 'min:1']])['attempt'];
+        $page    = $this->url('flow-sessions.show', $assistant, ['record' => $session->getKey()]);
+        $outcome = $this->reruns->rerun($session, $attempt);
+
+        if (null !== $outcome->refusal) {
+            Inertia::flash('error', trans('console.flow_sessions.rerun.refusals.' . $outcome->refusal->value));
+        } else {
+            Inertia::flash('success', trans('console.flow_sessions.rerun.queued'));
+        }
+
+        return redirect()->to($page);
     }
 
     /**
@@ -189,6 +230,49 @@ final class FlowSessionController extends Controller
         }
 
         return response()->json(['visits' => $this->graphs->visits($session, $nodeId)]);
+    }
+
+    /**
+     * What the page offers to re-run the session from the start, for a user who may: whether it can be re-run now, why
+     * not, and the flow version the re-run would run. Null for a user who may not and for a session that is never
+     * re-run (a conversation, a subflow child), so the page shows no button there.
+     *
+     * @return array{allowed: bool, refusal: string|null, targetVersion: int|null, attempt: int|null, url: string}|null
+     */
+    private function rerunOffer(Assistant $assistant, FlowSession $session): ?array
+    {
+        if (! Gate::allows('rerun', $session)) {
+            return null;
+        }
+
+        $check = $this->reruns->check($session);
+
+        if (in_array($check->refusal, [RerunRefusal::NotAnAutomation, RerunRefusal::NotARoot], true)) {
+            return null;
+        }
+
+        return [
+            'allowed'       => ! $check->isRefused(),
+            'refusal'       => $check->refusal?->value,
+            'targetVersion' => $check->targetVersion,
+            'attempt'       => $check->attempt,
+            'url'           => $this->url('flow-sessions.rerun', $assistant, ['record' => $session->getKey()]),
+        ];
+    }
+
+    /**
+     * The session this one re-runs, when it is a re-run whose source the assistant still has.
+     *
+     * @return array{id: string, url: string}|null
+     */
+    private function rerunOf(Assistant $assistant, FlowSession $session): ?array
+    {
+        $source = $this->sessions->rerunSource($assistant, $session);
+
+        return null === $source ? null : [
+            'id'  => (string) $source->getKey(),
+            'url' => $this->url('flow-sessions.show', $assistant, ['record' => $source->getKey()]),
+        ];
     }
 
     /**

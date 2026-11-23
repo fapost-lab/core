@@ -40,6 +40,7 @@ return [
             'published'              => 'Flow published',
             'webhook_url_created'    => 'Webhook trigger URL created',
             'webhook_secret_rotated' => 'Webhook trigger secret replaced',
+            'run_rerun'              => 'Automation run re-run from the start',
         ],
         'flow_group' => [
             'created' => 'Flow group created',

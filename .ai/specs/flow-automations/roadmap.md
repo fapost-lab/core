@@ -88,7 +88,7 @@ modes over one definition, and the SaaS shell reports how many people use each.
 Goal: the remaining conveniences. Done when: a failed run is re-run from the start with its payload, and a
 credential is connected through an OAuth consent screen.
 
-- [ ] Re-run from the start — same trigger payload, `RerunFlow` permission (after: Node trace with full data — the payload must be stored)
+- [x] Re-run from the start — same trigger payload, `RerunFlow` permission (after: Node trace with full data — the payload must be stored)
 - [x] OAuth2 with user consent — a callback route per tenant and scheduled token refresh (after: Credentials store — a new credential type)
 
 ## Waves

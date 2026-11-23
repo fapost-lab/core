@@ -135,10 +135,12 @@ final readonly class FlowEngine implements FlowEngineInterface
             'run_kind'           => $origin->kind,
             'trigger_id'         => $origin->triggerId,
             'fire_key'           => $origin->fireKey,
-            'deadline_at'        => $deadlineAt,
-            'event_chain_depth'  => $origin->chainDepth,
-            'start_key'          => $origin->startKey,
-            'version'            => 1,
+            // Kept as the trigger handed it over, apart from the state the flow may overwrite: a re-run starts from it.
+            'trigger_payload'   => null !== $origin->fireKey ? $initialState : null,
+            'deadline_at'       => $deadlineAt,
+            'event_chain_depth' => $origin->chainDepth,
+            'start_key'         => $origin->startKey,
+            'version'           => 1,
         ]));
 
         $this->afterCommit(function () use ($session): void {

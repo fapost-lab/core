@@ -98,6 +98,9 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 - Automation runs: `AutomationRunner` starts a run once per `(trigger_id, fire_key)` under the trigger lock and runs
   it in execution segments (`Services/ExecutionSegment`); a segment that runs out is handed on by
   `Services/SegmentHandOff` (a new `segment_id` on the run's root, then `ContinueAutomationRunJob` on
+  `flow.automations`) (`adr-20261118-segmented-automation-runs`). A failed root run is re-run from the start by
+  `Services/AutomationRunRerunService` from the sessions screen: the trigger payload kept on the row, the same start
+  job, a `rerun:` fire key (`Orchestration/RerunFireKey`) (`adr-20261123-rerun-from-start-keeps-trigger-payload`).
   `flow.automations`) (`adr-20261118-segmented-automation-runs`).
 - Starting a flow for a contact: the `start_flow` node (`Handlers/StartFlowNodeHandler`) checks the addressee, the
   target's active definition, the contact's channel on the target's bot (`Services/ContactChannelProbe`), the chain

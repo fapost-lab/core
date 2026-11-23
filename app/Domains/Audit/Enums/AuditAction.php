@@ -31,6 +31,7 @@ enum AuditAction: string
     case FlowPublished            = 'flow.published';
     case FlowWebhookUrlCreated    = 'flow.webhook_url_created';
     case FlowWebhookSecretRotated = 'flow.webhook_secret_rotated';
+    case FlowRunRerun             = 'flow.run_rerun';
     case FlowGroupCreated         = 'flow_group.created';
     case FlowGroupUpdated         = 'flow_group.updated';
     case FlowGroupDeleted         = 'flow_group.deleted';
@@ -95,6 +96,7 @@ enum AuditAction: string
             self::FlowPublished,
             self::FlowWebhookUrlCreated,
             self::FlowWebhookSecretRotated,
+            self::FlowRunRerun,
             self::FlowGroupCreated,
             self::FlowGroupUpdated,
             self::FlowGroupDeleted => AuditArea::Flows,

@@ -16,7 +16,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
-reviewed_at: 2026-11-20
+reviewed_at: 2026-11-23
 ---
 # Flow glossary
 
@@ -83,6 +83,13 @@ a session with neither (`ContactlessSessionException`).
 
 What fired a trigger — a schedule slot, an event id, a webhook delivery id — kept on the session as `fire_key`,
 unique with `trigger_id`, so a trigger starts one run per fire.
+
+## Re-run from the start
+
+A new automation run of a failed root run's trigger, started by a person from the run's page with the trigger payload
+the failed run kept (`flow_sessions.trigger_payload`), under the fire key `rerun:<source session id>:<n>`. It sends
+every call and message of the flow again; the failed run is left as it was. Not a retry: a node is never re-run on its
+own.
 
 ## Core event
 
