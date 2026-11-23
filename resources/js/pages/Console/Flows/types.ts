@@ -38,6 +38,7 @@ export interface FlowsTranslations {
   no_version: string
   trigger_types: Record<string, string>
   more_triggers: string
+  engines?: Record<string, string>
   builder: string
   builder_named: string
   actions_for: string

@@ -332,6 +332,30 @@ final class FlowTriggersPublishTest extends FeatureTestCase
         $this->assertSame('2026-11-20 09:00:00', FlowTrigger::query()->sole()->next_run_at?->format('Y-m-d H:i:s'));
     }
 
+    public function test_the_refusal_of_a_schedule_is_worded_in_the_locale_of_the_staff(): void
+    {
+        $draft = $this->draft();
+        $id    = (string) Str::uuid();
+
+        $this->storeDraftTriggers($draft, [$this->schedule($id, ['cron' => '61 * * * *', 'timezone' => 'UTC'])]);
+
+        $messages = [];
+
+        foreach (['en', 'ru'] as $locale) {
+            $this->app->setLocale($locale);
+
+            try {
+                $this->app->make(PublishFlowService::class)->execute($draft->flow_id);
+                $this->fail('Publishing should be refused.');
+            } catch (FlowValidationException $exception) {
+                $messages[$locale] = $exception->errors[0]->message;
+            }
+        }
+
+        $this->assertSame('The schedule needs a cron expression of five fields (minute, hour, day of month, month, day of week).', $messages['en']);
+        $this->assertStringStartsWith('Расписанию нужно cron-выражение', $messages['ru']);
+    }
+
     public function test_a_schedule_with_an_invalid_cron_or_time_zone_is_refused(): void
     {
         $draft = $this->draft();

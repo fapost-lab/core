@@ -9,6 +9,7 @@ import {useDeleteNode} from '@builder/composables/useDeleteNode'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 import {nodeHandles} from '@builder/utils/nodeHandles'
 import {countDescendants, type TreeNode} from '@builder/utils/buildTree'
+import {useTranslations} from '@builder/composables/useTranslations'
 
 const props = defineProps({
     treeNode:     { type: Object, required: true },
@@ -16,6 +17,7 @@ const props = defineProps({
     index:        { type: Number, default: null },
 })
 
+const { t } = useTranslations()
 const selectionStore = useSelectionStore()
 const builderStore   = useBuilderStore()
 
@@ -26,8 +28,12 @@ const isSelected = computed(() => selectionStore.selectedNodeId === node.value.i
 const hasError   = computed(() => builderStore.nodesWithErrors.has(node.value.id))
 
 // One branch per answer button, then the timeout and error exits.
+// Answer-button labels are flow content and stay as typed; only the fixed exits are translated.
 const handles = computed(() => nodeHandles(node.value).map((h) => ({
     ...h,
+    label: h.handle === 'timeout'
+        ? t('nodes.ask_person.handle_timeout')
+        : h.handle === 'error' ? t('nodes.ask_person.handle_error') : h.label,
     cls: h.handle === 'timeout' || h.handle === 'error' ? 'branch-no' : 'branch-default',
 })))
 
@@ -84,26 +90,26 @@ function openMoveDialog() { moveDialog.open(node.value.id) }
         >
             <div class="node-card-head" :style="{ background: colors.bg, color: colors.color }">
                 <div class="node-type-icon"><NodeIcon type="ask_person" /></div>
-                <span class="node-type-label">Ask person</span>
-                <div v-if="hasError" class="node-warn" title="Validation error">!</div>
+                <span class="node-type-label">{{ t('nodes.ask_person.type_label') }}</span>
+                <div v-if="hasError" class="node-warn" :title="t('node_card.validation_error')">!</div>
                 <span v-if="index != null" class="node-num">#{{ index }}</span>
-                <button class="node-delete-btn" title="Delete node" @click.stop="deleteDialog.requestDelete(node.id)">×</button>
+                <button class="node-delete-btn" :title="t('node_card.delete')" @click.stop="deleteDialog.requestDelete(node.id)">×</button>
             </div>
 
             <div class="node-card-body">
                 <div class="node-summary-row">
-                    <span class="node-summary-key">Timeout</span>
+                    <span class="node-summary-key">{{ t('nodes.ask_person.timeout') }}</span>
                     <span class="node-summary-val">{{ summary }}</span>
                 </div>
 
-                <div class="branch-hint">Click a handle to wire its branch →</div>
+                <div class="branch-hint">{{ t('node_card.wire_hint') }}</div>
                 <div class="condition-branches">
                     <button
                         v-for="h in handles"
                         :key="h.handle"
                         class="branch-btn"
                         :class="[h.cls, { 'active-branch': activeHandle === h.handle }]"
-                        :title="`Open ${h.label} branch`"
+                        :title="t('node_card.open_branch').replace(':name', h.label)"
                         @click.stop="selectBranch(h.handle)"
                     >
                         {{ h.label }}
@@ -115,9 +121,9 @@ function openMoveDialog() { moveDialog.open(node.value.id) }
         </div>
 
         <div class="node-side-actions" @click.stop>
-            <button class="node-side-btn" title="Move up"   :disabled="!canMoveUp"   @click.stop="builderStore.moveNodeUp(node.id)">↑</button>
-            <button class="node-side-btn" title="Move down" :disabled="!canMoveDown" @click.stop="builderStore.moveNodeDown(node.id)">↓</button>
-            <button class="node-side-btn" title="Move to another branch…" @click.stop="openMoveDialog">⇆</button>
+            <button class="node-side-btn" :title="t('node_card.move_up')" :disabled="!canMoveUp"   @click.stop="builderStore.moveNodeUp(node.id)">↑</button>
+            <button class="node-side-btn" :title="t('node_card.move_down')" :disabled="!canMoveDown" @click.stop="builderStore.moveNodeDown(node.id)">↓</button>
+            <button class="node-side-btn" :title="t('node_card.move_branch')" @click.stop="openMoveDialog">⇆</button>
         </div>
     </div>
 </template>

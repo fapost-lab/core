@@ -7,7 +7,7 @@ namespace Tests\Unit\Domains\Flow;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Validation\NodeWriteCollector;
 use App\Domains\Flow\Validation\VariablePathConflictChecker;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class VariablePathConflictCheckerTest extends TestCase
 {
@@ -23,6 +23,20 @@ final class VariablePathConflictCheckerTest extends TestCase
         $this->assertSame('nodes.a', $errors[0]->path);
         $this->assertStringContainsString('"contact.profile"', $errors[0]->message);
         $this->assertStringContainsString('"contact.profile.name" (node b)', $errors[0]->message);
+    }
+
+    public function test_the_message_follows_the_locale(): void
+    {
+        $this->app->setLocale('ru');
+
+        $errors = $this->check([
+            $this->input('a', ['name' => 'profile', 'storage' => 'contact']),
+            $this->input('b', ['name' => 'name', 'group' => 'profile', 'storage' => 'contact']),
+        ]);
+
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString('«contact.profile» записывается как одно значение узлом a', $errors[0]->message);
+        $this->assertStringContainsString('«contact.profile.name» (узел b)', $errors[0]->message);
     }
 
     public function test_the_order_of_the_nodes_does_not_matter(): void

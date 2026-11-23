@@ -119,7 +119,7 @@ function submit(): void {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="engine in expressionEngines" :key="engine" :value="engine">{{ engine }}</SelectItem>
+              <SelectItem v-for="engine in expressionEngines" :key="engine" :value="engine">{{ t.engines?.[engine] ?? engine }}</SelectItem>
             </SelectContent>
           </Select>
         </FormField>

@@ -8,12 +8,13 @@ import {useMoveNode} from '@builder/composables/useMoveNode'
 import {useDeleteNode} from '@builder/composables/useDeleteNode'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 import {countDescendants, type TreeNode} from '@builder/utils/buildTree'
+import {useTranslations} from '@builder/composables/useTranslations'
 
 const HANDLES = [
-    {handle: 'started',    label: 'Started',    cls: 'branch-yes'},
-    {handle: 'busy',       label: 'Busy',       cls: 'branch-no'},
-    {handle: 'no_channel', label: 'No channel', cls: 'branch-no'},
-    {handle: 'error',      label: 'Error',      cls: 'branch-no'},
+    {handle: 'started',    cls: 'branch-yes'},
+    {handle: 'busy',       cls: 'branch-no'},
+    {handle: 'no_channel', cls: 'branch-no'},
+    {handle: 'error',      cls: 'branch-no'},
 ] as const
 
 const props = defineProps({
@@ -22,6 +23,7 @@ const props = defineProps({
     index:        { type: Number, default: null },
 })
 
+const { t } = useTranslations()
 const selectionStore = useSelectionStore()
 const builderStore   = useBuilderStore()
 
@@ -37,6 +39,9 @@ const flowName = computed(() => {
     if (!flowId.value) return null
     return builderStore.availableFlows.find(f => f.id === flowId.value)?.name ?? flowId.value
 })
+
+// Computed so the labels follow the translations of the page.
+const handles = computed(() => HANDLES.map((h) => ({...h, label: t(`nodes.start_flow.handle_${h.handle}`)})))
 
 const activeHandle = ref('')
 
@@ -86,29 +91,29 @@ function openMoveDialog() { moveDialog.open(node.value.id) }
         >
             <div class="node-card-head" :style="{ background: colors.bg, color: colors.color }">
                 <div class="node-type-icon"><NodeIcon type="start_flow" /></div>
-                <span class="node-type-label">Start flow for contact</span>
-                <div v-if="hasError" class="node-warn" title="Validation error">!</div>
+                <span class="node-type-label">{{ t('nodes.start_flow.label') }}</span>
+                <div v-if="hasError" class="node-warn" :title="t('node_card.validation_error')">!</div>
                 <span v-if="index != null" class="node-num">#{{ index }}</span>
-                <button class="node-delete-btn" title="Delete node" @click.stop="deleteDialog.requestDelete(node.id)">×</button>
+                <button class="node-delete-btn" :title="t('node_card.delete')" @click.stop="deleteDialog.requestDelete(node.id)">×</button>
             </div>
 
             <div class="node-card-body">
                 <div v-if="flowName" class="node-summary-row">
-                    <span class="node-summary-key">Flow</span>
+                    <span class="node-summary-key">{{ t('nodes.start_flow.section_target') }}</span>
                     <span class="node-summary-val">{{ flowName }}</span>
                 </div>
                 <div v-else class="node-summary-row">
-                    <span class="node-summary-val muted">No flow chosen</span>
+                    <span class="node-summary-val muted">{{ t('nodes.start_flow.no_flow') }}</span>
                 </div>
 
-                <div class="branch-hint">Click a handle to wire its branch →</div>
+                <div class="branch-hint">{{ t('node_card.wire_hint') }}</div>
                 <div class="condition-branches">
                     <button
-                        v-for="h in HANDLES"
+                        v-for="h in handles"
                         :key="h.handle"
                         class="branch-btn"
                         :class="[h.cls, { 'active-branch': activeHandle === h.handle }]"
-                        :title="`Open ${h.label} branch`"
+                        :title="t('node_card.open_branch').replace(':name', h.label)"
                         @click.stop="selectBranch(h.handle)"
                     >
                         {{ h.label }}
@@ -120,9 +125,9 @@ function openMoveDialog() { moveDialog.open(node.value.id) }
         </div>
 
         <div class="node-side-actions" @click.stop>
-            <button class="node-side-btn" title="Move up"   :disabled="!canMoveUp"   @click.stop="builderStore.moveNodeUp(node.id)">↑</button>
-            <button class="node-side-btn" title="Move down" :disabled="!canMoveDown" @click.stop="builderStore.moveNodeDown(node.id)">↓</button>
-            <button class="node-side-btn" title="Move to another branch…" @click.stop="openMoveDialog">⇆</button>
+            <button class="node-side-btn" :title="t('node_card.move_up')" :disabled="!canMoveUp"   @click.stop="builderStore.moveNodeUp(node.id)">↑</button>
+            <button class="node-side-btn" :title="t('node_card.move_down')" :disabled="!canMoveDown" @click.stop="builderStore.moveNodeDown(node.id)">↓</button>
+            <button class="node-side-btn" :title="t('node_card.move_branch')" @click.stop="openMoveDialog">⇆</button>
         </div>
     </div>
 </template>

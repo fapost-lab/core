@@ -67,17 +67,19 @@ final readonly class VariablePathConflictChecker
             $groupParts = [];
 
             foreach ($groups as $groupKey => $nodeIds) {
-                $groupParts[] = sprintf('"%s" (node %s)', $groupKey, implode(', ', array_unique($nodeIds)));
+                $groupParts[] = (string) __('builder.validation.variable_path_conflict_group', [
+                    'group' => $groupKey,
+                    'nodes' => implode(', ', array_unique($nodeIds)),
+                ]);
             }
 
             $errors[] = new FlowValidationErrorDto(
                 path: "nodes.{$leafNodes[0]}",
-                message: sprintf(
-                    '"%s" is written as a single value by node %s but used as a group by %s. A path cannot be both: rename one of them.',
-                    $leafKey,
-                    implode(', ', $leafNodes),
-                    implode(', ', $groupParts),
-                ),
+                message: (string) __('builder.validation.variable_path_conflict', [
+                    'path'   => $leafKey,
+                    'nodes'  => implode(', ', $leafNodes),
+                    'groups' => implode(', ', $groupParts),
+                ]),
                 code: self::CODE_CONFLICT,
             );
         }

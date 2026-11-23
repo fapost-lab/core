@@ -151,6 +151,11 @@ return [
             'section_busy'       => 'If the contact is busy',
             'busy_window'        => 'Busy window (minutes)',
             'busy_window_help'   => 'The contact is busy — exit busy, nothing is sent — while an operator has the thread or a conversation with this bot moved in the last N minutes. An older live conversation is ended and replaced. 0 = never busy by time.',
+            'no_flow'            => 'No flow chosen',
+            'handle_started'     => 'Started',
+            'handle_busy'        => 'Busy',
+            'handle_no_channel'  => 'No channel',
+            'handle_error'       => 'Error',
         ],
 
         'webhook_response' => [
@@ -286,6 +291,8 @@ return [
             'save_to_variable'      => 'Save the answer to',
             'handle_timeout'        => 'Timed out',
             'handle_error'          => 'Error',
+            'type_label'            => 'Ask person',
+            'timeout'               => 'Timeout',
             'defaults'              => [
                 'text' => 'Please choose an answer.',
             ],
@@ -385,8 +392,12 @@ return [
     ],
 
     'validation' => [
-        'template_flow' => 'Template → breaks flow “:flow”',
-        'flow_level'    => 'Template',
+        'template_flow'                => 'Template → breaks flow “:flow”',
+        'flow_level'                   => 'Template',
+        'invalid_schedule_cron'        => 'The schedule needs a cron expression of five fields (minute, hour, day of month, month, day of week).',
+        'invalid_schedule_timezone'    => 'The schedule needs a time zone from the IANA list, such as Europe/Berlin.',
+        'variable_path_conflict'       => '":path" is written as a single value by node :nodes but used as a group by :groups. A path cannot be both: rename one of them.',
+        'variable_path_conflict_group' => '":group" (node :nodes)',
     ],
 
     'schedule_trigger' => [
@@ -492,5 +503,93 @@ return [
         'inactive'     => 'The Solution of this trigger (:solution) is not active, so the trigger is read-only and will not start the flow.',
         'unknown'      => 'The trigger type \':type\' is not installed. The trigger is kept as it is, read-only, and will not start the flow.',
         'payload_hint' => 'Available in the flow as :fields',
+    ],
+
+    'trigger_panel' => [
+        'types' => [
+            'message'  => 'Message',
+            'schedule' => 'Schedule',
+            'webhook'  => 'Webhook',
+            'api'      => 'API',
+            'event'    => 'Event',
+        ],
+        'sections' => [
+            'general'          => 'General',
+            'message_matching' => 'Message matching',
+            'schedule'         => 'Schedule',
+            'webhook'          => 'Webhook',
+            'api'              => 'API',
+            'event'            => 'Event',
+            'danger_zone'      => 'Danger zone',
+        ],
+        'fields' => [
+            'type'             => 'Trigger type',
+            'priority'         => 'Priority',
+            'is_active'        => 'Trigger is active',
+            'keywords'         => 'Keywords',
+            'phrases'          => 'Phrases',
+            'add_keyword'      => '+ Add keyword',
+            'add_phrase'       => '+ Add phrase',
+            'cron'             => 'Cron',
+            'timezone'         => 'Timezone',
+            'url'              => 'URL',
+            'event_name'       => 'Event name',
+            'assistant_filter' => 'Only from assistants',
+        ],
+        'placeholders' => [
+            'event_search'      => 'Search or type an event name…',
+            'any_assistant'     => 'Any assistant',
+            'no_assistants'     => 'No assistants',
+            'deleted_assistant' => 'Deleted assistant',
+        ],
+        'events' => [
+            'group_core'            => 'Core',
+            'group_flow'            => 'Flow events',
+            'no_match'              => 'No matching event — it will be saved as a new event name.',
+            'core_hint'             => 'A Core event starts the flow without a contact: the event\'s data is in flow.event.*, and nodes that need a contact cannot be published.',
+            'other_hint'            => 'Lists Core events and events from all assistants in this tenant. Pick one or type a new name.',
+            'assistant_filter_hint' => 'Start the flow only on events emitted by flows of these assistants. Leave empty for any assistant.',
+        ],
+        'delete' => [
+            'trigger' => 'Delete trigger',
+        ],
+    ],
+
+    'call' => [
+        'auth' => [
+            'section'                => 'Authorization',
+            'none'                   => 'None',
+            'credential'             => 'Saved credential',
+            'bearer'                 => 'Bearer token (stored in the flow definition)',
+            'basic'                  => 'Basic auth (stored in the flow definition)',
+            'credential_label'       => 'Credential',
+            'credential_unavailable' => 'Unavailable credential',
+            'no_credentials'         => 'No saved credentials yet. Add one in Administration → System → Credentials.',
+            'secret_applied'         => 'The secret is applied when the call runs and is never stored in the flow. It is sent only to the hosts the credential allows.',
+            'inline_warning'         => '⚠ These values are stored in the flow definition, readable by everyone who can open the flow. Prefer a saved credential for a real secret.',
+            'token'                  => 'Token',
+            'username'               => 'Username',
+            'password'               => 'Password',
+        ],
+    ],
+
+    'sequence' => [
+        'trigger_label_fallback' => ':type trigger',
+        'matchers'               => 'Matchers: :count',
+        'no_matchers'            => 'No phrases or keywords yet',
+        'no_event'               => 'No event selected',
+        'active'                 => 'Active',
+        'inactive'               => 'Inactive',
+        'click_to_add'           => 'Click to add a trigger',
+    ],
+
+    'node_card' => [
+        'validation_error' => 'Validation error',
+        'delete'           => 'Delete node',
+        'move_up'          => 'Move up',
+        'move_down'        => 'Move down',
+        'move_branch'      => 'Move to another branch…',
+        'wire_hint'        => 'Click a handle to wire its branch →',
+        'open_branch'      => 'Open :name branch',
     ],
 ];

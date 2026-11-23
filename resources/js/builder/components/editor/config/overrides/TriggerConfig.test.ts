@@ -34,7 +34,7 @@ const triggerTypeEntries = vi.hoisted(() => [
 
 const {pageProps} = vi.hoisted(() => ({pageProps: {
     auth:         {permissions: [] as string[]},
-    translations: {builder: {trigger_types: {payload_hint: 'Available in the flow as :fields'}, webhook_trigger: {get_url: 'Get URL', response_async: 'Accept at once (202)'}}},
+    translations: {builder: {trigger_types: {payload_hint: 'Available in the flow as :fields'}, trigger_panel: {types: {message: 'Message', schedule: 'Schedule', webhook: 'Webhook', api: 'API', event: 'Event'}, placeholders: {deleted_assistant: 'Deleted assistant'}, events: {group_core: 'Core', group_flow: 'Flow events'}}, webhook_trigger: {get_url: 'Get URL', response_async: 'Accept at once (202)'}}},
 }}))
 
 vi.mock('@inertiajs/vue3', () => ({usePage: () => ({props: pageProps})}))

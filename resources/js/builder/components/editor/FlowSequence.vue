@@ -6,6 +6,7 @@ import {useSelectionStore} from '@builder/store/selectionStore'
 import {useNavigationStore} from '@builder/store/navigationStore'
 import {useConfirm} from '@builder/composables/useConfirm'
 import {usePermissions} from '@builder/composables/usePermissions'
+import {useTranslations} from '@builder/composables/useTranslations'
 import FlowNodeCard from './FlowNodeCard.vue'
 import FlowInsertPoint from './FlowInsertPoint.vue'
 import FlowConditionCard from './FlowConditionCard.vue'
@@ -28,6 +29,7 @@ interface TreeNode {
 const builderStore = useBuilderStore()
 const selectionStore = useSelectionStore()
 const { confirm } = useConfirm()
+const { t } = useTranslations()
 const navigationStore = useNavigationStore()
 
 /**
@@ -293,8 +295,13 @@ function goToBreadcrumb(branch: string[]) {
 const isAtRoot = computed(() => selectionStore.activeBranch.length === 0)
 
 function describeTrigger(trigger: BuilderTrigger): { label: string; sub: string } {
-    const type = trigger.type.replace(/_/g, ' ')
-    const label = `${type.charAt(0).toUpperCase()}${type.slice(1)} trigger`
+    const labelKey = `graph.trigger_types.${trigger.type}`
+    const known = t(labelKey)
+    const humanised = trigger.type.replace(/_/g, ' ')
+    // A registered (Solution) type has no key of its own: it falls back to its humanised type name.
+    const label = known !== labelKey
+        ? known
+        : t('sequence.trigger_label_fallback').replace(':type', `${humanised.charAt(0).toUpperCase()}${humanised.slice(1)}`)
 
     if (trigger.type === 'message') {
         const keywords = (trigger.config?.keywords as unknown[]) ?? []
@@ -303,20 +310,20 @@ function describeTrigger(trigger: BuilderTrigger): { label: string; sub: string 
 
         return {
             label,
-            sub: total > 0 ? `${total} message matcher${total > 1 ? 's' : ''}` : 'No phrases or keywords yet',
+            sub: total > 0 ? t('sequence.matchers').replace(':count', String(total)) : t('sequence.no_matchers'),
         }
     }
 
     if (trigger.type === 'event') {
         return {
             label,
-            sub: (trigger.config?.event_name as string) || 'No event selected',
+            sub: (trigger.config?.event_name as string) || t('sequence.no_event'),
         }
     }
 
     return {
         label,
-        sub: trigger.is_active ? 'Active' : 'Inactive',
+        sub: trigger.is_active ? t('sequence.active') : t('sequence.inactive'),
     }
 }
 
@@ -335,7 +342,7 @@ const permissions = usePermissions()
 
 /** Removing an automatic trigger (anything but a message) needs the Manage automations permission. */
 function canRemoveTrigger(id: string): boolean {
-    const trigger = builderStore.triggers.find((t) => t.id === id)
+    const trigger = builderStore.triggers.find((candidate) => candidate.id === id)
 
     return trigger !== undefined && permissions.canRemoveTrigger(trigger.type)
 }
@@ -430,8 +437,8 @@ const trailingInsertContext = computed(() => {
                     <div v-if="triggerCards.length === 0" class="trigger-card" @click="addTrigger()">
                         <div class="trigger-icon">⚡</div>
                         <div>
-                            <div class="trigger-label">No trigger configured</div>
-                            <div class="trigger-sub">Click to add a trigger</div>
+                            <div class="trigger-label">{{ t('graph.no_trigger') }}</div>
+                            <div class="trigger-sub">{{ t('sequence.click_to_add') }}</div>
                         </div>
                     </div>
                     <div
@@ -450,7 +457,7 @@ const trailingInsertContext = computed(() => {
                             v-if="!builderStore.readOnly && canRemoveTrigger(card.id)"
                             type="button"
                             class="trigger-remove"
-                            title="Delete trigger"
+                            :title="t('graph.remove_trigger')"
                             @click.stop="removeTrigger(card.id)"
                         >×</button>
                     </div>
@@ -459,7 +466,7 @@ const trailingInsertContext = computed(() => {
                         type="button"
                         class="trigger-add"
                         @click="addTrigger()"
-                    >+ Add trigger</button>
+                    >+ {{ t('graph.add_trigger') }}</button>
                 </template>
 
                 <!-- Nodes -->
