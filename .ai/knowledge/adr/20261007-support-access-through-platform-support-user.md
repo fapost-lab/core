@@ -132,4 +132,7 @@ revoke or view them, because a token would outlive the operator's 60-minute visi
 on the actor, in `Gate::before` ahead of the admin bypass — unlike `PlatformSupportProtection`, which guards the
 support user as a target. An operator who must revoke a leaked token does it through an operator action that is
 given the token itself, never through the support user in the console. Decided in the review of
-`tenant-api-token-adr` and confirmed by the owner on 2026-11-19.
+`tenant-api-token-adr` and confirmed by the owner on 2026-11-19. Built by `tenant-api-tokens` (2026-11-20):
+`StaffGate`, registered ahead of the permission package's before-callback (which would otherwise grant the
+support user's admin-role `manage_api_tokens`), and `ApiTokenService` refuses the support user as well;
+the operator's action is `tenants:api-token:revoke`.

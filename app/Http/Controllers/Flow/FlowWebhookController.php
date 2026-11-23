@@ -36,14 +36,15 @@ final class FlowWebhookController extends Controller
         ));
 
         return match ($outcome->status) {
-            WebhookOutcomeStatus::Accepted         => $this->accepted($outcome),
-            WebhookOutcomeStatus::Replied          => $this->replied($outcome),
-            WebhookOutcomeStatus::Duplicate        => response()->json(['status' => 'duplicate', 'delivery_id' => $outcome->deliveryId]),
-            WebhookOutcomeStatus::NotFound         => $this->bare(404),
-            WebhookOutcomeStatus::InvalidSignature => $this->bare(401),
-            WebhookOutcomeStatus::PayloadTooLarge  => $this->bare(413),
-            WebhookOutcomeStatus::Throttled        => $this->bare(429, ['Retry-After' => (string) $outcome->retryAfterSeconds]),
-            WebhookOutcomeStatus::TenantStopped    => $this->bare(503, ['Retry-After' => (string) $outcome->retryAfterSeconds]),
+            WebhookOutcomeStatus::Accepted             => $this->accepted($outcome),
+            WebhookOutcomeStatus::Replied              => $this->replied($outcome),
+            WebhookOutcomeStatus::Duplicate            => response()->json(['status' => 'duplicate', 'delivery_id' => $outcome->deliveryId]),
+            WebhookOutcomeStatus::NotFound             => $this->bare(404),
+            WebhookOutcomeStatus::InvalidSignature     => $this->bare(401),
+            WebhookOutcomeStatus::PayloadTooLarge      => $this->bare(413),
+            WebhookOutcomeStatus::UnsupportedMediaType => $this->bare(415),
+            WebhookOutcomeStatus::Throttled            => $this->bare(429, ['Retry-After' => (string) $outcome->retryAfterSeconds]),
+            WebhookOutcomeStatus::TenantStopped        => $this->bare(503, ['Retry-After' => (string) $outcome->retryAfterSeconds]),
         };
     }
 

@@ -43,6 +43,10 @@ final class AuditBoundariesTest
                 Selector::inNamespace('App\\Domains\\Flow\\Subflow'),
                 Selector::inNamespace('App\\Domains\\Messaging'),
                 Selector::inNamespace('App\\Domains\\Webhook'),
+                // The flow webhook ingress shares App\Domains\Flow\Webhook with the builder's audited endpoint service.
+                Selector::classname('App\\Domains\\Flow\\Webhook\\FlowWebhookReceiver'),
+                Selector::classname('App\\Domains\\Flow\\Webhook\\WebhookSyncWait'),
+                Selector::classname('App\\Http\\Controllers\\Flow\\FlowWebhookController'),
                 Selector::inNamespace('App\\Domains\\Broadcasting\\Jobs'),
             )
             ->shouldNotDependOn()

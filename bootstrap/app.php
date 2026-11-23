@@ -6,6 +6,7 @@ use App\Domains\Flow\Exceptions\DraftVersionConflictException;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Staff\Http\Middleware\EndExpiredSupportSession;
 use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
+use App\Domains\Staff\Support\ApiTokenGuard;
 use App\Domains\Tenancy\Exceptions\TenantNotActiveException;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
 use App\Domains\Tenancy\Exceptions\TenantSlugMovedException;
@@ -25,6 +26,7 @@ use App\Http\Middleware\SetConsoleRootView;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TenancyMiddleware;
 use App\Http\Middleware\TmaAuthMiddleware;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -54,6 +56,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // No `web` group: a flow's webhook trigger is called by outside systems, with no session and no CSRF.
             Route::group([], base_path('routes/flow-webhook.php'));
             Route::middleware('web')->group(base_path('routes/tma.php'));
+            // No `web` group: the API of a tenant is called by outside systems with a tenant API token, with no
+            // session, CSRF or cookie. The stack is the `api-token` group below.
+            Route::middleware(ApiTokenGuard::MIDDLEWARE_GROUP)->prefix('api/v1')->group(base_path('routes/api.php'));
 
             // The console: the admin and assistant screens, sign-in and the routes of Solutions.
             Route::group([], base_path('routes/inertia.php'));
@@ -111,6 +116,17 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureCanAccessPanel::class,
         ]);
         $middleware->group('console', [...$admin, ResolveCurrentAssistant::class . ':assistant,operate']);
+
+        // The tenant API (adr-20261119-tenant-api-tokens §5): the tenant of the host (`tenant` resolves it, as
+        // ResolveTenantContext does for `web`, and answers 404 on the base domain, a platform subdomain or a foreign
+        // host), then its token, then the token's rate limit, then the write refusal of a stopped tenant. No session,
+        // CSRF or cookies.
+        $middleware->group(ApiTokenGuard::MIDDLEWARE_GROUP, [
+            'tenant',
+            'auth:' . ApiTokenGuard::NAME,
+            'throttle:' . ApiTokenGuard::LIMITER,
+            RefuseWritesWhenTenantStopped::class,
+        ]);
 
         // Routes of Solutions (App\Http\Shell\SolutionRoutes): the console's stacks, then 404 unless the Solution is
         // served to the tenant, and a check that the route renders only the Solution's own pages.
@@ -172,6 +188,16 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return app(ExceptionHandler::class)->render($request, new NotFoundHttpException('', $exception));
+        });
+
+        // A failed tenant API token is the same bare 401 whatever the reason and whatever the client accepts: never the
+        // console's redirect to its sign-in page.
+        $exceptions->render(function (AuthenticationException $exception, Request $request) {
+            if (! in_array(ApiTokenGuard::NAME, $exception->guards(), true)) {
+                return null;
+            }
+
+            return response()->json(['error' => 'unauthenticated'], 401);
         });
 
         $exceptions->render(function (DraftVersionConflictException $exception, Request $request) {

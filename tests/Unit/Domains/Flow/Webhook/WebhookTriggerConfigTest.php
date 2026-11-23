@@ -40,7 +40,14 @@ final class WebhookTriggerConfigTest extends TestCase
         yield 'the colon syntax' => [[...$hmac, 'delivery_id' => '{header:X-Delivery}']];
         yield 'the raw body as an id' => [[...$hmac, 'delivery_id' => '{raw}']];
         yield 'an unknown response mode' => [[...$hmac, 'response_mode' => 'wait']];
+        yield 'the secret header as the id' => [['verification' => 'header_equals', 'signature_header' => 'X-Webhook-Secret', 'delivery_id' => '{header.x-webhook-secret}']];
+        yield 'the signature as an alternative id' => [[...$hmac, 'delivery_id' => '{body.id|header.X-Signature}']];
+        yield 'a sibling signature as the id' => [[...$hmac, 'delivery_id' => '{header.X-Hub-Signature}']];
+        yield 'authorization as the id' => [[...$hmac, 'delivery_id' => '{header.Authorization}']];
+        yield 'a cookie as the id' => [[...$hmac, 'delivery_id' => '{header.Cookie}']];
+        yield 'the timestamp as the id' => [[...$hmac, 'timestamp_header' => 'X-T', 'signed_payload' => '{header.X-T}.{raw}', 'delivery_id' => '{header.X-T}']];
     }
+
     public function test_a_github_like_config_becomes_an_hmac_spec_with_its_timestamp_and_delivery_template(): void
     {
         $spec = WebhookTriggerConfig::fromConfig([
@@ -75,9 +82,19 @@ final class WebhookTriggerConfigTest extends TestCase
         $config = WebhookTriggerConfig::fromConfig(['verification' => 'header_equals', 'signature_header' => 'X-Webhook-Secret']);
 
         $this->assertSame(SignatureScheme::HeaderEquals, $config->ingressSpec()->scheme);
-        $this->assertContains('x-webhook-secret', $config->strippedHeaders());
-        $this->assertContains('authorization', $config->strippedHeaders());
-        $this->assertContains('cookie', $config->strippedHeaders());
+        $this->assertTrue($config->isStrippedHeader('X-Webhook-Secret'));
+        $this->assertTrue($config->isStrippedHeader('authorization'));
+        $this->assertTrue($config->isStrippedHeader('Cookie'));
+        $this->assertFalse($config->isStrippedHeader('X-GitHub-Delivery'));
+    }
+
+    public function test_every_signature_header_is_stripped_not_only_the_one_checked(): void
+    {
+        $config = WebhookTriggerConfig::fromConfig(['verification' => 'hmac_sha256', 'signature_header' => 'X-Hub-Signature-256', 'signature_prefix' => 'sha256=']);
+
+        $this->assertTrue($config->isStrippedHeader('x-hub-signature-256'));
+        $this->assertTrue($config->isStrippedHeader('X-Hub-Signature'));
+        $this->assertFalse($config->isStrippedHeader('X-GitHub-Event'));
     }
 
     /**

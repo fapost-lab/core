@@ -122,8 +122,9 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
 - **Filters and grouping** go through `DataTable`'s optional `filters` (`filter[key]`) and `groups`
   (`group=key`) — whitelisted closures; their keys appear in the props only on a table that
   declares them. The kit's `data-table` draws group headers from a `groupOf` callback.
-- **Secrets never reach the browser.** A token or key is in no prop, row or flash message (one deliberate exception:
-  the new webhook hash is flashed once after a rotation, to the one who may rotate): the edit form
+- **Secrets never reach the browser.** A token or key is in no prop, row or flash message (two deliberate exceptions:
+  the new webhook hash is flashed once after a rotation, to the one who may rotate; a tenant API token's
+  plain value is flashed once after it is issued or rotated, `Admin\ApiTokenController`, `apiToken`): the edit form
   shows it empty and an empty value means "keep what is stored". When an external provider refuses after the
   record is saved, the write still succeeds; the toast is a fixed, translated error chosen from the stored outcome
   (the channel's status, or the request's sync outcome), never from an exception, whose message can carry the

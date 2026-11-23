@@ -249,3 +249,19 @@ Passport installed and adds dependencies only by agreement. Forces:
 Source: task `tenant-api-token-adr`, specs `flow-automations` and `mcp-server`; design approved by the
 owner at the gate on 2026-11-19 ("Да, всё одобряю" — "Yes, I approve everything"); the review's
 decisions confirmed by the owner on 2026-11-19 ("Да, всё по рекомендациям").
+
+## Built 2026-11-20 (task `tenant-api-tokens`)
+
+The model above is built, without an endpoint (the API trigger is the first one). Two details the text did not
+fix, settled at the owner's gate of `flow-api-trigger` (2026-11-20) or by the task's agent:
+
+- `api_tokens` has one more column than (2): `expiry_notified_at`, the guard of "once" for the expiry notice (9),
+  also set on a rotated predecessor so its shortened life sends no notice.
+- The `api-token` stack is `tenant` → `auth:api-token` → `throttle:api-token` → `RefuseWritesWhenTenantStopped`:
+  the `tenant` middleware resolves the tenant of the host itself (as `ResolveTenantContext` does for `web`), so the
+  latter is not repeated (5).
+- `manage_api_tokens` and `start_flow_runs` are granted to the system admin role only, as the seeder does; no other
+  role. `Permission::isNarrowedByRecordPolicy()` treats every permission but four tenant-wide ones as narrowed,
+  `StartFlowRuns` included, so only an administrator puts it on a token (7).
+- The Staff `Gate::before` is registered as soon as the Gate is resolved, ahead of the permission package's own
+  before-callback, which would otherwise answer `true` for the support user's admin-role permissions (7, 8).

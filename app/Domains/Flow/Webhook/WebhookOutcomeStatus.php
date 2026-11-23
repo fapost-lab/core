@@ -30,6 +30,9 @@ enum WebhookOutcomeStatus: string
     /** The body is over {@see FlowWebhookReceiver::MAX_BODY_BYTES} (413). */
     case PayloadTooLarge = 'payload_too_large';
 
+    /** A multipart body, which PHP keeps from the raw input the check and the flow read (415). */
+    case UnsupportedMediaType = 'unsupported_media_type';
+
     /** The tenant is stopped; the sender should retry later (503). */
     case TenantStopped = 'tenant_stopped';
 }

@@ -63,6 +63,14 @@ return [
         'automations'   => 'Automations',
     ],
 
+    'api_tokens' => [
+        'expiring' => [
+            'title'  => 'API token “:name” expires soon',
+            'body'   => 'The API token “:name” (…:last_four) expires on :date. Rotate it before then and give the new token to the integrations that use it.',
+            'action' => 'Open API tokens',
+        ],
+    ],
+
     'permissions' => [
         'labels' => [
             'manage_assistants'         => 'Manage assistants',
@@ -90,10 +98,12 @@ return [
             'manage_settings'           => 'Manage settings',
             'view_operator_screens'     => 'View operator screens',
             'view_activity_log'         => 'View the activity log',
+            'manage_api_tokens'         => 'Manage API tokens',
             'manage_automations'        => 'Manage automations',
             'manage_credentials'        => 'Manage credentials',
             'use_credentials'           => 'Use credentials',
             'view_run_payloads'         => 'View run payloads',
+            'start_flow_runs'           => 'Start flow runs through the API',
         ],
         'descriptions' => [
             'rotate_channel_token'  => 'Reissues the webhook URL hash. Existing webhook configurations become invalid until re-configured on the platform side.',
@@ -104,10 +114,12 @@ return [
             'reply_conversations'   => 'Sends messages to a contact from the operator inbox under the assistant identity.',
             'view_operator_screens' => 'Opens the queue dashboard and the other operator screens of the whole installation: job payloads, logs and load figures.',
             'view_activity_log'     => 'Opens the audit log of the workspace: who did what in the console and when, including platform support inside the workspace.',
+            'manage_api_tokens'     => 'Opens the API tokens screen: issue, rotate and revoke the tokens outside systems use to reach this workspace. A token never gets this permission.',
             'manage_automations'    => 'Makes schedule, webhook, API and event triggers live, changes or removes them on publish, and turns on flows that have them.',
             'manage_credentials'    => 'Opens the credentials screen: lists, creates, replaces and deletes the secrets flows use to call outside systems.',
             'use_credentials'       => 'Picks a saved credential in a call node and tests a call with it. The value is never shown.',
             'view_run_payloads'     => 'Shows the full input and output of each node in a run\'s trace, including answers from outside services.',
+            'start_flow_runs'       => 'Lets a token start runs of published flows through their API trigger. Only administrators can put it on a token, since it reaches the flows of every assistant.',
         ],
         'sensitive_warning' => 'Sensitive — review carefully before assigning.',
     ],

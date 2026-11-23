@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow\Events;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Models\FlowDefinition;
+use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Jobs\Flow\DispatchFlowTriggerEventJob;
 use App\Jobs\Flow\StartFlowFromEventJob;
@@ -56,9 +60,83 @@ final class DispatchFlowTriggerEventJobTest extends FeatureTestCase
         Bus::assertNotDispatched(StartFlowFromEventJob::class);
     }
 
-    private function runDispatch(string $eventName, array $payload, ?string $contactId): void
+    public function test_an_assistant_filter_starts_only_the_triggers_that_list_the_emitting_sessions_assistant(): void
     {
-        $source = ['tenant_id' => self::TENANT_ID, 'session_id' => 'sess-1', 'node_id' => 'emit-1'];
+        Bus::fake();
+
+        $sales   = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
+        $support = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
+
+        $listsSales   = (string) Str::uuid();
+        $listsSupport = (string) Str::uuid();
+        $noFilter     = (string) Str::uuid();
+
+        $this->eventTrigger($listsSales, 'order.created', assistantFilter: [(string) $sales->getKey()]);
+        $this->eventTrigger($listsSupport, 'order.created', assistantFilter: [(string) $support->getKey()]);
+        $this->eventTrigger($noFilter, 'order.created');
+
+        $this->runDispatch('order.created', [], contactId: 'contact-9', sessionId: $this->sessionOf($sales));
+
+        $started = [];
+        Bus::assertDispatched(StartFlowFromEventJob::class, static function (StartFlowFromEventJob $job) use (&$started): bool {
+            $started[] = $job->flowId;
+
+            return true;
+        });
+
+        sort($started);
+        $expected = [$listsSales, $noFilter];
+        sort($expected);
+        $this->assertSame($expected, $started, 'The support-only trigger must not start on an event of the sales assistant.');
+    }
+
+    public function test_an_event_whose_session_is_unknown_starts_only_the_triggers_without_a_filter(): void
+    {
+        Bus::fake();
+
+        $sales    = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
+        $noFilter = (string) Str::uuid();
+
+        $this->eventTrigger((string) Str::uuid(), 'order.created', assistantFilter: [(string) $sales->getKey()]);
+        $this->eventTrigger($noFilter, 'order.created');
+
+        $this->runDispatch('order.created', [], contactId: 'contact-9', sessionId: (string) Str::uuid());
+
+        Bus::assertDispatchedTimes(StartFlowFromEventJob::class, 1);
+        Bus::assertDispatched(StartFlowFromEventJob::class, static fn (StartFlowFromEventJob $job): bool => $job->flowId === $noFilter);
+    }
+
+    private function sessionOf(Assistant $assistant): string
+    {
+        $contact = Contact::factory()->create(['tenant_id' => self::TENANT_ID]);
+        $flowId  = (string) Str::uuid();
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => self::TENANT_ID,
+            'flow_id'   => $flowId,
+            'version'   => 1,
+            'name'      => 'Emitting flow',
+            'nodes'     => [],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        return (string) FlowSession::query()->create([
+            'tenant_id'          => self::TENANT_ID,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => $contact->getKey(),
+            'flow_definition_id' => $definition->getKey(),
+            'flow_version'       => 1,
+            'current_node_id'    => 'emit-1',
+            'state'              => [],
+            'status'             => FlowSessionStatus::Active,
+            'version'            => 0,
+        ])->getKey();
+    }
+
+    private function runDispatch(string $eventName, array $payload, ?string $contactId, string $sessionId = 'sess-1'): void
+    {
+        $source = ['tenant_id' => self::TENANT_ID, 'session_id' => $sessionId, 'node_id' => 'emit-1'];
         if (null !== $contactId) {
             $source['contact_id'] = $contactId;
         }
@@ -67,7 +145,10 @@ final class DispatchFlowTriggerEventJobTest extends FeatureTestCase
         app()->call([$job, 'handle']);
     }
 
-    private function eventTrigger(string $flowId, string $eventName, bool $active = true): FlowTrigger
+    /**
+     * @param  list<string>|null  $assistantFilter
+     */
+    private function eventTrigger(string $flowId, string $eventName, bool $active = true, ?array $assistantFilter = null): FlowTrigger
     {
         $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
 
@@ -78,7 +159,9 @@ final class DispatchFlowTriggerEventJobTest extends FeatureTestCase
             'type'         => 'event',
             'is_active'    => $active,
             'priority'     => 0,
-            'config'       => ['event_name' => $eventName],
+            'config'       => null === $assistantFilter
+                ? ['event_name' => $eventName]
+                : ['event_name' => $eventName, 'assistant_filter' => $assistantFilter],
         ]);
     }
 }

@@ -57,7 +57,17 @@ or the tenant context. The URL handed to outside systems is the costliest thing 
   deletes a live webhook trigger or changes its type deletes its endpoint; deleting the flow deletes its endpoints.
 - **Limits.** Unknown or dead tokens count against the tenant and address (60 a minute) before the lookup; a known token
   has the platform setting `flow.webhook.per_token_per_minute` (120). Body at most 256 KB. A stopped tenant answers 503
-  with `Retry-After`.
+  with `Retry-After`. A `multipart/*` body is refused with 415: PHP keeps it from the raw input the check and the flow
+  read.
+- **What the flow sees.** The request under `flow.webhook`, without the request's credentials (`Authorization`,
+  `Cookie`, …), the signature or secret header, the signed timestamp and any header whose name contains `signature`
+  (a sender may sign twice, as GitHub does with `X-Hub-Signature`). A `delivery_id` may not name any of these headers:
+  the id is logged, kept in the run's state and fire key and echoed to the sender, so the secret would travel with it.
+  A published trigger that does is re-checked per request and answers 404.
+- **No loop through the call node.** The call node's egress guard refuses this installation's own `/hooks/flow/…`
+  URLs (every workspace host under the base domain), so two flows posting to each other's webhook cannot loop. A
+  chain-depth header on every outgoing call, bound to the event chain limit, was left for the owner: it would keep
+  deliberate webhook-to-webhook chains, at the cost of a header sent to every outside system.
 - **Answer.** `response_mode: async` (the default): 202 once the run is queued (`StartAutomationRunJob`).
   `response_mode: sync`: after the dispatch, `FlowWebhookReceiver` holds the request for the flow's answer through
   `WebhookSyncWait` — only while it holds a slot of `WebhookWaitSlotsInterface` (Redis sorted sets scored by expiry,

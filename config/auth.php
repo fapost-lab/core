@@ -44,6 +44,12 @@ return [
             'driver'   => 'session',
             'provider' => 'users',
         ],
+
+        // Tenant API tokens (adr-20261119-tenant-api-tokens): stateless, the principal is an ApiToken found by
+        // HashedApiTokenAuthenticator (Auth::viaRequest in StaffServiceProvider). No user provider.
+        'api-token' => [
+            'driver' => 'api-token',
+        ],
     ],
 
     /*

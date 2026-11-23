@@ -8,7 +8,7 @@ use DateTimeInterface;
 
 /**
  * The request as a flow sees it, under `flow.webhook`: `method`, `query`, `headers` (lower-cased names, values joined
- * by ", ", without the request's credentials, the signature and the signed timestamp), `body` (the decoded JSON, else
+ * by ", ", without the request's credentials, the signature headers and the signed timestamp), `body` (the decoded JSON, else
  * the form fields, else the text, else null for bytes that are not UTF-8), `delivery_id` and `received_at` (ISO 8601).
  */
 final class WebhookPayload
@@ -23,7 +23,7 @@ final class WebhookPayload
                 'webhook' => [
                     'method'      => $request->method,
                     'query'       => self::utf8Only($request->query),
-                    'headers'     => self::headers($request->headers, $config->strippedHeaders()),
+                    'headers'     => self::headers($request->headers, $config),
                     'body'        => self::body($request),
                     'delivery_id' => $deliveryId,
                     'received_at' => $receivedAt->format(DateTimeInterface::ATOM),
@@ -34,18 +34,17 @@ final class WebhookPayload
 
     /**
      * @param  array<string, list<string|null>|string|null>  $headers
-     * @param  list<string>                                  $stripped
      *
      * @return array<string, string>
      */
-    private static function headers(array $headers, array $stripped): array
+    private static function headers(array $headers, WebhookTriggerConfig $config): array
     {
         $kept = [];
 
         foreach ($headers as $name => $values) {
             $name = mb_strtolower((string) $name);
 
-            if (in_array($name, $stripped, true)) {
+            if ($config->isStrippedHeader($name)) {
                 continue;
             }
 

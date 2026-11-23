@@ -8,7 +8,8 @@ use GuzzleHttp\Exception\ConnectException;
 use Psr\Http\Message\RequestInterface;
 
 /**
- * Guzzle middleware that keeps the call node on public addresses.
+ * Guzzle middleware that keeps the call node on public addresses, and off this installation's own flow webhook
+ * triggers.
  *
  * It sits inside Guzzle's redirect middleware, so it runs for the first request
  * and again for every redirect hop. Per request it checks the scheme and the host
@@ -23,6 +24,9 @@ final readonly class EgressGuardMiddleware
 {
     /** Longest accepted name lookup; the HTTP timeout (10s by default) starts only after it. */
     public const int LOOKUP_DEADLINE_SECONDS = 8;
+
+    /** The target is a flow webhook trigger of this installation ({@see EgressPolicy::isOwnFlowWebhook()}). */
+    public const string REASON_OWN_FLOW_WEBHOOK = 'own_flow_webhook';
 
     public function __construct(
         private HostResolverInterface $resolver,
@@ -52,6 +56,11 @@ final readonly class EgressGuardMiddleware
 
         if (! in_array($scheme, ['http', 'https'], true)) {
             throw new EgressDeniedException($host, 'scheme_not_allowed');
+        }
+
+        // Before the operator allowlist and on every redirect hop, so a redirector outside cannot bounce a call back.
+        if ($this->policy->isOwnFlowWebhook($host, $uri->getPath())) {
+            throw new EgressDeniedException($host, self::REASON_OWN_FLOW_WEBHOOK);
         }
 
         $literal = $this->literalAddress($host);

@@ -8,6 +8,7 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Webhook\FlowWebhookEndpointService;
+use App\Domains\Flow\Webhook\FlowWebhookReceiver;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Jobs\Flow\StartAutomationRunJob;
@@ -62,6 +63,19 @@ final class FlowWebhookHostModeTest extends FeatureTestCase
 
         $this->postWebhook("http://main.{$this->base}", $token, '{}')->assertStatus(202);
         Queue::assertPushed(StartAutomationRunJob::class, fn (StartAutomationRunJob $job): bool => self::TENANT_A === $job->tenantId);
+    }
+
+    public function test_dead_url_misses_on_one_tenants_host_do_not_hold_back_another_tenants_live_url_from_the_same_address(): void
+    {
+        $token = $this->liveWebhookOfTenantA();
+
+        for ($i = 0; $i < FlowWebhookReceiver::UNKNOWN_TOKENS_PER_MINUTE; ++$i) {
+            $this->postWebhook("http://second.{$this->base}", mb_str_pad((string) $i, 43, 'B'), '{}')->assertNotFound();
+        }
+
+        $this->postWebhook("http://second.{$this->base}", str_repeat('C', 43), '{}')->assertStatus(429);
+        $this->postWebhook("http://main.{$this->base}", $token, '{}')->assertStatus(202);
+        Queue::assertPushed(StartAutomationRunJob::class, 1);
     }
 
     private function liveWebhookOfTenantA(): string

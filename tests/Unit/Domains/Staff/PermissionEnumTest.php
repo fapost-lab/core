@@ -27,12 +27,14 @@ final class PermissionEnumTest extends TestCase
         sort($values);
         $this->assertSame(
             [
+                'manage_api_tokens',
                 'manage_automations',
                 'manage_credentials',
                 'manage_roles',
                 'publish_flow',
                 'reply_conversations',
                 'rotate_channel_token',
+                'start_flow_runs',
                 'use_credentials',
                 'view_activity_log',
                 'view_conversations',
@@ -70,9 +72,32 @@ final class PermissionEnumTest extends TestCase
         $this->assertArrayHasKey('system', $groups);
         $this->assertArrayHasKey('automations', $groups);
         $this->assertSame(
-            [Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads],
+            [Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads, Permission::StartFlowRuns],
             $groups['automations'],
         );
+    }
+
+    public function test_a_token_never_holds_the_permissions_that_manage_people_tokens_or_the_installation(): void
+    {
+        $forbidden = array_map(
+            static fn (Permission $p): string => $p->value,
+            array_values(array_filter(Permission::cases(), static fn (Permission $p): bool => $p->isForbiddenToTokens())),
+        );
+
+        sort($forbidden);
+        $this->assertSame(['manage_api_tokens', 'manage_roles', 'manage_users', 'view_operator_screens'], $forbidden);
+    }
+
+    public function test_only_tenant_wide_permissions_are_not_narrowed_for_non_admins(): void
+    {
+        $wide = array_map(
+            static fn (Permission $p): string => $p->value,
+            array_values(array_filter(Permission::cases(), static fn (Permission $p): bool => ! $p->isNarrowedByRecordPolicy())),
+        );
+
+        sort($wide);
+        $this->assertSame(['manage_credentials', 'manage_settings', 'view_activity_log', 'view_system'], $wide);
+        $this->assertTrue(Permission::StartFlowRuns->isNarrowedByRecordPolicy());
     }
 
     public function test_every_group_and_new_permission_has_a_description_in_each_language(): void
@@ -82,7 +107,7 @@ final class PermissionEnumTest extends TestCase
                 $this->assertNotSame("staff.permission_groups.{$group}", __("staff.permission_groups.{$group}", [], $locale));
             }
 
-            foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads] as $permission) {
+            foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads, Permission::ManageApiTokens, Permission::StartFlowRuns] as $permission) {
                 $this->assertNotSame("staff.permissions.labels.{$permission->value}", __("staff.permissions.labels.{$permission->value}", [], $locale));
                 $this->assertNotSame("staff.permissions.descriptions.{$permission->value}", __("staff.permissions.descriptions.{$permission->value}", [], $locale));
             }
@@ -103,7 +128,7 @@ final class PermissionEnumTest extends TestCase
     {
         $perms = RoleEnum::Analyst->permissions();
 
-        foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads] as $permission) {
+        foreach ([Permission::ManageAutomations, Permission::ManageCredentials, Permission::UseCredentials, Permission::ViewRunPayloads, Permission::ManageApiTokens, Permission::StartFlowRuns] as $permission) {
             $this->assertNotContains($permission, $perms);
         }
     }

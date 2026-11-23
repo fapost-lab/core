@@ -139,6 +139,7 @@ function actorName(row: ActivityRow): string {
           <span class="font-medium">{{ actorName(row) }}</span>
           <Badge v-if="row.actorKind === 'support'" variant="warning">{{ t.actor_kind.support }}</Badge>
           <Badge v-else-if="row.actorKind === 'system'" variant="neutral">{{ t.actor_kind.system }}</Badge>
+          <Badge v-else-if="row.actorKind === 'api_token'" variant="info">{{ t.actor_kind.api_token }}</Badge>
         </div>
       </template>
 
@@ -193,6 +194,7 @@ function actorName(row: ActivityRow): string {
               <span class="font-medium">{{ actorName(selected) }}</span>
               <Badge v-if="selected.actorKind === 'support'" variant="warning">{{ t.actor_kind.support }}</Badge>
               <Badge v-else-if="selected.actorKind === 'system'" variant="neutral">{{ t.actor_kind.system }}</Badge>
+              <Badge v-else-if="selected.actorKind === 'api_token'" variant="info">{{ t.actor_kind.api_token }}</Badge>
               <Badge variant="neutral">{{ selected.areaLabel }}</Badge>
             </div>
 

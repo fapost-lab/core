@@ -30,6 +30,18 @@ use stdClass;
  * can hold what the trace masks (a token in a `call` URL).
  *
  * Every query is bounded by the current tenant; a session is found by the caller.
+ *
+ * The shapes below are mirrored by `resources/js/console/run-graph/runGraph.ts`.
+ *
+ * @phpstan-type NodeRun array{status: string, visits: int, handles: list<string>, durationMs: float|null, errorClass: string|null}
+ * @phpstan-type GraphNode array{id: string, type: string, version: int, label: string|null, typeLabel: string|null, endStatus: string|null, run: NodeRun|null}
+ * @phpstan-type GraphEdge array{id: string, from: string, to: string, handle: string}
+ * @phpstan-type PassNode array{id: string, status: string, handle: string|null}
+ * @phpstan-type GraphLoop array{nodeId: string, passes: list<array{pass: int, nodes: list<PassNode>}>}
+ * @phpstan-type GraphChild array{nodeId: string, count: int, flow: array<string, mixed>}
+ * @phpstan-type GraphFlow array{sessionId: string, status: string, flowName: string|null, nodes: list<GraphNode>, edges: list<GraphEdge>, loops: list<GraphLoop>, children: list<GraphChild>}
+ *
+ * A child's `flow` is a `GraphFlow` one level deeper; a type alias cannot name itself, so it stays `array<string, mixed>`.
  */
 final readonly class RunGraphReader
 {
@@ -69,7 +81,7 @@ final readonly class RunGraphReader
     }
 
     /**
-     * @return array{flow: array<string, mixed>, truncated: bool, limit: int}
+     * @return array{flow: GraphFlow, truncated: bool, limit: int}
      */
     public function graph(FlowSession $session): array
     {
@@ -152,7 +164,7 @@ final readonly class RunGraphReader
     /**
      * @param  array<array-key, mixed>  $edges
      *
-     * @return list<array{id: string, from: string, to: string, handle: string}>
+     * @return list<GraphEdge>
      */
     private static function edges(array $edges): array
     {
@@ -236,13 +248,13 @@ final readonly class RunGraphReader
      * for the subflow node. Once its child has finished, the node is done and took the exit the child's end maps to
      * (as `DefaultSubflowResumer` routes it).
      *
-     * @param  array<string, mixed>|null  $run
+     * @param  NodeRun|null  $run
      *
-     * @return array<string, mixed>|null
+     * @return NodeRun|null
      */
     private static function withSubflowOutcome(?array $run, FlowSession $child): ?array
     {
-        if (null === $run || self::WAITING !== $run['status'] || in_array($child->status, FlowSessionStatus::live(), true)) {
+        if (null === $run || self::WAITING !== $run['status'] || in_array($child->status, FlowSessionStatus::inFlight(), true)) {
             return $run;
         }
 
@@ -321,7 +333,7 @@ final readonly class RunGraphReader
     }
 
     /**
-     * @return array<string, mixed>
+     * @return GraphFlow
      */
     private function flow(FlowSession $session, int $depth, bool &$truncated): array
     {
@@ -355,9 +367,9 @@ final readonly class RunGraphReader
 
     /**
      * @param  array<array-key, mixed>  $nodes
-     * @param  array<string, array<string, mixed>>  $runs
+     * @param  array<string, NodeRun>  $runs
      *
-     * @return list<array<string, mixed>>
+     * @return list<GraphNode>
      */
     private function nodes(array $nodes, array $runs): array
     {
@@ -389,7 +401,7 @@ final readonly class RunGraphReader
      * Folds the trace into what each node did (its last status, visits, handles taken, total duration, last error class)
      * and the passes of each loop (`{loop node id → pass → node id → status}`).
      *
-     * @return array{0: array<string, array<string, mixed>>, 1: list<array{nodeId: string, passes: list<array{pass: int, nodes: list<array{id: string, status: string, handle: string|null}>}>}>}
+     * @return array{0: array<string, NodeRun>, 1: list<GraphLoop>}
      *
      * @param  array<string, array<string, true>>  $bodies  {@see self::loopBodies()}
      */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
@@ -16,6 +17,7 @@ use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Events\CoreEventCatalog;
+use App\Domains\Flow\Events\EventTriggerAssistantFilter;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
@@ -1327,6 +1329,7 @@ final readonly class ValidateFlowService
 
         $this->validateUniqueMessageTriggerNeedles($type, $config, $path, $flowId, $errors);
         $this->validateExistingEventTriggerSelection($type, $config, $path, $flowId, $errors);
+        $this->validateEventTriggerAssistantFilter($type, $config, $path, $flowId, $errors);
     }
 
     /**
@@ -1474,6 +1477,81 @@ final readonly class ValidateFlowService
                 path: "{$path}.config.event_name",
                 code: 'unknown_event_trigger_selection',
                 message: 'Selected event must already exist in the tenant event registry.',
+            );
+        }
+    }
+
+    /**
+     * The `assistant_filter` of an event trigger ({@see EventTriggerAssistantFilter}): refused on a Core event, which
+     * has no source assistant, and every id must be an assistant of the flow's tenant.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateEventTriggerAssistantFilter(
+        string $type,
+        array $config,
+        string $path,
+        ?string $flowId,
+        array &$errors,
+    ): void {
+        if (FlowTriggerType::Event->value !== $type) {
+            return;
+        }
+
+        $filter = EventTriggerAssistantFilter::fromConfig($config);
+
+        if ($filter->isEmpty()) {
+            return;
+        }
+
+        $filterPath = "{$path}.config." . EventTriggerAssistantFilter::CONFIG_KEY;
+        $eventName  = $config['event_name'] ?? null;
+
+        if (is_string($eventName) && CoreEventCatalog::has($eventName)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: $filterPath,
+                code: 'assistant_filter_on_core_event',
+                message: 'A Core event has no source assistant: remove the assistant filter from its trigger.',
+            );
+
+            return;
+        }
+
+        if (null === $flowId) {
+            return;
+        }
+
+        $draft = FlowDraft::query()
+            ->where('flow_id', $flowId)
+            ->first();
+
+        if (null === $draft) {
+            return;
+        }
+
+        $candidates = array_values(array_filter($filter->assistantIds, Str::isUuid(...)));
+
+        $known = [] === $candidates
+            ? []
+            : array_map(
+                static fn (mixed $id): string => mb_strtolower((string) $id),
+                Assistant::query()
+                    ->where('tenant_id', $draft->tenant_id)
+                    ->whereIn('id', $candidates)
+                    ->pluck('id')
+                    ->all(),
+            );
+
+        foreach ($filter->assistantIds as $assistantId) {
+            if (in_array(mb_strtolower($assistantId), $known, true)) {
+                continue;
+            }
+
+            $errors[] = new FlowValidationErrorDto(
+                path: $filterPath,
+                code: 'unknown_assistant_filter',
+                message: "The assistant filter names an assistant that does not exist: '{$assistantId}'.",
             );
         }
     }

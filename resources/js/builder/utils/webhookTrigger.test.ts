@@ -81,6 +81,30 @@ describe('field editing', () => {
         expect(config.signed_payload).toBe('v0:{raw}')
     })
 
+    it('follows a timestamp header typed a character at a time', () => {
+        let config = defaultWebhookConfig()
+
+        for (let length = 1; length <= 'X-Timestamp'.length; length++) {
+            config = withWebhookField(config, 'timestamp_header', 'X-Timestamp'.slice(0, length))
+        }
+
+        expect(config.signed_payload).toBe('{header.X-Timestamp}.{raw}')
+    })
+
+    it('follows a renamed header of the timestamp preset', () => {
+        const config = withWebhookField(webhookConfigFromPreset('hmac_timestamp'), 'timestamp_header', 'X-Slack-Request-Timestamp')
+
+        expect(config.signed_payload).toBe('{header.X-Slack-Request-Timestamp}.{raw}')
+    })
+
+    it('drops a filled-in signed string with its header, and keeps one the author wrote', () => {
+        const cleared = withWebhookField(webhookConfigFromPreset('hmac_timestamp'), 'timestamp_header', '')
+        const written = withWebhookField({ ...webhookConfigFromPreset('hmac_timestamp'), signed_payload: 'v0:{header.X-Timestamp}:{raw}' }, 'timestamp_header', 'X-Ts')
+
+        expect(cleared).not.toHaveProperty('signed_payload')
+        expect(written.signed_payload).toBe('v0:{header.X-Timestamp}:{raw}')
+    })
+
     it('clears the tolerance when the timestamp header is cleared', () => {
         const config = withWebhookField({ ...webhookConfigFromPreset('hmac_timestamp'), timestamp_tolerance: 60 }, 'timestamp_header', '')
 

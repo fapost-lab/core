@@ -30,7 +30,8 @@ reviewed_at: 2026-11-10
 
 Staff owns the tenant's operators: staff users with Spatie roles and permissions, account
 activation by token, activation and deactivation rules, and notifications to staff (in-app or
-email) raised by Flow's staff-notify node.
+email) raised by Flow's staff-notify node. It also owns the tenant's machine credentials: tenant
+API tokens, their `api-token` guard and stack, and their screen.
 
 ## Boundaries
 
@@ -44,8 +45,15 @@ email) raised by Flow's staff-notify node.
 
 ## Entry points
 
-- `app/Providers/StaffServiceProvider.php`: service bindings, policies, and a `Gate::before`
-  that grants admins everything.
+- `app/Providers/StaffServiceProvider.php`: service bindings, policies, the `api-token` guard and
+  rate limiter, and the Staff `Gate::before` (`Policies/StaffGate.php`: support-user protections,
+  fail-closed tokens, operator screens, the admin bypass), registered ahead of every other.
+- Tenant API tokens: `Models/ApiToken.php`, `Services/ApiTokenService.php` (the only writer),
+  `Services/HashedApiTokenAuthenticator.php` behind `Contracts/ApiTokenAuthenticatorInterface.php`,
+  `Support/ApiTokenSettings.php`, the `api-token` stack and `routes/api.php` (`bootstrap/app.php`),
+  the screen `app/Http/Controllers/Admin/ApiTokenController.php` with
+  `resources/js/pages/Console/ApiTokens`, the commands `tenants:api-token:revoke` (operator) and
+  `api-tokens:notify-expiring` (daily, `Services/ApiTokenExpiryNotifier.php`).
 - Activation: `/activate` routes (`routes/web.php`), `Services/ActivationTokenService.php`,
   `Jobs/SendActivationEmailJob.php`.
 - Notifications: `Jobs/SendStaffNotificationJob.php` (queue `messaging.system`), the staff

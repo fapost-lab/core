@@ -4,7 +4,7 @@ export interface ActivityLogTranslations {
   title: string
   description: string
   columns: { time: string; actor: string; action: string; subject: string; assistant: string }
-  actor_kind: { support: string; system: string }
+  actor_kind: { support: string; system: string; api_token: string }
   search_label: string
   filters: {
     area: string
@@ -61,7 +61,7 @@ export interface ActivityProperty {
 export interface ActivityRow extends Record<string, unknown> {
   id: string
   createdAt: string
-  actorKind: 'staff' | 'support' | 'system'
+  actorKind: 'staff' | 'support' | 'system' | 'api_token'
   actorLabel: string | null
   action: string
   actionLabel: string

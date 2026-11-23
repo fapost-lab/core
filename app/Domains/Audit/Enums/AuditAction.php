@@ -64,6 +64,9 @@ enum AuditAction: string
     case CredentialCreated          = 'credential.created';
     case CredentialUpdated          = 'credential.updated';
     case CredentialDeleted          = 'credential.deleted';
+    case ApiTokenIssued             = 'api_token.issued';
+    case ApiTokenRotated            = 'api_token.rotated';
+    case ApiTokenRevoked            = 'api_token.revoked';
     case WorkspaceDeletionRequested = 'workspace.deletion_requested';
     case WorkspaceDeletionCancelled = 'workspace.deletion_cancelled';
 
@@ -123,6 +126,9 @@ enum AuditAction: string
             self::CredentialCreated,
             self::CredentialUpdated,
             self::CredentialDeleted,
+            self::ApiTokenIssued,
+            self::ApiTokenRotated,
+            self::ApiTokenRevoked,
             self::WorkspaceDeletionRequested,
             self::WorkspaceDeletionCancelled => AuditArea::Settings,
 

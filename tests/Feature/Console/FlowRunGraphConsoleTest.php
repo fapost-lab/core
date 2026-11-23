@@ -227,6 +227,28 @@ final class FlowRunGraphConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_a_subflow_node_keeps_waiting_while_its_child_sleeps_in_a_delay(): void
+    {
+        $parentDefinition = $this->publish('Parent', [
+            ['id' => 'call-child', 'type' => 'subflow', 'version' => 1, 'config' => []],
+            ['id' => 'done', 'type' => 'end', 'version' => 1, 'config' => []],
+        ], [['from' => 'call-child', 'to' => 'done', 'handle' => 'success']]);
+        $childDefinition = $this->publish('Child', [['id' => 'sleep', 'type' => 'delay', 'version' => 1, 'config' => []]], []);
+        $parent          = $this->sessionFor($parentDefinition, FlowSessionStatus::PausedSubflow);
+        $this->sessionFor($childDefinition, FlowSessionStatus::Paused, [
+            'parent_session_id' => $parent->getKey(), 'parent_resume_node_id' => 'call-child',
+        ]);
+        $this->trace($parent, 'call-child', HistoryEventType::NodeEntered, ['type' => 'subflow']);
+        $this->trace($parent, 'call-child', HistoryEventType::NodeCompleted, ['type' => 'subflow', 'status' => 'waiting']);
+
+        $this->actingAs($this->admin())
+            ->get($this->graphUrl($parent))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('graph.flow.nodes.0.run.status', 'waiting')
+                ->where('graph.flow.nodes.0.run.handles', [])
+                ->etc());
+    }
+
     public function test_a_subflow_child_is_drawn_inside_the_node_that_started_it(): void
     {
         $parentDefinition = $this->publish('Parent', [['id' => 'call-child', 'type' => 'subflow', 'version' => 1, 'config' => []]], []);

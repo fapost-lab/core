@@ -18,13 +18,20 @@ emits does not wait for whatever consumes the event. A flow started by such an
 event runs for the contact whose conversation emitted it; an event emitted by a
 flow without a contact starts nothing.
 
+An event trigger on a flow event can be limited to events from chosen assistants
+(**Only from assistants** in the builder, `assistant_filter` in the trigger's
+settings): the flow then starts only on events emitted by flows that ran for one of
+those assistants. With no assistants chosen, it starts on the event from any
+assistant of the tenant.
+
 ## Core events
 
 Core raises these events itself. An event trigger on one of them starts its flow
 **without a contact** — even when the event is about a contact, whose id is then
 in the event data — so the flow cannot be published with a step that needs one.
 Every active event trigger on the event starts once per event, whichever
-assistant it belongs to.
+assistant it belongs to. A Core event comes from no assistant, so its trigger takes
+no assistant filter: publishing refuses one.
 
 | Event | When | Data in `flow.event.*` |
 |---|---|---|

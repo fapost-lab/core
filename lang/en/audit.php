@@ -85,6 +85,11 @@ return [
             'updated' => 'Credential updated',
             'deleted' => 'Credential deleted',
         ],
+        'api_token' => [
+            'issued'  => 'API token issued',
+            'rotated' => 'API token rotated',
+            'revoked' => 'API token revoked',
+        ],
         'settings' => [
             'updated' => 'Workspace settings updated',
         ],

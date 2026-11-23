@@ -24,4 +24,13 @@ final readonly class InboundWebhook
         public ?string $clientIp,
     ) {
     }
+
+    /** Whether the body is `multipart/*`, which PHP parses itself and keeps from {@see $rawBody}. */
+    public function isMultipart(): bool
+    {
+        $values = $this->headers['content-type'] ?? null;
+        $value  = is_array($values) ? (string) ($values[0] ?? '') : (string) $values;
+
+        return str_starts_with(mb_strtolower(mb_ltrim($value)), 'multipart/');
+    }
 }

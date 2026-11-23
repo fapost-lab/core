@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
+use App\Http\Controllers\Admin\ApiTokenController as AdminApiTokenController;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\CredentialController as AdminCredentialController;
@@ -171,6 +172,12 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('admin/credentials', [AdminCredentialController::class, 'store'])->name('console.admin.credentials.store');
         Route::put('admin/credentials/{record}', [AdminCredentialController::class, 'update'])->name('console.admin.credentials.update');
         Route::delete('admin/credentials/{record}', [AdminCredentialController::class, 'destroy'])->name('console.admin.credentials.destroy');
+
+        // API tokens: integrations of the workspace, issued, rotated and revoked here; a new screen, so its own URI.
+        Route::get('admin/api-tokens', [AdminApiTokenController::class, 'index'])->name('console.admin.api-tokens.index');
+        Route::post('admin/api-tokens', [AdminApiTokenController::class, 'store'])->name('console.admin.api-tokens.store');
+        Route::post('admin/api-tokens/{record}/rotate', [AdminApiTokenController::class, 'rotate'])->name('console.admin.api-tokens.rotate');
+        Route::delete('admin/api-tokens/{record}', [AdminApiTokenController::class, 'destroy'])->name('console.admin.api-tokens.destroy');
         // Activity log: who changed what in the console and the builder, read only; a new screen, so its own URI.
         Route::get('admin/activity', [AdminActivityLogController::class, 'index'])->name('console.admin.activity.index');
 

@@ -53,6 +53,23 @@ final class EgressGuardMiddlewareTest extends TestCase
         ];
     }
 
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function ownFlowWebhooks(): array
+    {
+        $token = str_repeat('a', 43);
+
+        return [
+            'a tenant host'               => ["https://acme.fapost.example/hooks/flow/{$token}"],
+            'the base domain'             => ["https://fapost.example/hooks/flow/{$token}"],
+            'the app host, any port'      => ["http://app.fapost.example:8080/hooks/flow/{$token}"],
+            'upper case and a dot'        => ["https://ACME.FAPOST.EXAMPLE./Hooks/Flow/{$token}"],
+            'an encoded slash'            => ["https://acme.fapost.example/hooks%2Fflow/{$token}"],
+            'behind the front controller' => ["https://acme.fapost.example/index.php/hooks/flow/{$token}"],
+        ];
+    }
+
     #[DataProvider('refusedTargets')]
     public function test_refuses_target_without_forwarding_the_request(string $url, string $reason): void
     {
@@ -198,6 +215,35 @@ final class EgressGuardMiddlewareTest extends TestCase
         $this->resolver->with('private.example.com', ['10.0.0.1']);
         $this->expectException(EgressDeniedException::class);
         $this->send(new Request('GET', 'https://private.example.com/'), policy: $policy);
+    }
+
+    #[DataProvider('ownFlowWebhooks')]
+    public function test_a_flow_webhook_of_this_installation_is_refused_even_for_an_allowed_host(string $url): void
+    {
+        $this->resolver->with('acme.fapost.example', ['93.184.216.34']);
+        $policy = EgressPolicy::fromConfig('acme.fapost.example,0.0.0.0/0', 5, null, ['https://ignored', 'fapost.example', 'app.fapost.example', null]);
+
+        try {
+            $this->send(new Request('POST', $url), policy: $policy);
+            $this->fail('The request should have been refused.');
+        } catch (EgressDeniedException $exception) {
+            $this->assertSame(EgressGuardMiddleware::REASON_OWN_FLOW_WEBHOOK, $exception->reason);
+        }
+
+        $this->assertNull($this->forwardedOptions);
+    }
+
+    public function test_other_paths_of_this_installation_and_webhooks_elsewhere_pass(): void
+    {
+        $this->resolver->with('acme.fapost.example', ['93.184.216.34']);
+        $this->resolver->with('hooks.other.example', ['93.184.216.35']);
+        $policy = EgressPolicy::fromConfig('', 5, null, ['fapost.example']);
+
+        $this->send(new Request('POST', 'https://acme.fapost.example/api/flows/start'), policy: $policy);
+        $this->send(new Request('POST', 'https://hooks.other.example/hooks/flow/' . str_repeat('a', 43)), policy: $policy);
+        $this->send(new Request('POST', 'https://acme.fapost.example/webhooks/flowers'), policy: $policy);
+
+        $this->assertNotNull($this->forwardedOptions);
     }
 
     /**

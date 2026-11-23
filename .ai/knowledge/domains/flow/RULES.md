@@ -38,6 +38,10 @@ broken.
   itself, refuses the request if any address is not public, pins the connection to the checked
   addresses (`CURLOPT_RESOLVE`) and re-checks every redirect hop. There is no switch to turn it off;
   the operator widens it with `FLOW_EGRESS_ALLOW`, which can never cover the metadata addresses.
+  The guard also refuses, on every hop and whatever the allowlist says, a flow webhook URL of this installation
+  (`/hooks/flow/…` on the `APP_URL` host, `tenancy.base_domain` or any host under it, other tenants' included,
+  reason `own_flow_webhook`): two flows whose `call` nodes post to each other's webhook would loop with no event to
+  count the chain. A loop guard, not a boundary — a DNS alias or an outside relay gets past it.
   Why: without it a flow reads Redis, Postgres or the cloud credentials service from inside the
   network. New Flow code that needs HTTP uses `GuardedHttpClient::request()`, not `Http::` or
   Guzzle; hosts the operator chose (Telegram, captcha) are outside this rule. Enforced:
@@ -224,6 +228,15 @@ broken.
   fake a Core fact, and flows that set each other off must stop (`adr-20261119-core-events-start-contactless-runs`).
   Enforced: `CoreEventTriggersTest`, `QueuedFlowTriggerEventPublisherTest`, `PublishCoreEventsTest`,
   `ContactTagEventsTest`, `ValidateFlowServiceTest`, `BuiltInNodeHandlersTest`, `ConversationBoundariesTest`.
+- **An event trigger's `assistant_filter` matches the assistant that emitted the event, never the trigger's own, and a
+  Core event takes none.** `config.assistant_filter` is a list of assistant ids; empty or absent is any assistant. A
+  flow event passes when the assistant of its emitting session (`flow_sessions.assistant_id`, read by
+  `ResolveEventTriggersService::forFlowEvent()` only when a trigger has a filter) is in the list; an unknown source
+  passes only unfiltered triggers. Validation refuses a filter on a Core-event trigger
+  (`assistant_filter_on_core_event`) and an id that is not an assistant of the tenant (`unknown_assistant_filter`).
+  Why: two bots' events of one name must be separable without a naming convention, and a filter on an event that has
+  no assistant would silently never fire (`adr-20261120-flow-event-trigger-assistant-filter`). Enforced:
+  `DispatchFlowTriggerEventJobTest`, `BuilderApiTest`, `TriggerConfig.test.ts`.
 
 ## Rules
 
@@ -325,7 +338,10 @@ broken.
   in the answer that generated it, and never reaches the draft, a definition or a template: `WebhookTriggerConfig`
   refuses any key it does not know and a draft save drops `secret`. `FlowWebhookReceiver` serves a token only for a
   live, active webhook row of the endpoint's flow whose flow has an active runnable definition and still has its draft
-  and assistant; a timestamp check is accepted only inside the signed string. A publish that deletes a live webhook
+  and assistant; a timestamp check is accepted only inside the signed string. The flow never sees the request's
+  credentials, the signature or secret header, the signed timestamp or any header named `*signature*`
+  (`WebhookTriggerConfig::isStrippedHeader()`), and a `delivery_id` may not name one of them: the id is logged, kept in
+  the run's state and fire key, and sent back to the sender. A publish that deletes a live webhook
   trigger or changes its type deletes its endpoint, and deleting a flow deletes its endpoints. A delivery runs once:
   Redis `SET NX` per `(tenant, trigger, fire key)` for a day, then the session's unique `(trigger_id, fire_key)`. Why:
   the config is copied into every version and template, and a URL held by an outside system must stop working when its
