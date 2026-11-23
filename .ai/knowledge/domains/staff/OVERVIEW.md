@@ -22,7 +22,8 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-11-10
+  - "database/migrations/tenant/*builder_mode*"
+reviewed_at: 2026-11-23
 ---
 # Staff
 
@@ -61,6 +62,9 @@ API tokens, their `api-token` guard and stack, and their screen.
   `Services/StaffNotificationInbox.php`, and its live channel in `Live/` (announced by
   `Listeners/AnnounceStaffNotification` on every in-app notification).
 - `Http/Middleware/EnsureUserIsActive.php` (the console stacks), `database/seeders/RoleSeeder.php`.
+- Personal settings are one column each on `users`, written for the signed-in user only: `locale`,
+  `pinned_applications`, `onboarding_checklist_hidden`, and `builder_mode` (enum `Enums/BuilderMode`, `tree`/`graph`,
+  `null` read as tree; written by the builder's `PUT /builder/preferences`, `adr-20261123-flow-builder-graph-mode`).
 - Admin UI: `app/Http/Controllers/Admin/{UserController,RoleController}.php`
   over `Services/StaffUserService.php` and `Services/StaffRoleService.php` (roles are written by
   `RoleWriterService`), pages in `resources/js/pages/Console/{Users,Roles}`.

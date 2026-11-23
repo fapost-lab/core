@@ -329,13 +329,13 @@ function addTrigger() {
     }
 }
 
-const { can } = usePermissions()
+const permissions = usePermissions()
 
 /** Removing an automatic trigger (anything but a message) needs the Manage automations permission. */
 function canRemoveTrigger(id: string): boolean {
     const trigger = builderStore.triggers.find((t) => t.id === id)
 
-    return trigger?.type === 'message' || can('manage_automations')
+    return trigger !== undefined && permissions.canRemoveTrigger(trigger.type)
 }
 
 function removeTrigger(id: string) {

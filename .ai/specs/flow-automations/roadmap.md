@@ -79,7 +79,7 @@ the flow's answer within 30 s, and an API call with a tenant token starts a run.
 Goal: a person edits a flow on the graph or on the tree, as they prefer. Done when: the builder offers both
 modes over one definition, and the SaaS shell reports how many people use each.
 
-- [ ] Graph builder mode — editing on the graph component, the choice kept per person (after: Run graph page — the same component, made editable)
+- [x] Graph builder mode — editing on the graph component, the choice kept per person (after: Run graph page — the same component, made editable)
 - [ ] Builder mode usage in SaaS — a Core analytics event read by the shell through a Foundation contract (after: Graph builder mode — there is nothing to count before it)
 
 ## Phase 9 — Re-run and user-consent OAuth
