@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { drawRunGraph, loopsOf, statusesFor, type DrawnFrame, type DrawnNode, type RunGraph, type RunGraphFlow, type RunGraphNode } from './runGraph'
+import { drawRunGraph, isUnrolled, loopsOf, statusesFor, UNROLL_MAX_PASSES, type DrawnFrame, type DrawnNode, type RunGraph, type RunGraphFlow, type RunGraphLoop, type RunGraphNode } from './runGraph'
 import { layoutRunGraph, toElkGraph } from './runGraphLayout'
 
 function node(id: string, type: string, run: RunGraphNode['run'] = null): RunGraphNode {
@@ -93,6 +93,11 @@ describe('drawRunGraph', () => {
 })
 
 describe('loops', () => {
+  // More passes than a loop is unrolled for: the loop is drawn once, with a pass switcher.
+  const filler: RunGraphLoop['passes'] = Array.from({ length: UNROLL_MAX_PASSES - 1 }, (_, index) => ({
+    pass: index + 1,
+    nodes: [{ id: 'body', status: 'done' as const, handle: 'default' }],
+  }))
   const looped: RunGraph = {
     truncated: false, limit: 20_000,
     flow: flow({
@@ -105,8 +110,9 @@ describe('loops', () => {
         {
           nodeId: 'loop',
           passes: [
-            { pass: 1, nodes: [{ id: 'body', status: 'done', handle: 'default' }, { id: 'skip', status: 'done', handle: 'default' }] },
-            { pass: 2, nodes: [{ id: 'body', status: 'failed', handle: null }] },
+            ...filler,
+            { pass: UNROLL_MAX_PASSES, nodes: [{ id: 'body', status: 'done', handle: 'default' }, { id: 'skip', status: 'done', handle: 'default' }] },
+            { pass: UNROLL_MAX_PASSES + 1, nodes: [{ id: 'body', status: 'failed', handle: null }] },
           ],
         },
       ],
@@ -116,32 +122,138 @@ describe('loops', () => {
   it('draws a loop once with how many passes it ran, showing the last pass by default', () => {
     const drawn = drawRunGraph(looped)
 
-    expect(boxNode(drawn, 's1:loop').loop).toEqual({ key: 's1:loop', count: 2, index: 1, pass: 2 })
+    expect(isUnrolled(looped.flow, 'loop')).toBe(false)
+    expect(boxNode(drawn, 's1:loop').loop).toEqual({ key: 's1:loop', count: UNROLL_MAX_PASSES + 1, index: UNROLL_MAX_PASSES, pass: UNROLL_MAX_PASSES + 1 })
     expect(boxNode(drawn, 's1:body').status).toBe('failed')
     expect(boxNode(drawn, 's1:skip').status).toBe('untaken')
     expect(drawn.edges.find((edge) => edge.id === 's1:e2')!.taken).toBe(false)
   })
 
   it('recolours the path by the chosen pass', () => {
-    const drawn = drawRunGraph(looped, { 's1:loop': 0 })
+    const drawn = drawRunGraph(looped, { 's1:loop': UNROLL_MAX_PASSES - 1 })
 
-    expect(boxNode(drawn, 's1:loop').loop?.index).toBe(0)
+    expect(boxNode(drawn, 's1:loop').loop?.index).toBe(UNROLL_MAX_PASSES - 1)
     expect(boxNode(drawn, 's1:body').status).toBe('done')
     expect(boxNode(drawn, 's1:skip').status).toBe('done')
     expect(drawn.edges.find((edge) => edge.id === 's1:e2')!.taken).toBe(true)
   })
 
   it('ignores a chosen pass the loop does not have', () => {
-    expect(statusesFor(looped.flow, { 's1:loop': 7 }).get('body')).toBe('failed')
+    expect(statusesFor(looped.flow, { 's1:loop': 70 }).get('body')).toBe('failed')
   })
 
   it('lists the loops of the run, its subflow children included', () => {
     const withChild = flow({ ...looped.flow, children: [{ nodeId: 'loop', count: 1, flow: flow({ ...looped.flow, sessionId: 's2' }) }] })
 
     expect(loopsOf(withChild).map((loop) => [loop.key, loop.count])).toEqual([
-      ['s1:loop', 2],
-      ['s2:loop', 2],
+      ['s1:loop', UNROLL_MAX_PASSES + 1],
+      ['s2:loop', UNROLL_MAX_PASSES + 1],
     ])
+  })
+})
+
+describe('unrolled loops', () => {
+  // loop -loop-> a -> b, then loop -default-> after; two passes, the second failing at a.
+  function small(overrides: Partial<RunGraphFlow> = {}): RunGraphFlow {
+    return flow({
+      nodes: [node('loop', 'loop', done(['loop', 'default'], 3)), node('a', 'assign', done(['default'], 2)), node('b', 'assign', done(['default'], 1)), node('after', 'end', done([]))],
+      edges: [
+        { id: 'e1', from: 'loop', to: 'a', handle: 'loop' },
+        { id: 'e2', from: 'a', to: 'b', handle: 'default' },
+        { id: 'e3', from: 'loop', to: 'after', handle: 'default' },
+      ],
+      loops: [
+        {
+          nodeId: 'loop',
+          passes: [
+            { pass: 1, nodes: [{ id: 'a', status: 'done', handle: 'default' }, { id: 'b', status: 'done', handle: 'default' }] },
+            { pass: 2, nodes: [{ id: 'a', status: 'failed', handle: null }] },
+          ],
+        },
+      ],
+      ...overrides,
+    })
+  }
+
+  it('draws a small loop as a frame per pass, each holding the body with what it did in that pass', () => {
+    const drawn = drawRunGraph({ truncated: false, limit: 20_000, flow: small() })
+    const frames = drawn.boxes.filter((box): box is DrawnFrame => box.kind === 'frame')
+
+    expect(frames.map((frame) => [frame.id, frame.frame, frame.title, frame.parent])).toEqual([
+      ['pass:s1:loop:1', 'pass', '1', null],
+      ['pass:s1:loop:2', 'pass', '2', null],
+    ])
+    // The body is drawn only inside the passes.
+    expect(drawn.boxes.map((box) => box.id)).not.toContain('s1:a')
+    expect([boxNode(drawn, 's1:a@1').status, boxNode(drawn, 's1:b@1').status]).toEqual(['done', 'done'])
+    expect([boxNode(drawn, 's1:a@2').status, boxNode(drawn, 's1:b@2').status]).toEqual(['failed', 'untaken'])
+    expect(boxNode(drawn, 's1:a@2')).toMatchObject({ parent: 'pass:s1:loop:2', pass: 2, sessionId: 's1' })
+    expect(boxNode(drawn, 's1:a@2').node.id).toBe('a')
+    expect(boxNode(drawn, 's1:loop').pass).toBeNull()
+
+    expect(drawn.edges.map((edge) => [edge.id, edge.source, edge.target, edge.taken])).toEqual([
+      ['s1:e2@1', 's1:a@1', 's1:b@1', true],
+      ['s1:loop->pass:s1:loop:1', 's1:loop', 'pass:s1:loop:1', true],
+      ['s1:e2@2', 's1:a@2', 's1:b@2', false],
+      ['s1:loop->pass:s1:loop:2', 's1:loop', 'pass:s1:loop:2', true],
+      ['s1:e3', 's1:loop', 's1:after', true],
+    ])
+  })
+
+  it('needs no pass switcher for an unrolled loop', () => {
+    expect(loopsOf(small()).map((loop) => [loop.key, loop.unrolled])).toEqual([['s1:loop', true]])
+  })
+
+  it('puts the passes where the loop node sits', () => {
+    const drawn = drawRunGraph({
+      truncated: false, limit: 20_000,
+      flow: small({
+        nodes: [node('check', 'condition', done(['r1'])), ...small().nodes],
+        edges: [{ id: 'e0', from: 'check', to: 'loop', handle: 'r1' }, ...small().edges],
+      }),
+    })
+
+    expect(drawn.boxes.find((box) => box.id === 'pass:s1:loop:1')!.parent).toBe('branch:s1:check|r1')
+    expect(drawn.boxes.map((box) => box.id)).not.toContain('branch:s1:a|default')
+  })
+
+  it.each([
+    ['too many passes', (base: RunGraphFlow) => ({ loops: [{ nodeId: 'loop', passes: Array.from({ length: UNROLL_MAX_PASSES + 1 }, (_, index) => ({ pass: index + 1, nodes: [] })) }] })],
+    ['too many cards', (base: RunGraphFlow) => ({
+      nodes: [...base.nodes, ...Array.from({ length: 9 }, (_, index) => node(`x${index}`, 'assign'))],
+      edges: [...base.edges, ...Array.from({ length: 9 }, (_, index) => ({ id: `x${index}`, from: index === 0 ? 'b' : `x${index - 1}`, to: `x${index}`, handle: 'default' }))],
+    })],
+    ['a branching node in the body', (base: RunGraphFlow) => ({ nodes: base.nodes.map((item) => (item.id === 'b' ? node('b', 'condition') : item)) })],
+    ['a subflow in the body', (base: RunGraphFlow) => ({ nodes: base.nodes.map((item) => (item.id === 'b' ? node('b', 'subflow') : item)) })],
+    ['a loop in the body', (base: RunGraphFlow) => ({ nodes: base.nodes.map((item) => (item.id === 'b' ? node('b', 'loop') : item)) })],
+    ['an edge into the body from outside', (base: RunGraphFlow) => ({ edges: [...base.edges, { id: 'in', from: 'after', to: 'b', handle: 'default' }] })],
+    ['no passes', () => ({ loops: [] })],
+  ])('keeps a loop with %s drawn once', (_, change) => {
+    const base = small()
+    const changed = { ...base, ...change(base) }
+
+    expect(isUnrolled(changed, 'loop')).toBe(false)
+    expect(drawRunGraph({ truncated: false, limit: 20_000, flow: changed }).boxes.some((box) => box.kind === 'frame' && box.frame === 'pass')).toBe(false)
+  })
+
+  it('lays the passes out with their copies inside them', async () => {
+    const placed = await layoutRunGraph(drawRunGraph({ truncated: false, limit: 20_000, flow: small() }))
+    const pass = placed.find((box) => box.box.id === 'pass:s1:loop:1')!
+    const copy = placed.find((box) => box.box.id === 's1:a@1')!
+
+    expect(placed.map((box) => box.box.id).sort()).toEqual(['pass:s1:loop:1', 'pass:s1:loop:2', 's1:a@1', 's1:a@2', 's1:after', 's1:b@1', 's1:b@2', 's1:loop'])
+    expect(copy.box.parent).toBe('pass:s1:loop:1')
+    expect(pass.width).toBeGreaterThan(copy.width)
+    expect(copy.position.y).toBeGreaterThan(0)
+  })
+
+  it('keeps a loop inside another loop drawn once', () => {
+    const nested = small({
+      nodes: [node('outer', 'loop'), ...small().nodes],
+      edges: [{ id: 'o1', from: 'outer', to: 'loop', handle: 'loop' }, ...small().edges],
+    })
+
+    expect(isUnrolled(nested, 'loop')).toBe(false)
   })
 })
 

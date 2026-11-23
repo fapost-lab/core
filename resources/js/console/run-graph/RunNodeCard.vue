@@ -42,7 +42,7 @@ const visits = computed(() => node.value.run?.visits ?? 0)
       <span class="size-4 shrink-0"><NodeIcon :type="node.type" /></span>
       <span class="truncate">{{ typeLabel }}</span>
       <span v-if="loop" class="ml-auto shrink-0 tabular-nums">{{ interpolate(data.labels.loop.times, { count: loop.count }) }}</span>
-      <span v-else-if="visits > 1" class="ml-auto shrink-0 tabular-nums">{{ interpolate(data.labels.loop.times, { count: visits }) }}</span>
+      <span v-else-if="data.drawn.pass === null && visits > 1" class="ml-auto shrink-0 tabular-nums">{{ interpolate(data.labels.loop.times, { count: visits }) }}</span>
     </div>
     <div class="flex min-w-0 flex-1 items-center justify-between gap-2 px-3">
       <span class="truncate text-sm" :class="node.label ? '' : 'text-muted-foreground font-mono text-xs'">{{ node.label ?? node.id }}</span>
