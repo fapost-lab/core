@@ -1,3 +1,5 @@
+import { branchOwners, framesOutermostFirst, frameHandleOf, parentFrameOf } from '@builder/utils/graphFrames'
+
 /**
  * The run graph of a flow session as a tree of boxes for ELK and Vue Flow: the definition the session executed, the path
  * it took lit, untaken nodes dimmed, branches and subflow children as nested frames, loops drawn once with "×N" and a
@@ -145,9 +147,6 @@ export interface DrawnGraph {
   edges: DrawnEdge[]
 }
 
-/** Node types whose non-default handles open a branch frame (rules of a condition, buttons of a message). */
-const BRANCHING_TYPES = new Set(['condition', 'branch', 'send_message'])
-
 export function nodeKey(sessionId: string, nodeId: string): string {
   return `${sessionId}:${nodeId}`
 }
@@ -175,27 +174,17 @@ function drawFlow(flow: RunGraphFlow, parent: string | null, selection: PassSele
   const nodesById = new Map(flow.nodes.map((node) => [node.id, node]))
 
   // Frames first, parents before children: a frame sits in the frame its branching node sits in.
-  const frameIds = [...new Set(flow.nodes.map((node) => owners.get(node.id)).filter((frame): frame is string => frame !== undefined))]
-  const parentFrame = (frameId: string): string | undefined => owners.get(branchingNodeOf(frameId))
-  const depth = (frameId: string): number => {
-    let level = 0
+  const frameIds = flow.nodes.map((node) => owners.get(node.id)).filter((frame): frame is string => frame !== undefined)
 
-    for (let current = parentFrame(frameId); current !== undefined && level < 100; current = parentFrame(current)) {
-      level++
-    }
-
-    return level
-  }
-
-  for (const frameId of [...frameIds].sort((a, b) => depth(a) - depth(b))) {
+  for (const frameId of framesOutermostFirst(frameIds, owners)) {
     const members = flow.nodes.filter((node) => owners.get(node.id) === frameId)
-    const owner = parentFrame(frameId)
+    const owner = parentFrameOf(frameId, owners)
     const frame: DrawnFrame = {
       kind: 'frame',
       id: frameBoxId(flow.sessionId, frameId),
       parent: owner === undefined ? parent : frameBoxId(flow.sessionId, owner),
       frame: 'branch',
-      title: frameId.slice(frameId.indexOf('|') + 1),
+      title: frameHandleOf(frameId),
       count: 1,
       status: members.some((node) => statuses.get(node.id) !== 'untaken') ? 'done' : 'untaken',
     }
@@ -267,48 +256,6 @@ function drawFlow(flow: RunGraphFlow, parent: string | null, selection: PassSele
 
 function frameBoxId(sessionId: string, frameId: string): string {
   return `branch:${sessionId}:${frameId}`
-}
-
-/** A branch frame's id is `<branching node id>|<handle>`; node ids never hold a `|`. */
-function branchingNodeOf(frameId: string): string {
-  return frameId.slice(0, frameId.indexOf('|'))
-}
-
-/**
- * The branch frame each node sits in, as `<branching node id>|<handle>`; a node outside any branch has none. A node
- * reached twice (a merge) stays where it was reached first, from the roots down.
- */
-export function branchOwners(flow: RunGraphFlow): Map<string, string> {
-  const incoming = new Set(flow.edges.map((edge) => edge.to))
-  const roots = flow.nodes.filter((node) => !incoming.has(node.id)).map((node) => node.id)
-  const types = new Map(flow.nodes.map((node) => [node.id, node.type]))
-  const owners = new Map<string, string>()
-  const visited = new Set<string>()
-  const stack: { id: string; owner: string | undefined }[] = roots.reverse().map((id) => ({ id, owner: undefined }))
-
-  while (stack.length > 0) {
-    const { id, owner } = stack.pop()!
-
-    if (visited.has(id)) {
-      continue
-    }
-
-    visited.add(id)
-
-    if (owner !== undefined) {
-      owners.set(id, owner)
-    }
-
-    const outgoing = flow.edges.filter((edge) => edge.from === id)
-
-    for (const edge of [...outgoing].reverse()) {
-      const opensBranch = BRANCHING_TYPES.has(types.get(id) ?? '') && edge.handle !== 'default'
-
-      stack.push({ id: edge.to, owner: opensBranch ? `${id}|${edge.handle}` : owner })
-    }
-  }
-
-  return owners
 }
 
 /** The index into a loop's passes the drawing shows: the chosen one when it exists, else the last. */

@@ -85,6 +85,7 @@ use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\RequestOperatorNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\SetTagNodeHandler;
+use App\Domains\Flow\Handlers\StartFlowNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Handlers\Support\TemplateResolver;
@@ -517,6 +518,10 @@ final class FlowServiceProvider extends ServiceProvider
         );
         $this->app->bind(SendMessageTimeoutSchedulerInterface::class, QueuedSendMessageTimeoutScheduler::class);
         $this->app->bind(AudienceBroadcasterInterface::class, BroadcastingAudienceBroadcaster::class);
+        $this->app->bind(
+            \App\Domains\Flow\Contracts\ContactFlowStartDispatcherInterface::class,
+            \App\Infrastructure\Flow\QueuedContactFlowStartDispatcher::class,
+        );
         $this->app->bind(OperatorRequestTimeoutSchedulerInterface::class, QueuedOperatorRequestTimeoutScheduler::class);
         $this->app->bind(NodeUsageStatisticsInterface::class, NodeUsageStatisticsService::class);
         $this->app->bind(
@@ -745,6 +750,7 @@ final class FlowServiceProvider extends ServiceProvider
             EndNodeHandler::class,
             RagQueryNodeHandler::class,
             SubflowNodeHandler::class,
+            StartFlowNodeHandler::class,
             SetTagNodeHandler::class,
             NotifyNodeHandler::class,
             AuthRequestNodeHandler::class,

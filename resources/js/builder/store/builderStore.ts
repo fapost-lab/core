@@ -11,9 +11,11 @@ import {
 } from '@builder/utils/templateNodes'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useRegistryStore} from '@builder/store/registryStore'
+import {saveBuilderMode} from '@builder/api/builderApi'
 import type {
   ActiveTab,
   AvailableTemplate,
+  BuilderMode,
   TemplateParameterDeclaration,
   FlowKind,
   BuilderFlowPayload,
@@ -149,6 +151,12 @@ export const useBuilderStore = defineStore('builder', () => {
     const isDirty   = ref(false)
     let hydrated    = false
     const activeTab = ref<ActiveTab>('builder')
+    /**
+     * The layout the author works in: the tree (structure + sequence) or the graph. A choice of the person, not of the
+     * draft — it is kept on the staff user (`users.builder_mode`), never in the definition, the undo stack or the
+     * dirty flag, and switching works in a read-only draft too.
+     */
+    const builderMode = ref<BuilderMode>('tree')
     const validationResult = ref<ValidationResult | null>(null)
     const validationOpen = ref(false)
     const undoStack = ref<string[]>([])
@@ -319,6 +327,7 @@ export const useBuilderStore = defineStore('builder', () => {
         publishedVersion.value = flow.publishedVersion ?? null
         readOnly.value = flow.readOnly === true
         readOnlyNotice.value = null
+        builderMode.value = flow.builderMode === 'graph' ? 'graph' : 'tree'
         kind.value = flow.kind === 'template' ? 'template' : 'flow'
         availableTemplates.value = Array.isArray(flow.availableTemplates) ? flow.availableTemplates : []
         usedBy.value = Array.isArray(flow.usedBy) ? flow.usedBy : []
@@ -422,6 +431,21 @@ export const useBuilderStore = defineStore('builder', () => {
 
     function setActiveTab(tab: ActiveTab) {
         activeTab.value = tab
+    }
+
+    /**
+     * Switches the layout at once and stores the choice for the person in the background. A refused or failed save
+     * (a stopped tenant answers 423) keeps the switch for this page: the layout is a view, nothing of the draft rides
+     * on it, so there is nothing to roll back.
+     */
+    function setBuilderMode(mode: BuilderMode): Promise<void> {
+        if (builderMode.value === mode) {
+            return Promise.resolve()
+        }
+
+        builderMode.value = mode
+
+        return saveBuilderMode(mode).then(() => undefined, () => undefined)
     }
 
     function setValidationResult(result: ValidationResult | null, open = true) {
@@ -1223,6 +1247,7 @@ export const useBuilderStore = defineStore('builder', () => {
         saveStatus,
         isDirty,
         activeTab,
+        builderMode,
         validationResult,
         validationOpen,
         nodesWithErrors,
@@ -1237,6 +1262,7 @@ export const useBuilderStore = defineStore('builder', () => {
         deleteTrigger,
         setSaveStatus,
         setActiveTab,
+        setBuilderMode,
         setValidationResult,
         closeValidation,
         undo,

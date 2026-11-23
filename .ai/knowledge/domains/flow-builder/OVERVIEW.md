@@ -23,7 +23,9 @@ paths:
   - app/Http/Requests/CallTestRequest.php
   - app/Http/Controllers/Console/FlowTemplateController.php
   - "resources/js/pages/Console/FlowTemplates/**"
-reviewed_at: 2026-11-11
+  - app/Http/Controllers/Builder/BuilderPreferenceController.php
+  - app/Http/Requests/UpdateBuilderPreferenceRequest.php
+reviewed_at: 2026-11-23
 ---
 # Flow builder
 
@@ -55,6 +57,14 @@ The Telegram mini app (`resources/js/tma`) is a separate surface and not part of
 - Frontend: `resources/js/builder/app.ts`, the single page `pages/FlowBuilder/FlowEditor.vue`,
   stores in `store/` (`builderStore`, `registryStore`, `selectionStore`, …), API client
   `api/builderApi.ts`, autosave `useAutoSave`.
+- Two layouts of the builder tab over the same draft (`adr-20261123-flow-builder-graph-mode`): the tree
+  (`FlowStructure` + `FlowSequence`, one branch level at a time) and the graph
+  (`components/editor/graph/FlowGraph.vue`, loaded lazily: the whole draft on a Vue Flow canvas, branch frames, ELK
+  layout from `utils/graphLayout.ts` and `utils/graphFrames.ts`, drawn by the pure `definitionGraph.ts`). The graph edits
+  only through the store's operations and shares `ConfigPanel` and the delete and move dialogs with the tree. The mode is
+  the staff user's (`users.builder_mode`): `builderStore.builderMode` / `setBuilderMode`, saved by
+  `PUT /builder/preferences` (`BuilderPreferenceController`, `UpdateBuilderPreferenceRequest`) and read from the page's
+  `flow.builderMode`; switching sits in `AppTopBar`.
 - Config UI: `components/editor/ConfigPanel.vue` (the override map), `SchemaFields.vue`, and
   `components/editor/config/fieldComponents.ts` (`FIELD_COMPONENTS`, shared with the template
   parameter fields). The top-level translatable fields the Content tab and template parameters

@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Commands;
 
 use App\Domains\Contact\Models\Contact;
-use App\Domains\Conversation\Contracts\OperatorRequestsInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
-use App\Domains\Flow\Enums\FlowSessionStatus;
-use App\Domains\Flow\Live\FlowActivityNotifier;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Services\FlowSessionTerminator;
 use App\Domains\Tenancy\Settings\TenantSettings;
 
 /**
@@ -33,7 +31,8 @@ use App\Domains\Tenancy\Settings\TenantSettings;
  * A session a command ends takes its pending operator request with it: the
  * thread goes back to the bot instead of waiting for an operator forever (the
  * bot stays silent while it waits). A thread an operator already handles is
- * left to them. The parents a subflow chain left waiting in `paused_subflow` are ended with it.
+ * left to them. The parents a subflow chain left waiting in `paused_subflow` are ended with it
+ * ({@see FlowSessionTerminator}).
  */
 final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInterface
 {
@@ -44,8 +43,7 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
         private FallbackMessageServiceInterface $messenger,
         private ContentTranslatorInterface $translator,
         private TenantSettings $tenantSettings,
-        private FlowActivityNotifier $activity,
-        private OperatorRequestsInterface $operatorRequests,
+        private FlowSessionTerminator $terminator,
     ) {
     }
 
@@ -162,62 +160,11 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
     }
 
     /**
-     * What a command writes to a session it ends: the terminal status, written past the optimistic lock.
-     */
-    private function forceTerminate(FlowSession $session): void
-    {
-        $session->newQuery()
-            ->whereKey($session->getKey())
-            ->update([
-                'status'          => FlowSessionStatus::TerminatedByUser->value,
-                'current_node_id' => null,
-                'updated_at'      => now(),
-            ]);
-
-        // A query write raises no model event, so the live screens are told here.
-        $this->activity->touched($session);
-    }
-
-    /**
      * Force-terminate a session bypassing optimistic lock — global commands
      * are explicitly permitted to break in even when a worker is stuck.
      */
     private function markTerminated(FlowSession $session): void
     {
-        $this->forceTerminate($session);
-
-        $this->operatorRequests->cancelForSession(
-            (string) $session->tenant_id,
-            (string) $session->assistant_id,
-            (string) $session->contact_id,
-            (string) $session->getKey(),
-        );
-
-        $this->terminateWaitingAncestors($session);
-    }
-
-    /**
-     * A command ends the whole conversation, not only its leaf: the parents a subflow left in
-     * `paused_subflow` would otherwise wait for a child that no longer exists and sit next to the
-     * session the next message starts, until the timeout sweeper reaches them.
-     */
-    private function terminateWaitingAncestors(FlowSession $session): void
-    {
-        $seen     = [(string) $session->getKey()];
-        $parentId = $session->parent_session_id;
-
-        while (is_string($parentId) && '' !== $parentId && !in_array($parentId, $seen, true)) {
-            $seen[] = $parentId;
-
-            $parent = FlowSession::query()->find($parentId);
-
-            if (!$parent instanceof FlowSession || FlowSessionStatus::PausedSubflow !== $parent->status) {
-                return;
-            }
-
-            $this->forceTerminate($parent);
-
-            $parentId = $parent->parent_session_id;
-        }
+        $this->terminator->terminate($session);
     }
 }

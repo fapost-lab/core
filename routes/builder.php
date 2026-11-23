@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Builder\AssistantOptionsController;
 use App\Http\Controllers\Builder\BuilderFlowController;
+use App\Http\Controllers\Builder\BuilderPreferenceController;
 use App\Http\Controllers\Builder\CallTestController;
 use App\Http\Controllers\Builder\ContactTagsController;
 use App\Http\Controllers\Builder\CredentialOptionsController;
@@ -34,4 +35,5 @@ Route::middleware(['auth', 'tenant', 'verified', EnsureTenantOnboarded::class, R
     Route::get('/credentials', [CredentialOptionsController::class, 'index']);
     Route::get('/assistants', [AssistantOptionsController::class, 'index']);
     Route::post('/call/test', CallTestController::class);
+    Route::put('/preferences', [BuilderPreferenceController::class, 'update'])->name('builder.preferences.update');
 });

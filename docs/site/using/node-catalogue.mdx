@@ -226,6 +226,48 @@ changes what every parent runs. To keep a parent on a tested version, enter its
 number in **Pinned version**: that version keeps running after the child is
 republished. Publishing refuses a version the child never published.
 
+### Start flow for contact
+
+Starts another flow as a **new conversation of a contact**, and goes on at once — it
+does not wait for that conversation, as a [Subflow](#subflow) does.
+
+Use it when something outside a conversation should reach a person: a scheduled
+reminder, an order a [webhook](/using/webhook-trigger) reports, an event. Pick the
+flow to start (a flow of the same assistant) and name the contact in **Contact**
+with an expression, such as `{{flow.customer_id}}`. The contact is required: the
+block never falls back to the contact of the run, so a flow without a contact can
+use it too. The started conversation is the contact's with the bot of the flow you
+picked, on the channel the contact used last.
+
+**Pass to the started flow** sets temporary variables of the new conversation, as
+the subflow's list does; a value that is only one expression keeps its type.
+
+The block continues on one of four exits:
+
+- `started` — the conversation is queued and starts within seconds. One step of
+  the flow starts one conversation, even when the step is repeated after a
+  failure; a loop over several contacts starts one per contact.
+- `busy` — the contact is in the middle of something with that bot: an operator
+  has the thread or one was requested, or a conversation with the bot moved in the
+  last **Busy window** minutes (30 by default), or a conversation with the bot is
+  waiting in a [Delay](#delay) to go on by itself. Nothing is sent. A live
+  conversation older than the window is ended and replaced by the new one; with a
+  window of 0 the contact is busy only while an operator has the thread. A
+  conversation never starts a flow over itself: a flow that names its own contact
+  on the same bot leaves by `busy`.
+- `no_channel` — the contact has no channel on an active channel of that bot, so
+  nothing could be delivered.
+- `error` — the expression gave no contact id (`addressee_unresolved`), no
+  contact has that id (`contact_not_found`), the flow has no active version
+  (`target_inactive`), or flows starting each other went five levels deep
+  (`chain_depth_exceeded`).
+
+The block checks the contact again when the conversation actually starts; if the
+contact became busy or lost the channel in between, nothing is started and this
+flow does not learn of it. A private flow starts even for a contact who has not
+passed authentication ([Visibility](/using/flows)): you wired the start yourself. To reach many contacts at once, use a
+[broadcast](/using/broadcasts).
+
 ### Template
 
 Places a [flow template](/using/flow-templates) in the flow as a single block.

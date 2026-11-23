@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Support;
 
+use App\Domains\Flow\Handlers\Support\TemplateRenderer;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Ramsey\Uuid\Uuid;
+
 /**
- * Reads the `addressee` a node's config names: whom the node reaches instead of the contact of the run.
+ * Reads and resolves the `addressee` a node's config names: whom the node reaches instead of the contact of the run.
  *
  * `{kind: "contact", contact: "<expression>"}` is one person, the contact id the expression gives; `{kind: "tags",
  * tags: [...]}` and `{kind: "segment", segment_id: "..."}` are an audience, reached through a broadcast. No `addressee`,
  * an empty one, or the builder's untouched default (kind `contact`, no expression) names none. A kind this class does
  * not know is still named, so validation can refuse it.
  *
- * Pure and static: the same config always reads the same.
+ * A contact expression is rendered with the flow's engine and must give a contact id (a UUID). Anything else resolves
+ * to null, never to the contact of the run: a missing id must not reach somebody else.
  */
-final class AddresseeResolver
+final readonly class AddresseeResolver
 {
     public const string KIND_CONTACT = 'contact';
     public const string KIND_TAGS    = 'tags';
@@ -22,6 +27,21 @@ final class AddresseeResolver
 
     /** @var list<string> */
     public const array KINDS = [self::KIND_CONTACT, self::KIND_TAGS, self::KIND_SEGMENT];
+
+    public function __construct(
+        private TemplateRenderer $templates,
+    ) {
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $config  the node's `config`
+     *
+     * @return array{kind: string|null, contact: string, tags: list<string>, segment_id: string}
+     */
+    public static function addresseeOf(array $config): array
+    {
+        return self::parse($config);
+    }
 
     /**
      * @param  array<array-key, mixed>  $config  the node's `config`
@@ -105,5 +125,23 @@ final class AddresseeResolver
         }
 
         return $tags;
+    }
+
+    /**
+     * The contact id the addressee's expression gives, lower-cased; null when it gives none or the kind is unknown.
+     *
+     * @param  array{kind: string|null, contact: string}  $addressee
+     * @param  array<string, mixed>                       $state
+     */
+    public function resolve(array $addressee, NodeExecutionContext $context, array $state): ?string
+    {
+        if (self::KIND_CONTACT !== $addressee['kind']) {
+            return null;
+        }
+
+        $rendered = $this->templates->render($addressee['contact'], $context, $state);
+        $id       = is_scalar($rendered) ? mb_trim((string) $rendered) : '';
+
+        return Uuid::isValid($id) ? mb_strtolower($id) : null;
     }
 }

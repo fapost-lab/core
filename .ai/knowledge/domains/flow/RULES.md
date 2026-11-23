@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-11-20
+reviewed_at: 2026-11-23
 ---
 # Flow rules
 
@@ -114,7 +114,7 @@ broken.
 - **A session runs the definition it started with.** `flow_definition_id` is set once, and
   definitions cannot be deleted while sessions reference them (`restrictOnDelete`).
 - **A flow template never starts a session.** Every start path (default flow, trigger, global
-  command, event job, subflow) loads its definition through
+  command, event job, `start_flow` job, subflow) loads its definition through
   `FlowDefinitionRepositoryInterface::findLatestActiveByFlowId()` (a subflow node pinned to a version, through
   `findRunnableByFlowIdAndVersion()`), which return only `runnable()`
   (`kind = flow`) definitions; a template has no trigger (refused on draft save) and is not offered
@@ -255,8 +255,8 @@ broken.
   `SessionLockTimeoutException` and the queue retries (the automation jobs and `ResumeDelayedFlowSessionJob` release
   themselves instead of spending an attempt). A caller that may hold a contactless session takes its scope from `LockScope::ofSession()`, never
   builds it from the session's columns (callers that only ever hold a contact's session — buttons, operator requests,
-  event starts — still pass the triple). `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
-  `StartFlowFromEventJob`, `SubflowTimeoutSweeper`, `AutomationRunDeadlineSweeper` and `AutomationRunner` follow it
+  event starts, `start_flow` starts — still pass the triple). `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
+  `StartFlowFromEventJob`, `StartFlowForContactJob`, `SubflowTimeoutSweeper`, `AutomationRunDeadlineSweeper` and `AutomationRunner` follow it
   (`tests/Feature/Redis`); the sweepers skip a parent or run whose lock is busy and retry on their next run, and skip
   with a warning one they cannot lock at all, so one never ends the pass.
 - **A contactless session never reaches a contact through an empty id.** Without a contact,
@@ -306,6 +306,19 @@ broken.
   `EventChainContext`), so the chain limit stops flows that broadcast on each other's broadcasts
   (`adr-20261123-flow-audience-message-through-broadcasting`). Enforced: `SendMessageBroadcastTest`,
   `BuiltInNodeHandlersTest`, `PublishCoreEventsTest`.
+- **A flow started for a contact starts once per step, never for the run's contact, and never over a moving
+  conversation or an operator.** A `start_flow` node's start key is the engine's execution key and the node id,
+  written on the started session (`flow_sessions.start_key`, unique); the node answers `started` when a session has
+  its key, and `StartFlowForContactJob` starts nothing for a used key, under the contact's lock and through the unique
+  violation of a racing duplicate. The contact comes only from the node's addressee (`addressee_unresolved`
+  otherwise); the conversation is on the target flow's draft assistant, and a contact with no channel on its active
+  channel is `no_channel`, never an exception. Busy (nothing sent) is: the delivery thread `staff` or `queued`, a live
+  conversation with that bot that moved within `busy_window_minutes` or sleeps in a `delay`, or the asking session or a parent of it being
+  that conversation; an older live conversation is ended by `FlowSessionTerminator` before the start. The node's
+  check is advisory, the job's under the lock holds. The started session is one event-chain level deeper than the run
+  (`chain_depth_exceeded` past `MAX_CHAIN_DEPTH`). Why: the person did not ask for the message, a sent message cannot
+  be taken back, and a repeat would write to them twice (`adr-20261123-start-flow-for-contact`). Enforced:
+  `StartFlowForContactTest`, `ContactContextValidationTest`.
 - **A trigger goes live only on publish, and its id is its row's primary key.** A flow's triggers are a list
   `{id, type, is_active, priority, config}` in `flow_drafts.triggers` and `flow_definitions.triggers`; `null` there
   means "not written yet", and the flow's live `flow_triggers` rows count (`FlowTriggerSet`), `[]` means none. A draft

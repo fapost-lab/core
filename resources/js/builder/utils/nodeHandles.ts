@@ -63,6 +63,15 @@ export function nodeHandles(node: FlowNodeLike): NodeHandle[] {
     ]
   }
 
+  if (node.type === 'start_flow') {
+    return [
+      {handle: 'started',    label: 'Started'},
+      {handle: 'busy',       label: 'Busy'},
+      {handle: 'no_channel', label: 'No channel'},
+      {handle: 'error',      label: 'Error'},
+    ]
+  }
+
   if (node.type === 'request_operator') {
     return [
       {handle: 'returned',  label: 'Operator finished'},

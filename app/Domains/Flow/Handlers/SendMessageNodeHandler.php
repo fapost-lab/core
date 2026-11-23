@@ -652,14 +652,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
      */
     private function resolveAddressee(array $addressee, array $state, NodeExecutionContext $context): ?string
     {
-        if (self::ADDRESSEE_KIND_CONTACT !== $addressee['kind']) {
-            return null;
-        }
-
-        $rendered = $this->templates->render($addressee['contact'], $context, $state);
-        $id       = is_scalar($rendered) ? mb_trim((string) $rendered) : '';
-
-        return Uuid::isValid($id) ? mb_strtolower($id) : null;
+        return new AddresseeResolver($this->templates)->resolve($addressee, $context, $state);
     }
 
     /**
