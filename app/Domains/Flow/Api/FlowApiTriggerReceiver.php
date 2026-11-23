@@ -9,13 +9,11 @@ use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Services\LiveTriggerLookup;
-use App\Domains\Flow\Webhook\WebhookDeliveryDedupInterface;
-use App\Domains\Flow\Webhook\WebhookReplyStoreInterface;
-use App\Domains\Flow\Webhook\WebhookSyncWait;
+use App\Domains\Flow\Webhook\InboundRunStarter;
+use App\Domains\Flow\Webhook\InboundRunStartStatus;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Jobs\Flow\StartAutomationRunJob;
 use DateTimeImmutable;
-use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
@@ -55,10 +53,7 @@ final readonly class FlowApiTriggerReceiver
         private LiveTriggerLookup $liveTriggers,
         private FlowDraftRepositoryInterface $drafts,
         private FlowTriggerStateRepositoryInterface $triggerStates,
-        private WebhookDeliveryDedupInterface $dedup,
-        private WebhookSyncWait $syncWait,
-        private WebhookReplyStoreInterface $replies,
-        private Dispatcher $dispatcher,
+        private InboundRunStarter $starter,
         private LoggerInterface $logger,
     ) {
     }
@@ -134,41 +129,22 @@ final readonly class FlowApiTriggerReceiver
             $this->logger->info('flow.api.no_idempotency_key', [...$context, 'request_id' => $requestId]);
         }
 
-        if ($deduped && ! $this->dedup->claim($tenantId, $trigger->id, $fireKey)) {
-            $this->logger->info('flow.api.duplicate', [...$context, 'request_id' => $requestId]);
+        $start = $this->starter->start(
+            tenantId: $tenantId,
+            trigger: $trigger,
+            fireKey: $fireKey,
+            deduped: $deduped,
+            initialState: ApiPayload::initialState($call, $body, $requestId, new DateTimeImmutable()),
+            sync: $config->isSync(),
+            logPrefix: 'flow.api',
+            logContext: [...$context, 'request_id' => $requestId],
+        );
 
-            // Never a second wait: it would take the wake-up the first call is waiting for.
-            $kept = $config->isSync() ? $this->replies->find($tenantId, $trigger->id, $fireKey) : null;
-
-            return null === $kept ? ApiTriggerOutcome::duplicate($requestId) : ApiTriggerOutcome::replied($requestId, $kept);
-        }
-
-        try {
-            $this->dispatcher->dispatch(new StartAutomationRunJob(
-                tenantId: $tenantId,
-                flowId: $trigger->flow_id,
-                triggerId: $trigger->id,
-                fireKey: $fireKey,
-                initialState: ApiPayload::initialState($call, $body, $requestId, new DateTimeImmutable()),
-                assistantId: $trigger->assistant_id,
-            ));
-        } catch (Throwable $exception) {
-            if ($deduped) {
-                $this->dedup->release($tenantId, $trigger->id, $fireKey);
-            }
-
-            throw $exception;
-        }
-
-        $this->logger->info('flow.api.accepted', [...$context, 'request_id' => $requestId]);
-
-        if (! $config->isSync()) {
-            return ApiTriggerOutcome::accepted($requestId);
-        }
-
-        $reply = $this->syncWait->await($tenantId, $trigger->id, $fireKey, [...$context, 'request_id' => $requestId]);
-
-        return null === $reply ? ApiTriggerOutcome::accepted($requestId) : ApiTriggerOutcome::replied($requestId, $reply);
+        return match ($start->status) {
+            InboundRunStartStatus::Duplicate => ApiTriggerOutcome::duplicate($requestId),
+            InboundRunStartStatus::Replied   => ApiTriggerOutcome::replied($requestId, $start->reply),
+            InboundRunStartStatus::Accepted  => ApiTriggerOutcome::accepted($requestId),
+        };
     }
 
     /**

@@ -10,20 +10,16 @@ use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
-use App\Domains\Flow\Contracts\FlowEngineInterface;
-use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
-use App\Domains\Flow\DTOs\FlowRunOrigin;
-use App\Domains\Flow\Services\ContactChannelProbe;
 use App\Domains\Flow\Services\ContactFlowStartCollision;
-use App\Domains\Flow\Services\FlowSessionTerminator;
+use App\Domains\Flow\Services\ContactFlowStarter;
+use App\Domains\Flow\Services\ContactFlowStartStatus;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Domains\Tenancy\Queue\StoppedTenantAction;
 use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Psr\Log\LoggerInterface;
@@ -37,7 +33,9 @@ use Throwable;
  * target still has an active definition, the contact still has a channel on an active channel of the target's
  * assistant, and the contact is not busy ({@see ContactFlowStartCollision}). Stale live conversations are ended before
  * the new one starts. A start key already used — a repeated step, a retried job, a racing duplicate caught by the
- * unique `start_key` — starts nothing. None of these outcomes is an exception: repeating would not change them.
+ * unique `start_key` — starts nothing. None of these outcomes is an exception: repeating would not change them. The
+ * start under the lock is {@see ContactFlowStarter}'s, shared with the event start; this job keeps the lookups before
+ * it and the logging after it.
  *
  * Like an event start, the target's access policy (public/auth) is not applied: the author wired the node explicitly.
  */
@@ -84,11 +82,7 @@ final class StartFlowForContactJob implements ShouldQueue, TenantAccessGatedJob
         ContactServiceInterface $contacts,
         AssistantRepositoryInterface $assistants,
         CurrentAssistantInterface $currentAssistant,
-        ContactChannelProbe $channels,
-        ContactFlowStartCollision $collision,
-        FlowSessionTerminator $terminator,
-        FlowEngineInterface $engine,
-        FlowExecutionGuardInterface $guard,
+        ContactFlowStarter $starter,
         LoggerInterface $logger,
     ): void {
         $tenant = $tenants->findById($this->tenantId);
@@ -104,11 +98,7 @@ final class StartFlowForContactJob implements ShouldQueue, TenantAccessGatedJob
             $contacts,
             $assistants,
             $currentAssistant,
-            $channels,
-            $collision,
-            $terminator,
-            $engine,
-            $guard,
+            $starter,
             $logger,
         ): void {
             if (null !== $sessions->findByStartKey($this->startKey)) {
@@ -145,60 +135,32 @@ final class StartFlowForContactJob implements ShouldQueue, TenantAccessGatedJob
             $assistantId = (string) $assistant->getKey();
             $currentAssistant->set($assistant);
 
-            // Outside the routing pipeline: claim the contact's session lock so the start cannot race an inbound
+            // Outside the routing pipeline: the start takes the contact's session lock, so it cannot race an inbound
             // message, or a second job, for the same contact and assistant.
-            $guard->run(
-                tenantId: $this->tenantId,
-                contactId: (string) $contact->getKey(),
+            $outcome = $starter->start(
+                guardTenantId: $this->tenantId,
+                contact: $contact,
                 assistantId: $assistantId,
-                callback: function () use ($definition, $contact, $assistantId, $sessions, $channels, $collision, $terminator, $engine, $logger): void {
-                    if (null !== $sessions->findByStartKey($this->startKey)) {
-                        return;
-                    }
-
-                    $thread = $channels->deliveryThread($this->tenantId, (string) $contact->getKey(), $assistantId);
-
-                    if (null === $thread) {
-                        $logger->info('flow.start_for_contact.no_channel', $this->logContext());
-
-                        return;
-                    }
-
-                    $verdict = $collision->assess($thread, $this->busyWindowMinutes, $this->askingSessionId);
-
-                    if ($verdict->isBusy()) {
-                        $logger->info('flow.start_for_contact.busy', [...$this->logContext(), 'reason' => $verdict->busyReason]);
-
-                        return;
-                    }
-
-                    foreach ($verdict->stale as $stale) {
-                        $terminator->terminate($stale);
-                    }
-
-                    try {
-                        $session = $engine->start(
-                            $definition,
-                            $contact,
-                            ['flow' => $this->input],
-                            FlowRunOrigin::conversation(chainDepth: $this->chainDepth, startKey: $this->startKey),
-                        );
-                    } catch (UniqueConstraintViolationException $exception) {
-                        // A duplicate of this start won the race past the lock (its TTL lapsed): it started once.
-                        if (null !== $sessions->findByStartKey($this->startKey)) {
-                            return;
-                        }
-
-                        throw $exception;
-                    }
-
-                    $logger->info('flow.start_for_contact.started', [
-                        ...$this->logContext(),
-                        'session_id'  => (string) $session->getKey(),
-                        'ended_stale' => count($verdict->stale),
-                    ]);
-                },
+                definition: $definition,
+                initialState: ['flow' => $this->input],
+                chainDepth: $this->chainDepth,
+                startKey: $this->startKey,
+                busyWindowMinutes: $this->busyWindowMinutes,
+                askingSessionId: $this->askingSessionId,
             );
+
+            match ($outcome->status) {
+                ContactFlowStartStatus::NoChannel => $logger->info('flow.start_for_contact.no_channel', $this->logContext()),
+                ContactFlowStartStatus::Busy      => $logger->info('flow.start_for_contact.busy', [...$this->logContext(), 'reason' => $outcome->busyReason]),
+                ContactFlowStartStatus::Started   => $logger->info('flow.start_for_contact.started', [
+                    ...$this->logContext(),
+                    'session_id'  => (string) $outcome->session?->getKey(),
+                    'ended_stale' => $outcome->endedStale,
+                ]),
+                ContactFlowStartStatus::Duplicate,
+                ContactFlowStartStatus::NotAdmitted,
+                ContactFlowStartStatus::RaceLost => null,
+            };
         });
     }
 

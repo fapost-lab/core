@@ -11,10 +11,12 @@ use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Enums\ConversationOwner;
 use App\Domains\Conversation\Models\Conversation;
+use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Services\ContactFlowStartCollision;
 use App\Jobs\Flow\StartFlowFromEventJob;
 use Illuminate\Contracts\Queue\Job as QueueJob;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,7 +24,11 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use ReflectionClass;
+use Stringable;
+use Tests\Feature\Domains\Flow\StartFlow\RacingStartKeyRepository;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -42,9 +48,23 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
 
     private string $flowId;
 
+    /** @var object{records: list<array{message: string, context: array<mixed>}>} */
+    private object $logger;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->logger = new class () extends AbstractLogger {
+            /** @var list<array{message: string, context: array<mixed>}> */
+            public array $records = [];
+
+            public function log($level, string|Stringable $message, array $context = []): void
+            {
+                $this->records[] = ['message' => (string) $message, 'context' => $context];
+            }
+        };
+        $this->app->instance(LoggerInterface::class, $this->logger);
 
         $this->assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
         $this->contact   = Contact::factory()->forTenant(self::TENANT_ID)->create(['external_id' => 'chat-1']);
@@ -85,6 +105,9 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
         $this->assertSame(EndStatus::Success->value, $session->end_status);
         $this->assertSame(['amount' => 42, 'currency' => 'USD'], $session->state['flow']['event'] ?? null);
         $this->assertStringStartsWith('event:', (string) $session->start_key);
+        $this->assertCount(1, $this->logged('flow.event.started'));
+        $this->assertSame((string) $session->getKey(), $this->logged('flow.event.started')[0]['session_id']);
+        $this->assertSame([], $this->logged('flow.event.start_duplicate'));
     }
 
     public function test_does_nothing_when_flow_is_not_active(): void
@@ -103,8 +126,11 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
         $triggerId = (string) Str::uuid();
 
         $this->runJob($this->job(triggerId: $triggerId, eventId: 'event-1'));
+        $this->assertSame([], $this->logged('flow.event.start_duplicate'));
+
         $this->runJob($this->job(triggerId: $triggerId, eventId: 'event-1'));
 
+        $this->assertCount(1, $this->logged('flow.event.start_duplicate'));
         $this->assertSame(1, $this->startedSessions()->count());
         $this->assertSame(
             'event:' . hash('sha256', $triggerId . ':event:event-1'),
@@ -134,6 +160,7 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
 
         $this->assertSame(0, $this->startedSessions()->count());
         $this->assertSame(FlowSessionStatus::WaitingInput, $live->refresh()->status, 'The operator\'s conversation is untouched.');
+        $this->assertBusyBecause(ContactFlowStartCollision::REASON_OPERATOR);
     }
 
     public function test_a_conversation_that_moved_within_the_window_starts_nothing(): void
@@ -144,6 +171,7 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
 
         $this->assertSame(0, $this->startedSessions()->count());
         $this->assertSame(FlowSessionStatus::WaitingInput, $live->refresh()->status);
+        $this->assertBusyBecause(ContactFlowStartCollision::REASON_CONVERSATION_MOVING);
     }
 
     public function test_a_stale_conversation_is_ended_and_replaced(): void
@@ -159,6 +187,7 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
             FlowSession::query()->where('contact_id', $this->contact->getKey())->whereIn('status', FlowSessionStatus::inFlightValues())->count(),
             'The contact is left with no second live conversation with the bot.',
         );
+        $this->assertSame(1, $this->logged('flow.event.started')[0]['ended_stale']);
     }
 
     public function test_a_conversation_asleep_in_a_delay_is_never_ended_by_an_event(): void
@@ -169,6 +198,7 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
 
         $this->assertSame(0, $this->startedSessions()->count());
         $this->assertSame(FlowSessionStatus::Paused, $sleeping->refresh()->status);
+        $this->assertBusyBecause(ContactFlowStartCollision::REASON_CONVERSATION_SCHEDULED);
     }
 
     public function test_the_conversation_that_emitted_the_event_is_never_ended_by_it(): void
@@ -179,6 +209,7 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
 
         $this->assertSame(0, $this->startedSessions()->count());
         $this->assertSame(FlowSessionStatus::WaitingInput, $emitter->refresh()->status);
+        $this->assertBusyBecause(ContactFlowStartCollision::REASON_OWN_CONVERSATION);
     }
 
     public function test_an_emitting_conversation_that_has_ended_does_not_hold_the_start(): void
@@ -208,6 +239,36 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
         $this->runJob($this->job());
 
         $this->assertSame(0, FlowSession::query()->where('contact_id', $this->contact->getKey())->count());
+        $this->assertCount(1, $this->logged('flow.event.start_skipped_no_channel'));
+        $this->assertSame([], $this->logged('flow.event.started'));
+    }
+
+    public function test_a_duplicate_that_won_the_race_past_the_lock_is_a_quiet_exit(): void
+    {
+        $triggerId = (string) Str::uuid();
+        $startKey  = 'event:' . hash('sha256', $triggerId . ':event:event-1');
+
+        // The duplicate's row lands between this job's look-ups and its insert.
+        $real = $this->app->make(FlowSessionRepositoryInterface::class);
+        $this->app->instance(FlowSessionRepositoryInterface::class, new RacingStartKeyRepository($real, function () use ($startKey): void {
+            $definition = FlowDefinition::query()->where('flow_id', $this->flowId)->sole();
+            FlowSession::query()->create([
+                'tenant_id'          => self::TENANT_ID,
+                'assistant_id'       => $this->assistant->getKey(),
+                'contact_id'         => $this->contact->getKey(),
+                'flow_definition_id' => $definition->getKey(),
+                'flow_version'       => 1,
+                'state'              => [],
+                'status'             => FlowSessionStatus::Completed,
+                'start_key'          => $startKey,
+                'version'            => 1,
+            ]);
+        }));
+
+        $this->runJob($this->job(triggerId: $triggerId, eventId: 'event-1'));
+
+        $this->assertSame(1, FlowSession::query()->where('start_key', $startKey)->count());
+        $this->assertSame([], $this->logged('flow.event.started'));
     }
 
     public function test_a_job_queued_before_the_ids_existed_starts_once_keyed_by_its_own_id(): void
@@ -268,6 +329,28 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
         $job->setJob($queued);
 
         return $job;
+    }
+
+    /**
+     * The context of every record logged under the message.
+     *
+     * @return list<array<mixed>>
+     */
+    private function logged(string $message): array
+    {
+        return array_values(array_map(
+            static fn (array $record): array => $record['context'],
+            array_filter($this->logger->records, static fn (array $record): bool => $message === $record['message']),
+        ));
+    }
+
+    private function assertBusyBecause(string $reason): void
+    {
+        $busy = $this->logged('flow.event.start_skipped_busy');
+
+        $this->assertCount(1, $busy);
+        $this->assertSame($reason, $busy[0]['reason']);
+        $this->assertSame([], $this->logged('flow.event.started'));
     }
 
     private function runJob(StartFlowFromEventJob $job): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Flow\Api\ApiTriggerConfig;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
@@ -394,9 +395,13 @@ final readonly class ValidateFlowService
         foreach ($triggers as $trigger) {
             $config = is_array($trigger) && is_array($trigger['config'] ?? null) ? $trigger['config'] : [];
 
-            if (is_array($trigger)
-                && in_array($trigger['type'] ?? null, [FlowTriggerType::Webhook->value, FlowTriggerType::Api->value], true)
-                && WebhookTriggerConfig::RESPONSE_SYNC === ($config['response_mode'] ?? null)) {
+            $syncMode = is_array($trigger) ? match ($trigger['type'] ?? null) {
+                FlowTriggerType::Webhook->value => WebhookTriggerConfig::RESPONSE_SYNC,
+                FlowTriggerType::Api->value     => ApiTriggerConfig::RESPONSE_SYNC,
+                default                         => null,
+            } : null;
+
+            if (null !== $syncMode && $syncMode === ($config['response_mode'] ?? null)) {
                 return;
             }
         }

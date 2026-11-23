@@ -108,7 +108,9 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   depth and the collision (`Services/ContactFlowStartCollision`), then queues `StartFlowForContactJob`
   (`scheduled.triggers`) through `ContactFlowStartDispatcherInterface`; the job re-checks under the contact's lock,
   ends stale conversations (`Services/FlowSessionTerminator`, shared with the global commands) and calls
-  `FlowEngine::start()` with a unique `start_key` (`adr-20261123-start-flow-for-contact`).
+  `FlowEngine::start()` with a unique `start_key` (`adr-20261123-start-flow-for-contact`). That sequence under the
+  lock is `Services/ContactFlowStarter`, shared with `StartFlowFromEventJob` (which adds run admission as a hook
+  after the collision check); the jobs keep their own lookups and log lines.
 - Engine navigation: `FlowSessionPersister::persist()` maps results to session columns (`Executed` →
   next node or completed, `Waiting` → `waiting_input`, `Delayed` → `paused` when it carries `resumeAt`, else `waiting_input`, `Failed`, `Finished`), `persistEnd()` closes
   the session with an `end_status`; all writes use the optimistic lock on `flow_sessions.version`.
@@ -146,7 +148,8 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   (`adr-20261119-flow-webhook-trigger`).
 - API triggers: `POST /api/v1/flow-triggers/{trigger}/runs` (`routes/api.php`, the `api-token` stack) →
   `Http/Controllers/Flow/FlowApiTriggerController` (`StartFlowRuns` by value) → `Api/FlowApiTriggerReceiver` (JSON
-  object, `Services/LiveTriggerLookup` — shared with the webhook — `Api/ApiFireKey`, the webhook's dedup) →
+  object, `Services/LiveTriggerLookup` — shared with the webhook — `Api/ApiFireKey`) → `Webhook/InboundRunStarter`
+  (the tail both inbound receivers share: dedup claim, kept answer of a duplicate, dispatch, `sync` wait) →
   `StartAutomationRunJob` with the call under `flow.api`, 202; `response_mode: sync` waits through
   `Webhook/WebhookSyncWait` like a webhook (`Webhook/InboundFireKey` tells both kinds of run apart).
 - Events: `StartFlowFromEventJob` (queue `scheduled.triggers`) and `DispatchFlowTriggerEventJob`; a flow event's start
