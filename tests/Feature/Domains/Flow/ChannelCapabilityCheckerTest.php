@@ -127,6 +127,17 @@ final class ChannelCapabilityCheckerTest extends FeatureTestCase
         ]));
     }
 
+    public function test_an_ask_person_question_needs_callback_buttons_it_can_remove(): void
+    {
+        $this->channel('plain', [ChannelCapability::ReplyButtons]);
+
+        $warnings = $this->check([['id' => 'q', 'type' => 'ask_person', 'config' => ['buttons' => [['id' => 'b1', 'label' => 'Yes']]]]]);
+
+        $this->assertSame(['nodes.q', 'nodes.q'], array_map(static fn ($warning): string => $warning->path, $warnings));
+        $this->assertStringContainsString('send a press back to the flow', $warnings[0]->message);
+        $this->assertStringContainsString('cannot remove buttons', $warnings[1]->message);
+    }
+
     public function test_dynamic_buttons_count_as_buttons(): void
     {
         $this->channel('plain');

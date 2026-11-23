@@ -536,6 +536,10 @@ have no contact of their own, as well as in conversations. The block sets:
 - **Late answer text**, optional. See below.
 - **Save the answer to**, optional: a variable that receives the pressed button's value.
 
+The question goes out with inline buttons that are removed after the answer, so it
+needs a channel that can show and remove them; validation warns when one of the
+assistant's channels cannot.
+
 The block has one exit per button, plus `timeout` and `error`. `error` is taken when
 the addressee gives no contact id, when the run has no assistant or channel to send
 through, when the message could not be sent, or when the question was lost.

@@ -12,8 +12,8 @@ use InvalidArgumentException;
 /**
  * Reads the state paths a node writes, as dotted strings (`flow.x`, `contact.group.x`), from every config shape of the
  * nodes that save a value: `input`, `assign` (operations and the legacy `target` / `key` form), `send_message`
- * (`save_to_variable`, legacy `save_to`), `call` (`save_to_variable`, `save_response_to`, `result_mapping`) and `subflow`
- * (`output_mapping` keys). A `loop` node's own counter is not here: it belongs to the loop, and each checker decides
+ * (`save_to_variable`, legacy `save_to`), `ask_person` (`save_to_variable`), `call` (`save_to_variable`,
+ * `save_response_to`, `result_mapping`) and `subflow` (`output_mapping` keys). A `loop` node's own counter is not here: it belongs to the loop, and each checker decides
  * how to treat it. Shared by {@see LoopConfigChecker} and {@see VariablePathConflictChecker}.
  */
 final readonly class NodeWriteCollector
@@ -62,6 +62,10 @@ final readonly class NodeWriteCollector
             case 'send_message':
                 $add($config['save_to_variable'] ?? null);
                 $paths = [...$paths, ...$this->legacyPath($config['save_to'] ?? null)];
+
+                break;
+            case 'ask_person':
+                $add($config['save_to_variable'] ?? null);
 
                 break;
             case 'call':

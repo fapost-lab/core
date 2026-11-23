@@ -10,6 +10,7 @@ use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowLog;
+use App\Domains\Flow\Models\FlowQuestion;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
 use App\Domains\Flow\Retention\AutomationRunPruner;
@@ -311,6 +312,21 @@ final class AutomationRunPrunerTest extends FeatureTestCase
         $this->assertSame(3, FlowSessionHistoryEntry::query()->where('session_id', $kept->getKey())->count());
     }
 
+    public function test_an_ask_person_question_goes_with_its_pruned_run_and_stays_with_the_kept_one(): void
+    {
+        $gone = $this->flowRun(FlowRunKind::Automation, FlowSessionStatus::Failed, $this->now->subDays(40));
+        $kept = $this->flowRun(FlowRunKind::Automation, FlowSessionStatus::Failed, $this->now->subDays(10));
+
+        foreach ([$gone, $kept] as $session) {
+            $this->question($session);
+        }
+
+        $this->assertSame(1, $this->pruner()->prune($this->tenantId, ...$this->cutoffs()));
+
+        $this->assertSame(0, FlowQuestion::query()->where('session_id', $gone->getKey())->count());
+        $this->assertSame(1, FlowQuestion::query()->where('session_id', $kept->getKey())->count());
+    }
+
     public function test_a_dry_run_counts_exactly_what_the_run_then_deletes(): void
     {
         $this->flowRun(FlowRunKind::Automation, FlowSessionStatus::Completed, $this->now->subDays(10));
@@ -414,6 +430,21 @@ final class AutomationRunPrunerTest extends FeatureTestCase
             'event_type' => 'state_change',
             'path'       => 'flow.x',
             'created_at' => $this->now,
+        ]);
+    }
+
+    private function question(FlowSession $session): void
+    {
+        FlowQuestion::query()->create([
+            'tenant_id'     => $session->tenant_id,
+            'token'         => Str::random(32),
+            'session_id'    => $session->getKey(),
+            'node_id'       => 'ask',
+            'execution_key' => 'ask:1',
+            'contact_id'    => Contact::factory()->forTenant($this->tenantId)->create()->getKey(),
+            'buttons'       => [['id' => (string) Str::uuid(), 'value' => 'yes']],
+            'status'        => 'expired',
+            'expires_at'    => $this->now->subDays(40),
         ]);
     }
 

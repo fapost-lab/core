@@ -217,6 +217,7 @@ final readonly class FlowGraphStructureValidator
         return match ($node['type'] ?? null) {
             'input'        => $this->inputErrors($nodeId, $config),
             'send_message' => $this->sendMessageErrors($nodeId, $config),
+            'ask_person'   => $this->askPersonErrors($nodeId, $config),
             'assign'       => $this->assignErrors($nodeId, $config),
             'branch'       => $this->branchRuleErrors($nodeId, $config),
             default        => [],
@@ -267,6 +268,28 @@ final readonly class FlowGraphStructureValidator
         }
 
         if (! $hasNew) {
+            return [];
+        }
+
+        return $this->variableShapeErrors(
+            $nodeId,
+            $config['save_to_variable'],
+            'save_to_variable',
+            'config.save_to_variable',
+            unsetAllowed: true,
+        )[1];
+    }
+
+    /**
+     * The answer's variable has the same shape as a `send_message` one; the node has no legacy form.
+     *
+     * @param  array<string, mixed>  $config
+     *
+     * @return list<FlowValidationErrorDto>
+     */
+    private function askPersonErrors(string $nodeId, array $config): array
+    {
+        if (! is_array($config['save_to_variable'] ?? null)) {
             return [];
         }
 
@@ -476,8 +499,8 @@ final readonly class FlowGraphStructureValidator
     /**
      * A variable object with no name is "no save target": the runtime reads it as such and does not fail
      * (`Variable::tryFromArray()` returns null), and the builder keeps `{type, storage}` defaults in a draft the
-     * author has not filled in yet. Where `$unsetAllowed` (`input`, `send_message`, branch rules) that is not an
-     * error here: an `input` without a target is `input_missing_save_target` in `ValidateFlowService`. An `assign`
+     * author has not filled in yet. Where `$unsetAllowed` (`input`, `send_message`, `ask_person`, branch rules) that is
+     * not an error here: an `input` without a target is `input_missing_save_target` in `ValidateFlowService`. An `assign`
      * operation without a target throws at runtime, so there it stays invalid. A name with no storage is always
      * invalid: the author meant to save the value, and it would be dropped.
      *
