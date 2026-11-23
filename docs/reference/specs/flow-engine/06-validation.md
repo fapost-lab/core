@@ -184,6 +184,7 @@ actual number. A limit a channel leaves `null` is not checked. What is counted m
 | `send_message` `text_with_keyboard` with static `buttons` | total; the longest row (buttons grouped by `row`, default 0); the longest label over every translation. A label containing `{{` is skipped: its length is known only after rendering |
 | same, with `dynamic_buttons` (replace the static buttons at runtime) | only `max_per_row` (default 2) against the row limit; the count is known only at runtime |
 | `input` expecting `select` or `confirm` | the same as static `buttons`; labels are not templated there, so none is skipped |
+| `ask_person` `buttons` | total; one button to a row, as the handler sends them; the longest label, skipping a templated one as for `send_message` |
 
 ## Publish-time checks (`PublishFlowService`)
 

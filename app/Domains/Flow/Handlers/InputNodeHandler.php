@@ -205,6 +205,8 @@ final class InputNodeHandler extends AbstractVersionedHandler
                 'content_type' => 'text',
                 'text'         => $text,
             ];
+        $payload['node_id']         = $context->nodeId;
+        $payload['idempotency_key'] = $context->idempotencyKey;
 
         $externalMessageId = $this->sender->send(
             tenantId: $context->tenantId,
@@ -290,8 +292,10 @@ final class InputNodeHandler extends AbstractVersionedHandler
                         'order'   => 0,
                     ],
                 ],
-                'keyboard_mode' => 'reply',
-                'session_id'    => $context->sessionId,
+                'keyboard_mode'   => 'reply',
+                'session_id'      => $context->sessionId,
+                'node_id'         => $context->nodeId,
+                'idempotency_key' => $context->idempotencyKey,
             ],
         );
 
@@ -422,6 +426,9 @@ final class InputNodeHandler extends AbstractVersionedHandler
             payload: [
                 'content_type' => 'text',
                 'text'         => $resolved,
+                'node_id'      => $context->nodeId,
+                // A key of its own: the hint never shares one with the prompt, whatever step sends it.
+                'idempotency_key' => 'hint:' . $context->idempotencyKey,
             ],
         );
     }

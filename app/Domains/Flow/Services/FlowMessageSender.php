@@ -30,6 +30,7 @@ use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Fapost\Foundation\Messaging\OutboundMessage;
+use InvalidArgumentException;
 use RuntimeException;
 
 final readonly class FlowMessageSender implements MessageSenderInterface
@@ -114,11 +115,22 @@ final readonly class FlowMessageSender implements MessageSenderInterface
     }
 
     /**
+     * The delivery key: the session, the sending node and the caller's key for this message. Both payload fields are
+     * required — a default would give every message of a session one key, and MessageSender would drop all but the
+     * first as duplicates.
+     *
      * @param  array<string, mixed>  $payload
      */
     private function idempotencyKey(string $sessionId, array $payload): string
     {
-        return "{$sessionId}:{$payload['node_id']}:{$payload['idempotency_key']}";
+        $nodeId = $payload['node_id'] ?? null;
+        $key    = $payload['idempotency_key'] ?? null;
+
+        if (! is_string($nodeId) || '' === $nodeId || ! is_string($key) || '' === $key) {
+            throw new InvalidArgumentException('A flow message needs a non-empty node_id and idempotency_key in its payload.');
+        }
+
+        return "{$sessionId}:{$nodeId}:{$key}";
     }
 
     /**

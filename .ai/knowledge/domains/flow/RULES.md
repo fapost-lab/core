@@ -266,6 +266,15 @@ broken.
   effect, in a separate step (`FlowEngine`), so a crash between the two repeats the effect on
   retry. Check a marker before acting, and rely on a downstream idempotency key where one exists
   (`MessageSender`'s `msg:sent:*`). *(inferred from the code; proposed as a rule)*
+- **Every payload a handler gives the flow `MessageSenderInterface` carries a non-empty `node_id`
+  and an `idempotency_key` that is stable across a retry and unique per message.** The default is the
+  node id and the step's `NodeExecutionContext::$idempotencyKey`; a message tied to a record uses the
+  record (`ask_person`'s `question:{id}`), and a second message one step may send (a hint) gets a key
+  of its own. `FlowMessageSender` keys the delivery `{session}:{node_id}:{idempotency_key}` and refuses
+  a payload without them. Why: a missing key once crashed every input and `auth_request@2` prompt,
+  and a default key would be worse — one key for the whole session, so `MessageSender` drops every
+  later message as a duplicate. Enforced for the input and `auth_request@2` prompts:
+  `FlowPromptDeliveryKeysTest` (engine, real `FlowMessageSender`).
 - **A `call` node's `CallContext::$idempotencyKey` is the engine's execution key plus the node id**
   (`CallNodeHandler::executionKey()`), never `{session}:{node}`. Why: that value repeats on every
   loop pass, so a transport or receiver deduplicating by it (`HttpTransport` sends it as
