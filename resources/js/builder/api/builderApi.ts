@@ -1,4 +1,4 @@
-import type {BuilderTrigger, FlowDefinition, NodeGroup, NodeTypePayload, ReadOnlyNotice, StateNamespaceEntry, ValidationResult, WebhookEndpointInfo,} from '@builder/dto/types'
+import type {BuilderMode, BuilderTrigger, FlowDefinition, NodeGroup, NodeTypePayload, ReadOnlyNotice, StateNamespaceEntry, ValidationResult, WebhookEndpointInfo,} from '@builder/dto/types'
 import {xsrfHeaders} from '@shared/http'
 
 const BASE = '/builder'
@@ -108,6 +108,10 @@ export const fetchCredentialOptions = (): Promise<CredentialOption[]> =>
 export const fetchAssistantOptions = (): Promise<SelectOption[]> =>
     request<{ data: SelectOption[] }>('GET', '/assistants').then((r) => r.data)
 
+/** Tenant contact segments for the send_message node (segment addressee) picker. */
+export const fetchSegmentOptions = (): Promise<SelectOption[]> =>
+    request<{ data: SelectOption[] }>('GET', '/segments').then((r) => r.data)
+
 export const saveDraft = (
     flowId: string,
     definition: FlowDefinition,
@@ -158,3 +162,7 @@ export const setWebhookSecret = (flowId: string, triggerId: string, secret: stri
 
 export const generateWebhookSecret = (flowId: string, triggerId: string): Promise<WebhookSecretResult> =>
     setWebhookSecret(flowId, triggerId)
+
+/** Stores the layout the signed-in staff user works in, so every flow opens in it next time. */
+export const saveBuilderMode = (mode: BuilderMode): Promise<{ builder_mode: BuilderMode }> =>
+    request<{ builder_mode: BuilderMode }>('PUT', '/preferences', { builder_mode: mode })

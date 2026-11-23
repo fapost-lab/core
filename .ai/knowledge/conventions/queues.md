@@ -10,7 +10,7 @@ paths:
   - "app/Domains/Broadcasting/**"
   - "app/Domains/Messaging/**"
 summary: Queues are split by purpose (flow.execution, messaging.*, scheduled.triggers, sync.external); rate limits and backpressure are preventive, not reactive.
-reviewed_at: 2026-11-18
+reviewed_at: 2026-11-23
 ---
 # Messaging and queues
 
@@ -27,7 +27,7 @@ messaging.transactional - replies in an active dialogue
 messaging.broadcast    - low-priority broadcasts / fan-out
 messaging.system       - service notifications
 messaging.logging      - conversation capture, written outside the delivery path
-scheduled.triggers     - scheduled/event trigger fan-out
+scheduled.triggers     - event trigger fan-out (schedule slots are claimed by a minute command; their runs go to flow.automations)
 flow.automations       - automation runs: their start and each execution segment
 sync.external          - external synchronisations
 ```
@@ -48,7 +48,7 @@ Queue assignment by purpose, as it exists in the codebase today:
 
 - `flow.execution`: `app/Jobs/Flow/ResumeDelayedFlowSessionJob.php`,
   `app/Jobs/Flow/ResumeTimedOutSendMessageNodeJob.php`, `ExpireOperatorRequestJob.php`,
-  `ContinueAfterOperatorRequestJob.php`, and the webhook controller's initial
+  `ContinueAfterOperatorRequestJob.php`, `ContinueAfterFlowQuestionJob.php`, and the webhook controller's initial
   dispatch (`app/Domains/Webhook/Http/WebhookController.php`). Flow replies are sent inline inside
   these jobs, not through a separate queue.
 - `messaging.transactional`: reserved like `sync.external` — no job targets it. A reply delivered
@@ -58,6 +58,7 @@ Queue assignment by purpose, as it exists in the codebase today:
   `app/Domains/Contact/Jobs/SendContactNotificationJob.php` (line 61): it is a service
   notification that runs on the low-priority broadcast queue.
 - `messaging.system`: `app/Jobs/Messaging/SyncChannelWebhookJob.php`,
+  `app/Jobs/Flow/SendOneTimeCodeJob.php` (the encrypted one-time code of an `auth_request` node),
   `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,
   `app/Domains/Staff/Jobs/SendLimitNoticeJob.php`,
   `app/Domains/Conversation/Jobs/NotifyOperatorRequestJob.php`,
@@ -67,7 +68,7 @@ Queue assignment by purpose, as it exists in the codebase today:
   most one job per assistant per 2 seconds otherwise (`FlowActivityNotifier`).
 - `messaging.logging`: `app/Domains/Conversation/Jobs/PersistConversationMessageJob.php`,
   `FetchConversationMediaJob.php`, `UpdateConversationDeliveryStatusJob.php`.
-- `scheduled.triggers`: `app/Jobs/Flow/StartFlowFromEventJob.php` and `DispatchFlowTriggerEventJob`
+- `scheduled.triggers`: `app/Jobs/Flow/StartFlowFromEventJob.php`, `DispatchFlowTriggerEventJob` and `StartFlowForContactJob`
   (queued through `app/Domains/Flow/Events/QueuedFlowTriggerEventPublisher.php`), and `FireRegisteredTriggerJob`
   (queued through `app/Domains/Flow/TriggerTypes/QueuedTriggerFirer.php`).
 - `flow.automations`: `app/Jobs/Flow/StartAutomationRunJob.php` and `ContinueAutomationRunJob.php` (an automation

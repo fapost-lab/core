@@ -420,6 +420,30 @@ final class NodeTraceRecordingTest extends FeatureTestCase
         $this->assertSameJson(['message' => ['type' => 'text', 'text' => 'hello']], $completed['input']);
     }
 
+    public function test_what_a_contact_types_to_an_auth_request_never_reaches_the_trace(): void
+    {
+        Config::set('flow.trace.payloads', true);
+        $this->app->make(NodeHandlerRegistry::class)->register(AuthRequestTraceProbeTestHandler::class);
+
+        $definition = $this->definition([['id' => 'auth', 'type' => 'auth_request', 'version' => AuthRequestTraceProbeTestHandler::VERSION, 'config' => []]], []);
+        $engine     = $this->app->make(FlowEngineInterface::class);
+        $session    = $engine->start($definition, $this->contact(), [], FlowRunOrigin::automation());
+
+        $session = $engine->resume($session, new IncomingMessage(
+            updateId: 'u1',
+            externalUserId: 'ext',
+            externalChatId: 'chat',
+            text: '482913',
+            type: IncomingMessageType::Text,
+            platform: 'telegram',
+        ));
+
+        $completed = $this->rows($session)->last()->metadata;
+
+        $this->assertSameJson(['message' => ['type' => 'text']], $completed['input']);
+        $this->assertStringNotContainsString('482913', (string) json_encode($this->rows($session)->pluck('metadata')->all()));
+    }
+
     public function test_deleting_a_contact_deletes_the_trace_rows_of_its_sessions(): void
     {
         $contact = $this->contact();
@@ -575,5 +599,51 @@ final class TraceProbeTestHandler implements NodeHandlerInterface
             ),
             default => NodeExecutionResult::executed(),
         };
+    }
+}
+
+/**
+ * Stands in for `auth_request` at a version of its own: waits, then completes on the next message.
+ */
+final class AuthRequestTraceProbeTestHandler implements NodeHandlerInterface
+{
+    public const int VERSION = 99;
+
+    public function type(): string
+    {
+        return 'auth_request';
+    }
+
+    public function version(): int
+    {
+        return self::VERSION;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function supportedVersions(): array
+    {
+        return [self::VERSION];
+    }
+
+    public function label(): string
+    {
+        return 'Auth request probe';
+    }
+
+    public function category(): string
+    {
+        return 'Contact';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return null === $context->incoming ? NodeExecutionResult::waiting() : NodeExecutionResult::executed();
     }
 }

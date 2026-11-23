@@ -24,6 +24,11 @@ interface FlowSessionRepositoryInterface
     public function findByFireKey(string $triggerId, string $fireKey): ?FlowSession;
 
     /**
+     * The conversation a `start_flow` node already started under this key, if any — `start_key` is unique.
+     */
+    public function findByStartKey(string $startKey): ?FlowSession;
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     public function create(array $attributes): FlowSession;

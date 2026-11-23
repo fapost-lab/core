@@ -13,6 +13,7 @@ use App\Domains\Conversation\Events\OperatorRequestStateChanged;
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Events\CoreEventCatalog;
 use App\Domains\Flow\Listeners\PublishCoreEvents;
+use App\Domains\Flow\Services\EventChainContext;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -62,6 +63,24 @@ final class PublishCoreEventsTest extends TestCase
         ]);
     }
 
+    /**
+     * The publisher counts one more than the chain context, so a broadcast a flow started at depth 4 (chain depth 5)
+     * publishes at 5 and one started at depth 5 (chain depth 6) past the limit; a console broadcast (0) publishes at 1.
+     */
+    public function test_broadcast_completed_is_published_one_below_the_broadcasts_own_chain_depth(): void
+    {
+        $chain     = new EventChainContext();
+        $publisher = new RecordingCorePublisher(chain: $chain);
+        $listener  = new PublishCoreEvents($publisher, new RecordingExceptionHandler(), $chain);
+
+        $listener->broadcastCompleted(new BroadcastCompleted('t-1', 'b-1', 'Promo', 1, 1, 0));
+        $listener->broadcastCompleted(new BroadcastCompleted('t-1', 'b-2', 'Promo', 1, 1, 0, 5));
+        $listener->broadcastCompleted(new BroadcastCompleted('t-1', 'b-3', 'Promo', 1, 1, 0, 6));
+
+        $this->assertSame([0, 4, 5], array_column($publisher->calls, 'depth'));
+        $this->assertSame(0, $chain->current(), 'the listener leaves the chain context as it found it');
+    }
+
     public function test_a_timed_out_operator_request_is_published(): void
     {
         $publisher = new RecordingCorePublisher();
@@ -93,7 +112,7 @@ final class PublishCoreEventsTest extends TestCase
         $publisher = new RecordingCorePublisher($failure);
         $reporter  = new RecordingExceptionHandler();
 
-        (new PublishCoreEvents($publisher, $reporter))->contactCreated(new ContactCreated('t-1', 'c-1', 'telegram', 'en'));
+        (new PublishCoreEvents($publisher, $reporter, new EventChainContext()))->contactCreated(new ContactCreated('t-1', 'c-1', 'telegram', 'en'));
 
         $this->assertSame([$failure], $reporter->reported);
     }
@@ -113,17 +132,19 @@ final class PublishCoreEventsTest extends TestCase
 
     private function listener(RecordingCorePublisher $publisher): PublishCoreEvents
     {
-        return new PublishCoreEvents($publisher, new RecordingExceptionHandler());
+        return new PublishCoreEvents($publisher, new RecordingExceptionHandler(), new EventChainContext());
     }
 }
 
 final class RecordingCorePublisher implements FlowTriggerEventPublisherInterface
 {
-    /** @var list<array{tenant: string, name: string, payload: array<string, mixed>, source: array<string, mixed>}> */
+    /** @var list<array{tenant: string, name: string, payload: array<string, mixed>, source: array<string, mixed>, depth: int|null}> */
     public array $calls = [];
 
-    public function __construct(private readonly ?Throwable $failure = null)
-    {
+    public function __construct(
+        private readonly ?Throwable $failure = null,
+        private readonly ?EventChainContext $chain = null,
+    ) {
     }
 
     public function publish(string $tenantId, string $eventName, array $payload, array $source): void
@@ -132,7 +153,7 @@ final class RecordingCorePublisher implements FlowTriggerEventPublisherInterface
             throw $this->failure;
         }
 
-        $this->calls[] = ['tenant' => $tenantId, 'name' => $eventName, 'payload' => $payload, 'source' => $source];
+        $this->calls[] = ['tenant' => $tenantId, 'name' => $eventName, 'payload' => $payload, 'source' => $source, 'depth' => $this->chain?->current()];
     }
 }
 

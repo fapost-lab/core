@@ -99,6 +99,12 @@ enum Permission: string
     case StartFlowRuns = 'start_flow_runs';
 
     /**
+     * Runs a failed automation run again from the start, with the trigger payload it started with: every outgoing call
+     * and message of the flow is sent again.
+     */
+    case RerunFlow = 'rerun_flow';
+
+    /**
      * Enum cases grouped by their logical UI group.
      *
      * @return array<string, list<self>>
@@ -187,8 +193,10 @@ enum Permission: string
             // Mints credentials that outlive their issuer and reach the whole tenant.
             self::ManageApiTokens,
             // Lets an outside system start runs.
-            self::StartFlowRuns => true,
-            default             => false,
+            self::StartFlowRuns,
+            // Sends a run's calls to outside systems and its messages to people a second time.
+            self::RerunFlow => true,
+            default         => false,
         };
     }
 
@@ -235,7 +243,8 @@ enum Permission: string
             self::ManageCredentials,
             self::UseCredentials,
             self::ViewRunPayloads,
-            self::StartFlowRuns => 'automations',
+            self::StartFlowRuns,
+            self::RerunFlow => 'automations',
         };
     }
 

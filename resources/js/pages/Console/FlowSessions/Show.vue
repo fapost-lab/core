@@ -5,12 +5,13 @@ export default { layout: AppShell }
 </script>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Head, Link, usePage } from '@inertiajs/vue3'
-import { ArrowLeft, FileText, Workflow } from '@lucide/vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { Head, Link, router, usePage } from '@inertiajs/vue3'
+import { ArrowLeft, FileText, RotateCcw, Workflow } from '@lucide/vue'
 import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fapost/ui/components/card'
+import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
 import type { LiveChannel } from '@console/lib/live-updates'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { useLiveUpdates } from '@console/lib/useLiveUpdates'
@@ -18,29 +19,104 @@ import { interpolate } from '@console/shell'
 import { templateNodeLabel } from './templateNode'
 import CopyButton from '../Contacts/CopyButton.vue'
 import LiveHint from './LiveHint.vue'
-import { END_STATUS_TONES, STATUS_TONES, type FlowSessionDetails, type FlowSessionsPageProps, type HistoryEntry, type KeyValue } from './types'
+import {
+  END_STATUS_TONES,
+  RUNNING_STATUSES,
+  STATUS_TONES,
+  type FlowSessionDetails,
+  type FlowSessionsPageProps,
+  type HistoryEntry,
+  type KeyValue,
+  type RerunOffer,
+  type RerunRow,
+  type RerunSource,
+} from './types'
 
 const props = defineProps<{
   session: FlowSessionDetails
   state: KeyValue[]
   history: HistoryEntry[] | null
+  rerun: RerunOffer | null
+  reruns: RerunRow[]
+  rerunOf: RerunSource | null
   live: LiveChannel | null
   urls: { index: string; graph: string; parent?: string; logs?: string }
 }>()
 
 const POLL_MS = 30_000
+/** How long the page keeps reloading after it queued a re-run, waiting for the new run to show up. */
+const AWAIT_RERUN_MS = 120_000
 /** Matches FlowSessionInspector::HISTORY_LIMIT. */
 const HISTORY_LIMIT = 200
 
 const page = usePage<FlowSessionsPageProps>()
 const t = computed(() => page.props.translations.console.flow_sessions)
+const form = computed(() => page.props.translations.console.form)
 
-// A finished session changes no more, so its page stops listening.
+const rerunOpen = ref(false)
+const rerunning = ref(false)
+/** Set for a while after a re-run was queued: the page keeps reloading until the new run is listed. */
+const awaitingRerun = ref(false)
+let awaitTimer: ReturnType<typeof setTimeout> | undefined
+
+function stopAwaiting(): void {
+  awaitingRerun.value = false
+  clearTimeout(awaitTimer)
+}
+
+// The new run is listed: nothing more to wait for.
+watch(() => props.reruns.length, (count, previous) => {
+  if (count > previous) {
+    stopAwaiting()
+  }
+})
+
+onBeforeUnmount(stopAwaiting)
+
+/** What the confirmation says: the warning that everything is sent again, and the version the re-run runs. */
+const rerunDescription = computed(() => {
+  const offer = props.rerun
+  if (!offer || offer.targetVersion === null) {
+    return ''
+  }
+
+  const description = interpolate(t.value.rerun.confirm_description, { version: offer.targetVersion })
+
+  return offer.targetVersion === props.session.flowVersion
+    ? description
+    : `${description} ${interpolate(t.value.rerun.version_changed, { source: props.session.flowVersion })}`
+})
+
+function rerunNow(): void {
+  if (!props.rerun?.allowed || rerunning.value) {
+    return
+  }
+
+  router.post(props.rerun.url, { attempt: props.rerun.attempt }, {
+    preserveScroll: true,
+    // Kept, so the page goes on waiting for the run it queued.
+    preserveState: true,
+    onStart: () => (rerunning.value = true),
+    onFinish: () => (rerunning.value = false),
+    onSuccess: () => {
+      // Refused, the offer says why and nothing is on its way.
+      if (!props.rerun?.allowed) {
+        return
+      }
+
+      stopAwaiting()
+      awaitingRerun.value = true
+      awaitTimer = setTimeout(stopAwaiting, AWAIT_RERUN_MS)
+    },
+  })
+}
+
+// A finished session changes no more, so its page stops listening — unless a re-run of it is on its way or still live.
 const { transport } = useLiveUpdates({
   live: () => props.live,
-  only: ['session', 'state', 'history'],
+  only: ['session', 'state', 'history', 'rerun', 'reruns'],
   pollMs: POLL_MS,
-  active: () => props.session.isLive,
+  active: () => props.session.isLive || awaitingRerun.value || props.reruns.some((row) => RUNNING_STATUSES.includes(row.status)),
 })
 
 function when(value: string | null): string | null {
@@ -78,7 +154,24 @@ function when(value: string | null): string | null {
               {{ t.view.logs }}
             </Link>
           </Button>
+          <Button
+            v-if="rerun"
+            variant="outline"
+            size="sm"
+            data-test="rerun"
+            :disabled="!rerun.allowed || rerunning"
+            :title="rerun.refusal ? t.rerun.refusals[rerun.refusal] : undefined"
+            @click="rerunOpen = true"
+          >
+            <RotateCcw aria-hidden="true" />
+            {{ t.rerun.action }}
+          </Button>
         </div>
+      </div>
+      <p v-if="rerun?.refusal" class="text-muted-foreground text-sm" data-test="rerun-refusal">{{ t.rerun.refusals[rerun.refusal] }}</p>
+      <div v-if="rerunOf" class="flex items-center gap-1 text-sm" data-test="rerun-of">
+        <span class="text-muted-foreground">{{ t.rerun.rerun_of }}</span>
+        <Link :href="rerunOf.url" class="font-mono hover:underline">{{ rerunOf.id }}</Link>
       </div>
     </div>
 
@@ -157,6 +250,22 @@ function when(value: string | null): string | null {
       </CardContent>
     </Card>
 
+    <Card v-if="reruns.length" data-test="reruns">
+      <CardHeader>
+        <CardTitle>{{ t.rerun.reruns }}</CardTitle>
+        <CardDescription>{{ t.rerun.reruns_description }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul class="flex flex-col divide-y">
+          <li v-for="row in reruns" :key="row.id" class="flex flex-wrap items-center gap-3 py-2 first:pt-0 last:pb-0">
+            <Link :href="row.url" class="font-mono text-sm hover:underline">{{ row.id }}</Link>
+            <StatusDot :tone="STATUS_TONES[row.status]">{{ t.statuses[row.status] }}</StatusDot>
+            <span v-if="row.createdAt" class="text-muted-foreground ml-auto text-xs" :title="row.createdAt">{{ when(row.createdAt) }}</span>
+          </li>
+        </ul>
+      </CardContent>
+    </Card>
+
     <Card>
       <CardHeader>
         <CardTitle>{{ t.view.state }}</CardTitle>
@@ -193,5 +302,15 @@ function when(value: string | null): string | null {
         <p v-else class="text-muted-foreground text-sm">{{ t.view.history_empty }}</p>
       </CardContent>
     </Card>
+
+    <ConfirmDialog
+      v-if="rerun?.allowed"
+      v-model:open="rerunOpen"
+      :title="t.rerun.confirm_title"
+      :description="rerunDescription"
+      :confirm-label="t.rerun.confirm"
+      :cancel-label="form.cancel"
+      @confirm="rerunNow"
+    />
   </div>
 </template>

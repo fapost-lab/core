@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
@@ -92,7 +93,7 @@ final class BuilderAuthorizationTest extends FeatureTestCase
 
         $this->actingAs($user);
 
-        foreach (['/builder/node-types', '/builder/tags', '/builder/staff', '/builder/assistants'] as $url) {
+        foreach (['/builder/node-types', '/builder/tags', '/builder/segments', '/builder/staff', '/builder/assistants'] as $url) {
             $this->getJson($url)->assertForbidden();
         }
     }
@@ -103,9 +104,26 @@ final class BuilderAuthorizationTest extends FeatureTestCase
 
         $this->actingAs($user);
 
-        foreach (['/builder/node-types', '/builder/tags', '/builder/staff', '/builder/assistants'] as $url) {
+        foreach (['/builder/node-types', '/builder/tags', '/builder/segments', '/builder/staff', '/builder/assistants'] as $url) {
             $this->getJson($url)->assertOk();
         }
+    }
+
+    public function test_the_segment_options_are_the_tenant_s_segments_by_name(): void
+    {
+        $tenantId = '00000000-0000-0000-0000-000000000001';
+        $rules    = ['match' => 'all', 'conditions' => [['type' => 'tag', 'operator' => 'has', 'value' => 'vip']]];
+        $vip      = ContactSegment::query()->create(['tenant_id' => $tenantId, 'name' => 'VIP', 'rules' => $rules]);
+        $beta     = ContactSegment::query()->create(['tenant_id' => $tenantId, 'name' => 'Beta', 'rules' => $rules]);
+        ContactSegment::query()->create(['tenant_id' => '00000000-0000-0000-0000-000000000002', 'name' => 'Other', 'rules' => $rules]);
+
+        $this->actingAs($this->userWithFlowPermissions())
+            ->getJson('/builder/segments')
+            ->assertOk()
+            ->assertExactJson(['data' => [
+                ['value' => (string) $beta->getKey(), 'label' => 'Beta'],
+                ['value' => (string) $vip->getKey(), 'label' => 'VIP'],
+            ]]);
     }
 
     public function test_call_test_is_forbidden_without_permission(): void

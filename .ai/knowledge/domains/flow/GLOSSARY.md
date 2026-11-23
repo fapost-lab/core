@@ -16,7 +16,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
-reviewed_at: 2026-11-20
+reviewed_at: 2026-11-23
 ---
 # Flow glossary
 
@@ -63,6 +63,14 @@ list is the foundation enum `StateNamespace`.
 
 A `system.*` key recording that a node's side effect already happened, checked before repeating
 it: `system.sent_messages`, `system.set_tag.<node>`, `system.staff_notified.*`, `system.contacts_notified.*`.
+`system.auth.<node>` is a counter rather than a marker: the attempts and sends of an `auth_request`
+challenge, and the number of the last challenge once the node has exited.
+
+## One-time code
+
+The digits an `auth_request@2` node sends a contact by SMS or email (through a
+`OneTimeCodeSenderInterface`) and waits to be typed back. Only its keyed hash is stored
+(`AuthCodeStore`); it never enters the session state, the trace or a log.
 
 ## Session lock
 
@@ -75,6 +83,13 @@ a session with neither (`ContactlessSessionException`).
 
 What fired a trigger — a schedule slot, an event id, a webhook delivery id — kept on the session as `fire_key`,
 unique with `trigger_id`, so a trigger starts one run per fire.
+
+## Re-run from the start
+
+A new automation run of a failed root run's trigger, started by a person from the run's page with the trigger payload
+the failed run kept (`flow_sessions.trigger_payload`), under the fire key `rerun:<source session id>:<n>`. It sends
+every call and message of the flow again; the failed run is left as it was. Not a retry: a node is never re-run on its
+own.
 
 ## Core event
 

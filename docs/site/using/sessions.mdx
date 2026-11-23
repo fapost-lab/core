@@ -64,6 +64,37 @@ how long it took and, for a failure, the error's type. The graph shows statuses
 only — a node's input, output and error text are not shown here. A live session's
 graph keeps itself current the same way the list does.
 
+## Running a failed run again
+
+A run an automatic trigger started — a webhook, an event — that **failed** can be
+started again from the start: **Run again** on its page starts a new run with the
+same data its trigger handed over, the request body or the event exactly as they
+arrived, even if the flow changed them while it ran. The failed run stays as it
+was; its page lists the runs started again from it, and each of those links back.
+
+<Warning>
+  Running again repeats everything the flow does. Every request to outside
+  systems and every message the flow sends goes out again, and the systems on the
+  other end see a new request, not a repeat. Make sure that is what you want
+  before you confirm.
+</Warning>
+
+- The new run takes the flow's **current published version**. The confirmation
+  says which, and says so when it is not the version the failed run ran — the
+  usual case after fixing the flow.
+- It is not offered for a conversation or for a subflow inside another run (run
+  the outer run again), and only a run whose status is *Failed* can be run again —
+  a run that reached an end node is not, whatever its outcome. It is refused when the
+  trigger that started the run is turned off or deleted, or the flow has no active
+  version.
+- Runs that failed before this was added kept no trigger data and cannot be run
+  again.
+- A double click, a second tab or a repeated request starts one run. To run it
+  once more, wait until the page lists the new run and use the button again.
+- It needs **View flow sessions & logs** and **Re-run failed automation runs** (see
+  [Roles and permissions](/using/roles-and-permissions)), and it is recorded in
+  the [Activity log](/using/activity-log).
+
 ## Status and outcome
 
 **Status** is about now: is this session still live.

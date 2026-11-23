@@ -672,6 +672,11 @@ final class AutomationRunTest extends FeatureTestCase
                 return $this->real->findByFireKey($triggerId, $fireKey);
             }
 
+            public function findByStartKey(string $startKey): ?FlowSession
+            {
+                return $this->real->findByStartKey($startKey);
+            }
+
             public function create(array $attributes): FlowSession
             {
                 return $this->real->create($attributes);

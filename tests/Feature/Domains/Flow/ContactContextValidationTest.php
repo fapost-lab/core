@@ -327,6 +327,53 @@ final class ContactContextValidationTest extends FeatureTestCase
         $this->assertStringContainsString("the node type 'send_message' reaches the contact of the run", $empty[0]->message);
     }
 
+    public function test_a_scheduled_flow_that_starts_a_flow_for_a_contact_is_published_and_a_contact_read_is_not(): void
+    {
+        $target = $this->draft([['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']]]);
+        $node   = static fn (string $contact, string $flowId): array => [
+            ['id' => 'start', 'type' => 'start_flow', 'version' => 1, 'config' => [
+                'flow_id'   => $flowId,
+                'addressee' => ['kind' => 'contact', 'contact' => $contact],
+            ]],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [['id' => 'e1', 'from' => 'start', 'to' => 'end', 'handle' => 'started']];
+
+        $scheduled = $this->draft($node('{{flow.customer_id}}', $target->flow_id), $edges);
+        $this->storeTrigger($scheduled, self::SCHEDULE);
+
+        $this->assertSame(1, $this->app->make(PublishFlowService::class)->execute($scheduled->flow_id)->version);
+
+        $read = $this->contactErrors(['start' => $node('{{contact.id}}', $target->flow_id)[0]], [self::SCHEDULE]);
+        $this->assertCount(1, $read);
+        $this->assertStringContainsString("it reads 'contact.id'", $read[0]->message);
+    }
+
+    public function test_a_start_flow_target_must_be_a_flow_of_the_same_assistant(): void
+    {
+        $other   = Assistant::factory()->create(['tenant_id' => $this->tenantId, 'default_language' => 'en']);
+        $foreign = FlowDraft::factory()->create(['tenant_id' => $this->tenantId, 'assistant_id' => $other->getKey()]);
+        $caller  = $this->draft([]);
+
+        $codes = function (string $target) use ($caller): array {
+            $result = $this->app->make(ValidateFlowService::class)->execute(
+                nodes: ['start' => ['id' => 'start', 'type' => 'start_flow', 'version' => 1, 'config' => [
+                    'flow_id'   => $target,
+                    'addressee' => ['kind' => 'contact', 'contact' => '{{flow.customer_id}}'],
+                ]]],
+                triggers: [self::MESSAGE],
+                flowId: $caller->flow_id,
+            );
+
+            return array_map(static fn ($error): string => "{$error->code}@{$error->path}", $result->errors);
+        };
+
+        $this->assertContains('start_flow_target_unknown@nodes.start.config.flow_id', $codes($foreign->flow_id));
+        $this->assertContains('start_flow_target_unknown@nodes.start.config.flow_id', $codes((string) Str::uuid()));
+        $this->assertContains('start_flow_template_in_flow_id@nodes.start.config.flow_id', $codes('{{flow.target}}'));
+        $this->assertNotContains('start_flow_target_unknown@nodes.start.config.flow_id', $codes($this->draft([])->flow_id));
+    }
+
     public function test_a_message_to_an_addressee_cannot_wait_for_an_answer_in_any_flow(): void
     {
         $nodes = ['ask' => ['id' => 'ask', 'type' => 'send_message', 'version' => 1, 'config' => [
@@ -343,6 +390,41 @@ final class ContactContextValidationTest extends FeatureTestCase
 
             $this->assertContains('addressee_cannot_wait@nodes.ask.config.content_type', $codes);
         }
+    }
+
+    public function test_a_scheduled_flow_that_asks_a_person_is_published_and_a_broken_question_is_refused(): void
+    {
+        $approve = (string) Str::uuid();
+        $nodes   = [
+            ['id' => 'ask', 'type' => 'ask_person', 'version' => 1, 'config' => [
+                'addressee'       => ['kind' => 'contact', 'contact' => '{{flow.manager_id}}'],
+                'text'            => ['en' => 'Refund order {{flow.order_id}}?'],
+                'buttons'         => [['id' => $approve, 'label' => ['en' => 'Approve'], 'value' => 'approve']],
+                'timeout_seconds' => 3600,
+            ]],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [['id' => 'e1', 'from' => 'ask', 'to' => 'end', 'handle' => $approve]];
+
+        $scheduled = $this->draft($nodes, $edges);
+        $this->storeTrigger($scheduled, self::SCHEDULE);
+
+        $this->assertSame(1, $this->app->make(PublishFlowService::class)->execute($scheduled->flow_id)->version);
+
+        $broken = ['ask' => ['id' => 'ask', 'type' => 'ask_person', 'version' => 1, 'config' => [
+            'text'             => ['en' => 'Hi {{contact.name}}'],
+            'buttons'          => [],
+            'timeout_seconds'  => 10,
+            'save_to_variable' => ['name' => 'decision', 'type' => 'text', 'storage' => 'contact'],
+        ]]];
+
+        $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $broken, triggers: [self::SCHEDULE]);
+        $codes  = array_map(static fn ($error): string => "{$error->code}@{$error->path}", $result->errors);
+
+        $this->assertContains('addressee_required@nodes.ask.config.addressee.contact', $codes);
+        $this->assertContains('buttons_required@nodes.ask.config.buttons', $codes);
+        $this->assertContains('timeout_out_of_range@nodes.ask.config.timeout_seconds', $codes);
+        $this->assertNotEmpty(array_filter($codes, static fn (string $code): bool => str_starts_with($code, 'node_needs_contact@')));
     }
 
     public function test_a_template_publish_that_puts_a_contact_node_into_a_scheduled_host_is_refused(): void

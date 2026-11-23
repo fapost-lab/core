@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Builder\AssistantOptionsController;
 use App\Http\Controllers\Builder\BuilderFlowController;
+use App\Http\Controllers\Builder\BuilderPreferenceController;
 use App\Http\Controllers\Builder\CallTestController;
 use App\Http\Controllers\Builder\ContactTagsController;
 use App\Http\Controllers\Builder\CredentialOptionsController;
 use App\Http\Controllers\Builder\NodeTypesController;
+use App\Http\Controllers\Builder\SegmentOptionsController;
 use App\Http\Controllers\Builder\StaffOptionsController;
 use App\Http\Controllers\Builder\TriggerTypesController;
 use App\Http\Controllers\Builder\WebhookEndpointController;
@@ -30,8 +32,10 @@ Route::middleware(['auth', 'tenant', 'verified', EnsureTenantOnboarded::class, R
     Route::get('/node-types', [NodeTypesController::class, 'index']);
     Route::get('/trigger-types', [TriggerTypesController::class, 'index']);
     Route::get('/tags', [ContactTagsController::class, 'index']);
+    Route::get('/segments', [SegmentOptionsController::class, 'index']);
     Route::get('/staff', [StaffOptionsController::class, 'index']);
     Route::get('/credentials', [CredentialOptionsController::class, 'index']);
     Route::get('/assistants', [AssistantOptionsController::class, 'index']);
     Route::post('/call/test', CallTestController::class);
+    Route::put('/preferences', [BuilderPreferenceController::class, 'update'])->name('builder.preferences.update');
 });

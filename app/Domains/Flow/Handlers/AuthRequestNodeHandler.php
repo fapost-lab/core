@@ -28,8 +28,9 @@ use Fapost\Support\Builder\Schema\Section;
  * {@code contact.is_authenticated} flag. It always continues through the single
  * `default` output — auth is enforced elsewhere (the flow-start access gate and
  * `branch` rules reading the flag). Writing the flag to {@code true} is
- * idempotent, so the handler is safe to retry. Richer challenges (phone/SMS)
- * plug in as new {@see AuthMethod} cases.
+ * idempotent, so the handler is safe to retry. The ownership checks (phone,
+ * SMS and email codes) and the `authenticated`/`failed` outputs are
+ * {@see AuthRequestV2NodeHandler}'s; nodes published as `@1` keep this behaviour.
  */
 final class AuthRequestNodeHandler extends AbstractVersionedHandler
 {
@@ -90,12 +91,8 @@ final class AuthRequestNodeHandler extends AbstractVersionedHandler
     {
         $config = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];
 
-        $method = AuthMethod::tryFrom(is_string($config['method'] ?? null) ? $config['method'] : '')
-            ?? AuthMethod::Basic;
-
-        return match ($method) {
-            AuthMethod::Basic => $this->executeBasic($config, $state, $context),
-        };
+        // Version 1 knows only `basic`; the ownership checks are `auth_request@2`'s.
+        return $this->executeBasic($config, $state, $context);
     }
 
     /**

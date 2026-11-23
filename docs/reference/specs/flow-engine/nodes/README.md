@@ -1,6 +1,6 @@
 # Flow Engine: per-node specs
 
-The 16 Core handlers registered in `FlowServiceProvider::registerCoreNodeHandlers()`. The same list, with
+The 17 Core handlers registered in `FlowServiceProvider::registerCoreNodeHandlers()`. The same list, with
 categories and classes, is `docs/platform/runtime/flow/10-registered-nodes-catalog.md`.
 
 | File | Node type | Handler |
@@ -13,12 +13,14 @@ categories and classes, is `docs/platform/runtime/flow/10-registered-nodes-catal
 | [06-call](06-call.md) | `call` | `CallNodeHandler` |
 | [07-emit-event](07-emit-event.md) | `emit_event` | `EmitEventNodeHandler` |
 | [08-subflow](08-subflow.md) | `subflow` | `SubflowNodeHandler` |
+| [start-flow](start-flow.md) | `start_flow` | `StartFlowNodeHandler` |
 | [10-end](10-end.md) | `end` | `EndNodeHandler` |
 | [11-loop](11-loop.md) | `loop` and `loop_end` | `LoopNodeHandler`, `LoopEndNodeHandler` |
 | [set-tag](set-tag.md) | `set_tag` | `SetTagNodeHandler` |
 | [notify](notify.md) | `notify` | `NotifyNodeHandler` |
 | [auth-request](auth-request.md) | `auth_request` | `AuthRequestNodeHandler` |
 | [request-operator](request-operator.md) | `request_operator` | `RequestOperatorNodeHandler` |
+| [ask-person](ask-person.md) | `ask_person` | `AskPersonNodeHandler` |
 
 `rag_query` (`RagQueryNodeHandler`) is registered too and has no standalone node spec here; it moves to the AI Solution, see
 `.ai/specs/ai-solution/`.

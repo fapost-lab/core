@@ -8,12 +8,14 @@ export default { layout: AppShell }
 import { computed } from 'vue'
 import { Head, usePage } from '@inertiajs/vue3'
 import CredentialForm from './CredentialForm.vue'
-import type { CredentialTypeSchema, CredentialsPageProps, EditableCredential } from './types'
+import OAuthConnection from './OAuthConnection.vue'
+import type { CredentialTypeSchema, CredentialsPageProps, EditableCredential, OAuthConnectionState } from './types'
 
 defineProps<{
   credential: EditableCredential
   types: CredentialTypeSchema[]
   urls: { index: string; submit: string }
+  oauth: OAuthConnectionState | null
 }>()
 
 const t = computed(() => usePage<CredentialsPageProps>().props.translations.console.credentials)
@@ -26,5 +28,7 @@ const t = computed(() => usePage<CredentialsPageProps>().props.translations.cons
     <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.edit_title }}</h1>
 
     <CredentialForm :key="credential.id" mode="edit" method="put" :types="types" :credential="credential" :submit-url="urls.submit" :cancel-url="urls.index" />
+
+    <OAuthConnection v-if="oauth" :oauth="oauth" />
   </div>
 </template>

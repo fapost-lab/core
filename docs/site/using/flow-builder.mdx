@@ -6,9 +6,10 @@ description: "Building a conversation from blocks."
 The builder is where a flow is actually written. It opens from **Builder** on any
 row of the [flows list](/using/flows).
 
-Blocks are stacked vertically in the order they run. There is no canvas to
-arrange and no lines to draw: a flow reads top to bottom, the way the
-conversation happens.
+Blocks are stacked vertically in the order they run, and nothing is arranged or
+wired by hand: a flow reads top to bottom, the way the conversation happens. The
+builder shows it in one of two layouts, the tree or the graph (see
+[Tree or graph](#tree-or-graph)).
 
 ## The screen
 
@@ -22,6 +23,26 @@ anything.
 
 **Top — the toolbar.** The flow's name, its published version, and whether the
 current work is saved.
+
+## Tree or graph
+
+The **Tree / Graph** switch beside the tabs changes how the builder shows the flow.
+The **Tree** is the screen described above: the structure on the left, one level
+of blocks at a time in the main column, a branch opened by clicking it.
+
+The **Graph** draws the whole flow on one canvas: every block as a card, the lines
+between them, and each branch of a condition or a button inside a frame of its
+own. Drag the canvas to move around it and scroll to zoom. The layout is
+automatic and follows the flow's structure; cards are not dragged into place.
+
+Both layouts edit the same flow. On the graph, click a card to open its settings
+in the same panel the tree uses; **+** on a line adds a block between two blocks,
+and **+** under a card adds a block on an outcome that leads nowhere yet (a
+button, a rule, an error path). Each card has its own **move** and **delete**. A
+subflow block links to the flow it starts.
+
+The choice is yours, not the flow's: it is remembered for you, and every flow
+opens in the layout you used last.
 
 ## Triggers
 
@@ -70,7 +91,8 @@ The full list with each block's exact type and configuration is in
   months later.
 </Note>
 
-Each block carries its own controls: move up, move down, swap, and delete.
+In the tree, each block carries its own controls: move up, move down, swap, and
+delete.
 
 ## Two tabs: Builder and Content
 

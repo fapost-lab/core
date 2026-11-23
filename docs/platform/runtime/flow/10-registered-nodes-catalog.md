@@ -1,8 +1,8 @@
 # 10. Registered Nodes Catalog
 
 Reflects the handlers actually registered in `FlowServiceProvider::registerCoreNodeHandlers()`
-(called from the `NodeHandlerRegistry` singleton factory in `register()`). All 18 are Core
-handlers at `v1`.
+(called from the `NodeHandlerRegistry` singleton factory in `register()`). All 20 are Core
+handlers, at `v1` except `auth_request@2` (`auth_request@1` stays registered beside it).
 
 | Type | Version | Category | Class | Purpose | Spec |
 |---|---:|---|---|---|---|
@@ -14,6 +14,7 @@ handlers at `v1`.
 | `call` | 1 | `Integration` | `CallNodeHandler` | Invokes an external HTTP endpoint or an in-process action handler through a pluggable transport; routes on `success`/`error`. | [06-call.md](../../../reference/specs/flow-engine/nodes/06-call.md) |
 | `emit_event` | 1 | `Logic` | `EmitEventNodeHandler` | Publishes a tenant-scoped event, fire-and-forget, so subscribed event-triggers can start other flows. | [07-emit-event.md](../../../reference/specs/flow-engine/nodes/07-emit-event.md) |
 | `subflow` | 1 | `Logic` | `SubflowNodeHandler` | Pauses the parent session and starts a child flow session, resuming the parent when the child ends. | [08-subflow.md](../../../reference/specs/flow-engine/nodes/08-subflow.md) |
+| `start_flow` | 1 | `Logic` | `StartFlowNodeHandler` | Queues a start of another flow as a conversation of a contact named by an expression, on the target flow's bot, once per step; leaves by `started`, `busy`, `no_channel` or `error`. | [start-flow.md](../../../reference/specs/flow-engine/nodes/start-flow.md) |
 | `template` | 1 | `Logic` | `App\Domains\Flow\Handlers\TemplateNodeHandler` | Pass-through reference node for a flow template; returns handle `enter`. Expanded into the template's published graph at flow publish. | No standalone node spec; see `.ai/knowledge/adr/20261111-flow-templates-expanded-at-publish.md` |
 | `template_output` | 1 | `Logic` | `TemplateOutputNodeHandler` | Pass-through named exit of a template (template-only); returns `default`. | No standalone node spec; see `.ai/knowledge/adr/20261111-flow-templates-expanded-at-publish.md` |
 | `rag_query` | 1 | `AI` | `RagQueryNodeHandler` | Queries a RAG provider via `RagAdapterRegistry` and writes the structured result into `state.rag.*`. | No standalone node spec; moves to the AI Solution, see `.ai/specs/ai-solution/` |
@@ -23,8 +24,10 @@ handlers at `v1`.
 | `loop_end` | 1 | `Logic` | `LoopEndNodeHandler` | Increments the loop iterator and signals the engine to navigate back to the parent `loop` node (engine special-case, no edge). | [11-loop.md](../../../reference/specs/flow-engine/nodes/11-loop.md) |
 | `set_tag` | 1 | `Data` | `SetTagNodeHandler` | Adds, removes or toggles a tag on the current contact. | [set-tag.md](../../../reference/specs/flow-engine/nodes/set-tag.md) |
 | `notify` | 1 | `Contact` | `NotifyNodeHandler` | Sends a queued notification, either to staff (admin-panel escalation) or to contacts (broadcast via an assistant). | [notify.md](../../../reference/specs/flow-engine/nodes/notify.md) |
-| `auth_request` | 1 | `Contact` | `AuthRequestNodeHandler` | Evaluates a challenge (currently `basic`: operator comparison) and, on a pass, raises the `contact.is_authenticated` flag. Always continues through `default`. | [auth-request.md](../../../reference/specs/flow-engine/nodes/auth-request.md) |
+| `auth_request` | 1 | `Contact` | `AuthRequestNodeHandler` | Evaluates the `basic` challenge (operator comparison) and, on a pass, raises the `contact.is_authenticated` flag. Always continues through `default`. Kept for nodes published as version 1. | [auth-request.md](../../../reference/specs/flow-engine/nodes/auth-request.md) |
+| `auth_request` | 2 | `Contact` | `AuthRequestV2NodeHandler` | `basic`, `phone` (the contact's own shared number), `sms_code`, `email_code` (a one-time code through the channel's `OneTimeCodeSenderInterface`). Raises the flag and exits `authenticated`, else `failed` with a reason. | [auth-request.md](../../../reference/specs/flow-engine/nodes/auth-request.md) |
 | `request_operator` | 1 | `Conversation` | `RequestOperatorNodeHandler` | Places an operator request on the conversation thread (bot to `queued`), notifies the operators and the contact, and waits; leaves by `returned`, `cancelled` or `timeout`. | [request-operator.md](../../../reference/specs/flow-engine/nodes/request-operator.md) |
+| `ask_person` | 1 | `Conversation` | `AskPersonNodeHandler` | Asks a contact (the addressee, by expression) a question with buttons through the run's assistant and parks until an answer or the timeout; leaves by the pressed button's handle, `timeout` or `error`. Context-free: works in contactless runs. | [ask-person.md](../../../reference/specs/flow-engine/nodes/ask-person.md) |
 
 `category()` values above come from each handler's own override; `SendMessageNodeHandler` and
 `InputNodeHandler` don't override it and fall back to `AbstractVersionedHandler::category()`,
@@ -33,7 +36,7 @@ which returns `'Core'`.
 ## How registration works
 
 `FlowServiceProvider::register()` binds `NodeHandlerRegistry` as a singleton whose factory calls
-`registerCoreNodeHandlers()`, which lists the 18 handler classes above and calls
+`registerCoreNodeHandlers()`, which lists the 20 handler classes above and calls
 `$registry->register($handlerClass)` for each. Per
 [ADR-0001](../../../../.ai/knowledge/adr/0001-node-handlers-built-per-scope.md), the registry
 keeps only the handler **class** (a throwaway instance is built once at registration to read and

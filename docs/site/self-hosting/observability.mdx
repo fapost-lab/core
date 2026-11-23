@@ -47,11 +47,13 @@ What to watch:
 
 ## The scheduler
 
-Six scheduled tasks matter, and all fail silently if the scheduler is not
+Eight scheduled tasks matter, and all fail silently if the scheduler is not
 running:
 
 | Task | When | If it does not run |
 |---|---|---|
+| `flow:fire-scheduled-triggers` | Every minute | No [schedule trigger](/using/schedule-trigger) runs; the moments missed meanwhile are not caught up |
+| `flow:rebuild-schedule-registry` | Hourly | A schedule whose registry entry was lost stays silent |
 | `flow:sweep-subflow-timeouts` | Every minute | Parent flows waiting on expired subflows never resume |
 | `logs:create-partition` | Monthly, on the 1st | Next month's flow-log partition is missing |
 | `logs:prune-flow` | Daily, 03:00 | Old log partitions accumulate |

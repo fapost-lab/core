@@ -21,8 +21,9 @@ use Tests\Feature\Domains\Credentials\CredentialsTestCase;
 
 /**
  * Publishing what a draft changes against what runs now: a new saved credential in a `call` node needs
- * `UseCredentials`, a changed automatic trigger (any type but `message`) needs `ManageAutomations`; turning on a flow
- * with an automatic trigger needs `ManageAutomations` too. The content manager holds both, an admin passes everything.
+ * `UseCredentials`, a changed automatic trigger (any type but `message`) needs `ManageAutomations`, a new or changed
+ * message to tags or a segment needs `ManageBroadcast`; turning on a flow with an automatic trigger needs
+ * `ManageAutomations` too. The content manager holds both, an admin passes everything.
  */
 final class FlowAutomationPermissionsTest extends CredentialsTestCase
 {
@@ -141,6 +142,75 @@ final class FlowAutomationPermissionsTest extends CredentialsTestCase
 
         $this->publish($this->author(), $draft)->assertForbidden();
         $this->assertSame(0, FlowTrigger::query()->count());
+    }
+
+    public function test_publishing_a_new_or_changed_message_to_tags_needs_the_right_to_manage_broadcasts(): void
+    {
+        $draft = $this->draft($this->audienceNodes('Hello'), attributes: ['edges' => $this->audienceEdges()]);
+
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts'));
+
+        $this->publish($this->author(Permission::ManageBroadcast), $draft)->assertSuccessful();
+
+        // Unchanged: republished without the right; a node edited around it too.
+        $this->publish($this->author(), $draft)->assertSuccessful();
+
+        $draft->forceFill(['nodes' => $this->audienceNodes('Hello again')])->save();
+        $this->publish($this->author(), $draft)->assertForbidden();
+
+        $draft->forceFill(['nodes' => $this->audienceNodes('Hello', ['vip', 'beta'])])->save();
+        $this->publish($this->author(), $draft)->assertForbidden();
+
+        // Dropping the audience needs nothing.
+        $draft->forceFill(['nodes' => [['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']]], 'edges' => []])->save();
+        $this->publish($this->author(), $draft)->assertSuccessful();
+    }
+
+    /**
+     * A placed template is checked as it will be published, after expansion: a template can bring a message to tags, and
+     * a host's parameter value rewrites its text.
+     */
+    public function test_a_message_to_tags_a_template_brings_or_a_parameter_rewrites_needs_the_right(): void
+    {
+        $template = FlowDraft::factory()->template()->create([
+            'tenant_id'    => $this->tenantId,
+            'assistant_id' => $this->assistant->getKey(),
+            'nodes'        => [
+                [...$this->audienceNodes('Hello')[0], 'id' => 't-tell', 'parameters' => [['key' => 'greeting', 'label' => null, 'field' => 'text']]],
+                ['id' => 't-done', 'type' => 'template_output', 'version' => 1, 'config' => ['name' => 'done']],
+            ],
+            'edges' => [['id' => 'te1', 'from' => 't-tell', 'to' => 't-done', 'handle' => 'default']],
+        ]);
+        $this->publish($this->author(Permission::ManageBroadcast), $template)->assertSuccessful();
+
+        $reference = static fn (array $values): array => ['id' => 'ref', 'type' => 'template', 'version' => 1, 'config' => array_filter([
+            'template_flow_id' => $template->flow_id,
+            'outputs'          => [['name' => 'done', 'label' => null]],
+            'parameter_values' => $values,
+        ])];
+        $host = $this->draft(
+            [$reference([]), ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']]],
+            attributes: ['edges' => [['id' => 'e1', 'from' => 'ref', 'to' => 'end', 'handle' => 'done']]],
+        );
+
+        $this->publish($this->author(), $host)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts'));
+        $this->publish($this->author(Permission::ManageBroadcast), $host)->assertSuccessful();
+        $this->publish($this->author(), $host)->assertSuccessful();
+
+        $host->forceFill(['nodes' => [$reference(['greeting' => ['en' => 'Pay now']]), $host->nodes[1]]])->save();
+
+        $this->publish($this->author(), $host)->assertForbidden();
+    }
+
+    public function test_a_flow_without_audience_messages_publishes_without_the_right_to_broadcast(): void
+    {
+        $draft = $this->draft($this->audienceNodes('Hello', addressee: ['kind' => 'contact', 'contact' => '{{flow.customer_id}}']), attributes: ['edges' => $this->audienceEdges()]);
+
+        $this->publish($this->author(), $draft)->assertSuccessful();
     }
 
     public function test_the_content_manager_publishes_automations_and_credentials_but_does_not_manage_credentials(): void
@@ -265,6 +335,32 @@ final class FlowAutomationPermissionsTest extends CredentialsTestCase
             ], static fn (mixed $value): bool => null !== $value)],
             ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
         ];
+    }
+
+    /**
+     * @param  list<string>               $tags
+     * @param  array<string, mixed>|null  $addressee
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function audienceNodes(string $text, array $tags = ['vip'], ?array $addressee = null): array
+    {
+        return [
+            ['id' => 'tell', 'type' => 'send_message', 'version' => 1, 'config' => [
+                'content_type' => 'text',
+                'text'         => ['en' => $text],
+                'addressee'    => $addressee ?? ['kind' => 'tags', 'tags' => $tags],
+            ]],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+    }
+
+    /**
+     * @return list<array<string, string>>
+     */
+    private function audienceEdges(): array
+    {
+        return [['id' => 'e1', 'from' => 'tell', 'to' => 'end', 'handle' => 'default']];
     }
 
     /**

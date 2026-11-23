@@ -26,7 +26,7 @@ final class CredentialTypeRegistryTest extends TestCase
         $registry = $this->app->make(CredentialTypeRegistry::class);
 
         $this->assertSame(
-            ['bearer', 'basic', 'api_key_header', 'api_key_query', 'oauth2_client_credentials'],
+            ['bearer', 'basic', 'api_key_header', 'api_key_query', 'oauth2_client_credentials', 'oauth2_authorization_code'],
             $registry->ids(),
         );
         $this->assertSame($registry->ids(), array_map(static fn (HttpCredentialTypeInterface $type): string => $type->id(), $registry->all()));

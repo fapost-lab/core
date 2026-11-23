@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\ApiTokenController as AdminApiTokenController;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\CredentialController as AdminCredentialController;
+use App\Http\Controllers\Admin\CredentialOAuthController as AdminCredentialOAuthController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\HealthController as AdminHealthController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
@@ -168,10 +169,14 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         // Credentials: saved secrets a flow's call node uses to authorize an HTTP request; a new screen, so its own URI.
         Route::get('admin/credentials', [AdminCredentialController::class, 'index'])->name('console.admin.credentials.index');
         Route::get('admin/credentials/create', [AdminCredentialController::class, 'create'])->name('console.admin.credentials.create');
+        // The OAuth2 consent callback: one URL per tenant host, registered at the provider; declared before `{record}` routes.
+        Route::get('admin/credentials/oauth/callback', [AdminCredentialOAuthController::class, 'callback'])->name('console.admin.credentials.oauth.callback');
         Route::get('admin/credentials/{record}/edit', [AdminCredentialController::class, 'edit'])->name('console.admin.credentials.edit');
         Route::post('admin/credentials', [AdminCredentialController::class, 'store'])->name('console.admin.credentials.store');
         Route::put('admin/credentials/{record}', [AdminCredentialController::class, 'update'])->name('console.admin.credentials.update');
         Route::delete('admin/credentials/{record}', [AdminCredentialController::class, 'destroy'])->name('console.admin.credentials.destroy');
+        Route::post('admin/credentials/{record}/oauth/connect', [AdminCredentialOAuthController::class, 'connect'])->name('console.admin.credentials.oauth.connect');
+        Route::delete('admin/credentials/{record}/oauth', [AdminCredentialOAuthController::class, 'disconnect'])->name('console.admin.credentials.oauth.disconnect');
 
         // API tokens: integrations of the workspace, issued, rotated and revoked here; a new screen, so its own URI.
         Route::get('admin/api-tokens', [AdminApiTokenController::class, 'index'])->name('console.admin.api-tokens.index');
@@ -305,11 +310,14 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('assistant/{assistant}/conversations/{record}/transfer', [ConversationController::class, 'transfer'])->name('console.conversations.transfer');
         Route::post('assistant/{assistant}/conversations/{record}/seize', [ConversationController::class, 'seize'])->name('console.conversations.seize');
 
-        // Flow sessions and the flow log: read-only, kept current live or by polling. Every log read is bounded in time.
+        // Flow sessions and the flow log: read-only but for a run's re-run, kept current live or by polling. Every log read is bounded in time.
         Route::get('assistant/{assistant}/flow-sessions', [FlowSessionController::class, 'index'])->name('console.flow-sessions.index');
         Route::get('assistant/{assistant}/flow-sessions/{record}', [FlowSessionController::class, 'show'])->name('console.flow-sessions.show');
         Route::get('assistant/{assistant}/flow-sessions/{record}/graph', [FlowSessionController::class, 'graph'])->name('console.flow-sessions.graph');
         Route::get('assistant/{assistant}/flow-sessions/{record}/graph/visits', [FlowSessionController::class, 'visits'])->middleware('throttle:120,1')->name('console.flow-sessions.visits');
+        // Re-running a failed automation run from the start sends its calls and messages again: throttled, and a
+        // repeated request before the new run exists starts it once (its fire key is the same).
+        Route::post('assistant/{assistant}/flow-sessions/{record}/rerun', [FlowSessionController::class, 'rerun'])->middleware('throttle:10,1')->name('console.flow-sessions.rerun');
         Route::get('assistant/{assistant}/flow-logs', [FlowLogController::class, 'index'])->name('console.flow-logs.index');
         Route::get('assistant/{assistant}/flow-logs/{record}', [FlowLogController::class, 'show'])->name('console.flow-logs.show');
         // Assistant settings: one form saved as a whole. A flow made from inside it is saved with the form and opens in the builder.

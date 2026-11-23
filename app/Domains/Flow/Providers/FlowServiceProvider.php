@@ -11,6 +11,9 @@ use App\Domains\Contact\Events\ContactTagAdded;
 use App\Domains\Contact\Events\ContactTagRemoved;
 use App\Domains\Conversation\Events\OperatorRequestStateChanged;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Auth\AuthCodeStore;
+use App\Domains\Flow\Auth\EmailOneTimeCodeSender;
+use App\Domains\Flow\Auth\OneTimeCodeSenderRegistry;
 use App\Domains\Flow\Call\CallExecutionLedgerInterface;
 use App\Domains\Flow\Call\CallLedgerCacheForgetter;
 use App\Domains\Flow\Call\CallTransportRegistry;
@@ -34,6 +37,7 @@ use App\Domains\Flow\Contracts\ActionHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationServiceInterface;
+use App\Domains\Flow\Contracts\AudienceBroadcasterInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
@@ -70,8 +74,10 @@ use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\Events\QueuedFlowTriggerEventPublisher;
 use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
+use App\Domains\Flow\Handlers\AskPersonNodeHandler;
 use App\Domains\Flow\Handlers\AssignNodeHandler;
 use App\Domains\Flow\Handlers\AuthRequestNodeHandler;
+use App\Domains\Flow\Handlers\AuthRequestV2NodeHandler;
 use App\Domains\Flow\Handlers\BranchNodeHandler;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\DelayNodeHandler;
@@ -85,6 +91,7 @@ use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\RequestOperatorNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\SetTagNodeHandler;
+use App\Domains\Flow\Handlers\StartFlowNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Handlers\Support\TemplateResolver;
@@ -128,6 +135,8 @@ use App\Domains\Flow\Routing\DropPolicy;
 use App\Domains\Flow\Routing\DropPolicyInterface;
 use App\Domains\Flow\Routing\MessageRouter;
 use App\Domains\Flow\Routing\SessionStateRouter;
+use App\Domains\Flow\Schedule\ScheduleRegistrySync;
+use App\Domains\Flow\Schedule\ScheduleTriggerFirer;
 use App\Domains\Flow\Services\AssistantTranslationService;
 use App\Domains\Flow\Services\FallbackMessageService;
 use App\Domains\Flow\Services\FlowEngine;
@@ -185,6 +194,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Services\PlatformSettingRegistry;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
 use App\Domains\Tenancy\ValueObjects\PlatformSettingField;
+use App\Infrastructure\Flow\BroadcastingAudienceBroadcaster;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
@@ -196,6 +206,8 @@ use App\Infrastructure\Flow\QueuedDelayResumeScheduler;
 use App\Infrastructure\Flow\QueuedOperatorRequestTimeoutScheduler;
 use App\Infrastructure\Flow\QueuedSendMessageTimeoutScheduler;
 use App\Infrastructure\Solution\ContainerSolutionAvailability;
+use Fapost\Foundation\Auth\Contracts\OneTimeCodeSenderRegistryInterface;
+use Fapost\Foundation\Auth\Enums\OneTimeCodeChannel;
 use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Fapost\Foundation\Flow\Contracts\TriggerFirerInterface;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
@@ -256,6 +268,22 @@ final class FlowServiceProvider extends ServiceProvider
             unit: 'calls',
             kind: LimitKind::PerPeriod,
             description: 'Executions of the call node, over any transport, and test calls from the builder. A call over the limit is not made.',
+        ));
+
+        $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
+            key: AuthRequestV2NodeHandler::SMS_LIMIT_KEY,
+            label: 'SMS verification codes',
+            unit: 'codes',
+            kind: LimitKind::PerPeriod,
+            description: 'One-time codes the auth_request node sends by SMS. A code over the limit is not sent and the node takes its failed output.',
+        ));
+
+        $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
+            key: AuthRequestV2NodeHandler::EMAIL_LIMIT_KEY,
+            label: 'Email verification codes',
+            unit: 'codes',
+            kind: LimitKind::PerPeriod,
+            description: 'One-time codes the auth_request node sends by email. A code over the limit is not sent and the node takes its failed output.',
         ));
 
         $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
@@ -444,12 +472,37 @@ final class FlowServiceProvider extends ServiceProvider
                 $this->app->make(StateNamespaceRegistry::class)->freeze();
                 $this->app->make(RagAdapterRegistry::class)->freeze();
                 $this->app->make(TriggerTypeRegistry::class)->freeze();
+                $this->app->make(OneTimeCodeSenderRegistry::class)->freeze();
             }
         });
     }
 
     public function register(): void
     {
+        // One-time codes of auth_request@2: Core's email sender is the default a package's registered sender replaces.
+        // A mailer that only logs or keeps mail in memory delivers nothing and would write the code to the log, so
+        // email codes have no sender then: publishing refuses them and a running node fails with `no_sender`.
+        $this->app->singleton(OneTimeCodeSenderRegistry::class, function ($app): OneTimeCodeSenderRegistry {
+            $registry = new OneTimeCodeSenderRegistry();
+            $registry->setDefault(OneTimeCodeChannel::Email, static function () use ($app): ?EmailOneTimeCodeSender {
+                $config    = $app->make('config');
+                $transport = $config->get('mail.mailers.' . $config->get('mail.default') . '.transport');
+
+                return in_array($transport, EmailOneTimeCodeSender::UNDELIVERING_TRANSPORTS, true)
+                    ? null
+                    : $app->make(EmailOneTimeCodeSender::class);
+            });
+
+            return $registry;
+        });
+        $this->app->singleton(
+            OneTimeCodeSenderRegistryInterface::class,
+            fn ($app): OneTimeCodeSenderRegistry => $app->make(OneTimeCodeSenderRegistry::class),
+        );
+        $this->app->bind(AuthCodeStore::class, fn ($app): AuthCodeStore => new AuthCodeStore(
+            cache: $app->make('cache.store'),
+            applicationKey: (string) $app->make('config')->get('app.key'),
+        ));
         // Registry contents are declared here (register phase, lazily executed
         // on first resolve) — boot() only freezes them. Solutions/Plugins add
         // their own entries through CoreRegistrar before the freeze. The registry
@@ -524,7 +577,20 @@ final class FlowServiceProvider extends ServiceProvider
             \App\Infrastructure\Flow\QueuedAutomationContinuationScheduler::class,
         );
         $this->app->bind(SendMessageTimeoutSchedulerInterface::class, QueuedSendMessageTimeoutScheduler::class);
+        $this->app->bind(AudienceBroadcasterInterface::class, BroadcastingAudienceBroadcaster::class);
+        $this->app->bind(
+            \App\Domains\Flow\Contracts\ContactFlowStartDispatcherInterface::class,
+            \App\Infrastructure\Flow\QueuedContactFlowStartDispatcher::class,
+        );
         $this->app->bind(OperatorRequestTimeoutSchedulerInterface::class, QueuedOperatorRequestTimeoutScheduler::class);
+        $this->app->bind(
+            \App\Domains\Flow\Contracts\FlowQuestionsInterface::class,
+            \App\Domains\Flow\Services\FlowQuestions::class,
+        );
+        $this->app->bind(
+            \App\Domains\Flow\Contracts\FlowQuestionContinuationSchedulerInterface::class,
+            \App\Infrastructure\Flow\QueuedFlowQuestionContinuationScheduler::class,
+        );
         $this->app->bind(NodeUsageStatisticsInterface::class, NodeUsageStatisticsService::class);
         $this->app->bind(
             SubflowResumerInterface::class,
@@ -557,6 +623,8 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(SubflowTimeoutSweeper::class);
         $this->app->scoped(AutomationRunDeadline::class);
         $this->app->scoped(AutomationRunDeadlineSweeper::class);
+        $this->app->scoped(ScheduleTriggerFirer::class);
+        $this->app->scoped(ScheduleRegistrySync::class);
 
         $this->app->scoped(GlobalCommandExecutor::class);
         $this->app->scoped(
@@ -729,6 +797,7 @@ final class FlowServiceProvider extends ServiceProvider
         // Scoped, not singleton: the guard reads the per-request lock registry.
         $this->app->scoped(FlowExecutionGuardInterface::class, FlowExecutionGuard::class);
         $this->app->scoped(DelayedSessionResumer::class);
+        $this->app->scoped(\App\Domains\Flow\Orchestration\FlowQuestionResumer::class);
     }
 
     /**
@@ -752,12 +821,15 @@ final class FlowServiceProvider extends ServiceProvider
             EndNodeHandler::class,
             RagQueryNodeHandler::class,
             SubflowNodeHandler::class,
+            StartFlowNodeHandler::class,
             SetTagNodeHandler::class,
             NotifyNodeHandler::class,
             AuthRequestNodeHandler::class,
+            AuthRequestV2NodeHandler::class,
             LoopNodeHandler::class,
             LoopEndNodeHandler::class,
             RequestOperatorNodeHandler::class,
+            AskPersonNodeHandler::class,
             TemplateNodeHandler::class,
             TemplateOutputNodeHandler::class,
             WebhookResponseNodeHandler::class,

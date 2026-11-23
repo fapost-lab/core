@@ -69,10 +69,41 @@ describe('nodeHandles for a condition', () => {
     })
 })
 
+describe('start_flow node', () => {
+    it('exposes the started, busy, no_channel and error handles and no default one', () => {
+        const handles = nodeHandles({id: 'n1', type: 'start_flow'}).map((h) => h.handle)
+
+        expect(handles).toEqual(['started', 'busy', 'no_channel', 'error'])
+    })
+})
+
 describe('request_operator node', () => {
     it('exposes the returned, cancelled and timeout handles and no default one', () => {
         const handles = nodeHandles({id: 'n1', type: 'request_operator'}).map((h) => h.handle)
 
         expect(handles).toEqual(['returned', 'cancelled', 'timeout'])
+    })
+})
+
+describe('ask_person node', () => {
+    it('exposes one handle per button, then timeout and error, and no default one', () => {
+        const handles = nodeHandles({
+            id: 'n1',
+            type: 'ask_person',
+            config: {
+                buttons: [
+                    {id: 'b-1', label: 'Approve', value: 'approve'},
+                    {id: 'b-2', label: {en: 'Reject', ru: 'Отклонить'}, value: 'reject'},
+                    {id: 'b-3', label: '', value: 'skip'},
+                ],
+            },
+        })
+
+        expect(handles.map((h) => h.handle)).toEqual(['b-1', 'b-2', 'b-3', 'timeout', 'error'])
+        expect(handles.map((h) => h.label)).toEqual(['Approve', 'Reject', 'Button 3', 'Timed out', 'Error'])
+    })
+
+    it('exposes only timeout and error while there are no buttons', () => {
+        expect(nodeHandles({id: 'n1', type: 'ask_person'}).map((h) => h.handle)).toEqual(['timeout', 'error'])
     })
 })

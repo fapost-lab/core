@@ -33,6 +33,26 @@ nothing is sent and the block leaves through its **error** exit with
 still means the contact of the conversation, which a flow without a contact cannot
 read.
 
+**Send to** can also name many people at once: **tags** (contacts with any of
+them) or a **segment**. The block then starts a broadcast for the flow's assistant
+and goes on at once, without waiting for it to finish; the broadcast appears on the
+Broadcasts screen marked *From automation*, with the flow's name, and can be
+cancelled there like any other. Such a message is text only — no media, keyboard or
+saved answer — and must not use `contact.*` or `module.*`, since it goes to everyone
+in the audience. Each language of the text is filled in when the block runs, and
+each recipient gets it in their own language. Optionally give the broadcast a
+**name** (otherwise the flow's name and the time) and a flow variable to **save**
+`{broadcast_id, recipient_count}` to; the count is the reach when the block ran.
+
+A step the engine repeats gets the same broadcast back, never a second one. While
+the block's previous broadcast is still running, the block leaves through **error**
+with `broadcast_running`; a segment that was deleted gives `audience_missing`, a text
+with nothing in the base language `message_empty`. An audience nobody is in still
+starts a broadcast, which completes with no recipients. Publishing a flow that adds
+such a block, or changes its audience or text, needs the **Manage broadcasts**
+permission. To act when the broadcast is done, start a flow on the
+`core.broadcast.completed` event.
+
 If the send fails, the flow leaves through the block's **error** exit, and the flow log
 shows `send_failure: ...` with the reason on the block. When the
 tenant has used up its outbound messages for the period, the message is not sent
@@ -206,6 +226,48 @@ changes what every parent runs. To keep a parent on a tested version, enter its
 number in **Pinned version**: that version keeps running after the child is
 republished. Publishing refuses a version the child never published.
 
+### Start flow for contact
+
+Starts another flow as a **new conversation of a contact**, and goes on at once — it
+does not wait for that conversation, as a [Subflow](#subflow) does.
+
+Use it when something outside a conversation should reach a person: a scheduled
+reminder, an order a [webhook](/using/webhook-trigger) reports, an event. Pick the
+flow to start (a flow of the same assistant) and name the contact in **Contact**
+with an expression, such as `{{flow.customer_id}}`. The contact is required: the
+block never falls back to the contact of the run, so a flow without a contact can
+use it too. The started conversation is the contact's with the bot of the flow you
+picked, on the channel the contact used last.
+
+**Pass to the started flow** sets temporary variables of the new conversation, as
+the subflow's list does; a value that is only one expression keeps its type.
+
+The block continues on one of four exits:
+
+- `started` — the conversation is queued and starts within seconds. One step of
+  the flow starts one conversation, even when the step is repeated after a
+  failure; a loop over several contacts starts one per contact.
+- `busy` — the contact is in the middle of something with that bot: an operator
+  has the thread or one was requested, or a conversation with the bot moved in the
+  last **Busy window** minutes (30 by default), or a conversation with the bot is
+  waiting in a [Delay](#delay) to go on by itself. Nothing is sent. A live
+  conversation older than the window is ended and replaced by the new one; with a
+  window of 0 the contact is busy only while an operator has the thread. A
+  conversation never starts a flow over itself: a flow that names its own contact
+  on the same bot leaves by `busy`.
+- `no_channel` — the contact has no channel on an active channel of that bot, so
+  nothing could be delivered.
+- `error` — the expression gave no contact id (`addressee_unresolved`), no
+  contact has that id (`contact_not_found`), the flow has no active version
+  (`target_inactive`), or flows starting each other went five levels deep
+  (`chain_depth_exceeded`).
+
+The block checks the contact again when the conversation actually starts; if the
+contact became busy or lost the channel in between, nothing is started and this
+flow does not learn of it. A private flow starts even for a contact who has not
+passed authentication ([Visibility](/using/flows)): you wired the start yourself. To reach many contacts at once, use a
+[broadcast](/using/broadcasts).
+
 ### Template
 
 Places a [flow template](/using/flow-templates) in the flow as a single block.
@@ -340,11 +402,44 @@ including what to do when nothing relevant was found.
 
 ### Auth request
 
-Checks that the contact is who they claim to be before continuing.
+Checks that the contact is who they claim to be before continuing. A passed check
+marks the contact authenticated, which opens [private flows](/using/flows) to them and
+can be read later by a Branch block. Use it to gate anything that should not be
+available to a stranger who found the bot.
 
-It compares an answer against an expected value and records the result on the
-session, so later blocks can require it. Use it to gate anything that should not
-be available to a stranger who found the bot.
+Pick a **method**:
+
+- **Basic** compares an answer the flow already has (a variable) with an expected value.
+- **Phone number** asks the contact to share their own number with a button. A contact
+  card someone forwarded, or a typed number, is not accepted. Set an **expected phone
+  number** (for example one your CRM returned to a Call block) to accept only that
+  number; without it the block proves only that the contact owns a Telegram account with
+  a phone number. Needs a channel that can ask for a contact.
+- **Code by email** sends a one-time code to the address you set (usually a contact
+  attribute) and waits for the contact to type it back. The email has a fixed text in the
+  contact's language, signed with the assistant's name; you write only the chat message
+  that asks for the code. Name the **new code** button to let the contact ask for another
+  one after a pause.
+- **Code by SMS** works the same way over SMS, once an SMS connector is installed;
+  publishing is refused without one.
+
+The block has two outcomes: **Authenticated** and **Failed**. A failed check says why in
+the flow log: too many wrong answers (`attempts_exhausted`), an expired code
+(`expired`), a code that could not be delivered (`delivery_failed`) or too many codes
+(`rate_limited`). For a phone check that ran out of attempts, the last refusal is given
+as the detail: a forwarded contact card (`foreign_contact`) or a different number
+(`phone_mismatch`). The code itself never appears in the flow, its variables or the flow
+log, and is not accepted again once used.
+
+Limits protect the address you send to: a code is 4 to 8 digits (6 by default) and works
+for up to 30 minutes (10 by default), the contact has up to 10 attempts (5 by default) and
+up to 5 codes per check (3 by default), and one address or number gets at most 5 codes an
+hour in your workspace. A code sent by email or SMS counts against the workspace's
+verification codes for the period, where the operator sets such a limit. An address taken
+from what the contact typed is allowed, but publishing warns about it: anyone could have
+codes sent to any address.
+
+Blocks added before this version keep their single outcome and the Basic method.
 
 ### Notify
 
@@ -419,6 +514,49 @@ The block is self-contained. To reuse a configured request, put it in a
 than an operator conversation (hours, for example `P1D`); otherwise it is ended
 while the operator may still be talking, and the parent continues through `failed`.
 Messages the flow sends are not blocked while an operator holds the conversation.
+
+### Ask a person
+
+Sends a question with buttons to a contact and waits for the answer.
+
+The **addressee** is required: an expression that gives a contact id, such as
+`{{flow.manager_id}}`. The question goes to that contact on the run's assistant, so
+the block works in flows started by a schedule, a webhook, an event or the API, which
+have no contact of their own, as well as in conversations. The block sets:
+
+- **Question text** and **1 to 8 buttons**. A label is translatable; a button's value
+  is the same in every language.
+- **Wait** from 60 seconds to 7 days. Required.
+- **Late answer text**, optional. See below.
+- **Save the answer to**, optional: a variable that receives the pressed button's value.
+
+The block has one exit per button, plus `timeout` and `error`. `error` is taken when
+the addressee gives no contact id, when the run has no assistant or channel to send
+through, when the message could not be sent, or when the question was lost.
+
+The block's output in the run trace holds `answer`, `button_id`, `answered_by` and
+`answered_at`, or `timed_out_at` when nobody answered, plus `question_id`. When the
+wait was shortened (see below), `clamped_by_run_deadline` is set.
+
+Only the addressee, on that assistant, can answer, and only with one of the
+question's buttons. Anything else is ignored silently. A press never reaches the
+addressee's own conversation and never starts a flow for them, even if the question
+is unknown or gone, and it works while an operator holds the addressee's thread. An
+accepted press removes the buttons and sends no text. A press after the decision,
+after the timeout, or after the run ended or was reset gets the late answer text, or
+the system text "This has already been decided." (an operator can override it per
+tenant, like other system texts).
+
+<Note>
+  An automation run lives at most `flow.automation.max_run_hours` (24 hours by
+  default), and the wait ends one minute before the run's deadline at the latest. With
+  less than a minute left, the block takes `timeout` at once and asks nothing. To wait
+  longer than a day, raise that platform setting.
+</Note>
+
+In a conversation, while the run waits, its own contact gets the usual "busy" reply,
+and `/reset` ends the run. A question is deleted together with its run (under the
+automation run retention) and with its addressee's contact.
 
 ## Annotation
 

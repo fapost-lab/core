@@ -1,0 +1,71 @@
+---
+title: "Schedule trigger"
+description: "Start a flow on a schedule — every weekday at nine, every hour, the first of the month — in the time zone you choose."
+---
+
+A schedule trigger starts a flow at the moments a cron expression describes, in a time zone you choose. The flow runs
+without a contact, as an automation run, with the moment it was started for available under `flow.schedule`.
+
+## Setting it up
+
+1. Add a trigger to the flow and choose **Schedule**.
+2. Enter the **Cron** expression: five fields — minute, hour, day of month, month, day of week. For example:
+
+   | Cron | Runs |
+   |---|---|
+   | `0 9 * * 1-5` | at 09:00, Monday to Friday |
+   | `*/15 * * * *` | every 15 minutes |
+   | `30 7 1 * *` | at 07:30 on the first of every month |
+   | `@daily` | at midnight (also `@hourly`, `@weekly`, `@monthly`, `@yearly`) |
+
+   A schedule runs at most once a minute: an expression with a sixth field (seconds) is refused.
+3. Enter the **Time zone** as an IANA name, such as `Europe/Berlin`, `America/New_York` or `UTC`. The cron is read in
+   that zone, so `0 9 * * *` in `Europe/Berlin` runs at nine in Berlin, in winter and in summer.
+4. [Publish](/using/publishing) the flow. Adding, changing or removing a schedule needs **Manage automations**.
+
+Publishing refuses an expression that is not five fields (`invalid_schedule_cron`) and a time zone that is not an IANA
+name (`invalid_schedule_timezone`).
+
+The first run is the first moment of the schedule after the publish. Publishing again without changing the cron or the
+time zone keeps the schedule where it is; changing either one, or switching the trigger off and on again, starts it
+afresh from the moment of the publish. Switching the trigger off, deleting it or deleting the flow stops it.
+
+<Note>
+  A schedule published before your installation was upgraded to the release that runs schedules does not run until
+  its flow is published again.
+</Note>
+
+## When it runs and when it does not
+
+- **One run at a time.** If the previous run of the trigger is still going — running, sleeping in a **Delay** block,
+  waiting for an answer or for a subflow — the next moment is skipped, not queued. The skip is written to the log as
+  `flow.schedule.tick_skipped`.
+- **No catching up.** Moments that pass while the platform or the workspace is down (or stopped) are not run
+  afterwards. A moment is still run if it is picked up up to five minutes late; after a longer outage the schedule logs
+  `flow.schedule.tick_missed` once and continues with its next moment.
+- **Daylight saving time.** A time that does not exist on the day clocks go forward (02:30 in Berlin on the last
+  Sunday of March) does not run that day. A time that happens twice on the day clocks go back runs once, the first
+  time.
+- **Within the minute.** Runs of the same minute are spread over its sixty seconds, so a schedule may start a few
+  seconds after the full minute; each trigger always gets the same offset.
+- A flow that is not published, or whose published version is switched off, does not run; the moment is skipped and
+  logged.
+
+## What the flow receives
+
+| Variable | Value |
+|---|---|
+| `flow.schedule.slot` | The moment the run is for, in UTC, ISO 8601 — for example `2026-11-20T08:00:00+00:00` |
+| `flow.schedule.local_time` | The same moment in the trigger's time zone — `2026-11-20T09:00:00+01:00` |
+| `flow.schedule.timezone` | The trigger's time zone |
+| `flow.schedule.cron` | The trigger's cron expression |
+
+The flow has no contact, so blocks that need one cannot be published in it; see [Publishing](/using/publishing).
+
+## For operators
+
+Schedules are run by `flow:fire-scheduled-triggers`, which the scheduler starts every minute; without
+`php artisan schedule:run` every minute ([Services](/self-hosting/services)) no schedule runs. The command looks up
+which workspaces have something due in a table of the platform database, `flow_schedule_registry`, created by the
+landlord migration, and enters only those. `flow:rebuild-schedule-registry` rewrites that table from the workspaces
+every hour.

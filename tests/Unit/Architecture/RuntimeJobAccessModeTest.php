@@ -21,6 +21,7 @@ use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantAccessStates;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use App\Infrastructure\Solution\RunsSolutionJob;
+use App\Jobs\Flow\ContinueAfterFlowQuestionJob;
 use App\Jobs\Flow\ContinueAfterOperatorRequestJob;
 use App\Jobs\Flow\ContinueAutomationRunJob;
 use App\Jobs\Flow\DispatchFlowTriggerEventJob;
@@ -28,7 +29,9 @@ use App\Jobs\Flow\ExpireOperatorRequestJob;
 use App\Jobs\Flow\FireRegisteredTriggerJob;
 use App\Jobs\Flow\ResumeDelayedFlowSessionJob;
 use App\Jobs\Flow\ResumeTimedOutSendMessageNodeJob;
+use App\Jobs\Flow\SendOneTimeCodeJob;
 use App\Jobs\Flow\StartAutomationRunJob;
+use App\Jobs\Flow\StartFlowForContactJob;
 use App\Jobs\Flow\StartFlowFromEventJob;
 use App\Jobs\Media\CleanupSoftDeletedMediaJob;
 use App\Jobs\Messaging\BroadcastSendJob;
@@ -66,14 +69,17 @@ final class RuntimeJobAccessModeTest extends TestCase
         DispatchFlowTriggerEventJob::class,
         FireRegisteredTriggerJob::class,
         StartFlowFromEventJob::class,
+        StartFlowForContactJob::class,
         StartAutomationRunJob::class,
         ContinueAutomationRunJob::class,
         SendContactNotificationJob::class,
         SendStaffNotificationJob::class,
+        SendOneTimeCodeJob::class,
         ResumeDelayedFlowSessionJob::class,
         ResumeTimedOutSendMessageNodeJob::class,
         ExpireOperatorRequestJob::class,
         ContinueAfterOperatorRequestJob::class,
+        ContinueAfterFlowQuestionJob::class,
         NotifyOperatorRequestJob::class,
         RunBroadcastJob::class,
         SendBroadcastRecipientJob::class,

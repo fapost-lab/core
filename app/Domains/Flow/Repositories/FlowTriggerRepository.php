@@ -5,13 +5,21 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Repositories;
 
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Schedule\ScheduleClock;
+use App\Domains\Flow\Schedule\ScheduleTriggerConfig;
 use App\Domains\Flow\Services\FlowTriggerSet;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
-final class FlowTriggerRepository implements FlowTriggerRepositoryInterface
+final readonly class FlowTriggerRepository implements FlowTriggerRepositoryInterface
 {
+    public function __construct(private ScheduleClock $clock)
+    {
+    }
+
     public function getActiveByType(string $tenantId, ?string $assistantId, string $type): iterable
     {
         $query = FlowTrigger::query()
@@ -71,7 +79,9 @@ final class FlowTriggerRepository implements FlowTriggerRepositoryInterface
                     'is_active'    => $trigger['is_active'],
                     'priority'     => $trigger['priority'],
                     'config'       => $trigger['config'],
-                ])->save();
+                ]);
+                $this->scheduleNextRun($row);
+                $row->save();
 
                 continue;
             }
@@ -90,6 +100,8 @@ final class FlowTriggerRepository implements FlowTriggerRepositoryInterface
                     'next_run_at' => null,
                 ]);
             }
+
+            $this->scheduleNextRun($row);
 
             // An unchanged row is not saved: saving runs today's config validator, and a row an older validator
             // accepted must not block a publish that does not touch it.
@@ -134,5 +146,30 @@ final class FlowTriggerRepository implements FlowTriggerRepositoryInterface
             ->where('is_active', true)
             ->where('config->event_name', $eventName)
             ->exists();
+    }
+
+    /**
+     * A schedule trigger's next slot as the publish leaves it: an active one with none (new, its cron or time zone
+     * changed, just switched on, or published before schedules ran) gets the first slot after now; one that already
+     * has a slot keeps it; a switched-off one has none. Other types never have one.
+     */
+    private function scheduleNextRun(FlowTrigger $row): void
+    {
+        if (FlowTriggerType::Schedule !== $row->type || ! $row->is_active) {
+            if (null !== $row->next_run_at) {
+                $row->next_run_at = null;
+            }
+
+            return;
+        }
+
+        if (null !== $row->next_run_at) {
+            return;
+        }
+
+        $row->next_run_at = $this->clock->nextSlotAfter(
+            ScheduleTriggerConfig::fromConfig(is_array($row->config) ? $row->config : []),
+            CarbonImmutable::now(),
+        );
     }
 }

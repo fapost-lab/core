@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
+use App\Domains\Flow\Handlers\AskPersonNodeHandler;
 use App\Domains\Flow\Handlers\AssignNodeHandler;
 use App\Domains\Flow\Handlers\BranchNodeHandler;
 use App\Domains\Flow\Handlers\CallNodeHandler;
@@ -11,6 +12,7 @@ use App\Domains\Flow\Handlers\EmitEventNodeHandler;
 use App\Domains\Flow\Handlers\InputNodeHandler;
 use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
+use App\Domains\Flow\Handlers\StartFlowNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Handlers\WebhookResponseNodeHandler;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -31,6 +33,7 @@ final class NodeHandlerSchemaSectionsTest extends TestCase
     public static function handlerProvider(): array
     {
         return [
+            'ask_person'       => [AskPersonNodeHandler::class],
             'assign'           => [AssignNodeHandler::class],
             'branch'           => [BranchNodeHandler::class],
             'call'             => [CallNodeHandler::class],
@@ -39,6 +42,7 @@ final class NodeHandlerSchemaSectionsTest extends TestCase
             'input'            => [InputNodeHandler::class],
             'send'             => [SendMessageNodeHandler::class],
             'subflow'          => [SubflowNodeHandler::class],
+            'start_flow'       => [StartFlowNodeHandler::class],
             'webhook_response' => [WebhookResponseNodeHandler::class],
         ];
     }

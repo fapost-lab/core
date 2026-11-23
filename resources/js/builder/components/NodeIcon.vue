@@ -95,6 +95,13 @@ const SHAPES: Record<string, string> = {
         <rect x="10" y="10" width="4" height="4" rx="0.6" fill="currentColor" stroke="none" />
     `,
 
+    // ── start_flow — arrow leading into a person ──
+    start_flow: `
+        <path d="M3 12h7M7 8.5l3.5 3.5L7 15.5" />
+        <circle cx="17" cy="8.5" r="3" />
+        <path d="M11.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+    `,
+
     // ── template — puzzle-like block with an output arrow ──
     template: `
         <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -118,6 +125,13 @@ const SHAPES: Record<string, string> = {
     notify: `
         <path d="M12 4a5 5 0 0 0-5 5c0 5-2 6-2 6h14s-2-1-2-6a5 5 0 0 0-5-5z" />
         <path d="M10 19a2 2 0 0 0 4 0" />
+    `,
+
+    // ── ask_person — speech bubble with a question mark ──
+    ask_person: `
+        <path d="M5 5h14v10H11l-4 4v-4H5z" />
+        <path d="M10.2 9.2a1.8 1.8 0 1 1 2.4 1.7c-.4.2-.6.5-.6.9" />
+        <circle cx="12" cy="13.2" r=".6" fill="currentColor" stroke="none" />
     `,
 
     // ── auth_request — shield with check ──

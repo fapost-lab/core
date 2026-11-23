@@ -104,6 +104,7 @@ return [
             'use_credentials'           => 'Use credentials',
             'view_run_payloads'         => 'View run payloads',
             'start_flow_runs'           => 'Start flow runs through the API',
+            'rerun_flow'                => 'Re-run failed automation runs',
         ],
         'descriptions' => [
             'rotate_channel_token'  => 'Reissues the webhook URL hash. Existing webhook configurations become invalid until re-configured on the platform side.',
@@ -120,6 +121,7 @@ return [
             'use_credentials'       => 'Picks a saved credential in a call node and tests a call with it. The value is never shown.',
             'view_run_payloads'     => 'Shows the full input and output of each node in a run\'s trace, including answers from outside services.',
             'start_flow_runs'       => 'Lets a token start runs of published flows through their API trigger. Only administrators can put it on a token, since it reaches the flows of every assistant.',
+            'rerun_flow'            => 'Runs a failed automation run again from the start with the same trigger payload. Every request to outside systems and every message of the flow is sent again.',
         ],
         'sensitive_warning' => 'Sensitive — review carefully before assigning.',
     ],

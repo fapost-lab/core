@@ -12,7 +12,9 @@ import FlowConditionCard from './FlowConditionCard.vue'
 import FlowSendMessageCard from './FlowSendMessageCard.vue'
 import FlowSubflowCard from './FlowSubflowCard.vue'
 import FlowCallCard from './FlowCallCard.vue'
+import FlowAskPersonCard from './FlowAskPersonCard.vue'
 import FlowRequestOperatorCard from './FlowRequestOperatorCard.vue'
+import FlowStartFlowCard from './FlowStartFlowCard.vue'
 import FlowLoopCard from './FlowLoopCard.vue'
 import FlowTemplateCard from './FlowTemplateCard.vue'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
@@ -329,13 +331,13 @@ function addTrigger() {
     }
 }
 
-const { can } = usePermissions()
+const permissions = usePermissions()
 
 /** Removing an automatic trigger (anything but a message) needs the Manage automations permission. */
 function canRemoveTrigger(id: string): boolean {
     const trigger = builderStore.triggers.find((t) => t.id === id)
 
-    return trigger?.type === 'message' || can('manage_automations')
+    return trigger !== undefined && permissions.canRemoveTrigger(trigger.type)
 }
 
 function removeTrigger(id: string) {
@@ -513,6 +515,12 @@ const trailingInsertContext = computed(() => {
                         :parent-branch="selectionStore.activeBranch"
                         :tree-node="item"
                     />
+                    <FlowAskPersonCard
+                        v-else-if="item.node.type === 'ask_person'"
+                        :index="index + 1"
+                        :parent-branch="selectionStore.activeBranch"
+                        :tree-node="item"
+                    />
                     <FlowRequestOperatorCard
                         v-else-if="item.node.type === 'request_operator'"
                         :index="index + 1"
@@ -521,6 +529,12 @@ const trailingInsertContext = computed(() => {
                     />
                     <FlowTemplateCard
                         v-else-if="item.node.type === 'template'"
+                        :index="index + 1"
+                        :parent-branch="selectionStore.activeBranch"
+                        :tree-node="item"
+                    />
+                    <FlowStartFlowCard
+                        v-else-if="item.node.type === 'start_flow'"
                         :index="index + 1"
                         :parent-branch="selectionStore.activeBranch"
                         :tree-node="item"
