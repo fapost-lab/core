@@ -60,6 +60,20 @@ final class LoopNodeHandler extends AbstractVersionedHandler implements Declares
         $this->comparator = new OperatorComparator();
     }
 
+    /**
+     * The name a loop keeps its pass under (`flow.<name>`): its `iterator_name`, or {@see DEFAULT_ITERATOR_NAME}
+     * when that is missing or empty. The one place the fallback is decided — the engine's budget, the node trace,
+     * `loop_end`, publishing and validation all read a loop's iterator through it, so they never disagree on the key.
+     *
+     * @param  array<array-key, mixed>  $config  the node's `config`
+     */
+    public static function iteratorNameOf(array $config): string
+    {
+        $raw = $config['iterator_name'] ?? null;
+
+        return is_string($raw) && '' !== $raw ? $raw : self::DEFAULT_ITERATOR_NAME;
+    }
+
     public function version(): int
     {
         return 1;
@@ -108,7 +122,7 @@ final class LoopNodeHandler extends AbstractVersionedHandler implements Declares
     {
         $config       = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];
         $mode         = is_string($config['mode'] ?? null) ? $config['mode'] : 'counted';
-        $iteratorName = $this->resolveIteratorName($config);
+        $iteratorName = self::iteratorNameOf($config);
 
         $iteratorPath = 'flow.' . $iteratorName;
         // Total is per-loop, derived from the iterator name so sibling loops
@@ -229,13 +243,5 @@ final class LoopNodeHandler extends AbstractVersionedHandler implements Declares
             sourceHandle: self::DEFAULT_HANDLE,
             stateChanges: $stateChanges,
         );
-    }
-
-    /** @param  array<string, mixed>  $config */
-    private function resolveIteratorName(array $config): string
-    {
-        $raw = $config['iterator_name'] ?? null;
-
-        return is_string($raw) && '' !== $raw ? $raw : self::DEFAULT_ITERATOR_NAME;
     }
 }

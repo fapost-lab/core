@@ -48,9 +48,8 @@ against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `Publish
 - **`max_size` editor:** `VariableStorageEditor` shows "Keep last" under the list toggle for a list saved to the
   contact; it compiles to `properties.max_size` and publish writes it to the registry (7.3). `list_max_size_invalid`
   (`ListSizeChecker`) rejects a value that is not a whole number from 1 to 1000, or one set on a session list.
-- **Loop-aware step budget (14.1, option a):** `StepBudget`, one per engine call of an automation, one per session per
-  outermost engine call of a conversation (shared with the nested call that resumes a parent after its subflow child
-  ended). Steps inside a loop body — the body,
+- **Loop-aware step budget (14.1, option a):** `StepBudget`, one per session per outermost engine call of either kind
+  (shared with the nested call that resumes a parent after its subflow child ended). Steps inside a loop body — the body,
   its `loop_end` and the loop node's re-evaluations — do not count against `flow.execution.max_iterations`; entering a
   loop costs it one step. A loop may run `flow.execution.max_loop_iterations` iterations (platform setting, default
   1000, at most 3000), checked against its persisted iterator when it takes the `loop` exit — over the whole run for an
@@ -576,8 +575,9 @@ Two branches, each with its own loop and the same `iterator_name`, are fine: onl
 - **Subflow:** a subflow in a loop body creates a new child session per iteration (wait mode; `resumeAfterSubflow`
   returns to the post-subflow position inside the body). 100 iterations x a subflow is 100 child sessions:
   acceptable but heavy, use with care. In an automation the parent resumed by its child's end runs the next steps
-  of the body in a nested engine call, which writes the iteration count; the frame that ran the subflow node then counts
-  only its own step and leaves that count alone (`AutomationRunTest`).
+  of the body in a nested engine call that shares the frame's step budget, so the subflow step is in the iteration count
+  that call writes; the frame that ran the subflow node then counts its own step in `step_count`/`loop_step_count`
+  (`AutomationRunTest`).
 
 ---
 

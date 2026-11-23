@@ -101,8 +101,7 @@ final readonly class VariablePathConflictChecker
             // A loop keeps its counter (and, when counted, its total) in the session.
             if (LoopNodeHandler::TYPE === ($node['type'] ?? null)) {
                 $config   = is_array($node['config'] ?? null) ? $node['config'] : [];
-                $raw      = $config['iterator_name'] ?? null;
-                $iterator = is_string($raw) && '' !== $raw ? $raw : LoopNodeHandler::DEFAULT_ITERATOR_NAME;
+                $iterator = LoopNodeHandler::iteratorNameOf($config);
                 $paths[]  = 'flow.' . $iterator;
 
                 if ('while' !== ($config['mode'] ?? null)) {

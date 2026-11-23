@@ -94,6 +94,18 @@ final class AutomationRunTest extends FeatureTestCase
         ];
     }
 
+    /**
+     * @return array<string, array{int}>
+     */
+    public static function subflowRunawaySegments(): array
+    {
+        return [
+            'one segment'           => [50],
+            'three steps a segment' => [3],
+            'one step a segment'    => [1],
+        ];
+    }
+
     public function test_a_run_crosses_several_segments_and_ends_as_one_session(): void
     {
         $flowId = $this->probeChain(5);
@@ -526,6 +538,49 @@ final class AutomationRunTest extends FeatureTestCase
         $this->assertSame(2, $parent->step_count);
         $this->assertSame(24, $parent->loop_step_count);
         $this->assertSame(0, $parent->loop_iteration_step_count);
+    }
+
+    #[DataProvider('subflowRunawaySegments')]
+    public function test_a_runaway_loop_body_with_a_subflow_stops_at_one_iteration_s_steps(int $segmentSteps): void
+    {
+        // p1 and the subflow node lead back to p1 without a loop_end, and each child ends in the call that starts it,
+        // so a nested call resumes the parent inside its subflow step. Each subflow step must count in the iteration:
+        // the run stops at max_iterations steps of it, not at about twice as many.
+        config([
+            'flow.execution.max_iterations'      => 10,
+            'flow.execution.max_loop_iterations' => 5,
+            'flow.automation.segment_steps'      => $segmentSteps,
+        ]);
+        $childFlowId  = $this->childOfProbes(1);
+        $parentFlowId = $this->flow([
+            ['id' => 'loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                'mode'          => 'counted',
+                'iterator_name' => 'i',
+                'count_source'  => ['type' => 'literal', 'value' => 1],
+            ]],
+            ['id' => 'p1', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H']],
+            ['id' => 'p-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [
+            ['id' => 'pe1', 'from' => 'loop', 'to' => 'p1', 'handle' => 'loop'],
+            ['id' => 'pe2', 'from' => 'p1', 'to' => 'p-sub', 'handle' => 'default'],
+            ['id' => 'pe3', 'from' => 'p-sub', 'to' => 'p1', 'handle' => 'success'],
+            ['id' => 'pe4', 'from' => 'loop', 'to' => 'p-end', 'handle' => 'default'],
+        ]);
+
+        try {
+            $this->start($parentFlowId, 'slot-1');
+            $this->drain();
+            $this->fail('A loop body with a subflow that never reaches its loop_end must hit the iteration\'s step limit.');
+        } catch (FlowExecutionLimitExceededException $exception) {
+            $this->assertStringContainsString("One iteration of loop node 'loop' exceeded 10 steps", $exception->getMessage());
+        }
+
+        $parent = FlowSession::query()->whereNull('parent_session_id')->sole();
+        $this->assertSame(FlowSessionStatus::Failed, $parent->status);
+        // p1 and the subflow node, five times each, are the ten steps of the iteration; the eleventh, p1, fails it.
+        $this->assertSame(['p1' => 5, 'k1' => 5], AutomationProbeTestHandler::$runs);
+        $this->assertSame(1, $parent->step_count);
     }
 
     public function test_a_subflow_step_whose_child_ran_out_still_counts_in_its_iteration(): void

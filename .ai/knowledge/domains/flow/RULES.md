@@ -154,21 +154,19 @@ broken.
   its `loop_end`; a `loop` node takes its `loop` exit with its persisted iterator past `flow.execution.max_loop_iterations`
   (over the whole run for an automation, so it holds across segments and retries; per engine call for a conversation,
   from the iterator the call found, so a loop that waits for the contact is not stopped after so many messages); or all steps pass the ceiling
-  `min(FlowEngineInterface::MAX_STEPS_PER_RUN, max_iterations × (max_loop_iterations + 1))`. A conversation counts per
-  outermost engine call — one budget per session, held by the scoped `ExecutionSegment`, so a parent resumed in a
-  nested call after its subflow child ended keeps its loop's count, its clock and its steps; an automation run counts over all its segments — steps outside loop bodies in `step_count` (capped by
+  `min(FlowEngineInterface::MAX_STEPS_PER_RUN, max_iterations × (max_loop_iterations + 1))`. Either kind keeps one budget
+  per session per outermost engine call (`ExecutionSegment::stepBudget()`), so a parent resumed in a nested call inside
+  its subflow step (its child ended in the same call) goes on from a count that holds that step — its loop's count, its
+  steps and, in a conversation, its clock. A conversation counts per outermost call; an automation run counts over all its segments — steps outside loop bodies in `step_count` (capped by
   `max_iterations`), steps inside them in `loop_step_count` (the sum capped by the ceiling) — and a segment that starts
   inside a loop body knows it from the iterator in state. A conversation call, which has no segments, also fails a loop
   body still running after `FlowEngineInterface::MAX_SEGMENT_SECONDS` (30 s) of the outermost call — subflow children
   it ran synchronously included — so a long loop of slow nodes never outlives the 60 s job timeout and leaves the
   session stuck `active`. An automation also persists the steps of the iteration in progress (`loop_iteration_step_count`,
   reset by a `loop_end` and by the loop's exit), so a runaway inside or after a loop body that never reaches its
-  `loop_end` stops at `max_iterations` steps of that iteration however many segments it spans; a subflow step whose parent a nested
-  call already took further (its child ended in the same call) leaves that call's `loop_iteration_step_count` in place
-  and counts itself only in `step_count`/`loop_step_count`. Known gap: that nested call starts from the count before the
-  subflow step, so each such step is missing from the iteration count until the next `loop_end`; a runaway body with a
-  subflow in it is held by a looser bound than `max_iterations` (about twice it, or only the ceiling and the run
-  deadline for a cycle of subflow nodes alone). Settings are read through the scoped
+  `loop_end` stops at `max_iterations` steps of that iteration however many segments it spans, a body with a subflow in
+  it included; a segment stops before it charges a step it will not run, so the shared budget never holds a step of a
+  running session that nobody persisted. Settings are read through the scoped
   `PlatformSettingsReaderInterface`; a lost session lock aborts with `SessionLockLostException`. Why: a loop over a long
   list is legitimate and must not trip the shared budget, while a runaway flow must still free its worker
   (`adr-20261118-segmented-automation-runs`, amendment 2026-11-19). Enforced: `LoopEngineTest`, `AutomationRunTest`,

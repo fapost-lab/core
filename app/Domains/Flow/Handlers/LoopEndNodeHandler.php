@@ -68,9 +68,7 @@ final class LoopEndNodeHandler extends AbstractVersionedHandler implements Decla
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $config       = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];
-        $iteratorName = is_string($config['iterator_name'] ?? null) && '' !== $config['iterator_name']
-            ? $config['iterator_name']
-            : LoopNodeHandler::DEFAULT_ITERATOR_NAME;
+        $iteratorName = LoopNodeHandler::iteratorNameOf($config);
 
         $iteratorPath    = 'flow.' . $iteratorName;
         $currentIterator = data_get($state, $iteratorPath);

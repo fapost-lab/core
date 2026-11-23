@@ -37,10 +37,12 @@ interface FlowEngineInterface
     public const int MAX_STEPS_PER_RUN = 10000;
 
     /**
-     * The highest value {@see MAX_LOOP_ITERATIONS_SETTING} accepts: three steps per iteration (loop, a one-node body,
-     * loop_end) still fit under {@see MAX_STEPS_PER_RUN}.
+     * The highest value {@see MAX_LOOP_ITERATIONS_SETTING} accepts. A loop iteration takes at least three steps (the
+     * `loop` node, a one-node body, `loop_end`), and 3000 of them take 9000 — under {@see MAX_STEPS_PER_RUN}, with
+     * 1000 steps to spare for the rest of the run. Stated as a value rather than derived, so it stays an integer;
+     * `StepBudgetTest` holds it to that bound.
      */
-    public const int MAX_LOOP_ITERATIONS_LIMIT = (self::MAX_STEPS_PER_RUN - 1000) / 3;
+    public const int MAX_LOOP_ITERATIONS_LIMIT = 3000;
 
     /**
      * The platform setting that caps the steps of one execution segment of an automation run (env default

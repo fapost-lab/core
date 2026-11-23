@@ -25,7 +25,7 @@ use Fapost\Foundation\DTO\NodeExecutionStatus;
  *   never more than {@see FlowEngineInterface::MAX_STEPS_PER_RUN}.
  *
  * A conversation ({@see forConversation()}) counts all of this per outermost engine call — one budget per session,
- * shared through {@see ExecutionSegment::conversationBudget()} with the nested calls that resume the session after a
+ * shared through {@see ExecutionSegment::stepBudget()} with the nested calls that resume the session after a
  * subflow child ended in it; a loop's iterations from the iterator the call found when it first reached the loop, so a
  * loop that waits for the contact in its body ("show the menu again") goes round once per message and is not stopped
  * after so many messages. A conversation call has no execution segments, so a loop body there also stops once the
@@ -41,8 +41,10 @@ use Fapost\Foundation\DTO\NodeExecutionStatus;
  * `max_iterations` steps of that iteration, not only at the ceiling. The engine persists each step's count by
  * {@see lastStepInLoop()} and {@see iterationSteps()}.
  *
- * Never bound: an automation run builds one per engine call, a conversation one per session per outermost call (held
- * by the scoped {@see ExecutionSegment}, cleared when that call returns). Plain values only, nothing survives the call.
+ * One budget per session per outermost engine call, of either kind, held by the scoped {@see ExecutionSegment} and
+ * shared with the nested calls that resume the session inside its own subflow step (its child ended in that call): the
+ * nested call goes on from a count that already holds the subflow step, so an automation's persisted iteration count
+ * never loses it. Never bound; plain values only, cleared when the outermost call returns.
  */
 final class StepBudget
 {
@@ -156,6 +158,16 @@ final class StepBudget
     }
 
     /**
+     * The loop whose body the next step counts in: the loop a `loop` node last entered or went round, or the one a
+     * segment started in; null outside loop bodies and, in a conversation call, until the call passes a `loop` node.
+     * The node trace attributes an iterator several loops share to it.
+     */
+    public function activeLoopNodeId(): ?string
+    {
+        return $this->activeLoopNodeId;
+    }
+
+    /**
      * The most steps a run may take in all, loop bodies included: the shared budget once outside loops and once per
      * loop iteration, capped at {@see FlowEngineInterface::MAX_STEPS_PER_RUN}. An automation run checks it against
      * its steps over all segments.
@@ -247,15 +259,11 @@ final class StepBudget
     }
 
     /**
-     * @param  array<string, mixed>  $node
+     * @param  array<array-key, mixed>  $node
      */
     private static function iteratorName(array $node): string
     {
-        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
-
-        return is_string($config['iterator_name'] ?? null) && '' !== $config['iterator_name']
-            ? $config['iterator_name']
-            : LoopNodeHandler::DEFAULT_ITERATOR_NAME;
+        return LoopNodeHandler::iteratorNameOf(is_array($node['config'] ?? null) ? $node['config'] : []);
     }
 
     /**
