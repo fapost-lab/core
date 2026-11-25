@@ -106,7 +106,8 @@ final class NotifyContactsPublishTest extends FeatureTestCase
 
         $republished = FlowDefinition::query()->where('flow_id', $host->flow_id)->active()->sole();
         $this->assertSame(2, $republished->version);
-        $this->assertSame($legacy['config'], collect($republished->nodes)->firstWhere('id', 'notify')['config'], 'the host keeps its published node');
+        // Compared as a map: jsonb does not keep the order of the keys.
+        $this->assertEquals($legacy['config'], collect($republished->nodes)->firstWhere('id', 'notify')['config'], 'the host keeps its published node');
     }
 
     /**
