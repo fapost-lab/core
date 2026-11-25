@@ -16,9 +16,33 @@ use Fapost\Foundation\Messaging\OutboundMessage;
 use Illuminate\Support\Facades\Bus;
 use Tests\Feature\FeatureTestCase;
 
+/**
+ * The deprecated fan-out of the retired `notify` contacts mode still delivers what an older release queued.
+ */
 final class SendContactNotificationJobTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
+    /**
+     * `serialize()` of the job as the release that still dispatched it built it (tag target, a localized message),
+     * base64-encoded. It is what a queued payload's command holds, so it must keep unserializing.
+     */
+    private const string QUEUED_BY_OLDER_RELEASE = 'Tzo1MToiQXBwXERvbWFpbnNcQ29udGFjdFxKb2JzXFNlbmRDb250YWN0Tm90aWZpY2F0aW9uSm9iIjo4OntzOjg6InRlbmFudElkIjtzOjI1OiIwMUpURU5BTlQwMDAwMDAwMDAwMDAwMDAwIjtzOjExOiJhc3Npc3RhbnRJZCI7czoxMToiYXNzaXN0YW50LTEiO3M6MTM6ImNvbnRhY3RUYXJnZXQiO3M6MzoidGFnIjtzOjQ6InRhZ3MiO2E6MTp7aTowO3M6MzoidmlwIjt9czo3OiJtZXNzYWdlIjthOjI6e3M6MjoiZW4iO3M6MjoiSGkiO3M6MjoicnUiO3M6MTI6ItCf0YDQuNCy0LXRgiI7fXM6OToic2Vzc2lvbklkIjtzOjk6InNlc3Npb24tMSI7czo2OiJub2RlSWQiO3M6Njoibm9kZS0xIjtzOjU6InF1ZXVlIjtzOjE5OiJtZXNzYWdpbmcuYnJvYWRjYXN0Ijt9';
+
+    public function test_a_job_queued_by_an_older_release_unserializes_with_its_properties(): void
+    {
+        $job = unserialize(base64_decode(self::QUEUED_BY_OLDER_RELEASE, true));
+
+        $this->assertInstanceOf(SendContactNotificationJob::class, $job);
+        $this->assertSame('01JTENANT0000000000000000', $job->tenantId);
+        $this->assertSame('assistant-1', $job->assistantId);
+        $this->assertSame('tag', $job->contactTarget);
+        $this->assertSame(['vip'], $job->tags);
+        $this->assertSame(['en' => 'Hi', 'ru' => 'Привет'], $job->message);
+        $this->assertSame('session-1', $job->sessionId);
+        $this->assertSame('node-1', $job->nodeId);
+        $this->assertSame('messaging.broadcast', $job->queue);
+    }
 
     public function test_tag_target_delivers_only_to_reachable_contacts(): void
     {
@@ -95,6 +119,18 @@ final class SendContactNotificationJobTest extends FeatureTestCase
         $this->runJob($channel->assistant_id, 'all', [], ['en' => 'Welcome', 'ru' => 'Добро пожаловать']);
 
         Bus::assertDispatched(BroadcastSendJob::class, fn (BroadcastSendJob $job): bool => 'Добро пожаловать' === $job->message->payload->text);
+    }
+
+    public function test_a_language_without_text_falls_back_to_the_base_language(): void
+    {
+        Bus::fake();
+
+        $channel = $this->channel();
+        $this->bind($this->contact(['language' => 'de']), $channel);
+
+        $this->runJob($channel->assistant_id, 'all', [], ['ru' => 'Привет', 'en' => 'Hello']);
+
+        Bus::assertDispatched(BroadcastSendJob::class, fn (BroadcastSendJob $job): bool => 'Hello' === $job->message->payload->text);
     }
 
     private function channel(): Channel

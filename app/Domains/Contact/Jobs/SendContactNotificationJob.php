@@ -8,8 +8,6 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Conversation\Enums\MessageOrigin;
-use App\Domains\Flow\Contracts\ContentTranslatorInterface;
-use App\Domains\Flow\Enums\ContactNotifyTarget;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Domains\Tenancy\Queue\StoppedTenantAction;
@@ -27,35 +25,37 @@ use Illuminate\Support\Facades\Cache;
 use Psr\Log\LoggerInterface;
 
 /**
- * Fans a `notify` node's contacts-mode message out to an assistant's audience.
+ * Fans a `notify` node's retired contacts-mode message out to an assistant's audience, for jobs an older release queued.
  *
- * @deprecated Nothing dispatches it any more: a `notify` node in the retired contacts
- *             mode now starts a broadcast through Flow's `AudienceBroadcasterInterface`.
- *             It stays for one release, so jobs already queued on `messaging.broadcast`
- *             when that change is deployed still run; it is removed with
- *             {@see BroadcastSendJob} afterwards.
+ * @deprecated Nothing dispatches it: a published `notify` node in contacts mode starts a broadcast through Flow's
+ *             `AudienceBroadcasterInterface` (`adr-20261125-notify-contacts-retired-through-broadcasting`). It still
+ *             delivers, so a job queued on `messaging.broadcast` by a release that dispatched it is sent when this one
+ *             is deployed: the session already recorded the node as notified, so nothing else would send it. Remove it,
+ *             with {@see BroadcastSendJob}, once a Core release has shipped without a dispatcher.
  *
- * Raised by {@see \App\Domains\Flow\Handlers\NotifyNodeHandler} (before the
- * contacts mode was retired) once the flow had composed the notification text. Runs on the low-priority broadcast queue,
- * re-establishes tenant context (queue workers carry no HTTP tenant middleware),
- * resolves the recipient set (by tag / all) for the target assistant, and emits
- * one {@see BroadcastSendJob} per deliverable contact.
+ * It imports nothing of Flow, which closed the Contact → Flow edge through this job: the contact target is compared
+ * as the string Flow's `ContactNotifyTarget::All` held, and {@see self::resolveField()} copies the content
+ * translator's field resolution.
  *
- * Platform constraint: a contact can only be messaged on a channel they have
- * already interacted with — i.e. an active {@see ChannelContact} must exist for
- * the assistant. Tag-targeted contacts without such a binding are skipped and
- * logged. Per-recipient content language is resolved through the content
- * translator (unlike staff mode, which uses the admin-UI language).
+ * Re-establishes tenant context (queue workers carry no HTTP tenant middleware), resolves the recipient set (by tag /
+ * all) for the target assistant, and emits one {@see BroadcastSendJob} per deliverable contact.
  *
- * A Redis-backed guard keyed on (session, node) keeps a retried fan-out from
- * double-enqueuing; the per-message idempotency key dedupes the actual sends.
+ * Platform constraint: a contact can only be messaged on a channel they have already interacted with — i.e. an active
+ * {@see ChannelContact} must exist for the assistant. Tag-targeted contacts without such a binding are skipped and
+ * logged. Per-recipient content language is resolved: contact language → assistant default → tenant fallback.
+ *
+ * A Redis-backed guard keyed on (session, node) keeps a retried fan-out from double-enqueuing; the per-message
+ * idempotency key dedupes the actual sends.
  */
 final class SendContactNotificationJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Queueable;
 
+    /** The contact target that reaches every linked contact; Flow's `ContactNotifyTarget::All`. */
+    private const string TARGET_ALL = 'all';
+
     /**
-     * @param  list<string>   $tags     Tag filter — only used when {@see $contactTarget} is `tag`.
+     * @param  list<string>   $tags     Tag filter — only used when {@see $contactTarget} is not `all`.
      * @param  string|array<string, string>  $message  Rendered text, or a localized {lang: text} map.
      */
     public function __construct(
@@ -88,7 +88,6 @@ final class SendContactNotificationJob implements ShouldQueue, TenantAccessGated
         TenantSwitcher $tenantSwitcher,
         Dispatcher $dispatcher,
         ContactTagRepositoryInterface $tagRepository,
-        ContentTranslatorInterface $translator,
         LoggerInterface $logger,
     ): void {
         // Retry-safety: only the first attempt for this (session, node) fans out.
@@ -100,7 +99,7 @@ final class SendContactNotificationJob implements ShouldQueue, TenantAccessGated
 
         $tenant = $tenants->getById($this->tenantId);
 
-        $tenantSwitcher->runForTenant($tenant, function () use ($dispatcher, $tagRepository, $translator, $logger): void {
+        $tenantSwitcher->runForTenant($tenant, function () use ($dispatcher, $tagRepository, $logger): void {
             $assistant = Assistant::query()->find($this->assistantId);
 
             if (! $assistant instanceof Assistant) {
@@ -119,7 +118,8 @@ final class SendContactNotificationJob implements ShouldQueue, TenantAccessGated
                 return;
             }
 
-            $fallbackLanguage = app(TenantSettings::class)->fallback_language;
+            $settings         = app(TenantSettings::class);
+            $fallbackLanguage = $settings->fallback_language;
 
             foreach ($recipients as $channelContact) {
                 $channel = $channelContact->channel;
@@ -135,7 +135,7 @@ final class SendContactNotificationJob implements ShouldQueue, TenantAccessGated
                     $fallbackLanguage,
                 );
 
-                $text = $translator->resolveField($this->message, $language);
+                $text = $this->resolveField($this->message, $language, $settings->content_base_language);
 
                 if ('' === mb_trim($text)) {
                     continue;
@@ -175,7 +175,7 @@ final class SendContactNotificationJob implements ShouldQueue, TenantAccessGated
      */
     private function resolveRecipients(ContactTagRepositoryInterface $tagRepository, LoggerInterface $logger): Collection
     {
-        if (ContactNotifyTarget::All->value === $this->contactTarget) {
+        if (self::TARGET_ALL === $this->contactTarget) {
             return $this->deliverableChannelContacts(null);
         }
 
@@ -263,5 +263,34 @@ final class SendContactNotificationJob implements ShouldQueue, TenantAccessGated
         }
 
         return $fallback;
+    }
+
+    /**
+     * The message in the recipient's language, else the base language, else the first one given: the content
+     * translator's `resolveField()`, copied so this job imports nothing of Flow.
+     *
+     * @param  string|array<string, string>  $content
+     */
+    private function resolveField(string|array $content, string $language, string $baseLanguage): string
+    {
+        if (is_string($content)) {
+            return $content;
+        }
+
+        if (isset($content[$language]) && is_scalar($content[$language])) {
+            return (string) $content[$language];
+        }
+
+        if (isset($content[$baseLanguage]) && is_scalar($content[$baseLanguage])) {
+            return (string) $content[$baseLanguage];
+        }
+
+        $firstKey = array_key_first($content);
+
+        if (null === $firstKey || ! is_scalar($content[$firstKey])) {
+            return '';
+        }
+
+        return (string) $content[$firstKey];
     }
 }

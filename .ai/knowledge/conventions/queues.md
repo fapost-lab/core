@@ -10,7 +10,7 @@ paths:
   - "app/Domains/Broadcasting/**"
   - "app/Domains/Messaging/**"
 summary: Queues are split by purpose (flow.execution, messaging.*, scheduled.triggers, sync.external); rate limits and backpressure are preventive, not reactive.
-reviewed_at: 2026-11-23
+reviewed_at: 2026-11-25
 ---
 # Messaging and queues
 
@@ -53,11 +53,11 @@ Queue assignment by purpose, as it exists in the codebase today:
   these jobs, not through a separate queue.
 - `messaging.transactional`: reserved like `sync.external` — no job targets it. A reply delivered
   out of band (outside the `flow.execution` job that produced it) is what it is kept for.
-- `messaging.broadcast`: `app/Domains/Broadcasting/Jobs/RunBroadcastJob.php`,
-  `SendBroadcastRecipientJob.php`, `app/Jobs/Messaging/BroadcastSendJob.php`, and, as a deviation,
-  `app/Domains/Contact/Jobs/SendContactNotificationJob.php` (line 61): it is a service
-  notification that runs on the low-priority broadcast queue. It is deprecated and no longer dispatched (the
-  `notify` contacts mode sends through Broadcasting); it stays a release for jobs already queued.
+- `messaging.broadcast`: `app/Domains/Broadcasting/Jobs/RunBroadcastJob.php` and
+  `SendBroadcastRecipientJob.php`. Two deprecated jobs nothing dispatches stay on it for one release, for
+  payloads an older release queued: `app/Jobs/Messaging/BroadcastSendJob.php`, which still delivers its prepared
+  message, and `app/Domains/Contact/Jobs/SendContactNotificationJob.php`, the retired `notify` contacts-mode fan-out, which
+  still fans out what was queued (a service notification on the low-priority broadcast queue, as before).
 - `messaging.system`: `app/Jobs/Messaging/SyncChannelWebhookJob.php`,
   `app/Jobs/Flow/SendOneTimeCodeJob.php` (the encrypted one-time code of an `auth_request` node),
   `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,
