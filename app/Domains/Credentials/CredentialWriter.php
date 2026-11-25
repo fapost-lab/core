@@ -17,11 +17,11 @@ use Fapost\Foundation\Credentials\Contracts\HttpCredentialTypeInterface;
 use Fapost\Foundation\Credentials\DTO\CredentialField;
 use Fapost\Foundation\Credentials\Enums\CredentialFieldKind;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -63,12 +63,18 @@ final readonly class CredentialWriter
 
     private const string SETTINGS_MARKER = 'settings.';
 
+    /**
+     * @param  ConnectionResolverInterface  $db  resolved to the default connection on each call, never captured: a
+     *                                         tenant switch moves the default connection the models write through,
+     *                                         and a transaction on a connection taken earlier would not cover them
+     */
     public function __construct(
         private TenantContextInterface $tenants,
         private CredentialTypeRegistry $types,
         private OAuth2TokenCache $tokens,
         private OAuth2GrantRepository $grants,
         private AuditTrailInterface $audit,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -119,7 +125,7 @@ final readonly class CredentialWriter
         $this->failOn($errors);
 
         try {
-            $credential = DB::transaction(function () use ($name, $typeId, $settings, $hosts, $secrets): Credential {
+            $credential = $this->db->connection()->transaction(function () use ($name, $typeId, $settings, $hosts, $secrets): Credential {
                 $credential = Credential::query()->create([
                     'tenant_id'         => $this->tenantId(),
                     'name'              => $name,
@@ -178,7 +184,7 @@ final readonly class CredentialWriter
         $clientChanged = $secretReplaced || $hostsWidened || self::grantBoundSettingsChanged($credential, $settings);
 
         try {
-            DB::transaction(function () use ($credential, $name, $settings, $hosts, $secrets, $secretReplaced, $clientChanged, $hostsWidened): void {
+            $this->db->connection()->transaction(function () use ($credential, $name, $settings, $hosts, $secrets, $secretReplaced, $clientChanged, $hostsWidened): void {
                 $before = ['name' => $credential->name, 'allowed_hosts' => $credential->allowed_hosts, ...self::settingsFlat($credential->settings)];
 
                 $credential->fill(['name' => $name, 'settings' => $settings, 'allowed_hosts' => $hosts]);
@@ -226,7 +232,7 @@ final readonly class CredentialWriter
      */
     public function delete(Credential $credential): void
     {
-        DB::transaction(function () use ($credential): void {
+        $this->db->connection()->transaction(function () use ($credential): void {
             // The credential's row first, then its grant: the order a consent takes them in, so a reconnect and a
             // delete at once wait for each other instead of deadlocking.
             $this->grants->lockedCredential((string) $credential->getKey());

@@ -8,11 +8,13 @@ use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Credentials\CredentialWriter;
 use App\Domains\Credentials\Models\Credential;
 use App\Domains\Credentials\Models\CredentialOAuthGrant;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\RecordingConnectionResolver;
 use Throwable;
 
 final class CredentialWriterTest extends CredentialsTestCase
@@ -472,6 +474,20 @@ final class CredentialWriterTest extends CredentialsTestCase
         }
 
         $this->assertSame(0, Credential::query()->count());
+    }
+
+    public function test_the_write_opens_its_transaction_on_the_connection_resolved_when_it_writes(): void
+    {
+        $resolver = new RecordingConnectionResolver($this->app->make('db'));
+        $this->app->instance(ConnectionResolverInterface::class, $resolver);
+
+        $writer = $this->writer();
+
+        $this->assertSame([], $resolver->resolved, 'A connection captured when the writer is built would outlive a tenant switch.');
+
+        $writer->create(['name' => 'CRM', 'type' => 'bearer', 'secrets' => ['token' => self::SECRET], 'allowed_hosts' => ['api.example.com']]);
+
+        $this->assertSame([DB::getDefaultConnection()], $resolver->resolved);
     }
 
     /**
