@@ -114,16 +114,26 @@ final class NotifyContactsBroadcastTest extends FeatureTestCase
         $this->assertSame(1, Broadcast::query()->count());
     }
 
+    public function test_a_run_naming_no_flow_definition_goes_on_with_a_broadcast_failure(): void
+    {
+        $result = $this->execute(['contact_target' => 'tag', 'tags' => ['vip'], 'message' => 'Hello'], 'step-1', ['flow' => []]);
+
+        $this->assertSame('default', $result->sourceHandle);
+        $this->assertSame('broadcast_failure', $result->metadata['broadcast_outcome']);
+        $this->assertSame(0, Broadcast::query()->count());
+    }
+
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>       $config
+     * @param  array<string, mixed>|null  $state  null: a run of the test's flow definition
      */
-    private function execute(array $config, string $idempotencyKey): NodeExecutionResult
+    private function execute(array $config, string $idempotencyKey, ?array $state = null): NodeExecutionResult
     {
         $handler = $this->app->make(NodeHandlerRegistryInterface::class)->resolve('notify', 1);
 
         return $handler->execute(
             ['id' => 'notify-1', 'config' => ['mode' => 'contacts', 'assistant_id' => (string) $this->nodeAssistant->getKey(), ...$config]],
-            ['system' => ['flow_definition_id' => (string) $this->definition->getKey()], 'flow' => []],
+            $state ?? ['system' => ['flow_definition_id' => (string) $this->definition->getKey()], 'flow' => []],
             new NodeExecutionContext(
                 tenantId: self::TENANT_ID,
                 contactId: 'contact-1',

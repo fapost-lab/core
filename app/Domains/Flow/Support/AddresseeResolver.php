@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Support;
 
+use App\Domains\Flow\Enums\AudienceKind;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Ramsey\Uuid\Uuid;
@@ -22,8 +23,10 @@ use Ramsey\Uuid\Uuid;
 final readonly class AddresseeResolver
 {
     public const string KIND_CONTACT = 'contact';
-    public const string KIND_TAGS    = 'tags';
-    public const string KIND_SEGMENT = 'segment';
+
+    /** The audience kinds are {@see AudienceKind} values, so the audience path can always map one to a broadcast. */
+    public const string KIND_TAGS    = AudienceKind::Tags->value;
+    public const string KIND_SEGMENT = AudienceKind::Segment->value;
 
     /** @var list<string> */
     public const array KINDS = [self::KIND_CONTACT, self::KIND_TAGS, self::KIND_SEGMENT];

@@ -774,6 +774,28 @@ final class BroadcastsConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_a_broadcast_manager_who_cannot_open_flows_sees_the_flow_name_without_a_link(): void
+    {
+        $draft = FlowDraft::factory()->create([
+            'tenant_id'    => $this->assistant->tenant_id,
+            'assistant_id' => $this->assistant->getKey(),
+            'name'         => 'Seasonal sale',
+        ]);
+        $this->broadcast('From a flow', [
+            'status'     => BroadcastStatus::Running->value,
+            'origin'     => 'automation',
+            'flow_id'    => $draft->flow_id,
+            'origin_key' => 'key-no-flows',
+        ]);
+
+        $this->actingAs($this->userWith(Permission::ManageBroadcast))
+            ->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.flowName', 'Seasonal sale')
+                ->where('table.rows.0.flowUrl', null)
+                ->etc());
+    }
+
     public function test_only_a_running_broadcast_can_be_cancelled(): void
     {
         $this->actingAs($this->admin());

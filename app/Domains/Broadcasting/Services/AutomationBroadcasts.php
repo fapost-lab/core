@@ -148,8 +148,8 @@ final readonly class AutomationBroadcasts
      *
      * The reach is an estimate, so a failed count must not turn a started broadcast into a failure: it is reported as
      * 0 and logged. A started broadcast always counts the live audience. A replayed one (a retried step) reports what
-     * the run has fixed once it has, so a retry gives the same number as the first answer; before that, the live
-     * estimate.
+     * the run has fixed once it has, so retries after that agree with each other; before that, the live estimate. The
+     * first answer may differ from them: the audience can change between the start and the run fixing it.
      */
     private function named(AutomationBroadcastOutcome $outcome, Broadcast $broadcast): AutomationBroadcastResult
     {

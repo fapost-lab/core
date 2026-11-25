@@ -12,6 +12,7 @@ use App\Domains\Flow\Enums\AudienceBroadcastOutcome;
 use App\Domains\Flow\Enums\AudienceKind;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\NotifyNodeHandler;
+use App\Domains\Flow\Handlers\Support\AudienceMessage;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
@@ -333,10 +334,14 @@ final class NotifyNodeHandlerTest extends TestCase
             app(Dispatcher::class),
             app(TemplateRenderer::class),
             app(StaffNotifierRegistry::class),
-            $this->broadcaster,
-            $definitions,
-            $drafts,
-            new EventChainContext(),
+            new AudienceMessage(
+                $this->broadcaster,
+                new EventChainContext(),
+                $definitions,
+                $drafts,
+                app(TemplateRenderer::class),
+                $this->log,
+            ),
             $this->log,
         );
     }

@@ -24,7 +24,8 @@ use Illuminate\Support\Str;
  * Writes and reads {@see ContactSegment}s of the current tenant.
  *
  * Segments are tenant-level, so every read and write is bounded by the tenant in {@see TenantContextInterface}: a
- * segment of another tenant is "not found", never "forbidden". Rules are stored in the shape the Filament form wrote
+ * segment of another tenant is "not found", never "forbidden". The one exception is {@see self::existsForTenant()},
+ * which takes the tenant explicitly from its caller. Rules are stored in the shape the Filament form wrote
  * (see {@see self::canonicalRules()}), so either UI opens what the other saved. Saving rules does not touch the cached
  * size, as in Filament; a recount is a separate action.
  *
