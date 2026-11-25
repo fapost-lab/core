@@ -728,7 +728,7 @@ many staff users of the tenant have each mode now: `tree`, `graph` and their `to
   query on each call.
 
 `Analytics\Events\BuilderModeChanged` is dispatched after a staff user switched the builder to the other
-mode and the choice was saved. It carries `tenantId`, `mode` and `previousMode` (`'tree'` or `'graph'`) and
+mode and the choice was saved, except the platform's support user's, which `usageFor()` does not count either. It carries `tenantId`, `mode` and `previousMode` (`'tree'` or `'graph'`) and
 `occurredAt`, and names no user. Choosing the mode one already has dispatches nothing. Listen to it to follow
 the switches over time; do not rebuild the current counts from it, because deactivating or removing a user
 dispatches nothing — read `usageFor()` for those.

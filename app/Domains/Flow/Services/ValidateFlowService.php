@@ -49,7 +49,6 @@ use Exception;
 use Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface;
 use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
 use Fapost\Foundation\Flow\Enums\NodeConfigIssueSeverity;
-use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
@@ -358,13 +357,10 @@ final readonly class ValidateFlowService
         }
 
         foreach (["builder.node_issues.types.{$type}.{$issue->code}", "builder.node_issues.codes.{$issue->code}"] as $key) {
-            if (! Lang::has($key)) {
-                continue;
-            }
-
+            // The translator answers a missing key with the key itself.
             $translated = __($key, $issue->params);
 
-            if (is_string($translated)) {
+            if (is_string($translated) && $key !== $translated) {
                 return $translated;
             }
         }
