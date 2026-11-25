@@ -12,6 +12,7 @@ use App\Domains\Flow\Enums\AudienceBroadcastOutcome;
 use App\Domains\Flow\Enums\AudienceKind;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
+use App\Domains\Flow\Handlers\Support\ContactPlaceholders;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Support\AddresseeResolver;
 use Carbon\Carbon;
@@ -37,9 +38,6 @@ final readonly class AudienceMessage
 
     /** Where `save_broadcast_to` may write: a flow variable. */
     private const string FLOW_PATH_PATTERN = '/^flow(\.\w+)+$/';
-
-    /** A `{{contact…}}` or `{{module…}}` placeholder of the template engine. */
-    private const string CONTACT_PLACEHOLDER_PATTERN = '/\{\{\s*(contact|module)(\.\w+)*\s*\}\}/';
 
     public function __construct(
         private AudienceBroadcasterInterface $broadcaster,
@@ -91,7 +89,7 @@ final readonly class AudienceMessage
         }
 
         foreach (['text', 'broadcast_name'] as $field) {
-            if (self::readsContact($config[$field] ?? null)) {
+            if (ContactPlaceholders::readsContact($config[$field] ?? null)) {
                 $issues[] = NodeConfigIssue::error(
                     'addressee_broadcast_contact_expression',
                     "A message to tags or a segment goes to many people and must not read a contact: remove the contact placeholders from '{$field}'.",
@@ -185,22 +183,6 @@ final readonly class AudienceMessage
             stateChanges: $stateChanges,
             metadata: [...$output, 'broadcast_outcome' => $result->outcome->value],
         );
-    }
-
-    /**
-     * Whether a text, or any language of a localized one, has a `{{contact…}}` or `{{module…}}` placeholder.
-     */
-    private static function readsContact(mixed $value): bool
-    {
-        $texts = is_array($value) ? $value : [$value];
-
-        foreach ($texts as $text) {
-            if (is_string($text) && 1 === preg_match(self::CONTACT_PLACEHOLDER_PATTERN, $text)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static function broadcastError(string $type, string $message): NodeExecutionResult

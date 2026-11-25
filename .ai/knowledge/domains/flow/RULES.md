@@ -366,6 +366,16 @@ broken.
   `EventChainContext`), so the chain limit stops flows that broadcast on each other's broadcasts
   (`adr-20261123-flow-audience-message-through-broadcasting`). Enforced: `SendMessageBroadcastTest`,
   `BuiltInNodeHandlersTest`, `PublishCoreEventsTest`.
+- **`notify`'s `contacts` mode is retired: never added or changed at publish, and a published one sends only as a
+  broadcast.** Publishing a flow's or a template's draft that adds such a node or changes it against the published
+  version (mode, assistant, audience, tags, message, after template expansion) is refused with `notify_contacts_retired`;
+  an unchanged one only warns (`notify_contacts_deprecated`), and a template republishing its hosts is not checked. At
+  run time the node starts a broadcast of its own `assistant_id` through `AudienceBroadcasterInterface` (tags, or
+  everyone — an audience only this node may name), with `send_message`'s key, live limit and chain depth, never
+  dispatches `SendContactNotificationJob`, refuses a text reading `contact.*`/`module.*`, keeps its
+  `system.contacts_notified.<node>` marker and always leaves through `default`, the outcome in `broadcast_outcome`
+  (`adr-20261125-notify-contacts-retired-through-broadcasting`). Enforced: `NotifyNodeHandlerTest`,
+  `NotifyContactsBroadcastTest`, `NotifyContactsPublishTest`.
 - **A flow started for a contact starts once per step, never for the run's contact, and never over a moving
   conversation or an operator.** A `start_flow` node's start key is the engine's execution key and the node id,
   written on the started session (`flow_sessions.start_key`, unique); the node answers `started` when a session has

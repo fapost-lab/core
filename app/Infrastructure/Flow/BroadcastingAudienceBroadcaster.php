@@ -16,7 +16,8 @@ use App\Domains\Flow\Enums\AudienceKind;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 
 /**
- * The seam between a flow's `send_message` node and Broadcasting: the node's request becomes a broadcast through
+ * The seam between a flow's `send_message` node (and a legacy `notify` node in `contacts` mode) and Broadcasting: the
+ * node's request becomes a broadcast through
  * {@see AutomationBroadcasts}, the automation's entry, which neither audits nor asks for the current assistant.
  *
  * Bound per resolve, never as a singleton: it and {@see AutomationBroadcasts} read the current tenant.
@@ -38,6 +39,7 @@ final readonly class BroadcastingAudienceBroadcaster implements AudienceBroadcas
             target: match ($request->audience) {
                 AudienceKind::Tags    => BroadcastTarget::Tags,
                 AudienceKind::Segment => BroadcastTarget::Segment,
+                AudienceKind::All     => BroadcastTarget::All,
             },
             tags: $request->tags,
             segmentId: $request->segmentId,

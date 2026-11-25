@@ -6,7 +6,9 @@ namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
+use App\Domains\Flow\Enums\NotifyMode;
 use App\Domains\Flow\Handlers\CallNodeHandler;
+use App\Domains\Flow\Handlers\NotifyNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
@@ -17,7 +19,8 @@ use App\Domains\Flow\Templates\TemplateExpander;
 /**
  * What publishing a draft would change that needs a right beyond publishing: a saved credential the published version
  * does not reference yet, an automatic trigger (any type but `message`) made live, changed or removed, and a message to
- * tags or a segment (a broadcast) added or changed.
+ * tags or a segment (a broadcast) added or changed. And what publishing may not change at all: a `notify` node in the
+ * retired `contacts` mode added or changed.
  *
  * Both compare the draft with what runs now: credentials with the flow's published definition (a template's too),
  * triggers with the flow's live rows ({@see FlowTriggerSet::live()}). Dropping a credential reference needs nothing;
@@ -86,6 +89,38 @@ final readonly class FlowPublishChanges
         }
 
         return false;
+    }
+
+    /**
+     * The ids of the `notify` nodes in the retired `contacts` mode that publishing the draft would add, or change against
+     * the published version (mode, assistant, audience, tags, message). An unchanged one may stay; removing one needs
+     * nothing. Such a mode can no longer be authored: the same broadcast is a `send_message` to tags or a segment.
+     *
+     * Compared like {@see changesAudienceMessages()}: a flow's draft after template expansion, by node id, against the
+     * published definition, so a template copy and a host's parameter values count; a template's draft as it is,
+     * against the template's published version.
+     *
+     * @return list<string>
+     */
+    public function changedContactNotifications(FlowDraft $draft): array
+    {
+        $drafted = self::contactNotifications($this->expandedNodes($draft));
+
+        if ([] === $drafted) {
+            return [];
+        }
+
+        $published = $this->definitions->findLatestPublishedByFlowId($draft->flow_id);
+        $current   = null === $published ? [] : self::contactNotifications(is_array($published->nodes) ? $published->nodes : []);
+        $changed   = [];
+
+        foreach ($drafted as $id => $notification) {
+            if (! array_key_exists($id, $current) || $current[$id] !== $notification) {
+                $changed[] = (string) $id;
+            }
+        }
+
+        return $changed;
     }
 
     /**
@@ -177,6 +212,51 @@ final readonly class FlowPublishChanges
         }
 
         return $messages;
+    }
+
+    /**
+     * The `notify` nodes in `contacts` mode, by id, as what decides who gets what: the assistant, the audience, the tags
+     * in a stable order and the message with its languages sorted (jsonb does not keep their order).
+     *
+     * @param  array<array-key, mixed>  $nodes
+     *
+     * @return array<string, string>
+     */
+    private static function contactNotifications(array $nodes): array
+    {
+        $notifications = [];
+
+        foreach ($nodes as $node) {
+            if (! is_array($node) || NotifyNodeHandler::TYPE !== ($node['type'] ?? null) || ! is_array($node['config'] ?? null)) {
+                continue;
+            }
+
+            $config = $node['config'];
+            $id     = $node['id'] ?? null;
+
+            if (NotifyMode::Contacts->value !== ($config['mode'] ?? null) || ! is_scalar($id)) {
+                continue;
+            }
+
+            $tags = is_array($config['tags'] ?? null) ? array_values(array_filter($config['tags'], 'is_string')) : [];
+            sort($tags);
+
+            $message = $config['message'] ?? null;
+
+            if (is_array($message)) {
+                ksort($message);
+            }
+
+            $notifications[(string) $id] = json_encode([
+                'mode'           => $config['mode'],
+                'assistant_id'   => $config['assistant_id'] ?? null,
+                'contact_target' => $config['contact_target'] ?? null,
+                'tags'           => $tags,
+                'message'        => $message,
+            ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }
+
+        return $notifications;
     }
 
     /**

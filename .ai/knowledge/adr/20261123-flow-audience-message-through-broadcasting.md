@@ -71,4 +71,6 @@ broadcasts when a broadcast completes would broadcast for ever.
 - A broadcast stuck in `running` blocks its node until someone cancels it on the console.
 - `recipient_count` at the node is an estimate; the run fixes its audience when it starts.
 - Starting a flow per contact of an audience ("input towards many") is not part of this; it waits for the
-  `broadcast-flows` spec. `notify` in `contacts` mode stays a second mass path until its own follow-up.
+  `broadcast-flows` spec. `notify` in `contacts` mode stays a second mass path until its own follow-up — closed by
+  `adr-20261125-notify-contacts-retired-through-broadcasting` (the mode is retired, published nodes send through
+  `AutomationBroadcasts`).

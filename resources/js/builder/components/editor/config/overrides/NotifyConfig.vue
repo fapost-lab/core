@@ -34,7 +34,9 @@ function pairs(key: string): SelectOption[] {
     }
     return []
 }
-const modeOptions          = computed(() => pairs('mode'))
+// The contacts mode is retired: a node is offered it only when it was opened in that mode, so a published one still
+// shows its config, and a new one can no longer pick it (publishing a new or changed one is refused).
+const modeOptions          = computed(() => pairs('mode').filter((o) => o.value !== 'contacts' || openedAsContacts.value))
 const targetOptions        = computed(() => pairs('target'))
 const roleOptions          = computed(() => pairs('role'))
 const channelOptions       = computed(() => pairs('channel'))
@@ -58,6 +60,7 @@ const assistantId   = ref<string[]>(cfg().assistant_id ? [String(cfg().assistant
 const contactTarget = ref(str(cfg().contact_target, 'tag'))
 const tags          = ref<string[]>(arr(cfg().tags))
 const message       = ref(str(cfg().message, ''))
+const openedAsContacts = ref(mode.value === 'contacts')
 
 watch(
     () => props.node.id,
@@ -72,6 +75,7 @@ watch(
         contactTarget.value = str(c.contact_target, 'tag')
         tags.value          = arr(c.tags)
         message.value       = str(c.message, '')
+        openedAsContacts.value = mode.value === 'contacts'
     },
 )
 
@@ -139,6 +143,8 @@ function persist() {
 
         <!-- ── Contacts mode ── -->
         <AccordionSection v-if="mode === 'contacts'" :title="label('assistant', 'Contact recipients')" default-open>
+            <p class="field-hint" data-testid="notify-contacts-retired">{{ t('nodes.notify.contacts_retired') }}</p>
+
             <div class="config-field">
                 <div class="field-label">{{ label('assistant', 'Assistant') }}</div>
                 <SearchSelect
