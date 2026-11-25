@@ -18,13 +18,15 @@ import { interpolate } from '@console/shell'
 import { xsrfHeaders } from '@shared/http'
 import { fallbackTypeLabel } from '@builder/utils/nodeAvailability'
 import LiveHint from './LiveHint.vue'
-import { drawRunGraph, loopsOf, RUN_STATUS_TONES, type DrawnNode, type PassSelection, type RunGraph } from '@console/run-graph/runGraph'
+import { drawRunGraph, loopsOf, runKindsOf, RUN_STATUS_TONES, type DrawnNode, type PassSelection, type RunGraph } from '@console/run-graph/runGraph'
 import { STATUS_TONES, type FlowSessionStatus, type FlowSessionsPageProps } from './types'
 
 /** Vue Flow and ELK load with the canvas, only on this page: every console page is in the main bundle. */
 const RunGraphCanvas = defineAsyncComponent(() => import('@console/run-graph/RunGraphCanvas.vue'))
 
 interface Visit {
+  /** The trace row's id: the key of the visit's data. */
+  id: string
   event: string
   at: string | null
   status: 'done' | 'waiting' | 'failed' | 'running'
@@ -33,13 +35,26 @@ interface Visit {
   durationMs: number | null
   iterations: Record<string, number>
   errorClass: string | null
+  /** Whether the visit carries data; sent only to a holder of ViewRunPayloads. */
+  hasData?: boolean
 }
+
+/** One visit's data as the trace wrote it: masked, and limited with `[truncated, N bytes]` markers. */
+interface VisitPayload {
+  input: unknown
+  output: unknown
+  errorMessage: string | null
+}
+
+type PayloadState = { status: 'loading' } | { status: 'failed' } | { status: 'loaded'; payload: VisitPayload }
 
 const props = defineProps<{
   session: { id: string; status: FlowSessionStatus; flowName: string | null; isLive: boolean }
   graph: RunGraph
   live: LiveChannel | null
-  urls: { session: string; visits: string }
+  canViewPayloads: boolean
+  /** One visit's data, with `__ENTRY__` for the visit's id; null without ViewRunPayloads. */
+  urls: { session: string; visits: string; payload: string | null }
 }>()
 
 const POLL_MS = 15_000
@@ -79,7 +94,7 @@ function shownIndex(key: string, count: number): number {
   return loop?.loop?.index ?? count - 1
 }
 
-// The node panel: the node's newest visits, statuses only, loaded when it opens.
+// The node panel: the node's newest visits, statuses only, loaded when it opens; a visit's data loads on demand below.
 const panelOpen = ref(false)
 const visits = ref<Visit[] | null>(null)
 const visitsFailed = ref(false)
@@ -90,6 +105,8 @@ async function openNode(box: DrawnNode): Promise<void> {
   panelOpen.value = true
   visits.value = null
   visitsFailed.value = false
+  payloads.value = {}
+  payloadRequests.clear()
 
   const request = ++visitsRequest
   const query = new URLSearchParams({ session: box.sessionId, node: box.node.id })
@@ -114,6 +131,90 @@ async function openNode(box: DrawnNode): Promise<void> {
       visitsFailed.value = true
     }
   }
+}
+
+// A visit's data, for a holder of ViewRunPayloads: loaded on demand, one visit a request, and shown as text only.
+const runKinds = computed(() => runKindsOf(props.graph.flow))
+const payloads = ref<Record<string, PayloadState>>({})
+const payloadRequests = new Map<string, number>()
+let payloadRequest = 0
+
+function togglePayload(visit: Visit): void {
+  if (payloads.value[visit.id]?.status === 'loaded') {
+    const { [visit.id]: _hidden, ...rest } = payloads.value
+    payloads.value = rest
+    payloadRequests.delete(visit.id)
+
+    return
+  }
+
+  void loadPayload(visit)
+}
+
+async function loadPayload(visit: Visit): Promise<void> {
+  const box = selectedNode.value
+
+  if (props.urls.payload === null || box === null) {
+    return
+  }
+
+  const request = ++payloadRequest
+  payloadRequests.set(visit.id, request)
+  payloads.value = { ...payloads.value, [visit.id]: { status: 'loading' } }
+
+  const url = props.urls.payload.replace('__ENTRY__', encodeURIComponent(visit.id))
+  const query = new URLSearchParams({ session: box.sessionId })
+  let state: PayloadState
+
+  try {
+    const response = await fetch(`${url}?${query.toString()}`, {
+      headers: { Accept: 'application/json', ...xsrfHeaders() },
+      credentials: 'same-origin',
+    })
+
+    if (!response.ok) {
+      throw new Error(String(response.status))
+    }
+
+    state = { status: 'loaded', payload: (await response.json()) as VisitPayload }
+  } catch {
+    state = { status: 'failed' }
+  }
+
+  if (payloadRequests.get(visit.id) === request) {
+    payloads.value = { ...payloads.value, [visit.id]: state }
+  }
+}
+
+/** Why a completed visit shows no input and output: a conversation never records them, an automation did not while recording was off. */
+function missingDataNote(): string {
+  const kind = selectedNode.value ? runKinds.value[selectedNode.value.sessionId] : undefined
+
+  return kind === 'conversation' ? g.value.node.payloads_conversation : g.value.node.payloads_off
+}
+
+/** The parts of a loaded visit's data to show, in order; a part the visit does not carry is left out. */
+function payloadParts(state: PayloadState | undefined): { key: string; label: string; value: unknown }[] {
+  if (state?.status !== 'loaded') {
+    return []
+  }
+
+  const { input, output, errorMessage } = state.payload
+  const parts = [
+    { key: 'input', label: g.value.node.input, value: input },
+    { key: 'output', label: g.value.node.output, value: output },
+    { key: 'error', label: g.value.node.error_message, value: errorMessage },
+  ]
+
+  return parts.filter((part) => part.value !== null && part.value !== undefined)
+}
+
+function hasInputOrOutput(state: PayloadState | undefined): boolean {
+  return state?.status === 'loaded' && (state.payload.input != null || state.payload.output != null)
+}
+
+function payloadText(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2)
 }
 
 watch(panelOpen, (open) => {
@@ -201,12 +302,13 @@ function iterationsText(iterations: Record<string, number>): string {
             <span class="font-mono">{{ selectedNode?.node.id }}</span> · {{ g.node.description }}
           </SheetDescription>
         </SheetHeader>
-        <div class="px-4 pb-4">
+        <div class="flex flex-col gap-3 px-4 pb-4">
+          <p v-if="!canViewPayloads" class="text-muted-foreground text-xs">{{ g.node.payloads_hidden }}</p>
           <p v-if="visitsFailed" class="text-destructive text-sm">{{ g.node.failed }}</p>
           <p v-else-if="visits === null" class="text-muted-foreground text-sm">{{ g.node.loading }}</p>
           <p v-else-if="visits.length === 0" class="text-muted-foreground text-sm">{{ g.node.empty }}</p>
           <ol v-else class="flex flex-col divide-y">
-            <li v-for="(visit, index) in visits" :key="index" class="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
+            <li v-for="visit in visits" :key="visit.id" class="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
               <div class="flex flex-wrap items-center gap-2 text-sm">
                 <StatusDot :tone="RUN_STATUS_TONES[visit.status]">{{ g.node.events[visit.event] ?? visit.event }}</StatusDot>
                 <span v-if="visit.at" class="text-muted-foreground ml-auto text-xs" :title="visit.at">{{ visit.at }}</span>
@@ -233,6 +335,28 @@ function iterationsText(iterations: Record<string, number>): string {
                   <dd class="truncate font-mono">{{ visit.errorClass }}</dd>
                 </template>
               </dl>
+              <template v-if="canViewPayloads">
+                <div v-if="visit.hasData" class="flex flex-col gap-2 pt-1">
+                  <Button variant="ghost" size="sm" class="-ml-2 w-fit" :aria-expanded="payloads[visit.id]?.status === 'loaded'" @click="togglePayload(visit)">
+                    {{ payloads[visit.id]?.status === 'loaded' ? g.node.hide_data : g.node.data }}
+                  </Button>
+                  <p v-if="payloads[visit.id]?.status === 'loading'" class="text-muted-foreground text-xs">{{ g.node.payload_loading }}</p>
+                  <div v-else-if="payloads[visit.id]?.status === 'failed'" class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="text-destructive">{{ g.node.payload_failed }}</span>
+                    <Button variant="outline" size="sm" @click="loadPayload(visit)">{{ g.node.retry }}</Button>
+                  </div>
+                  <template v-else-if="payloads[visit.id]?.status === 'loaded'">
+                    <template v-for="part in payloadParts(payloads[visit.id])" :key="part.key">
+                      <div class="flex flex-col gap-1">
+                        <span class="text-muted-foreground text-xs">{{ part.label }}</span>
+                        <pre class="bg-muted/40 max-h-96 overflow-auto rounded-md p-2 font-mono text-xs break-all whitespace-pre-wrap">{{ payloadText(part.value) }}</pre>
+                      </div>
+                    </template>
+                    <p v-if="visit.event === 'node_completed' && !hasInputOrOutput(payloads[visit.id])" class="text-muted-foreground text-xs">{{ missingDataNote() }}</p>
+                  </template>
+                </div>
+                <p v-else-if="visit.event === 'node_completed'" class="text-muted-foreground pt-1 text-xs">{{ missingDataNote() }}</p>
+              </template>
             </li>
           </ol>
         </div>

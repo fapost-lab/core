@@ -63,9 +63,22 @@ card shows what happened there — done, waiting, failed or still running.
   the last one is shown.
 
 Click a card to see the node's latest visits: when it ran, which exit it took,
-how long it took and, for a failure, the error's type. The graph shows statuses
-only — a node's input, output and error text are not shown here. A live session's
-graph keeps itself current the same way the list does.
+how long it took and, for a failure, the error's type. A live session's graph
+keeps itself current the same way the list does.
+
+With the **View run payloads** permission, a visit that recorded data has a
+**Show data** button: it loads that visit's input, output and error text, as the
+run recorded them. Values under sensitive keys (tokens, passwords, keys) are
+masked, and a large value is cut down to a `[truncated, N bytes]` marker. What
+gets recorded:
+
+- **Automation runs** record a node's input and output while recording is on in
+  the platform settings; a visit from a time it was off shows no data.
+- **Conversations** never record input and output — only the error text of a
+  step that failed.
+
+Without that permission the graph shows statuses only, and the node panel says
+which permission shows the rest.
 
 ## Running a failed run again
 

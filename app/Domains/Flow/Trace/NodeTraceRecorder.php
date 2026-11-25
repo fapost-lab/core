@@ -23,10 +23,10 @@ use Throwable;
  * ({@see TracePayloadLimiter}), and written nowhere else.
  *
  * Nothing here may break a step: every failure, from building the envelope to the insert, ends in the warning
- * `flow.trace.write_failed`. Rows are written outside the step's transaction, like `flow_logs`. One screen reads them,
- * statuses only: the run graph ({@see RunGraphReader}) selects a whitelist of envelope fields and never `input`,
- * `output` or the error message, which wait for `ViewRunPayloads`. The session page's history
- * ({@see \App\Domains\Flow\Services\FlowSessionInspector}) filters out {@see self::EVENT_TYPES}.
+ * `flow.trace.write_failed`. Rows are written outside the step's transaction, like `flow_logs`. One screen reads them:
+ * the run graph draws statuses ({@see RunGraphReader}, a whitelist of envelope fields, never `input`, `output` or the
+ * error message), and shows a holder of `ViewRunPayloads` one visit's data at a time ({@see RunPayloadReader}). The
+ * session page's history ({@see \App\Domains\Flow\Services\FlowSessionInspector}) filters out {@see self::EVENT_TYPES}.
  *
  * Rows are written in the order the engine runs, with one exception: a `subflow` node whose child ends in the same run.
  * The child's end resumes the parent from inside the subflow handler ({@see \App\Domains\Flow\Subflow\DefaultSubflowResumer}),
