@@ -9,6 +9,7 @@ use App\Domains\Flow\Admission\TriggerRateBreaker;
 use App\Domains\Flow\Call\RedisCallExecutionLedger;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Orchestration\AutomationRunDeadline;
+use App\Domains\Flow\Orchestration\StrandedAutomationRunRecovery;
 use App\Domains\Flow\Retention\AutomationRunRetention;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Flow\Webhook\FlowWebhookReceiver;
@@ -104,6 +105,7 @@ final class PlatformSettingsTest extends FeatureTestCase
             'audit.retention_days',
             PartitionRetention::SETTING,
             AutomationRunDeadline::SETTING,
+            StrandedAutomationRunRecovery::SETTING,
             FlowEngineInterface::SEGMENT_SECONDS_SETTING,
             FlowEngineInterface::SEGMENT_STEPS_SETTING,
             AutomationRunRetention::FAILED_SETTING,

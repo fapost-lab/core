@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands\Flow;
 
 use App\Domains\Flow\Orchestration\AutomationRunDeadlineSweeper;
+use App\Domains\Flow\Orchestration\StrandedAutomationRunRecovery;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantAccessStates;
 use App\Domains\Tenancy\Services\TenantSwitcher;
@@ -13,7 +14,8 @@ use Throwable;
 
 /**
  * Fails the automation runs still live past their deadline, across every active tenant that is not stopped
- * ({@see AutomationRunDeadlineSweeper}). Wired to the scheduler in {@see routes/console.php} to run every minute. Exit
+ * ({@see AutomationRunDeadlineSweeper}), then hands on that tenant's runs that stranded without a job
+ * ({@see StrandedAutomationRunRecovery}) — after the deadline pass, so an overdue run is failed, not recovered. Wired to the scheduler in {@see routes/console.php} to run every minute. Exit
  * code is always 0 — a per-tenant failure is printed and the loop continues.
  */
 final class SweepOverdueAutomationRunsCommand extends Command
@@ -22,7 +24,7 @@ final class SweepOverdueAutomationRunsCommand extends Command
     protected $signature = 'flow:sweep-overdue-automation-runs';
 
     /** @var string */
-    protected $description = 'Fail automation runs that are still live past their deadline, or whose start was lost';
+    protected $description = 'Fail automation runs that are still live past their deadline, or whose start was lost, and hand on runs stranded without a job';
 
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
@@ -55,6 +57,17 @@ final class SweepOverdueAutomationRunsCommand extends Command
                             $report['failed_runs'],
                             $report['failed_sessions'],
                             $report['skipped_busy'],
+                        ));
+                    }
+
+                    $recovery = $this->laravel->make(StrandedAutomationRunRecovery::class)->recover($tenant->getId());
+
+                    if ($recovery['recovered_runs'] > 0 || $recovery['skipped_busy'] > 0) {
+                        $this->line(sprintf(
+                            '✔ %s: recovered_runs=%d, recovery_skipped_busy=%d',
+                            $slug,
+                            $recovery['recovered_runs'],
+                            $recovery['skipped_busy'],
                         ));
                     }
                 });

@@ -16,7 +16,7 @@ paths:
   - "database/migrations/tenant/*loop_step_count*"
   - "database/migrations/tenant/*loop_iteration_step_count*"
 summary: Why an automation run starts once per (trigger, fire key), runs in engine-level execution segments continued by a single valid segment_id, counts its steps per session, and is serialized on a (tenant, trigger) lock on its own queue flow.automations
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-25
 ---
 # An automation run starts once per fire key, runs in engine-level segments that a single valid continuation carries on, and is serialized on its trigger's lock
 
@@ -52,7 +52,10 @@ approved by the agent at the gate (unattended), 2026-11-18.
   its place — at most one is). A retry of the same job continues the run even when it was killed inside a nested call
   (a child running inside its parent's step, a parent resumed by its child's end); a job whose run was already handed
   on, or a duplicate, does nothing. A retried start finds the run by its fire key and continues its `active` session
-  the same way, leaving the continuation it had queued stale.
+  the same way, leaving the continuation it had queued stale. Amended by
+  `adr-20261125-stranded-automation-run-recovery`: with no `active` session, a start or continuation hands a subflow
+  child that is already over back to the parent still waiting on it; and the recovery pass may queue a second copy of
+  the current segment id, which the run's lock serializes with the first.
 - **A run moved on and left without a job is handed on.** A delay wake-up or a subflow-sweeper pass that moved an
   automation run on and then broke off (a lost lock) leaves it `active` with nothing queued, and neither retries it
   (the wake-up finds no parked marker, the sweeper only looks at `paused_subflow` parents). Both call
@@ -91,11 +94,11 @@ approved by the agent at the gate (unattended), 2026-11-18.
 ## Consequences
 
 - A continuation lost between the `segment_id` commit and the queue push (a process killed in that instant), or a
-  sweeper pass killed outright (not an exception) after it resumed a run, leaves the run `active` until the
-  run-deadline sweeper of `flow-run-deadline-sweeper` picks it up (`adr-20261119-automation-run-deadline`: the run
-  fails at its deadline, 24 h by default; it is not resumed earlier). So does a run whose job broke off after a subflow
-  child's end committed but before its parent was resumed (the parent waits in `paused_subflow` over an ended child,
-  which no retry follows); the subflow sweeper then expires the parent at its timeout.
+  sweeper pass killed outright (not an exception) after it resumed a run, leaves the run `active` with nothing queued;
+  so does a run whose job broke off after a subflow child's end committed but before its parent was resumed (the parent
+  waits in `paused_subflow` over an ended child). A retry of that job now resumes the parent, and the recovery pass of
+  `adr-20261125-stranded-automation-run-recovery` hands either shape on after `flow.automation.recover_after_minutes`
+  (10 by default) without movement; the run deadline (`adr-20261119-automation-run-deadline`) stays the last net.
 - A delay wake-up now waits out a busy lock — a conversation's too — for up to an hour past its due time instead of
   failing after three tries.
 - A step repeated by a killed segment is the one step it had not persisted; the handler rule "a side effect must be safe

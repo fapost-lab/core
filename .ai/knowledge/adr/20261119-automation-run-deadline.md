@@ -12,7 +12,7 @@ paths:
   - app/Domains/Flow/Enums/FlowRunFailureReason.php
   - "database/migrations/tenant/*run_deadline*"
 summary: Why an automation run carries a deadline frozen at its start (flow.automation.max_run_hours, default 24), why the every-minute sweeper fails the whole live chain without running a node or the parent's failed handle, and the 3 h lost-start threshold for pending runs
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-25
 ---
 # Every automation run has a deadline frozen at its start; past it a sweeper fails the whole run, and runs no node
 
@@ -66,7 +66,8 @@ the design at the gate on 2026-11-19 (24 h deadline, 3 h lost-start threshold, e
 - `expired` instead of `failed` — the spec says failed; the reason already tells the two apart.
 - Selecting `contact_id IS NULL` — an automation with a contact would have no deadline.
 - Early recovery of a stranded `active` run (hand it on after N minutes without movement) — out of this task's scope;
-  deferred by the owner to a later task. Until then a run that lost its push waits for its deadline and fails.
+  deferred by the owner to a later task, since built: `adr-20261125-stranded-automation-run-recovery`, a pass of the
+  same command after the deadline pass.
 - A deadline of 1–2 h (cuts legitimate long runs; failing is irreversible) or 7 days (a stuck every-minute trigger is
   silent for a week); a lost-start threshold equal to the deadline (holds the trigger 24 h) or 15 minutes (fails starts
   that legitimately wait on a lock or a stopped tenant).
@@ -75,7 +76,9 @@ the design at the gate on 2026-11-19 (24 h deadline, 3 h lost-start threshold, e
 ## Consequences
 
 - A run killed mid-way frees its flow for deletion at most a deadline (24 h by default) after its start; a lost start,
-  after 3 h. The windows of `adr-20261118-segmented-automation-runs` are closed by failure, not by recovery.
+  after 3 h. The windows of `adr-20261118-segmented-automation-runs` are closed first by early recovery
+  (`adr-20261125-stranded-automation-run-recovery`); the deadline stays the last net, closing by failure what recovery
+  cannot hand on.
 - Failing is irreversible: resume and re-run are not built. A legitimate automation that sleeps in `delay`, waits on a
   subflow or waits for input past the deadline is failed with no error branch in the flow. Publishing does not yet warn
   about a `delay` or timeout longer than the deadline.

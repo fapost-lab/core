@@ -14,9 +14,11 @@ use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\SegmentHandOff;
+use App\Domains\Flow\Subflow\SubflowResumerInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Psr\Log\LoggerInterface;
@@ -41,7 +43,14 @@ use Psr\Log\LoggerInterface;
  * ({@see \App\Domains\Flow\Services\ExecutionSegment}) only while the root still carries the segment id the
  * continuation carries, and then runs whichever session of the run is `active` — so a retry of a job killed inside
  * a nested call (a child running inside its parent's step, a parent resumed by its child's end) still continues the
- * run. A stale or duplicate continuation is a no-op, so at most one continuation of a run is ever valid.
+ * run. A stale continuation is a no-op, so only the continuations of the root's current segment id are valid. The
+ * recovery pass may queue a second copy of that id ({@see SegmentHandOff::redispatch()}); copies are serialized by the
+ * run's lock, and whichever runs first moves the run on, so the other finds the id stale or nothing left to run.
+ *
+ * A job that broke off after a subflow child's last step committed and before its parent was resumed leaves the parent
+ * in `paused_subflow` over a child that is already over. A retried start or a continuation of the run hands that
+ * child's end back to the parent ({@see SegmentHandOff::pendingReturnOf()}), so the parent takes its exit and runs on
+ * (adr-20261125-stranded-automation-run-recovery).
  */
 final readonly class AutomationRunner
 {
@@ -64,6 +73,7 @@ final readonly class AutomationRunner
         private FlowTriggerRepositoryInterface $triggers,
         private FlowDraftRepositoryInterface $drafts,
         private TriggerRunAdmission $admission,
+        private SubflowResumerInterface $subflowResumer,
         private LoggerInterface $logger,
     ) {
     }
@@ -182,11 +192,7 @@ final readonly class AutomationRunner
                     return;
                 }
 
-                $live = $this->handOff->liveSessionOf($root);
-
-                if (null !== $live) {
-                    $this->engine->runSession($live);
-                }
+                $this->runOn($root);
             },
         );
     }
@@ -202,12 +208,55 @@ final readonly class AutomationRunner
             $this->engine->activate($root);
         }
 
+        $this->runOn($root);
+
+        return $root->refresh();
+    }
+
+    /**
+     * Run the `active` session of the run; with none, hand a subflow child that is already over back to the parent
+     * still waiting on it, which then runs on. A run that is parked, over or failed is left as it is.
+     */
+    private function runOn(FlowSession $root): void
+    {
         $live = $this->handOff->liveSessionOf($root);
 
         if (null !== $live) {
             $this->engine->runSession($live);
+
+            return;
         }
 
-        return $root->refresh();
+        $child = $this->handOff->pendingReturnOf($root);
+
+        if (null === $child) {
+            return;
+        }
+
+        $endStatus = $this->endStatusOf($child);
+
+        $this->logger->info('flow.automation.subflow_return_recovered', [
+            'root_id'    => (string) $root->getKey(),
+            'child_id'   => (string) $child->getKey(),
+            'parent_id'  => $child->parent_session_id,
+            'end_status' => $endStatus,
+        ]);
+
+        $this->subflowResumer->resumeIfChild($child, $endStatus);
+    }
+
+    /**
+     * The end a child hands its parent, as the engine hands it when the child's last step runs: its `end` node's
+     * status, or success for a child that ran off its graph and failed for one that failed.
+     */
+    private function endStatusOf(FlowSession $child): string
+    {
+        $endStatus = $child->getAttribute('end_status');
+
+        if (is_string($endStatus) && '' !== $endStatus) {
+            return $endStatus;
+        }
+
+        return FlowSessionStatus::Failed === $child->status ? EndStatus::Failed->value : EndStatus::Success->value;
     }
 }

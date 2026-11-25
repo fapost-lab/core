@@ -121,6 +121,7 @@ use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\Orchestration\AutomationRunDeadlineSweeper;
 use App\Domains\Flow\Orchestration\DelayedSessionResumer;
 use App\Domains\Flow\Orchestration\FlowOrchestrator;
+use App\Domains\Flow\Orchestration\StrandedAutomationRunRecovery;
 use App\Domains\Flow\Policies\FlowDraftPolicy;
 use App\Domains\Flow\Policies\FlowGroupPolicy;
 use App\Domains\Flow\Policies\FlowLogPolicy;
@@ -381,6 +382,19 @@ final class FlowServiceProvider extends ServiceProvider
             unit: 'hours',
             min: AutomationRunDeadline::MIN_HOURS,
             max: AutomationRunDeadline::MAX_HOURS,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: StrandedAutomationRunRecovery::SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.automation.recover_after_minutes',
+            fallback: StrandedAutomationRunRecovery::DEFAULT_MINUTES,
+            label: 'Stranded automation run recovery',
+            description: 'How many minutes an automation run may go without a step and without a job before its next step is queued again — its job was lost, or ran out of attempts. A run waiting in a delay or for an answer is not touched. Raise it when the automation queue is often backed up for longer.',
+            group: 'Flow',
+            unit: 'minutes',
+            min: StrandedAutomationRunRecovery::MIN_MINUTES,
+            max: StrandedAutomationRunRecovery::MAX_MINUTES,
         ));
 
         $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
@@ -652,6 +666,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(SubflowTimeoutSweeper::class);
         $this->app->scoped(AutomationRunDeadline::class);
         $this->app->scoped(AutomationRunDeadlineSweeper::class);
+        $this->app->scoped(StrandedAutomationRunRecovery::class);
         $this->app->scoped(ScheduleTriggerFirer::class);
         $this->app->scoped(ScheduleRegistrySync::class);
 

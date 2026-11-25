@@ -12,9 +12,11 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use App\Jobs\Flow\ContinueAutomationRunJob;
 use Closure;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Mockery;
 use RuntimeException;
@@ -23,8 +25,9 @@ use Tests\Support\FakeTenantAccessMode;
 
 /**
  * `flow:sweep-overdue-automation-runs` sweeps every active tenant that is not stopped through
- * {@see \App\Domains\Flow\Orchestration\AutomationRunDeadlineSweeper}; which runs fail is proven in
- * `AutomationRunDeadlineSweeperTest`.
+ * {@see \App\Domains\Flow\Orchestration\AutomationRunDeadlineSweeper}, then through
+ * {@see \App\Domains\Flow\Orchestration\StrandedAutomationRunRecovery}; which runs fail is proven in
+ * `AutomationRunDeadlineSweeperTest`, which are handed on in `StrandedAutomationRunRecoveryTest`.
  */
 final class SweepOverdueAutomationRunsCommandTest extends FeatureTestCase
 {
@@ -68,6 +71,29 @@ final class SweepOverdueAutomationRunsCommandTest extends FeatureTestCase
         $this->assertSame(FlowSessionStatus::Active, $run->refresh()->status);
     }
 
+    public function test_a_stranded_run_of_an_active_tenant_is_handed_on_and_an_overdue_one_is_not(): void
+    {
+        Queue::fake();
+        $stranded = $this->overdueRun(['deadline_at' => now()->addHour(), 'updated_at' => now()->subMinutes(11)]);
+        $overdue  = $this->overdueRun(['updated_at' => now()->subMinutes(11)]);
+
+        $this->artisan('flow:sweep-overdue-automation-runs')->assertExitCode(0);
+
+        $this->assertSame((string) $stranded->getKey(), Queue::pushed(ContinueAutomationRunJob::class)->sole()->sessionId);
+        $this->assertSame(FlowSessionStatus::Failed, $overdue->refresh()->status);
+    }
+
+    public function test_a_stranded_run_of_a_stopped_tenant_is_not_handed_on(): void
+    {
+        Queue::fake();
+        $this->app->instance(TenantAccessModeInterface::class, FakeTenantAccessMode::stopped());
+        $this->overdueRun(['deadline_at' => now()->addHour(), 'updated_at' => now()->subMinutes(11)]);
+
+        $this->artisan('flow:sweep-overdue-automation-runs')->assertExitCode(0);
+
+        Queue::assertNothingPushed();
+    }
+
     public function test_a_failing_tenant_is_reported_and_the_others_are_still_swept(): void
     {
         $tenants = $this->app->make(TenantRepositoryInterface::class);
@@ -107,9 +133,12 @@ final class SweepOverdueAutomationRunsCommandTest extends FeatureTestCase
         $this->assertSame('* * * * *', $event->expression);
     }
 
-    private function overdueRun(): FlowSession
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function overdueRun(array $overrides = []): FlowSession
     {
-        return FlowSession::query()->create([
+        return FlowSession::query()->forceCreate([
             'tenant_id'          => $this->tenantId,
             'flow_definition_id' => $this->definition->getKey(),
             'flow_version'       => 1,
@@ -120,6 +149,7 @@ final class SweepOverdueAutomationRunsCommandTest extends FeatureTestCase
             'deadline_at'        => now()->subMinute(),
             'state'              => [],
             'version'            => 1,
+            ...$overrides,
         ]);
     }
 }
