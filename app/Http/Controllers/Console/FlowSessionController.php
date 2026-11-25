@@ -42,7 +42,7 @@ use Inertia\Response;
  */
 final class FlowSessionController extends Controller
 {
-    /** Stands for the visit's id in `urls.payload`; the page puts the id in its place. */
+    /** Stands for the visit's id in `urls.payload.template`; sent as `urls.payload.placeholder`, the page puts the id in its place. */
     private const string ENTRY_PLACEHOLDER = '__ENTRY__';
 
     public function __construct(
@@ -181,7 +181,8 @@ final class FlowSessionController extends Controller
     /**
      * The run graph of a session: the definition it executed with what each node did, its loops and its subflow
      * children. Statuses only ({@see RunGraphReader}); a node's visits load as JSON from {@see visits()}, and for a holder
-     * of `ViewRunPayloads` one visit's data from {@see payload()} (`urls.payload`, with `__ENTRY__` for the visit's id).
+     * of `ViewRunPayloads` one visit's data from {@see payload()} (`urls.payload`: a URL template and the placeholder the
+     * page replaces with the visit's id, so the placeholder is written only here).
      */
     public function graph(string $assistantKey, string $record): Response
     {
@@ -200,13 +201,16 @@ final class FlowSessionController extends Controller
                 'flowName' => $this->text($session->flowDefinition?->name),
                 'isLive'   => in_array($session->status, FlowSessionStatus::live(), true),
             ],
-            'graph'           => $this->graphs->graph($session),
-            'canViewPayloads' => $canViewPayloads,
-            'live'            => $this->live($assistant),
-            'urls'            => [
+            'graph' => $this->graphs->graph($session),
+            'can'   => ['viewPayloads' => $canViewPayloads],
+            'live'  => $this->live($assistant),
+            'urls'  => [
                 'session' => $this->url('flow-sessions.show', $assistant, ['record' => $key]),
                 'visits'  => $this->url('flow-sessions.visits', $assistant, ['record' => $key]),
-                'payload' => $canViewPayloads ? $this->url('flow-sessions.payload', $assistant, ['record' => $key, 'entry' => self::ENTRY_PLACEHOLDER]) : null,
+                'payload' => $canViewPayloads ? [
+                    'template'    => $this->url('flow-sessions.payload', $assistant, ['record' => $key, 'entry' => self::ENTRY_PLACEHOLDER]),
+                    'placeholder' => self::ENTRY_PLACEHOLDER,
+                ] : null,
             ],
         ]);
     }

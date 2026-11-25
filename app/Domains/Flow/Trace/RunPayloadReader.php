@@ -62,7 +62,8 @@ final readonly class RunPayloadReader
 
     /**
      * Which of the given trace rows of the session carry data ({@see self::payload()}), without reading it: the keys are
-     * checked in SQL.
+     * checked in SQL. An empty error message is no data, as {@see self::payload()} reads it: a handler that throws an
+     * exception without a message records one.
      *
      * @param  list<string>  $entryIds
      *
@@ -81,7 +82,7 @@ final readonly class RunPayloadReader
             ->where(static fn (Builder $query): Builder => $query
                 ->whereJsonContainsKey('metadata->input')
                 ->orWhereJsonContainsKey('metadata->output')
-                ->orWhereJsonContainsKey('metadata->error->message'))
+                ->orWhere('metadata->error->message', '<>', ''))
             ->pluck('id');
 
         $out = [];
