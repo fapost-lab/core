@@ -8,8 +8,8 @@ paths:
   - app/Domains/Flow/Handlers/SubflowNodeHandler.php
 source: docs/reference/specs/flow-engine/nodes/08-subflow.md
 summary: "subflow node: depth limits, timeout and resume"
-source_hash: 44b25e36308ecad45bfc401009727c84c34f3a80
-reviewed_at: 2026-10-05
+source_hash: d74aea3ea34b175852c27f4cf3770a405b89e4d0
+reviewed_at: 2026-11-25
 ---
 # Node: `subflow`
 

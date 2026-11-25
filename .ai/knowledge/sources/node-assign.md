@@ -8,8 +8,8 @@ paths:
   - app/Domains/Flow/Handlers/AssignNodeHandler.php
 source: docs/reference/specs/flow-engine/nodes/05-assign.md
 summary: "assign node: operations on variables"
-source_hash: 9eabdf31742a93872b67f08ebb5154caaf534c70
-reviewed_at: 2026-10-05
+source_hash: 461061dc2d4fd56272293e67ea9672e44ee9debb
+reviewed_at: 2026-11-25
 ---
 # Node: `assign`
 

@@ -8,8 +8,8 @@ paths:
   - app/Domains/Flow/Handlers/CallNodeHandler.php
 source: docs/reference/specs/flow-engine/nodes/06-call.md
 summary: "call node: transport, target, parameters and result mapping"
-source_hash: 4df36a16eb86f7c555f1f9686ecf7ecbc619f528
-reviewed_at: 2026-10-21
+source_hash: 8acd9448aa9f2e21c7c119b8713a0cb9bdb9a23c
+reviewed_at: 2026-11-25
 ---
 # Node: `call`
 

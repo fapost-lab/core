@@ -9,8 +9,8 @@ paths:
   - app/Domains/Flow/Contracts/VariableResolverInterface.php
 source: docs/reference/specs/builder/storage/05-backend-contract.md
 summary: How a user variable maps to a state path, reserved names, and the read-time coercion entry point
-source_hash: 3593b1819d0af8432b1f7a33d77a26e8c404f815
-reviewed_at: 2026-10-05
+source_hash: 06a16caa7302961896cb190484912eab2af45e71
+reviewed_at: 2026-11-25
 ---
 # 05 · Backend variable contract and resolver
 

@@ -10,8 +10,8 @@ paths:
   - app/Domains/Flow/Contracts/NodeUsageStatisticsInterface.php
 source: docs/reference/specs/flow-engine/node-usage-statistics.md
 summary: flow:node-usage report of node type@version usage, static and runtime
-source_hash: c123161079bcbbb96578aa64bc20a07396ff0355
-reviewed_at: 2026-10-21
+source_hash: 922254aaf564c8a8fbf03c52e815f60b47ada287
+reviewed_at: 2026-11-25
 ---
 # Node usage statistics
 
