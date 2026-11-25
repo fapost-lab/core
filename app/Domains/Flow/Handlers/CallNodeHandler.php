@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Call\CallAttempt;
+use App\Domains\Flow\Call\CallCredentialResolver;
 use App\Domains\Flow\Call\CallExecutionLedgerInterface;
 use App\Domains\Flow\Call\CallOutcome;
 use App\Domains\Flow\Call\CallRetryPolicy;
@@ -20,11 +21,7 @@ use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Support\UsageUnitKey;
 use Carbon\CarbonImmutable;
-use Fapost\Foundation\Credentials\Contracts\CredentialStoreInterface;
-use Fapost\Foundation\Credentials\DTO\CredentialReference;
 use Fapost\Foundation\Credentials\DTO\CredentialSecret;
-use Fapost\Foundation\Credentials\Exceptions\CredentialNotFoundException;
-use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
@@ -106,12 +103,6 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
 
     private const string CREDENTIAL_ID_META = 'credential_id';
 
-    private const string ERROR_CREDENTIAL_UNSUPPORTED = 'credential_unsupported';
-
-    private const string ERROR_CREDENTIAL_NOT_FOUND = 'credential_not_found';
-
-    private const string ERROR_CREDENTIAL_UNAVAILABLE = 'credential_unavailable';
-
     private const string ERROR_SOLUTION_INACTIVE = 'solution_inactive';
 
     private const string ERROR_SOLUTION_NOT_READY = 'solution_not_ready';
@@ -127,7 +118,7 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
         private readonly VariableResolverInterface $variableResolver,
         private readonly PeriodQuota $quota,
         private readonly CallExecutionLedgerInterface $ledger,
-        private readonly CredentialStoreInterface $credentials,
+        private readonly CallCredentialResolver $credentials,
     ) {
     }
 
@@ -337,7 +328,24 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
     }
 
     /**
-     * The `credential_id` must be a string that names an existing credential of the tenant, on the `http` transport.
+     * Whether a target written without a template sends to a plain `http://` URL. A templated target is only known at
+     * run time, where the transport refuses it.
+     */
+    private static function isPlainHttpTarget(mixed $target): bool
+    {
+        if (! is_string($target) || str_contains($target, '{{')) {
+            return false;
+        }
+
+        $parts = preg_split('/\s+/', mb_trim($target), 2);
+        $url   = is_array($parts) && 2 === count($parts) ? $parts[1] : '';
+
+        return 'http' === mb_strtolower((string) parse_url($url, PHP_URL_SCHEME));
+    }
+
+    /**
+     * The `credential_id` must be a string that names an existing credential of the tenant, on the `http` transport,
+     * and a target written without a template must not be a plain `http://` URL.
      * Draft saving and publishing share this check: the validator does not tell them apart, so a problem blocks publishing.
      *
      * @param  array<string, mixed>  $config
@@ -358,7 +366,7 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
 
         $transport = is_string($config['transport'] ?? null) && '' !== $config['transport'] ? $config['transport'] : self::DEFAULT_TRANSPORT;
 
-        if (HttpTransport::ID !== $transport) {
+        if (! $this->credentials->supports($transport)) {
             return [NodeConfigIssue::error(
                 'call_credential_unsupported',
                 'A saved credential can only be used with the http transport.',
@@ -366,13 +374,16 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
             )];
         }
 
-        $known = array_filter(
-            $this->credentials->references(),
-            static fn (CredentialReference $reference): bool => $reference->id === $id,
-        );
-
-        if ([] === $known) {
+        if (! $this->credentials->exists($id)) {
             return [NodeConfigIssue::error('call_credential_not_found', 'The saved credential does not exist.', 'credential_id')];
+        }
+
+        if (self::isPlainHttpTarget($config['target'] ?? null)) {
+            return [NodeConfigIssue::error(
+                'call_credential_insecure_target',
+                'A saved credential is sent only to an https target.',
+                'target',
+            )];
         }
 
         return [];
@@ -386,17 +397,9 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
      */
     private function resolveCredential(string $id, string $transportId): CredentialSecret|NodeExecutionResult
     {
-        if (HttpTransport::ID !== $transportId) {
-            return $this->credentialRefusal(self::ERROR_CREDENTIAL_UNSUPPORTED, $id);
-        }
+        $credential = $this->credentials->resolve($id, $transportId);
 
-        try {
-            return $this->credentials->secret($id);
-        } catch (CredentialNotFoundException) {
-            return $this->credentialRefusal(self::ERROR_CREDENTIAL_NOT_FOUND, $id);
-        } catch (CredentialUnavailableException) {
-            return $this->credentialRefusal(self::ERROR_CREDENTIAL_UNAVAILABLE, $id);
-        }
+        return is_string($credential) ? $this->credentialRefusal($credential, $id) : $credential;
     }
 
     private function credentialRefusal(string $code, string $credentialId): NodeExecutionResult

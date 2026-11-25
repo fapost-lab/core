@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domains\Credentials;
+namespace App\Domains\Shared\Infrastructure;
 
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
@@ -10,8 +10,11 @@ use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use function mb_strlen;
 
 /**
- * Deletes the Redis keys that match a pattern, the way the tenant cache forgetters do: SCAN, then UNLINK in batches,
- * so a large keyspace blocks Redis for no longer than a batch. Holds the config repository, so it is bound scoped.
+ * Deletes the Redis keys that match a pattern: SCAN, then UNLINK in batches, so a large keyspace blocks Redis for no
+ * longer than a batch. The tenant cache forgetters of Flow and Credentials and the OAuth2 token cache share it.
+ *
+ * Holds the config repository (the connection's key prefix), so it is bound scoped
+ * ({@see \App\Providers\AppServiceProvider}).
  */
 final readonly class RedisKeyPurger
 {

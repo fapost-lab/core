@@ -205,9 +205,10 @@ final class CredentialsConsoleTest extends CredentialsTestCase
 
     public function test_an_update_with_an_empty_secret_keeps_the_stored_one_and_ignores_a_type_change(): void
     {
-        $credential = $this->credential(['name' => 'CRM', 'secret' => ['token' => self::SECRET]]);
+        $credential = $this->credential(['name' => 'CRM', 'secret' => ['token' => self::SECRET], 'allowed_hosts' => ['api.example.com', 'api.example.org', 'api.example.net']]);
         $changedAt  = $credential->secret_changed_at;
 
+        // Narrowing the hosts needs no secret; widening them would.
         $response = $this->actingAs($this->admin())
             ->put($this->url("/{$credential->id}"), [
                 'name'          => 'CRM renamed',

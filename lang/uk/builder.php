@@ -502,6 +502,7 @@ return [
             'call_invalid_credential'                => 'credential_id має бути id збереженого доступу.',
             'call_credential_unsupported'            => 'Збережений доступ можна використовувати лише з транспортом http.',
             'call_credential_not_found'              => 'Збереженого доступу не існує.',
+            'call_credential_insecure_target'        => 'Збережений доступ надсилається лише на https-адресу.',
             'addressee_cannot_wait'                  => 'Повідомлення адресату не може чекати на відповідь: приберіть \':field\' або адресата.',
             'start_flow_invalid_busy_window'         => 'busy_window_minutes має бути цілим числом від 0 до :max.',
             'webhook_response_invalid_status'        => 'Статус відповіді має бути цілим числом від :min до :max.',

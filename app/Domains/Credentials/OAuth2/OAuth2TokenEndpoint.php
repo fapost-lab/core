@@ -28,6 +28,9 @@ final readonly class OAuth2TokenEndpoint
 
     public const string CLIENT_AUTH_BODY = 'body';
 
+    /** The least time a token request is sent with; less than this left of a caller's limit sends nothing. */
+    public const float MIN_TIMEOUT_SECONDS = 1.0;
+
     private const int TIMEOUT_SECONDS = 10;
 
     public function __construct(
@@ -75,11 +78,14 @@ final readonly class OAuth2TokenEndpoint
      * Posts the form with the client's credentials, in the Authorization header (`basic`) or in the body.
      *
      * @param  array<string, string>  $form  the grant's own parameters
+     * @param  float|null  $timeoutSeconds  what the caller has left to spend (a call's timeout); the request takes the
+     *                                      smaller of it and its own limit. Null for no caller limit
      *
-     * @throws CredentialUnavailableException when the token URL, the client or its authentication method is not usable
+     * @throws CredentialUnavailableException when the token URL, the client or its authentication method is not usable,
+     *                                        or less than {@see self::MIN_TIMEOUT_SECONDS} is left of the caller's limit
      * @throws OAuth2TokenRequestFailedException when the endpoint gave no token
      */
-    public function request(CredentialSecret $secret, #[SensitiveParameter] array $form): OAuth2TokenResponse
+    public function request(CredentialSecret $secret, #[SensitiveParameter] array $form, ?float $timeoutSeconds = null): OAuth2TokenResponse
     {
         $tokenUrl     = $this->checkedUrl($secret);
         $clientId     = $secret->setting('client_id');
@@ -94,7 +100,14 @@ final readonly class OAuth2TokenEndpoint
             throw CredentialUnavailableException::because($secret->id, 'the client authentication method is not valid');
         }
 
-        $request = $this->http->request()->withoutRedirecting()->acceptJson()->asForm()->timeout(self::TIMEOUT_SECONDS);
+        if (null !== $timeoutSeconds && $timeoutSeconds < self::MIN_TIMEOUT_SECONDS) {
+            $this->warn($secret, 'no time left of the call');
+
+            throw CredentialUnavailableException::because($secret->id, 'no time is left for the token request');
+        }
+
+        $timeout = null === $timeoutSeconds ? self::TIMEOUT_SECONDS : min((float) self::TIMEOUT_SECONDS, $timeoutSeconds);
+        $request = $this->http->request()->withoutRedirecting()->acceptJson()->asForm()->timeout($timeout);
 
         if (self::CLIENT_AUTH_BASIC === $clientAuth) {
             $request = $request->withBasicAuth($clientId, $clientSecret);

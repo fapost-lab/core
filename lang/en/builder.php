@@ -502,6 +502,7 @@ return [
             'call_invalid_credential'                => 'credential_id must be the id of a saved credential.',
             'call_credential_unsupported'            => 'A saved credential can only be used with the http transport.',
             'call_credential_not_found'              => 'The saved credential does not exist.',
+            'call_credential_insecure_target'        => 'A saved credential is sent only to an https target.',
             'addressee_cannot_wait'                  => 'A message to an addressee cannot wait for an answer: remove \':field\' or the addressee.',
             'start_flow_invalid_busy_window'         => 'busy_window_minutes must be a whole number from 0 to :max.',
             'webhook_response_invalid_status'        => 'The response status must be a whole number from :min to :max.',

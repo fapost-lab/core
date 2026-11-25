@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow\Call;
 
+use App\Domains\Flow\Call\CallCredentialResolver;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Call\Transports\HttpTransport;
 use App\Domains\Flow\Handlers\CallNodeHandler;
@@ -25,7 +26,7 @@ final class CallNodeEgressTest extends TestCase
 
         $registry = new CallTransportRegistry();
         $registry->register($this->app->make(HttpTransport::class));
-        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore());
+        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger(), new CallCredentialResolver(new InMemoryCredentialStore()));
 
         $result = $handler->execute(
             [

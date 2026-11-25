@@ -6,9 +6,9 @@ namespace Tests\Feature\Domains\Credentials;
 
 use App\Domains\Credentials\OAuth2\OAuth2TokenEndpoint;
 use App\Domains\Credentials\OAuth2TokenCache;
-use App\Domains\Credentials\RedisKeyPurger;
 use App\Domains\Credentials\Types\OAuth2ClientCredentialsType;
 use App\Domains\Flow\Call\Egress\GuardedHttpClient;
+use App\Domains\Shared\Infrastructure\RedisKeyPurger;
 use Fapost\Foundation\Credentials\DTO\CredentialSecret;
 use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
 use Illuminate\Contracts\Encryption\Encrypter;
@@ -143,6 +143,46 @@ final class OAuth2ClientCredentialsTypeTest extends TestCase
         $this->cache->forget('tenant-1', 'cred-1');
 
         $this->assertSame(['credentials:oauth2:tenant-1:cred-2:v1', 'credentials:oauth2:tenant-2:cred-1:v1'], array_keys($this->redis->values));
+    }
+
+    public function test_a_rejected_token_drops_only_the_key_of_its_version(): void
+    {
+        $this->cache->put($this->secret([], 'v1'), 'tok-1', 100);
+        $this->cache->put($this->secret([], 'v2'), 'tok-2', 100);
+
+        $this->type()->tokenRejected($this->secret([], 'v1'));
+
+        $this->assertSame(['credentials:oauth2:tenant-1:cred-1:v2'], array_keys($this->redis->values));
+    }
+
+    public function test_the_token_request_takes_the_smaller_of_the_calls_time_and_its_own_limit(): void
+    {
+        $timeouts = [];
+        Http::fake(static function (Request $request, array $options) use (&$timeouts) {
+            $timeouts[] = $options['timeout'] ?? null;
+
+            return Http::response(['access_token' => 'tok-abc123']);
+        });
+
+        $this->type()->authorizeWithin($this->secret([], 'v1'), 3.5);
+        $this->type()->authorizeWithin($this->secret([], 'v2'), 30.0);
+        $this->type()->authorize($this->secret([], 'v3'));
+
+        $this->assertEquals([3.5, 10, 10], $timeouts);
+    }
+
+    public function test_less_than_a_second_left_of_the_call_sends_no_token_request(): void
+    {
+        Http::fake();
+
+        try {
+            $this->type()->authorizeWithin($this->secret(), 0.5);
+            $this->fail('No time left must make the credential unavailable.');
+        } catch (CredentialUnavailableException $exception) {
+            $this->assertStringContainsString('no time', $exception->getMessage());
+        }
+
+        Http::assertNothingSent();
     }
 
     public function test_a_server_error_is_reported_by_its_status_alone(): void

@@ -12,7 +12,7 @@ paths:
   - app/Http/Controllers/Admin/CredentialOAuthController.php
   - app/Console/Commands/Credentials/RefreshOAuth2GrantsCommand.php
 summary: Why a tenant's saved credentials live in their own Credentials domain, are bound to a mandatory list of allowed hosts, reach a call only as a masked, never-redirected, Foundation-contract secret
-reviewed_at: 2026-11-23
+reviewed_at: 2026-11-25
 ---
 # Saved credentials are a Credentials domain; a call applies one only to an allowed host and masks it on the way out
 
@@ -120,6 +120,39 @@ through the callback URL and may reach a web server or proxy access log (single 
 tenant slug changes the callback URL, so the redirect URI must be updated at the provider and the credential
 reconnected; `SESSION_SAME_SITE=strict` keeps the session cookie off the provider's redirect and breaks the
 callback; tokens are not revoked at the provider on disconnect.
+
+## Amendment: hardening (task `flow-credentials-call-hardening`, 2026-11-25)
+
+The owner approved the design at the human gate ("I accept your decisions": every recommended option). It closes
+review findings of the store and the OAuth2 work.
+
+- **A credential is sent only over https.** `HttpTransport` refuses a target whose scheme is not `https` before the
+  host check, with `credential_insecure_target` (metadata `{host}`), no connection and no token request; the call
+  node's `validate()` refuses a literal `http://` target with a credential at publish (`call_credential_insecure_target`).
+  A templated target is caught only at run time. A live flow that sent a credential over `http://` now fails visibly.
+- **A stored secret never reaches a new host unasked.** `CredentialWriter::update` treats the allowed hosts as widened
+  when the new list has a pattern the old one did not cover (`HostMatcher::covers`: an exact host covered by a match;
+  `*.d` only by `*.d` or a wildcard over a parent of `d`), and treats a token URL moved to another host the same way.
+  Then every secret field must be entered again (`credential_validation.secret_reenter_for_new_host`), the consent
+  grant of an `oauth2_authorization_code` credential is dropped (its tokens are a person's, which re-entering the
+  client secret does not protect), and `credential.updated` records `hosts_widened`. Narrowing needs neither. The
+  rejected alternative was to accept the risk: someone allowed to edit a credential but never shown its key could
+  otherwise add their own host and read the key in that server's log.
+- **Authorizing stays inside the call's window.** A Core interface `AuthorizesWithinDeadlineInterface`
+  (`authorizeWithin($secret, $seconds)`), implemented by both OAuth2 types, takes the call's timeout: the token request
+  uses the smaller of it and its own 10 s (under 1 s left sends nothing, `credential_unavailable`), and the
+  authorization-code refresh waits for its lock at most what is left. Foundation does not change; the keep-alive
+  command and the console pass no limit.
+- **A 401 drops one key.** The client-credentials type deletes the cached token of the credential's version
+  (`OAuth2TokenCache::forgetVersion`), not every version by a keyspace scan; the pattern purge stays for an edit, a
+  delete and the tenant forgetter. The purge itself is `App\Domains\Shared\Infrastructure\RedisKeyPurger` (scoped),
+  shared with Flow's ledger forgetter.
+- **An exception quoting a secret leaves the transport masked.** Any exception the HTTP client throws on a call with a
+  credential, other than the ones already turned into results, is thrown again as `CredentialMaskedException` with the
+  secrets replaced and no previous exception when its message quotes one. The node and the builder's test call resolve
+  a credential through one `CallCredentialResolver`, so their codes cannot drift.
+- **Audit and unknown types.** `credential.updated` marks each changed setting as `settings.<key>`; an update of a
+  credential whose type is no longer registered is refused (`type_unknown`) instead of overwriting it with nothing.
 
 ## Alternatives
 

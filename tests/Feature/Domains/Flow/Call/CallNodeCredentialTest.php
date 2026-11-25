@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow\Call;
 
+use App\Domains\Flow\Call\CallCredentialResolver;
 use App\Domains\Flow\Call\CallTransportRegistry;
+use App\Domains\Flow\Call\Transports\HttpTransport;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\Variables\VariableResolver;
@@ -15,6 +17,7 @@ use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use Fapost\Foundation\Flow\Enums\NodeConfigIssueSeverity;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Tests\Support\FakeUsageMeter;
 use Tests\Support\InMemoryCallExecutionLedger;
@@ -200,6 +203,64 @@ final class CallNodeCredentialTest extends TestCase
         $this->assertSame('credential_id', $issues[0]->field);
     }
 
+    public function test_a_literal_plain_http_target_with_a_credential_blocks_publishing(): void
+    {
+        $handler = $this->handler($this->transport());
+
+        $codes = static fn (array $config): array => array_map(
+            static fn ($issue): string => $issue->code,
+            $handler->validate($config),
+        );
+
+        $this->assertSame(
+            ['call_credential_insecure_target'],
+            $codes($this->node(['credential_id' => self::ID, 'target' => 'POST http://api.example.com/x'])),
+        );
+        $this->assertSame([], $codes($this->node(['credential_id' => self::ID, 'target' => 'POST {{vars.url}}'])));
+        $this->assertSame([], $codes($this->node(['credential_id' => self::ID, 'target' => 'POST https://api.example.com/x'])));
+        // Without a credential a plain http target is the author's business.
+        $this->assertSame([], $codes($this->node(['target' => 'POST http://api.example.com/x'])));
+
+        $issues = $handler->validate($this->node(['credential_id' => self::ID, 'target' => 'GET HTTP://api.example.com/x']));
+
+        $this->assertSame('call_credential_insecure_target', $issues[0]->code);
+        $this->assertSame('target', $issues[0]->field);
+        $this->assertSame(NodeConfigIssueSeverity::Error, $issues[0]->severity);
+    }
+
+    public function test_a_secret_the_target_echoes_is_masked_in_the_ledger_and_the_saved_variable(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response(
+            ['you_sent' => 'Bearer ' . self::SECRET],
+            200,
+            ['Content-Type' => 'application/json', 'X-Echo' => self::SECRET],
+        )]);
+
+        $registry = new CallTransportRegistry();
+        $registry->register($this->app->make(HttpTransport::class));
+        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($this->meter), $this->ledger, new CallCredentialResolver($this->store));
+
+        $result = $handler->execute(
+            $this->node(['credential_id' => self::ID, 'save_to_variable' => ['name' => 'response', 'storage' => 'session']]),
+            [],
+            $this->context('k:echo'),
+        );
+
+        $this->assertSame('success', $result->sourceHandle);
+        $this->assertSame(['you_sent' => 'Bearer ***'], $result->stateChanges['flow.response']['body'] ?? null);
+        $this->assertSame('***', $result->stateChanges['flow.response']['headers']['X-Echo'] ?? null);
+        $this->assertStringNotContainsString(self::SECRET, json_encode($result->stateChanges, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString(self::SECRET, json_encode($result->trace, JSON_THROW_ON_ERROR));
+
+        $this->assertCount(1, $this->ledger->completed);
+
+        $stored = array_values($this->ledger->completed)[0];
+
+        $this->assertSame(['you_sent' => 'Bearer ***'], $stored->payload);
+        $this->assertSame('***', $stored->metadata['headers']['X-Echo']);
+        $this->assertStringNotContainsString(self::SECRET, json_encode($stored, JSON_THROW_ON_ERROR));
+    }
+
     private function secret(string $id): CredentialSecret
     {
         return new CredentialSecret(UsageGates::TENANT_ID, $id, 'bearer', 'v1', [], ['api.example.com'], ['token' => self::SECRET]);
@@ -242,7 +303,7 @@ final class CallNodeCredentialTest extends TestCase
         $registry = new CallTransportRegistry();
         $registry->register($transport);
 
-        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($this->meter), $this->ledger, $this->store);
+        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($this->meter), $this->ledger, new CallCredentialResolver($this->store));
     }
 
     /**

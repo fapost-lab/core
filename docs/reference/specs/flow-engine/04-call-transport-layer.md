@@ -87,19 +87,23 @@ Registered in `FlowServiceProvider` through `CallTransportRegistry`.
 - The success boundary is `options.success_when`: `2xx` (default), `any_response`, `2xx_or_4xx`. The node's own `success_statuses` (see `nodes/06-call.md`) overrides it, for any transport.
   Transport-level failures (DNS, timeout, TLS) are always errors with code `transport_failure`.
 - Error codes: `invalid_target`, `invalid_method`, `egress_denied`, `transport_failure`, `http_4xx`,
-  `http_5xx`, `http_other`, and with a credential `credential_host_denied`, `credential_unavailable`. On a call with a
-  credential, a header value or URL the HTTP client refuses is `transport_failure` with the refusal message masked, never
-  a thrown exception.
+  `http_5xx`, `http_other`, and with a credential `credential_insecure_target`, `credential_host_denied`,
+  `credential_unavailable`. On a call with a credential, a header value or URL the HTTP client refuses is
+  `transport_failure` with the refusal message masked, never a thrown exception; any other exception the client throws
+  whose message quotes a secret is thrown again as `CredentialMaskedException` with the message masked and no previous.
 - The request goes through `GuardedHttpClient` (`app/Domains/Flow/Call/Egress/`), never the raw HTTP
   client; a PHPat rule (`tests/Architecture/EgressGuardTest.php`) enforces it. The guard refuses
   non-public addresses (see `nodes/06-call.md`, "Egress guard") and ends such a call with
   `egress_denied`, metadata `{host, reason}`.
 - With `CallRequest::$credential` (a saved credential of the tenant, see `nodes/06-call.md`, "Saved credentials"):
-  1. the target host must match the credential's allowed hosts (`HostMatcher`: an exact host or `*.domain`), else
-     `credential_host_denied` with metadata `{host}` and no connection (a warning is logged with the tenant, node, host
-     and credential id, never the path or query);
+  1. the target must be an https URL, else `credential_insecure_target` with metadata `{host}`, and its host must match
+     the credential's allowed hosts (`HostMatcher`: an exact host or `*.domain`), else `credential_host_denied` with
+     metadata `{host}`; either way there is no connection and no token request (a warning is logged with the tenant,
+     node, host and credential id, never the path or query);
   2. the credential's type (`CredentialTypeRegistry`) supplies the headers and query; they replace the author's of the same
-     name (headers compared case-insensitively), and the author's `auth.bearer` / `auth.basic.*` are ignored. A type that
+     name (headers compared case-insensitively; on POST, PUT, PATCH and DELETE a pair of that name the author wrote in
+     the URL's own query is removed, the other pairs stay byte for byte), and the author's `auth.bearer` /
+     `auth.basic.*` are ignored. A type that
      cannot authorize (an unknown type, a missing setting, an OAuth2 endpoint that gave no token) is `credential_unavailable`;
   3. redirects are not followed (`withoutRedirecting()`): a 3xx is the answer, so the credential never goes to a host
      the admin did not list;
@@ -108,10 +112,12 @@ Registered in `FlowServiceProvider` through `CallTransportRegistry`.
      metadata (`SecretRedactor`). The error code is left alone. The ledger records what the transport returned, so a
      stored result is masked too;
   5. a 401 from the target is told to the credential's type when it keeps a token (`RejectedTokenAwareInterface`): the
-     client-credentials type drops its cached token, the authorization-code type marks its access token expired (no
-     resend; retries are the node's business);
-  6. authorizing spends the call's own `timeout`: an OAuth2 token request on a cold cache leaves the target only what
-     is left of it, and with less than `min(1 s, half the timeout)` left nothing is sent (`credential_unavailable`, metadata
+     client-credentials type drops the cached token of that credential version (one key, no scan), the
+     authorization-code type marks its access token expired (no resend; retries are the node's business);
+  6. authorizing spends the call's own `timeout`: a type that makes requests to authorize
+     (`AuthorizesWithinDeadlineInterface`, both OAuth2 types) gets the timeout as its limit — the token request takes
+     the smaller of it and its own 10 s, the authorization-code refresh lock is waited for at most what is left, and
+     with less than 1 s left no token request is sent (`credential_unavailable`); the target gets only what is left, and with less than `min(1 s, half the timeout)` left nothing is sent (`credential_unavailable`, metadata
      `{reason: timeout}`),
      so a credential never stretches the node past the window the runtime sizes its jobs and locks by. The credential's
      query reaches the URL on every method, a DELETE without a body included.

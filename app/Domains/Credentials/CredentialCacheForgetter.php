@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Credentials;
 
+use App\Domains\Shared\Infrastructure\RedisKeyPurger;
 use App\Domains\Tenancy\Contracts\TenantCacheForgetterInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 

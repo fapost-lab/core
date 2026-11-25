@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow\Call;
 
+use App\Domains\Credentials\Types\BasicCredentialType;
 use App\Domains\Flow\Call\CallTester;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Call\Egress\EgressGuardMiddleware;
@@ -13,6 +14,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Tests\Feature\Domains\Credentials\CredentialsTestCase;
 
 /**
@@ -89,6 +91,30 @@ final class CallTesterCredentialTest extends CredentialsTestCase
         );
 
         $this->assertSame('transport_failure', $result['error_code']);
+        $this->assertStringNotContainsString(self::SECRET, json_encode($result, JSON_THROW_ON_ERROR));
+    }
+
+    public function test_a_failure_quoting_the_basic_authorization_value_comes_back_masked(): void
+    {
+        $encoded = base64_encode('alice:' . self::SECRET);
+        Http::fake(['api.example.com/*' => static function () use ($encoded): never {
+            throw new RuntimeException('client failed, header was Basic ' . $encoded);
+        }]);
+        $credential = $this->credential([
+            'type'     => BasicCredentialType::ID,
+            'settings' => ['username' => 'alice'],
+            'secret'   => ['password' => self::SECRET],
+        ]);
+
+        $result = $this->tester()->run(
+            ['transport' => 'http', 'target' => 'GET https://api.example.com/me', 'credential_id' => $credential->id],
+            [],
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('test_exception', $result['error_code']);
+        $this->assertSame('client failed, header was Basic ***', $result['body']);
+        $this->assertStringNotContainsString($encoded, json_encode($result, JSON_THROW_ON_ERROR));
         $this->assertStringNotContainsString(self::SECRET, json_encode($result, JSON_THROW_ON_ERROR));
     }
 

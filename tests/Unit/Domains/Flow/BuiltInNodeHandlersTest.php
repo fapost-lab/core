@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
+use App\Domains\Flow\Call\CallCredentialResolver;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Contracts\AudienceBroadcasterInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
@@ -1118,7 +1119,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_call_unknown_transport_routes_to_error(): void
     {
-        $handler = new CallNodeHandler(new CallTransportRegistry(), new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore());
+        $handler = new CallNodeHandler(new CallTransportRegistry(), new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger(), new CallCredentialResolver(new InMemoryCredentialStore()));
 
         $result = $handler->execute([
             'id'     => 'call-u',
@@ -1857,7 +1858,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $registry = new CallTransportRegistry();
         $registry->register($transport);
 
-        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore());
+        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger(), new CallCredentialResolver(new InMemoryCredentialStore()));
     }
 
     private function makeHandler(

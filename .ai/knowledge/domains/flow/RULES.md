@@ -57,18 +57,26 @@ broken.
 - **A `call` with a saved credential never exposes the secret and never sends it off its allowed hosts.**
   (1) `credential_id` is read as written, never through a template, so a flow variable cannot pick another
   credential; the secret travels in `CallRequest::$credential`, never in `parameters` or `options` (the node's
-  input). (2) Only the `http` transport applies a credential (`credential_unsupported` otherwise), and only to
+  input). (2) Only the `http` transport applies a credential (`credential_unsupported` otherwise), only over
+  https (`credential_insecure_target`, no connection; a literal `http://` target fails publishing) and only to
   a host in the credential's allowed hosts (`credential_host_denied`, no connection). (3) The credential's
-  headers and query replace the author's of the same name, the inline `auth.*` is ignored, and the author's
-  routing headers (`Host`, `X-Forwarded-Host`, `Forwarded`, `X-Original-Host`, `X-Host`) are dropped.
-  (4) Such a call never follows a redirect, and authorizing it (an OAuth2 token request) spends the call's own
-  `timeout`, so the node stays inside the window its job and lock are sized by. (5) The whole result, error messages and exception text included,
-  is masked with `SecretRedactor` before it reaches the ledger, state or logs. Why: whoever edits a flow must
+  headers and query replace the author's of the same name (a same-named pair in the URL's own query included), the
+  inline `auth.*` is ignored, and the author's routing headers (`Host`, `X-Forwarded-Host`, `Forwarded`,
+  `X-Original-Host`, `X-Host`) are dropped.
+  (4) Such a call never follows a redirect, and authorizing it (an OAuth2 token request, a refresh lock wait) spends
+  the call's own `timeout` (`AuthorizesWithinDeadlineInterface`), so the node stays inside the window its job and lock
+  are sized by. (5) The whole result, error messages and exception text included, is masked with `SecretRedactor`
+  before it reaches the ledger, state or logs, and an exception that escapes the transport quoting a secret is thrown
+  again masked (`CredentialMaskedException`). Why: whoever edits a flow must
   not be able to read the key or send it to a server of their own (`adr-20261119-credentials-store`). Enforced:
   `tests/Feature/Domains/Flow/Call/CallNodeCredentialTest.php` (`test_the_credential_id_is_not_a_template`,
   `test_the_credential_reaches_the_transport_and_the_secret_is_in_neither_parameters_nor_options`,
-  `test_only_the_http_transport_takes_a_credential`), `HttpTransportCredentialTest.php`
-  (`test_a_host_outside_the_list_is_refused_without_a_connection`,
+  `test_only_the_http_transport_takes_a_credential`, `test_a_literal_plain_http_target_with_a_credential_blocks_publishing`,
+  `test_a_secret_the_target_echoes_is_masked_in_the_ledger_and_the_saved_variable`), `HttpTransportCredentialTest.php`
+  (`test_a_host_outside_the_list_is_refused_without_a_connection`, `test_a_plain_http_target_is_refused_without_a_connection`,
+  `test_a_post_and_a_delete_keep_the_authors_other_query_pairs_byte_for_byte_and_drop_the_authors_credential_key`,
+  `test_the_call_timeout_reaches_a_type_that_authorizes_within_a_deadline`,
+  `test_an_exception_quoting_the_secret_leaves_the_transport_masked_and_without_a_previous`,
   `test_the_authors_routing_headers_are_dropped_so_the_request_lands_on_the_allowed_host`,
   `test_a_redirect_is_not_followed_and_the_credential_goes_nowhere_else`,
   `test_a_token_request_that_spends_the_whole_timeout_sends_nothing_to_the_target`,

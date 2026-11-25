@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Credentials;
 
+use App\Domains\Shared\Infrastructure\RedisKeyPurger;
 use Fapost\Foundation\Credentials\DTO\CredentialSecret;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
@@ -13,7 +14,8 @@ use Throwable;
 /**
  * The OAuth2 access tokens fetched for credentials, so N calls cost one token request. Keyed
  * `credentials:oauth2:{tenant}:{credential}:{version}`: a credential saved again has a new version and stops
- * matching its old token. A token is encrypted in Redis and lives for its `expires_in` less a margin.
+ * matching its old token. A token is encrypted in Redis and lives for its `expires_in` less a margin. A 401 from the
+ * target drops the one key of its version; an edit or a delete drops every version.
  *
  * Holds no tenant state. A Redis or decryption failure is logged (never with a token) and answered as a miss, so
  * a call is never blocked by the cache: the token is fetched again.
@@ -72,7 +74,20 @@ final readonly class OAuth2TokenCache
     }
 
     /**
-     * Drops the tokens of every version of the credential.
+     * Drops the token of this version of the credential only: one key, no keyspace scan, so it is cheap enough for
+     * every 401 a target answers.
+     */
+    public function forgetVersion(CredentialSecret $secret): void
+    {
+        try {
+            $this->redis->connection()->del($this->key($secret));
+        } catch (Throwable $exception) {
+            $this->warn('forget', $secret->tenantId, $secret->id, $exception);
+        }
+    }
+
+    /**
+     * Drops the tokens of every version of the credential (a pattern purge), for an edit or a delete of it.
      */
     public function forget(string $tenantId, string $credentialId): void
     {

@@ -72,6 +72,7 @@ handle with `error_code` and `credential_id` in the metadata, and the flow log s
 | `credential_unsupported` | the transport is not `http` |
 | `credential_not_found` | no credential with that id in the tenant |
 | `credential_unavailable` | the stored secret cannot be decrypted (the application key changed), or, from the transport, the type cannot authorize (for OAuth2, no token) |
+| `credential_insecure_target` | from the transport: the target is not an https URL; no connection |
 | `credential_host_denied` | from the transport: the target host is not among the credential's allowed hosts; no connection |
 
 The node passes the credential in `CallRequest::$credential`, on every attempt of a `retry` (it is read once per
@@ -300,12 +301,13 @@ See [04-call-transport-layer.md](../04-call-transport-layer.md), section 4.3.
 `ValidateFlowService` has no call-specific rules beyond the schema (no required fields are declared) and the handler's own
 `validate()`: the `success_statuses` list, the `retry` policy, the `strict_mapping` flag (see above) and the `credential_id`:
 `call_invalid_credential` (not a string), `call_credential_unsupported` (the transport is not `http`),
-`call_credential_not_found` (no such credential in the tenant). They are errors, so they block publishing; the validator does not
+`call_credential_not_found` (no such credential in the tenant), `call_credential_insecure_target` (a target written
+without a template is a plain `http://` URL; a templated one is refused at run time). They are errors, so they block publishing; the validator does not
 tell a draft check from a publish, so a draft validation reports them as errors too.
 An unknown transport, a malformed target or an invalid `success_when` surfaces at runtime as the
 `error` handle. There is a builder "test call" endpoint (`CallTestController`, `CallTester`) for
-trying a request before publishing; it accepts `credential_id` and answers with the same codes, masking an exception message with
-the credential's secret fields.
+trying a request before publishing; it accepts `credential_id` and answers with the same codes (both resolve it through `CallCredentialResolver`), masking an
+exception message with the credential's secret fields.
 
 Tests: `tests/Unit/Domains/Flow/BuiltInNodeHandlersTest.php`,
 `tests/Unit/Domains/Flow/Call/HandlerTransportTest.php`,

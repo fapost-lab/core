@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow\Call;
 
 use App\Domains\Flow\Call\CallAttempt;
+use App\Domains\Flow\Call\CallCredentialResolver;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
@@ -113,7 +114,7 @@ final class CallNodeIdempotencyTest extends TestCase
         $registry->register($transport);
         $ledger = new InMemoryCallExecutionLedger();
         $ledger->complete(UsageGates::TENANT_ID, 'session-1:call-1:3:call-1', CallResult::ok(['id' => 'user-1']));
-        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(FakeUsageMeter::denying()), $ledger, new InMemoryCredentialStore());
+        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(FakeUsageMeter::denying()), $ledger, new CallCredentialResolver(new InMemoryCredentialStore()));
 
         $modern = $handler->execute($this->node(), [], $this->context('session-1:call-1:3'));
         $legacy = $handler->execute(['id' => 'call-1', 'config' => ['url' => 'https://x.test/hook']], [], $this->context('session-1:call-1:3'));
@@ -160,7 +161,7 @@ final class CallNodeIdempotencyTest extends TestCase
             {
             }
         };
-        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), $ledger, new InMemoryCredentialStore());
+        $handler = new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), $ledger, new CallCredentialResolver(new InMemoryCredentialStore()));
 
         $result = $handler->execute($this->node(), [], $this->context('session-1:call-1:3'));
         $handler->execute($this->node(), [], $this->context('session-1:call-1:3'));
@@ -183,7 +184,7 @@ final class CallNodeIdempotencyTest extends TestCase
         $ledger = new InMemoryCallExecutionLedger();
 
         return [
-            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), $ledger, new InMemoryCredentialStore()),
+            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), $ledger, new CallCredentialResolver(new InMemoryCredentialStore())),
             $transport,
             $ledger,
         ];

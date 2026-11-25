@@ -7,6 +7,7 @@ namespace Tests\Feature\Domains\Credentials;
 use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Credentials\CredentialWriter;
 use App\Domains\Credentials\Models\Credential;
+use App\Domains\Credentials\Models\CredentialOAuthGrant;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -188,7 +189,7 @@ final class CredentialWriterTest extends CredentialsTestCase
             'type'          => 'basic',
             'settings'      => ['username' => 'ignored'],
             'secrets'       => ['token' => ''],
-            'allowed_hosts' => ['api.example.com', 'b.example.com'],
+            'allowed_hosts' => ['API.example.com.'],
         ]);
 
         $fresh = Credential::query()->findOrFail($credential->id);
@@ -199,7 +200,7 @@ final class CredentialWriterTest extends CredentialsTestCase
         $this->assertSame(['token' => self::SECRET], $fresh->secret);
         $this->assertSame([], $fresh->settings);
         $this->assertTrue($fresh->secret_changed_at->equalTo($changedAt));
-        $this->assertSame(['api.example.com', 'b.example.com'], $fresh->allowed_hosts);
+        $this->assertSame(['api.example.com'], $fresh->allowed_hosts);
     }
 
     public function test_replacing_the_secret_moves_secret_changed_at(): void
@@ -300,8 +301,8 @@ final class CredentialWriterTest extends CredentialsTestCase
         $this->assertSame('settings', $entries[0]->log_name);
         $this->assertSame(['name' => 'CRM', 'type' => 'api_key_header', 'allowed_hosts' => ['api.example.com']], $created->attribute_changes?->toArray()['attributes']);
         $this->assertSame('CRM renamed', $updated->attribute_changes?->toArray()['attributes']['name']);
-        $this->assertSame(['settings'], $updated->attribute_changes?->toArray()['changed']);
-        $this->assertSame(['secret_replaced' => true], $updated->properties?->toArray());
+        $this->assertSame(['settings.header', 'settings.prefix'], $updated->attribute_changes?->toArray()['changed']);
+        $this->assertEquals(['secret_replaced' => true, 'hosts_widened' => true], $updated->properties?->toArray());
         $this->assertSame('CRM renamed', $deleted->subject_label);
 
         $dump = json_encode($entries->map(static fn (ActivityEntry $entry): array => $entry->getAttributes())->all(), JSON_THROW_ON_ERROR);
@@ -309,6 +310,143 @@ final class CredentialWriterTest extends CredentialsTestCase
         foreach ([self::SECRET, 'replacement-secret-value', 'X-Secret-Header', 'X-Other-Header', 'Prefix-Value'] as $value) {
             $this->assertStringNotContainsString($value, $dump);
         }
+    }
+
+    public function test_widening_the_hosts_without_entering_the_secret_again_is_refused(): void
+    {
+        $credential = $this->credential(['name' => 'CRM']);
+
+        try {
+            $this->writer()->update($credential, ['name' => 'CRM', 'allowed_hosts' => ['api.example.com', 'collector.attacker.test']]);
+            $this->fail('A stored secret must not reach a new host.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(['secrets.token'], array_keys($exception->errors()));
+            $this->assertSame([__('credential_validation.secret_reenter_for_new_host')], $exception->errors()['secrets.token']);
+        }
+
+        $fresh = Credential::query()->findOrFail($credential->id);
+
+        $this->assertSame(['api.example.com'], $fresh->allowed_hosts);
+        $this->assertSame(0, ActivityEntry::query()->count());
+    }
+
+    public function test_widening_the_hosts_with_the_secret_entered_again_is_saved_and_audited(): void
+    {
+        $credential = $this->credential(['name' => 'CRM']);
+
+        $this->writer()->update($credential, [
+            'name'          => 'CRM',
+            'secrets'       => ['token' => 'the-same-or-new-value'],
+            'allowed_hosts' => ['api.example.com', 'b.example.com'],
+        ]);
+
+        $fresh = Credential::query()->findOrFail($credential->id);
+
+        $this->assertSame(['api.example.com', 'b.example.com'], $fresh->allowed_hosts);
+        $this->assertSame(['token' => 'the-same-or-new-value'], $fresh->secret);
+        $this->assertEquals(['secret_replaced' => true, 'hosts_widened' => true], ActivityEntry::query()->sole()->properties?->toArray());
+    }
+
+    public function test_narrowing_the_hosts_keeps_the_stored_secret(): void
+    {
+        $credential = $this->credential(['allowed_hosts' => ['api.example.com', 'b.example.com', '*.vendor.test']]);
+
+        $this->writer()->update($credential, ['name' => $credential->name, 'allowed_hosts' => ['api.vendor.test', '*.eu.vendor.test']]);
+
+        $fresh = Credential::query()->findOrFail($credential->id);
+
+        $this->assertSame(['api.vendor.test', '*.eu.vendor.test'], $fresh->allowed_hosts);
+        $this->assertSame(['token' => self::SECRET], $fresh->secret);
+        $this->assertSame(['secret_replaced' => false], ActivityEntry::query()->sole()->properties?->toArray());
+    }
+
+    public function test_a_wildcard_over_a_listed_host_widens_the_list(): void
+    {
+        $credential = $this->credential(['allowed_hosts' => ['api.example.com']]);
+
+        $this->expectException(ValidationException::class);
+
+        $this->writer()->update($credential, ['name' => $credential->name, 'allowed_hosts' => ['*.example.com']]);
+    }
+
+    public function test_moving_the_token_url_to_another_host_asks_for_the_secret_again(): void
+    {
+        $credential = $this->credential([
+            'type'          => 'oauth2_client_credentials',
+            'allowed_hosts' => ['*.example.com'],
+            'settings'      => ['token_url' => 'https://auth.example.com/token', 'client_id' => 'c', 'client_auth' => 'basic'],
+            'secret'        => ['client_secret' => self::SECRET],
+        ]);
+        $input = [
+            'name'          => $credential->name,
+            'settings'      => ['token_url' => 'https://other.example.com/token', 'client_id' => 'c', 'client_auth' => 'basic'],
+            'allowed_hosts' => ['*.example.com'],
+        ];
+
+        try {
+            $this->writer()->update($credential, $input);
+            $this->fail('The client secret must not follow the token URL to another host unasked.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(['secrets.client_secret'], array_keys($exception->errors()));
+        }
+
+        // The same host, another path: nothing to re-enter.
+        $this->writer()->update($credential, [...$input, 'settings' => [...$input['settings'], 'token_url' => 'https://auth.example.com/v2/token']]);
+
+        $this->assertSame('https://auth.example.com/v2/token', Credential::query()->findOrFail($credential->id)->settings['token_url']);
+    }
+
+    public function test_widening_the_hosts_of_a_consent_credential_drops_its_grant(): void
+    {
+        $credential = $this->oauthCredential();
+        $this->grant($credential);
+
+        $this->writer()->update($credential, [
+            'name'          => $credential->name,
+            'settings'      => $credential->settings,
+            'secrets'       => ['client_secret' => self::SECRET],
+            'allowed_hosts' => ['api.example.com', 'auth.example.com', 'api2.example.com'],
+        ]);
+
+        $this->assertSame(0, CredentialOAuthGrant::query()->count());
+        // Compared as a map: a jsonb column (Postgres) does not keep the key order.
+        $this->assertEquals(
+            ['secret_replaced' => false, 'hosts_widened' => true, 'grant_dropped' => true],
+            ActivityEntry::query()->sole()->properties?->toArray(),
+        );
+    }
+
+    public function test_narrowing_the_hosts_of_a_consent_credential_keeps_its_grant(): void
+    {
+        $credential = $this->oauthCredential();
+        $this->grant($credential);
+
+        $this->writer()->update($credential, [
+            'name'          => $credential->name,
+            'settings'      => $credential->settings,
+            'allowed_hosts' => ['auth.example.com'],
+        ]);
+
+        $this->assertSame(1, CredentialOAuthGrant::query()->count());
+    }
+
+    public function test_a_credential_of_an_unregistered_type_cannot_be_updated(): void
+    {
+        $credential = $this->credential(['type' => 'gone_type', 'settings' => ['header' => 'X-Key']]);
+
+        try {
+            $this->writer()->update($credential, ['name' => 'Renamed', 'allowed_hosts' => ['api.example.com']]);
+            $this->fail('An unknown type must be refused.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(['type'], array_keys($exception->errors()));
+        }
+
+        $fresh = Credential::query()->findOrFail($credential->id);
+
+        $this->assertSame($credential->name, $fresh->name);
+        $this->assertSame(['header' => 'X-Key'], $fresh->settings);
+        $this->assertSame(['token' => self::SECRET], $fresh->secret);
+        $this->assertSame(0, ActivityEntry::query()->count());
     }
 
     public function test_an_update_without_a_secret_records_that_it_was_not_replaced(): void

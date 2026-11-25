@@ -9,7 +9,7 @@ use RuntimeException;
 
 /**
  * A Redis connection for tests that need none: keeps string values with their TTL in an array and answers `get`,
- * `set ... EX`, `scan` and `unlink`. {@see self::$failing} makes every call throw, as an unreachable server does.
+ * `set ... EX`, `del`, `scan` and `unlink`. {@see self::$failing} makes every call throw, as an unreachable server does.
  *
  * It is both the factory and the connection it hands out.
  */
@@ -45,6 +45,17 @@ final class InMemoryRedis implements RedisFactory
         $this->ttls[$key]   = $ttl;
 
         return true;
+    }
+
+    public function del(string $key): int
+    {
+        $this->guard();
+
+        $existed = isset($this->values[$key]);
+
+        unset($this->values[$key], $this->ttls[$key]);
+
+        return $existed ? 1 : 0;
     }
 
     /**

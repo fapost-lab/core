@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Credentials\Types;
 
+use App\Domains\Credentials\Contracts\AuthorizesWithinDeadlineInterface;
 use App\Domains\Credentials\Contracts\RejectedTokenAwareInterface;
 use App\Domains\Credentials\Contracts\ValidatesOwnSettingsInterface;
 use App\Domains\Credentials\Models\CredentialOAuthGrant;
@@ -23,13 +24,14 @@ use Illuminate\Contracts\Encryption\DecryptException;
  * OAuth2 authorization code grant: a person consents once at the provider (from the credential's console page, see
  * {@see \App\Domains\Credentials\OAuth2\OAuth2Consent}), and the grant that consent gave is stored apart from the
  * credential ({@see CredentialOAuthGrant}). A call sends its access token as `Authorization: Bearer <token>`; one that
- * runs out within {@see self::EXPIRY_MARGIN_SECONDS} seconds is refreshed first ({@see OAuth2GrantRefresher}).
+ * runs out within {@see self::EXPIRY_MARGIN_SECONDS} seconds is refreshed first ({@see OAuth2GrantRefresher}), within
+ * what is left of the call's timeout when the transport gives one ({@see AuthorizesWithinDeadlineInterface}).
  *
  * No grant, or one the provider refused, is `credential_unavailable`. The client is the tenant's own application at
  * the provider: its token URL must be on an allowed host, its authorization URL only https (the browser goes there,
  * not the server, and no secret is sent to it).
  */
-final readonly class OAuth2AuthorizationCodeType implements HttpCredentialTypeInterface, RejectedTokenAwareInterface, ValidatesOwnSettingsInterface
+final readonly class OAuth2AuthorizationCodeType implements AuthorizesWithinDeadlineInterface, HttpCredentialTypeInterface, RejectedTokenAwareInterface, ValidatesOwnSettingsInterface
 {
     public const string ID = 'oauth2_authorization_code';
 
@@ -112,43 +114,12 @@ final readonly class OAuth2AuthorizationCodeType implements HttpCredentialTypeIn
 
     public function authorize(CredentialSecret $secret): HttpAuthorization
     {
-        // The refresh goes to the token URL: a credential moved off its token host stops working at once.
-        $this->endpoint->checkedUrl($secret);
+        return $this->authorizeWithLimit($secret, null);
+    }
 
-        $grant = $this->grants->find($secret->id);
-
-        if (null === $grant) {
-            throw CredentialUnavailableException::because($secret->id, 'the credential is not connected');
-        }
-
-        if (OAuth2GrantStatus::Connected !== $grant->status) {
-            throw CredentialUnavailableException::because($secret->id, 'the credential needs to be connected again');
-        }
-
-        if (!$grant->accessValidFor(self::EXPIRY_MARGIN_SECONDS)) {
-            $grant = $this->refresher->refreshIfDue(
-                $secret,
-                static fn (CredentialOAuthGrant $current): bool => !$current->accessValidFor(self::EXPIRY_MARGIN_SECONDS),
-            );
-        }
-
-        $clientId     = (string) $secret->setting('client_id');
-        $clientSecret = (string) $secret->value('client_secret');
-
-        try {
-            $accessToken  = $grant->access_token;
-            $refreshToken = $grant->refresh_token;
-        } catch (DecryptException) {
-            throw CredentialUnavailableException::because($secret->id, 'the stored grant cannot be decrypted');
-        }
-
-        return new HttpAuthorization(
-            headers: ['Authorization' => 'Bearer ' . $accessToken],
-            secrets: array_values(array_filter(
-                [$clientSecret, $accessToken, $refreshToken, base64_encode($clientId . ':' . $clientSecret)],
-                static fn (?string $value): bool => null !== $value && '' !== $value,
-            )),
-        );
+    public function authorizeWithin(CredentialSecret $secret, float $seconds): HttpAuthorization
+    {
+        return $this->authorizeWithLimit($secret, $seconds);
     }
 
     public function tokenRejected(CredentialSecret $secret): void
@@ -195,5 +166,50 @@ final readonly class OAuth2AuthorizationCodeType implements HttpCredentialTypeIn
         $reserved = array_values(array_intersect(array_map('mb_strtolower', array_keys($params)), self::RESERVED_PARAMS));
 
         return [] === $reserved ? null : __('credential_validation.authorize_params_reserved', ['keys' => implode(', ', $reserved)]);
+    }
+
+    /**
+     * @param  float|null  $seconds  the most the refresh lock wait and request may take; null for their own limits
+     */
+    private function authorizeWithLimit(CredentialSecret $secret, ?float $seconds): HttpAuthorization
+    {
+        // The refresh goes to the token URL: a credential moved off its token host stops working at once.
+        $this->endpoint->checkedUrl($secret);
+
+        $grant = $this->grants->find($secret->id);
+
+        if (null === $grant) {
+            throw CredentialUnavailableException::because($secret->id, 'the credential is not connected');
+        }
+
+        if (OAuth2GrantStatus::Connected !== $grant->status) {
+            throw CredentialUnavailableException::because($secret->id, 'the credential needs to be connected again');
+        }
+
+        if (!$grant->accessValidFor(self::EXPIRY_MARGIN_SECONDS)) {
+            $grant = $this->refresher->refreshIfDue(
+                $secret,
+                static fn (CredentialOAuthGrant $current): bool => !$current->accessValidFor(self::EXPIRY_MARGIN_SECONDS),
+                $seconds,
+            );
+        }
+
+        $clientId     = (string) $secret->setting('client_id');
+        $clientSecret = (string) $secret->value('client_secret');
+
+        try {
+            $accessToken  = $grant->access_token;
+            $refreshToken = $grant->refresh_token;
+        } catch (DecryptException) {
+            throw CredentialUnavailableException::because($secret->id, 'the stored grant cannot be decrypted');
+        }
+
+        return new HttpAuthorization(
+            headers: ['Authorization' => 'Bearer ' . $accessToken],
+            secrets: array_values(array_filter(
+                [$clientSecret, $accessToken, $refreshToken, base64_encode($clientId . ':' . $clientSecret)],
+                static fn (?string $value): bool => null !== $value && '' !== $value,
+            )),
+        );
     }
 }

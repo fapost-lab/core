@@ -6,7 +6,6 @@ namespace App\Domains\Flow\Call;
 
 use App\Domains\Credentials\CredentialTypeRegistry;
 use App\Domains\Credentials\SecretRedactor;
-use App\Domains\Flow\Call\Transports\HttpTransport;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -14,10 +13,7 @@ use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Support\UsageUnitKey;
 use Carbon\CarbonImmutable;
-use Fapost\Foundation\Credentials\Contracts\CredentialStoreInterface;
 use Fapost\Foundation\Credentials\DTO\CredentialSecret;
-use Fapost\Foundation\Credentials\Exceptions\CredentialNotFoundException;
-use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\Flow\Call\CallContext;
 use Fapost\Foundation\Flow\Call\CallRequest;
@@ -33,9 +29,10 @@ use Throwable;
  * templates are rendered against a caller-supplied `sample` map instead, and a
  * synthetic {@see CallContext} is handed to the transport.
  *
- * A `credential_id` in the config is resolved as the node does, with the same error codes (`credential_unsupported`,
- * `credential_not_found`, `credential_unavailable`), and a refused credential costs no quota. The transport masks
- * the credential's secrets in its result; an exception message is masked here with the credential's secret fields.
+ * A `credential_id` in the config is resolved as the node does, through the same {@see CallCredentialResolver} and
+ * with its codes, and a refused credential costs no quota. The transport masks the credential's secrets in its result
+ * and in an exception it lets through; an exception message is masked here once more with the credential's secret
+ * fields, a second guard for an exception thrown before the transport knew them.
  *
  * Note: this performs a real outgoing request / handler invocation. Mutating
  * calls (POST/PUT/DELETE, side-effecting actions) genuinely take effect — the
@@ -48,7 +45,7 @@ final readonly class CallTester
         private TemplateRenderer $templates,
         private TenantContextInterface $tenantContext,
         private PeriodQuota $quota,
-        private CredentialStoreInterface $credentials,
+        private CallCredentialResolver $credentials,
         private CredentialTypeRegistry $credentialTypes,
     ) {
     }
@@ -89,7 +86,7 @@ final readonly class CallTester
         $credentialId = $config['credential_id'] ?? null;
 
         if (is_string($credentialId) && '' !== $credentialId) {
-            $credential = $this->resolveCredential($credentialId, $transportId);
+            $credential = $this->credentials->resolve($credentialId, $transportId);
 
             if (is_string($credential)) {
                 return $this->errorResult($credential, 0);
@@ -181,24 +178,6 @@ final readonly class CallTester
             'error_code'  => $result->errorCode,
             'duration_ms' => $this->elapsedMs($start),
         ];
-    }
-
-    /**
-     * The credential, or the error code that says why it cannot be used.
-     */
-    private function resolveCredential(string $id, string $transportId): CredentialSecret|string
-    {
-        if (HttpTransport::ID !== $transportId) {
-            return 'credential_unsupported';
-        }
-
-        try {
-            return $this->credentials->secret($id);
-        } catch (CredentialNotFoundException) {
-            return 'credential_not_found';
-        } catch (CredentialUnavailableException) {
-            return 'credential_unavailable';
-        }
     }
 
     /**

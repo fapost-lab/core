@@ -15,7 +15,7 @@ use Throwable;
  * holds the lock reads the grant again before asking the provider.
  *
  * Keyed `credentials:oauth2-refresh:{tenant}:{credential}` in the default cache store; held at most
- * {@see self::TTL_SECONDS} seconds, waited for at most `$waitSeconds`.
+ * {@see self::TTL_SECONDS} seconds, waited for at most `$waitSeconds` (or less, when the caller has less time).
  */
 final readonly class OAuth2GrantLock
 {
@@ -31,13 +31,14 @@ final readonly class OAuth2GrantLock
      * @template T
      *
      * @param  callable(): T  $callback
+     * @param  float|null  $waitSeconds  the most the caller may wait; the lock's own wait when it is longer or null
      *
      * @return T
      *
      * @throws OAuth2GrantLockBusyException when the lock is not had in time, the store has no locks, or the store
      *                                       failed while taking it (Redis down): no write of the grant without the lock
      */
-    public function run(string $tenantId, string $credentialId, callable $callback): mixed
+    public function run(string $tenantId, string $credentialId, callable $callback, ?float $waitSeconds = null): mixed
     {
         $store = $this->cache->getStore();
 
@@ -48,7 +49,7 @@ final readonly class OAuth2GrantLock
         try {
             $lock = $store->lock("credentials:oauth2-refresh:{$tenantId}:{$credentialId}", self::TTL_SECONDS);
 
-            $lock->block($this->waitSeconds);
+            $lock->block(null === $waitSeconds ? $this->waitSeconds : max(0.0, min((float) $this->waitSeconds, $waitSeconds)));
         } catch (LockTimeoutException) {
             throw new OAuth2GrantLockBusyException('The grant of the credential is being refreshed elsewhere.');
         } catch (Throwable) {
