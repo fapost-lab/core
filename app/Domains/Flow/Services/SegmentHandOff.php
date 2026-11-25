@@ -23,15 +23,31 @@ use Illuminate\Support\Str;
  * A run can also strand with its subflow child already over and its parent still in `paused_subflow`: the job broke
  * off after the child's last step committed and before the parent was resumed. {@see pendingReturnOf()} names that
  * child; only {@see \App\Domains\Flow\Orchestration\AutomationRunner} resumes the parent with it, under the run's
- * lock on the automation queue (adr-20261125-stranded-automation-run-recovery).
+ * lock on the automation queue (adr-20261125-stranded-automation-run-recovery). {@see strandedShapeOf()} is the one
+ * answer to "has the run something left to run"; {@see sessionsOfRunByLevel()} the one walk down a run, and
+ * {@see chainOf()} the one walk up it.
  */
 final readonly class SegmentHandOff
 {
     /** A subflow chain is at most a few levels deep; the bound only guards against a corrupt cycle. */
     public const int MAX_CHAIN_DEPTH = 10;
 
-    /** The statuses of a subflow child that is over and hands control back to its parent. */
-    private const array RETURNED = [FlowSessionStatus::Ended, FlowSessionStatus::Completed, FlowSessionStatus::Failed];
+    /** A run with an `active` session ({@see liveSessionOf()}). */
+    public const string SHAPE_ACTIVE = 'active';
+
+    /** A run whose parent still waits on a subflow child that is already over ({@see pendingReturnOf()}). */
+    public const string SHAPE_SUBFLOW_RETURN = 'subflow_return';
+
+    /**
+     * The statuses of a subflow child that is over and hands control back to its parent. An `expired` child — an orphan
+     * the subflow sweeper expired — hands it back as failed.
+     */
+    private const array RETURNED = [
+        FlowSessionStatus::Ended,
+        FlowSessionStatus::Completed,
+        FlowSessionStatus::Failed,
+        FlowSessionStatus::Expired,
+    ];
 
     public function __construct(
         private ConnectionInterface $connection,
@@ -70,18 +86,26 @@ final readonly class SegmentHandOff
 
         $root = FlowSession::query()->find($this->rootIdOf($session));
 
-        if (null === $root) {
-            return;
-        }
-
-        $live = $this->liveSessionOf($root);
-
-        if (null !== $live) {
-            $this->handOn($live);
-        } elseif (null !== $this->pendingReturnOf($root)) {
-            // A parent left waiting on a child that is already over: the continuation resumes it.
+        // A parent left waiting on a child that is already over is handed on too: the continuation resumes it.
+        if (null !== $root && null !== $this->strandedShapeOf($root)) {
             $this->handOn($root);
         }
+    }
+
+    /**
+     * What the run under {@code $root} has left to run, if anything: an `active` session ({@see self::SHAPE_ACTIVE}),
+     * or a subflow child's end to hand back to its parent ({@see self::SHAPE_SUBFLOW_RETURN}). Null when the run is
+     * parked, over or failed. Only reads.
+     *
+     * @return self::SHAPE_*|null
+     */
+    public function strandedShapeOf(FlowSession $root): ?string
+    {
+        if (null !== $this->liveSessionOf($root)) {
+            return self::SHAPE_ACTIVE;
+        }
+
+        return null !== $this->pendingReturnOf($root) ? self::SHAPE_SUBFLOW_RETURN : null;
     }
 
     /**
@@ -140,7 +164,7 @@ final readonly class SegmentHandOff
 
     /**
      * The subflow child whose end the run still has to hand back, if it has one: down the chain of `paused_subflow`
-     * parents, the first parent whose latest child is over (`ended`, `completed` or `failed`) while the parent still
+     * parents, the first parent whose latest child is over (`ended`, `completed`, `failed` or `expired`) while the parent still
      * waits on the node that started that child. Null when the run has an `active` session, or is parked, over, or
      * failed as a whole. Only reads; resuming the parent is {@see \App\Domains\Flow\Orchestration\AutomationRunner}'s.
      */
@@ -181,38 +205,83 @@ final readonly class SegmentHandOff
 
     /**
      * The top session of a subflow chain: the run a trigger started. When a row of the chain is gone, the id the
-     * chain last names — the root a continuation is queued for — even though that row no longer exists.
+     * chain last names — the root a continuation is queued for — even though that row no longer exists. Reads only
+     * `parent_session_id` per level: it runs at every segment end of a subflow child.
      */
     public function rootIdOf(FlowSession $session): string
     {
-        return $this->chainOf($session)['root_id'];
+        return $this->walkUp($session)['root_id'];
     }
 
     /**
-     * The one walk up a subflow chain by `parent_session_id`, bounded by {@see self::MAX_CHAIN_DEPTH}: the id the chain
-     * names as its root ({@see rootIdOf()}), and the highest session of the chain that still exists — the root itself,
-     * or, when the root row is gone, the session that names it as its parent.
+     * The one walk up a subflow chain ({@see walkUp()}): the id the chain names as its root ({@see rootIdOf()}), and
+     * the highest session of the chain that still exists — the root itself, or, when the root row is gone, the session
+     * that names it as its parent — loaded in full once. Should that row be deleted in between, the session given.
      *
      * @return array{root_id: string, top: FlowSession}
      */
     public function chainOf(FlowSession $session): array
     {
+        ['root_id' => $rootId, 'top_id' => $topId] = $this->walkUp($session);
+
+        $top = $topId === (string) $session->getKey() ? $session : FlowSession::query()->find($topId);
+
+        return ['root_id' => $rootId, 'top' => $top ?? $session];
+    }
+
+    /**
+     * Every session of the run under {@code $top} — itself and every session of the tenant below it by
+     * `parent_session_id`, of any status — level by level from the top, bounded by {@see self::MAX_CHAIN_DEPTH}.
+     *
+     * @return list<list<FlowSession>>
+     */
+    public function sessionsOfRunByLevel(string $tenantId, FlowSession $top): array
+    {
+        $levels    = [[$top]];
+        $parentIds = [(string) $top->getKey()];
+
+        for ($depth = 1; $depth < self::MAX_CHAIN_DEPTH; ++$depth) {
+            $children = FlowSession::query()
+                ->where('tenant_id', $tenantId)
+                ->whereIn('parent_session_id', $parentIds)
+                ->get()
+                ->all();
+
+            if ([] === $children) {
+                break;
+            }
+
+            $levels[]  = $children;
+            $parentIds = array_map(static fn (FlowSession $child): string => (string) $child->getKey(), $children);
+        }
+
+        return $levels;
+    }
+
+    /**
+     * The walk up a subflow chain by `parent_session_id`, bounded by {@see self::MAX_CHAIN_DEPTH}, reading that one
+     * column per level: the id the chain names as its root, and the id of the highest session that still exists.
+     *
+     * @return array{root_id: string, top_id: string}
+     */
+    private function walkUp(FlowSession $session): array
+    {
         $rootId   = (string) $session->getKey();
-        $top      = $session;
+        $topId    = $rootId;
         $parentId = $session->parent_session_id;
 
         for ($level = 0; $level < self::MAX_CHAIN_DEPTH && is_string($parentId) && '' !== $parentId; ++$level) {
             $rootId = $parentId;
-            $parent = FlowSession::query()->find($parentId);
+            $parent = FlowSession::query()->whereKey($parentId)->toBase()->first(['parent_session_id']);
 
             if (null === $parent) {
                 break;
             }
 
-            $top      = $parent;
+            $topId    = $parentId;
             $parentId = $parent->parent_session_id;
         }
 
-        return ['root_id' => $rootId, 'top' => $top];
+        return ['root_id' => $rootId, 'top_id' => $topId];
     }
 }

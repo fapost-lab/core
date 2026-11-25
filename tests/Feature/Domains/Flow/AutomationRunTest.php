@@ -115,6 +115,17 @@ final class AutomationRunTest extends FeatureTestCase
         ];
     }
 
+    /**
+     * @return array<string, array{FlowSessionStatus}>
+     */
+    public static function childrenOverAsFailed(): array
+    {
+        return [
+            'a failed child'                          => [FlowSessionStatus::Failed],
+            'an orphan child the sweeper has expired' => [FlowSessionStatus::Expired],
+        ];
+    }
+
     public function test_a_run_crosses_several_segments_and_ends_as_one_session(): void
     {
         $flowId = $this->probeChain(5);
@@ -1002,7 +1013,8 @@ final class AutomationRunTest extends FeatureTestCase
         $this->assertSame(['k1' => 1, 'k2' => 1, 'k3' => 1, 'p1' => 1], AutomationProbeTestHandler::$runs);
     }
 
-    public function test_a_parent_left_waiting_on_a_failed_child_takes_the_failed_exit_once_handed_on(): void
+    #[DataProvider('childrenOverAsFailed')]
+    public function test_a_parent_left_waiting_on_a_failed_child_takes_the_failed_exit_once_handed_on(FlowSessionStatus $childStatus): void
     {
         config(['flow.automation.segment_steps' => 50]);
         $childFlowId  = $this->childOfProbes(1);
@@ -1018,7 +1030,7 @@ final class AutomationRunTest extends FeatureTestCase
             ['id' => 'pe4', 'from' => 'p-fail', 'to' => 'p-end', 'handle' => 'default'],
         ]);
         $parent = $this->automationSession($parentFlowId, 'p-sub', FlowSessionStatus::PausedSubflow, ['fire_key' => 'slot-1']);
-        $child  = $this->automationSession($childFlowId, 'k1', FlowSessionStatus::Failed, [
+        $child  = $this->automationSession($childFlowId, 'k1', $childStatus, [
             'parent_session_id'     => $parent->getKey(),
             'parent_resume_node_id' => 'p-sub',
         ]);
@@ -1049,6 +1061,10 @@ final class AutomationRunTest extends FeatureTestCase
         $waiting = $parent();
         $ended   = $child($waiting, FlowSessionStatus::Ended);
         $this->assertTrue($ended->is($handOff->pendingReturnOf($waiting)));
+
+        $overAnOrphan = $parent();
+        $expired      = $child($overAnOrphan, FlowSessionStatus::Expired);
+        $this->assertTrue($expired->is($handOff->pendingReturnOf($overAnOrphan)), 'An orphan the sweeper expired is over too.');
 
         $running = $parent();
         $child($running, FlowSessionStatus::Active);

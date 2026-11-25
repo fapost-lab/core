@@ -247,7 +247,8 @@ final readonly class AutomationRunner
 
     /**
      * The end a child hands its parent, as the engine hands it when the child's last step runs: its `end` node's
-     * status, or success for a child that ran off its graph and failed for one that failed.
+     * status, or success for a child that ran off its graph and failed for one that failed — or that the subflow
+     * sweeper expired, as the sweeper itself hands it back.
      */
     private function endStatusOf(FlowSession $child): string
     {
@@ -257,6 +258,8 @@ final readonly class AutomationRunner
             return $endStatus;
         }
 
-        return FlowSessionStatus::Failed === $child->status ? EndStatus::Failed->value : EndStatus::Success->value;
+        return in_array($child->status, [FlowSessionStatus::Failed, FlowSessionStatus::Expired], true)
+            ? EndStatus::Failed->value
+            : EndStatus::Success->value;
     }
 }
