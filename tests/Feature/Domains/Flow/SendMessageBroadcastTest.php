@@ -21,6 +21,7 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Handlers\Support\AudienceMessage;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -164,6 +165,28 @@ final class SendMessageBroadcastTest extends FeatureTestCase
         $this->assertSame(0, Broadcast::query()->count());
     }
 
+    public function test_a_run_naming_no_flow_definition_takes_error_and_creates_nothing(): void
+    {
+        $this->flow([]);
+
+        $result = $this->execute(['content_type' => 'text', 'text' => 'Hi', 'addressee' => ['kind' => 'tags', 'tags' => ['vip']]], 'step-1', ['flow' => []]);
+
+        $this->assertSame('error', $result->sourceHandle);
+        $this->assertSame('broadcast_failure', $result->metadata['error_type']);
+        $this->assertSame(AudienceMessage::NO_FLOW_DEFINITION, $result->metadata['error']);
+        $this->assertSame(0, Broadcast::query()->count());
+    }
+
+    public function test_a_language_given_as_a_number_reaches_the_broadcast_as_text(): void
+    {
+        $this->flow([]);
+
+        $result = $this->execute(['content_type' => 'text', 'text' => ['en' => 42], 'addressee' => ['kind' => 'tags', 'tags' => ['nobody']]], 'step-1');
+
+        $this->assertSame('default', $result->sourceHandle);
+        $this->assertEquals(['en' => '42'], Broadcast::query()->sole()->message);
+    }
+
     /**
      * A run four links down an event chain starts a broadcast whose completion is the fifth link: still published. The
      * listener's arithmetic past that point is pinned by `PublishCoreEventsTest`.
@@ -191,15 +214,16 @@ final class SendMessageBroadcastTest extends FeatureTestCase
     }
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>       $config
+     * @param  array<string, mixed>|null  $state  null: a run of the test's flow definition
      */
-    private function execute(array $config, string $idempotencyKey): NodeExecutionResult
+    private function execute(array $config, string $idempotencyKey, ?array $state = null): NodeExecutionResult
     {
         $handler = $this->app->make(NodeHandlerRegistryInterface::class)->resolve('send_message', 1);
 
         return $handler->execute(
             ['id' => 'tell', 'config' => $config],
-            ['system' => ['flow_definition_id' => (string) $this->definition->getKey()], 'flow' => []],
+            $state ?? ['system' => ['flow_definition_id' => (string) $this->definition->getKey()], 'flow' => []],
             new NodeExecutionContext(
                 tenantId: self::TENANT_ID,
                 contactId: null,

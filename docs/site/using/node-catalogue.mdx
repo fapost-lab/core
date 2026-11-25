@@ -42,7 +42,9 @@ saved answer — and must not use `contact.*` or `module.*`, since it goes to ev
 in the audience. Each language of the text is filled in when the block runs, and
 each recipient gets it in their own language. Optionally give the broadcast a
 **name** (otherwise the flow's name and the time) and a flow variable to **save**
-`{broadcast_id, recipient_count}` to; the count is the reach when the block ran.
+`{broadcast_id, recipient_count}` to; the count is the reach when the block ran — for
+a repeated step, the audience the broadcast fixed once it began sending — and 0 when it
+could not be counted.
 
 A step the engine repeats gets the same broadcast back, never a second one. While
 the block's previous broadcast is still running, the block leaves through **error**

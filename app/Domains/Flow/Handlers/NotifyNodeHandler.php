@@ -5,28 +5,23 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Contracts\AudienceBroadcasterInterface;
-use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
-use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
-use App\Domains\Flow\DTOs\AudienceBroadcastRequest;
 use App\Domains\Flow\Enums\AudienceKind;
 use App\Domains\Flow\Enums\ContactNotifyTarget;
 use App\Domains\Flow\Enums\NotifyMode;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
+use App\Domains\Flow\Handlers\Support\AudienceMessage;
 use App\Domains\Flow\Handlers\Support\ContactPlaceholders;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
-use App\Domains\Flow\Services\EventChainContext;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\StaffNotifyChannel;
 use App\Domains\Staff\Enums\StaffNotifyTarget;
 use App\Domains\Staff\Jobs\SendStaffNotificationJob;
 use App\Domains\Staff\Notifications\StaffNotifierRegistry;
-use Carbon\Carbon;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface;
 use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
-use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use Fapost\Support\Builder\Schema\Fields\ArrayField;
 use Fapost\Support\Builder\Schema\Fields\SelectField;
@@ -44,8 +39,8 @@ use Throwable;
  *    language. Recipients: all assistant staff / role / explicit users.
  *  - **Contacts** — retired. A node published in this mode before still reaches
  *    contacts of its own assistant (by tag / all), but as a broadcast started
- *    through {@see AudienceBroadcasterInterface}, the same way as `send_message`
- *    to tags or a segment: a `broadcasts` row on the console, once per node
+ *    through {@see AudienceMessage::startBroadcast()} (so {@see AudienceBroadcasterInterface}),
+ *    the same way as `send_message` to tags or a segment: a `broadcasts` row on the console, once per node
  *    execution, never while the node's previous broadcast runs. Publishing a
  *    flow that adds such a node or changes one is refused
  *    (`notify_contacts_retired`, {@see \App\Domains\Flow\Services\FlowPublishChanges}).
@@ -79,10 +74,7 @@ final class NotifyNodeHandler extends AbstractVersionedHandler implements NodeCo
         private readonly Dispatcher $dispatcher,
         private readonly TemplateRenderer $templates,
         private readonly StaffNotifierRegistry $notifiers,
-        private readonly AudienceBroadcasterInterface $broadcaster,
-        private readonly FlowDefinitionRepositoryInterface $definitions,
-        private readonly FlowDraftRepositoryInterface $drafts,
-        private readonly EventChainContext $eventChain,
+        private readonly AudienceMessage $audience,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -255,7 +247,7 @@ final class NotifyNodeHandler extends AbstractVersionedHandler implements NodeCo
 
     /**
      * Contacts mode (retired) — the message, every language of it rendered from the running flow, goes to the node's
-     * assistant's audience (by tag / all) as a broadcast started through {@see AudienceBroadcasterInterface}.
+     * assistant's audience (by tag / all) as a broadcast started through {@see AudienceMessage::startBroadcast()}.
      *
      * The node keeps its `notify@1` contract: one `default` exit whatever happens. A message that reads a contact, a
      * refusal and a failure send nothing and say why in the trace metadata and the log. The marker is written in every
@@ -296,36 +288,27 @@ final class NotifyNodeHandler extends AbstractVersionedHandler implements NodeCo
             return $this->sentNothing(self::OUTCOME_CONTACT_EXPRESSION_REFUSED, $markerKey, $metadata, $context);
         }
 
-        $message = $this->renderMessage($config['message'] ?? null, $state, $context);
+        $message = $this->audience->renderMessage($config['message'] ?? null, $state, $context);
 
         if (! $this->hasRenderableMessage($message)) {
             throw new InvalidNodeConfigException('notify: message is required.');
         }
 
         try {
-            $flowDefinitionId = data_get($state, StateNamespace::System->value . '.flow_definition_id');
-
-            if (! is_string($flowDefinitionId) || '' === $flowDefinitionId) {
-                return $this->sentNothing(self::OUTCOME_FAILURE, $markerKey, $metadata, $context, 'the run names no flow definition.');
-            }
-
-            $definition = $this->definitions->findById($flowDefinitionId);
-            $draft      = $this->drafts->findByFlowId((string) $definition->flow_id);
-
-            $result = $this->broadcaster->start(new AudienceBroadcastRequest(
-                tenantId: $context->tenantId,
+            $result = $this->audience->startBroadcast(
                 assistantId: $assistantId,
-                name: (string) $draft->name . ' — ' . Carbon::now()->format('Y-m-d H:i'),
                 audience: ContactNotifyTarget::All === $target ? AudienceKind::All : AudienceKind::Tags,
                 tags: ContactNotifyTarget::All === $target ? [] : $tags,
                 segmentId: null,
                 message: $message,
-                flowId: (string) $definition->flow_id,
-                sessionId: $context->sessionId,
-                nodeId: $context->nodeId,
-                originKey: hash('sha256', "{$context->idempotencyKey}:{$context->nodeId}"),
-                chainDepth: $this->eventChain->current() + 1,
-            ));
+                name: null,
+                state: $state,
+                context: $context,
+            );
+
+            if (null === $result) {
+                return $this->sentNothing(self::OUTCOME_FAILURE, $markerKey, $metadata, $context, AudienceMessage::NO_FLOW_DEFINITION);
+            }
         } catch (Throwable $exception) {
             return $this->sentNothing(self::OUTCOME_FAILURE, $markerKey, $metadata, $context, $exception->getMessage(), $exception);
         }
@@ -375,37 +358,6 @@ final class NotifyNodeHandler extends AbstractVersionedHandler implements NodeCo
             stateChanges: [$markerKey => true],
             metadata: [...$metadata, self::OUTCOME_META => $outcome],
         );
-    }
-
-    /**
-     * Every language of the message, rendered now: the broadcast keeps it as it is, and Broadcasting picks each
-     * recipient's language. A plain string is the base language's text.
-     *
-     * @param  array<string, mixed>  $state
-     *
-     * @return array<string, string>|string
-     */
-    private function renderMessage(mixed $message, array $state, NodeExecutionContext $context): array|string
-    {
-        $rendered = $this->templates->render($message, $context, $state);
-
-        if (is_scalar($rendered)) {
-            return (string) $rendered;
-        }
-
-        if (! is_array($rendered)) {
-            return '';
-        }
-
-        $languages = [];
-
-        foreach ($rendered as $language => $text) {
-            if (is_string($language) && is_scalar($text)) {
-                $languages[$language] = (string) $text;
-            }
-        }
-
-        return $languages;
     }
 
     /**

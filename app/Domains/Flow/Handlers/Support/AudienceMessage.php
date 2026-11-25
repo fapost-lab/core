@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-namespace App\Domains\Flow\Services;
+namespace App\Domains\Flow\Handlers\Support;
 
 use App\Domains\Flow\Contracts\AudienceBroadcasterInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\DTOs\AudienceBroadcastRequest;
+use App\Domains\Flow\DTOs\AudienceBroadcastResult;
 use App\Domains\Flow\Enums\AudienceBroadcastOutcome;
 use App\Domains\Flow\Enums\AudienceKind;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
-use App\Domains\Flow\Handlers\Support\ContactPlaceholders;
-use App\Domains\Flow\Handlers\Support\TemplateRenderer;
+use App\Domains\Flow\Services\EventChainContext;
 use App\Domains\Flow\Support\AddresseeResolver;
 use Carbon\Carbon;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -28,11 +28,14 @@ use Throwable;
  * The audience path of a `send_message` node: a message to tags or a segment, sent as a broadcast of the flow's
  * assistant through {@see AudienceBroadcasterInterface}.
  *
- * Kept out of the node handler so the handler stays the one-contact path. Not a singleton: the broadcaster it holds
- * reads the current tenant.
+ * Kept out of the node handler so the handler stays the one-contact path. A retired `notify` node in `contacts` mode
+ * starts its broadcast through the same {@see self::startBroadcast()}, so a flow's broadcast is keyed, named and
+ * chained in one place. Not a singleton: the broadcaster it holds reads the current tenant.
  */
 final readonly class AudienceMessage
 {
+    /** Why a node could not start its broadcast when {@see self::startBroadcast()} found no flow to start it for. */
+    public const string NO_FLOW_DEFINITION    = 'the run names no flow definition.';
     private const string BROADCAST_ID_META    = 'broadcast_id';
     private const string RECIPIENT_COUNT_META = 'recipient_count';
 
@@ -127,31 +130,20 @@ final readonly class AudienceMessage
         }
 
         try {
-            $flowDefinitionId = data_get($state, StateNamespace::System->value . '.flow_definition_id');
-
-            if (! is_string($flowDefinitionId) || '' === $flowDefinitionId) {
-                return self::broadcastError('broadcast_failure', 'the run names no flow definition.');
-            }
-
-            $definition = $this->definitions->findById($flowDefinitionId);
-            $draft      = $this->drafts->findByFlowId((string) $definition->flow_id);
-            $message    = $this->renderBroadcastMessage($config['text'] ?? null, $state, $context);
-            $name       = $this->broadcastName($config['broadcast_name'] ?? null, (string) $draft->name, $state, $context);
-
-            $result = $this->broadcaster->start(new AudienceBroadcastRequest(
-                tenantId: $context->tenantId,
-                assistantId: (string) $draft->assistant_id,
-                name: $name,
+            $result = $this->startBroadcast(
+                assistantId: null,
                 audience: AudienceKind::from((string) $addressee['kind']),
                 tags: $addressee['tags'],
                 segmentId: '' === $addressee['segment_id'] ? null : $addressee['segment_id'],
-                message: $message,
-                flowId: (string) $definition->flow_id,
-                sessionId: $context->sessionId,
-                nodeId: $context->nodeId,
-                originKey: hash('sha256', "{$context->idempotencyKey}:{$context->nodeId}"),
-                chainDepth: $this->eventChain->current() + 1,
-            ));
+                message: $this->renderMessage($config['text'] ?? null, $state, $context),
+                name: $config['broadcast_name'] ?? null,
+                state: $state,
+                context: $context,
+            );
+
+            if (null === $result) {
+                return self::broadcastError('broadcast_failure', self::NO_FLOW_DEFINITION);
+            }
         } catch (Throwable $exception) {
             $this->logger->warning('flow.send_message_broadcast_failed', [
                 'tenant_id'  => $context->tenantId,
@@ -185,28 +177,69 @@ final readonly class AudienceMessage
         );
     }
 
-    private static function broadcastError(string $type, string $message): NodeExecutionResult
-    {
-        return new NodeExecutionResult(
-            status: NodeExecutionStatus::Executed,
-            sourceHandle: 'error',
-            metadata: ['error' => $message, 'error_type' => $type],
-            errorMessage: "{$type}: {$message}",
-        );
+    /**
+     * Starts the broadcast of a flow node: the one request both `send_message` to an audience and a retired `notify`
+     * in `contacts` mode make. The broadcast is the flow's (`flow_id`, the session, the node), keyed once per node
+     * execution (sha256 of `idempotencyKey:nodeId`, so a retried step gets it back), and one level deeper in the event
+     * chain than the run. Its name is the given one, rendered, or "<flow name> — <date and time>".
+     *
+     * @param  string|null                  $assistantId  the assistant whose audience it reaches; null: the flow's
+     * @param  list<string>                 $tags
+     * @param  array<string, string>|string  $message      already rendered ({@see self::renderMessage()})
+     * @param  array<string, mixed>         $state
+     *
+     * @return AudienceBroadcastResult|null null when the run names no flow definition, so there is no flow to start it for
+     *
+     * @throws Throwable when the flow cannot be read or the broadcaster fails
+     */
+    public function startBroadcast(
+        ?string $assistantId,
+        AudienceKind $audience,
+        array $tags,
+        ?string $segmentId,
+        array|string $message,
+        mixed $name,
+        array $state,
+        NodeExecutionContext $context,
+    ): ?AudienceBroadcastResult {
+        $flowDefinitionId = data_get($state, StateNamespace::System->value . '.flow_definition_id');
+
+        if (! is_string($flowDefinitionId) || '' === $flowDefinitionId) {
+            return null;
+        }
+
+        $definition = $this->definitions->findById($flowDefinitionId);
+        $draft      = $this->drafts->findByFlowId((string) $definition->flow_id);
+
+        return $this->broadcaster->start(new AudienceBroadcastRequest(
+            tenantId: $context->tenantId,
+            assistantId: $assistantId ?? (string) $draft->assistant_id,
+            name: $this->broadcastName($name, (string) $draft->name, $state, $context),
+            audience: $audience,
+            tags: $tags,
+            segmentId: $segmentId,
+            message: $message,
+            flowId: (string) $definition->flow_id,
+            sessionId: $context->sessionId,
+            nodeId: $context->nodeId,
+            originKey: hash('sha256', "{$context->idempotencyKey}:{$context->nodeId}"),
+            chainDepth: $this->eventChain->current() + 1,
+        ));
     }
 
     /**
      * Every language of the text, rendered with the flow's engine now: the broadcast keeps it as it is, and Broadcasting
-     * chooses each recipient's language. A plain string is the base language's text.
+     * chooses each recipient's language. A plain value is the base language's text; a language whose value is not a
+     * plain value (a list, a map) is left out.
      *
      * @param  array<string, mixed>  $state
      *
      * @return array<string, string>|string
      */
-    private function renderBroadcastMessage(mixed $text, array $state, NodeExecutionContext $context): array|string
+    public function renderMessage(mixed $text, array $state, NodeExecutionContext $context): array|string
     {
-        if (is_string($text)) {
-            return $this->renderToString($text, $state, $context);
+        if (is_scalar($text)) {
+            return $this->renderToString((string) $text, $state, $context);
         }
 
         if (! is_array($text)) {
@@ -216,12 +249,22 @@ final readonly class AudienceMessage
         $rendered = [];
 
         foreach ($text as $language => $value) {
-            if (is_string($language) && is_string($value)) {
-                $rendered[$language] = $this->renderToString($value, $state, $context);
+            if (is_string($language) && is_scalar($value)) {
+                $rendered[$language] = $this->renderToString((string) $value, $state, $context);
             }
         }
 
         return $rendered;
+    }
+
+    private static function broadcastError(string $type, string $message): NodeExecutionResult
+    {
+        return new NodeExecutionResult(
+            status: NodeExecutionStatus::Executed,
+            sourceHandle: 'error',
+            metadata: ['error' => $message, 'error_type' => $type],
+            errorMessage: "{$type}: {$message}",
+        );
     }
 
     /**
