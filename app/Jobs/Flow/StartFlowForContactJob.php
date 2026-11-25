@@ -13,6 +13,7 @@ use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Services\ContactFlowStartCollision;
 use App\Domains\Flow\Services\ContactFlowStarter;
+use App\Domains\Flow\Services\ContactFlowStartRequest;
 use App\Domains\Flow\Services\ContactFlowStartStatus;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
@@ -137,7 +138,7 @@ final class StartFlowForContactJob implements ShouldQueue, TenantAccessGatedJob
 
             // Outside the routing pipeline: the start takes the contact's session lock, so it cannot race an inbound
             // message, or a second job, for the same contact and assistant.
-            $outcome = $starter->start(
+            $outcome = $starter->start(new ContactFlowStartRequest(
                 guardTenantId: $this->tenantId,
                 contact: $contact,
                 assistantId: $assistantId,
@@ -147,14 +148,14 @@ final class StartFlowForContactJob implements ShouldQueue, TenantAccessGatedJob
                 startKey: $this->startKey,
                 busyWindowMinutes: $this->busyWindowMinutes,
                 askingSessionId: $this->askingSessionId,
-            );
+            ));
 
             match ($outcome->status) {
                 ContactFlowStartStatus::NoChannel => $logger->info('flow.start_for_contact.no_channel', $this->logContext()),
                 ContactFlowStartStatus::Busy      => $logger->info('flow.start_for_contact.busy', [...$this->logContext(), 'reason' => $outcome->busyReason]),
                 ContactFlowStartStatus::Started   => $logger->info('flow.start_for_contact.started', [
                     ...$this->logContext(),
-                    'session_id'  => (string) $outcome->session?->getKey(),
+                    'session_id'  => (string) $outcome->startedSession()->getKey(),
                     'ended_stale' => $outcome->endedStale,
                 ]),
                 ContactFlowStartStatus::Duplicate,

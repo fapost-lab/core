@@ -101,10 +101,7 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
                             ->label((string) __('builder.nodes.webhook_response.body_type'))
                             ->required()
                             ->default(WebhookReplyType::Json->value)
-                            ->options([
-                                WebhookReplyType::Json->value => (string) __('builder.nodes.webhook_response.body_types.json'),
-                                WebhookReplyType::Text->value => (string) __('builder.nodes.webhook_response.body_types.text'),
-                            ]),
+                            ->options(WebhookReplyType::options()),
                         JsonField::make('body')
                             ->label((string) __('builder.nodes.webhook_response.body'))
                             ->default([])
@@ -139,7 +136,8 @@ final class WebhookResponseNodeHandler extends AbstractVersionedHandler implemen
         $type = WebhookReplyType::fromValue($config['body_type'] ?? WebhookReplyType::Json->value);
 
         if (null === $type) {
-            $issues[] = NodeConfigIssue::error('webhook_response_invalid_body_type', 'The body type must be json or text.', 'body_type');
+            $values   = implode(' or ', array_map(static fn (WebhookReplyType $case): string => $case->value, WebhookReplyType::cases()));
+            $issues[] = NodeConfigIssue::error('webhook_response_invalid_body_type', "The body type must be {$values}.", 'body_type');
         }
 
         if (WebhookReplyType::Json === $type && array_key_exists('body', $config) && ! is_array($config['body'])) {
