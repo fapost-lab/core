@@ -11,9 +11,10 @@ return [
     ],
 
     'publish_denied' => [
-        'credentials' => 'This version uses a saved credential that the published one does not. Publishing it needs the Use credentials permission.',
-        'automations' => 'This version adds, changes or removes a schedule, webhook, API or event trigger. Publishing it needs the Manage automations permission.',
-        'broadcasts'  => 'This version adds or changes a message to tags or a segment, which is sent as a broadcast. Publishing it needs the Manage broadcasts permission.',
+        'credentials'         => 'This version uses a saved credential that the published one does not. Publishing it needs the Use credentials permission.',
+        'automations'         => 'This version adds, changes or removes a schedule, webhook, API or event trigger. Publishing it needs the Manage automations permission.',
+        'broadcasts'          => 'This version adds or changes a message to tags or a segment, which is sent as a broadcast. Publishing it needs the Manage broadcasts permission.',
+        'broadcasts_upstream' => 'This version changes what leads to a message to tags or a segment — the blocks or links before it, the flow\'s triggers or its expression engine — and with it what the broadcast says or how often it goes out. Publishing it needs the Manage broadcasts permission.',
     ],
 
     'read_only' => [

@@ -13,7 +13,7 @@ paths:
   - app/Domains/Flow/Handlers/SendMessageNodeHandler.php
   - app/Domains/Flow/Services/AudienceMessage.php
 summary: Why send_message to tags or a segment starts a broadcast of the flow's assistant through Broadcasting's automation entry (no revision, no audit), once per node execution (origin_key), one live per node, with the run's chain depth + 1, and publishing it needs ManageBroadcast
-reviewed_at: 2026-11-23
+reviewed_at: 2026-11-25
 ---
 # A flow's message to tags or a segment is a broadcast started through Broadcasting's automation entry
 
@@ -36,7 +36,8 @@ broadcasts when a broadcast completes would broadcast for ever.
   revision, no audit, no current assistant. What a person confirmed is the published flow; publishing a draft that adds
   such a node or changes its audience, text or name needs `ManageBroadcast` (`FlowPublishChanges`, `FlowDraftPolicy`),
   compared on the draft after template expansion, since a template can bring such a node and a host's parameter value
-  rewrites its text. The right covers the node's own fields, not what its `{{flow.*}}` placeholders read upstream.
+  rewrites its text. The right covers the node's own fields, not what its `{{flow.*}}` placeholders read upstream —
+  amended by `adr-20261125-broadcast-publish-right-covers-what-leads-to-it`: it covers what leads to the node too.
 - The broadcast belongs to the flow's assistant (`flow_drafts.assistant_id`), not the run's, which an automation run
   may not have.
 - The text is text only. Every language of it is rendered at the node and frozen into `broadcasts.message`;

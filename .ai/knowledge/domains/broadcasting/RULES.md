@@ -16,7 +16,7 @@ paths:
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-reviewed_at: 2026-11-18
+reviewed_at: 2026-11-25
 ---
 # Broadcasting rules
 
@@ -37,7 +37,8 @@ broken.
   `BroadcastDispatcher::start()` decide the single winner. Enforced: `BroadcastsConsoleTest`.
 - **An automation starts a broadcast only through `AutomationBroadcasts`, once per node execution and never while the
   node's previous one is live.** A flow's `send_message` to tags or a segment has no revision to confirm (publishing the
-  flow was the confirmation, and needs `ManageBroadcast`), no audit record and no current assistant (the broadcast is
+  flow was the confirmation, and needs `ManageBroadcast` for the node and for what leads to it,
+  `adr-20261125-broadcast-publish-right-covers-what-leads-to-it`), no audit record and no current assistant (the broadcast is
   the flow's assistant's). `origin_key` is unique, so a retried step gets its broadcast back; a partial unique index on
   `(flow_id, flow_node_id)` over `draft`/`running` rows refuses a second live one (`broadcast_running`). The insert runs
   in its own transaction so a unique violation can be read back on PostgreSQL. Its completion event carries
