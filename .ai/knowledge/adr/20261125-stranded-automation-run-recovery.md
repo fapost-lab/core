@@ -31,11 +31,12 @@ lock), a continuation waiting in a backlog of `flow.automations`, and a continua
 
 - **F13 is repaired where segments run.** `SegmentHandOff::pendingReturnOf($root)` only reads: down the chain of
   `paused_subflow` sessions, the first parent whose **latest** child (any status, by `created_at` then ULID) is `ended`,
-  `completed` or `failed`, while the parent still waits on the node that started it
+  `completed`, `failed` or `expired` (an orphan the subflow sweeper expired; amended 2026-11-25), while the parent still
+  waits on the node that started it
   (`child.parent_resume_node_id = parent.current_node_id`). `AutomationRunner::continue()` and `continueFired()`, under
   the run's lock, run the `active` session; with none, they hand that child's end to the parent through
   `SubflowResumerInterface::resumeIfChild()` (the child's `end_status`, else success for `completed`/`ended`, failed for
-  `failed`, as the engine maps it), and the parent runs on in that segment. So a retried start or continuation that used
+  `failed`, as the engine maps it, and failed for `expired`, as the subflow sweeper hands an orphan back), and the parent runs on in that segment. So a retried start or continuation that used
   to be a no-op ends the run. `liveSessionOf()` stays a pure read: the delay and question resumers and the subflow
   sweeper call it, and parent nodes must never run on those paths. `handOnIfStranded()` also hands the run on when
   `pendingReturnOf()` names a child, so the continuation repairs it on `flow.automations`.
@@ -85,8 +86,9 @@ lock), a continuation waiting in a backlog of `flow.automations`, and a continua
   position serialize the copies).
 - A deterministically failing job (a node that throws every time) is queued again once per threshold and fails its
   attempts again, until the deadline; visible in `flow.automation.run_recovered`.
-- A parent whose child the subflow sweeper `expired` (an orphan whose hand-back to its own parent failed) is not handed
-  on: `expired` is not a returned status here, so that grandparent waits for its own subflow timeout or the deadline.
+- A parent whose child the subflow sweeper `expired` (an orphan whose hand-back to its own parent failed) is handed on
+  like any other stranded parent and takes its `failed` exit within the threshold, instead of waiting for its own
+  subflow timeout or the deadline (amended 2026-11-25, task `flow-run-recovery-fixes`).
 - Every pass reads the idle live automation sessions of each tenant (the partial index of the deadline pass covers
   them); runs parked in a `delay` or on a question below a `paused_subflow` root are read but not locked.
 - A recovery pass runs no node and writes no session row except the new `segment_id` of a root that had none.

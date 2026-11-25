@@ -205,19 +205,7 @@ final readonly class AutomationRunDeadlineSweeper
      */
     private function liveSessionsOfRun(string $tenantId, FlowSession $top): array
     {
-        $levels    = [[$top]];
-        $parentIds = [(string) $top->getKey()];
-
-        for ($depth = 1; $depth < SegmentHandOff::MAX_CHAIN_DEPTH && [] !== $parentIds; ++$depth) {
-            $children = FlowSession::query()->whereIn('parent_session_id', $parentIds)->get()->all();
-
-            if ([] === $children) {
-                break;
-            }
-
-            $levels[]  = $children;
-            $parentIds = array_map(static fn (FlowSession $child): string => (string) $child->getKey(), $children);
-        }
+        $levels = $this->handOff->sessionsOfRunByLevel($tenantId, $top);
 
         $live = [];
 

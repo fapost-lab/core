@@ -141,11 +141,11 @@ final readonly class StrandedAutomationRunRecovery
             // A run still moving below its root (a child stepping) or parked below (a child waiting for input or in
             // a delay) has nothing to hand on: its trigger's lock, shared by every run of the trigger, is not taken
             // for it, so a segment or a start of that trigger is not held up by every pass.
-            if (! $this->isIdle($this->sessionsOfRun($top), $idleBefore)) {
+            if (! $this->isIdle($this->sessionsOfRun($tenantId, $top), $idleBefore)) {
                 continue;
             }
 
-            if (null !== $this->handOff->liveSessionOf($top) || null !== $this->handOff->pendingReturnOf($top)) {
+            if (null !== $this->handOff->strandedShapeOf($top)) {
                 $roots[$rootId] = $top;
             }
         }
@@ -170,7 +170,7 @@ final readonly class StrandedAutomationRunRecovery
             return false;
         }
 
-        $sessions = $this->sessionsOfRun($root);
+        $sessions = $this->sessionsOfRun($tenantId, $root);
 
         foreach ($sessions as $session) {
             if (in_array($session->status, AutomationRunRetention::LIVE, true) && $this->deadline->isOverdue($session, $now)) {
@@ -184,11 +184,9 @@ final readonly class StrandedAutomationRunRecovery
             return false;
         }
 
-        if (null !== $this->handOff->liveSessionOf($root)) {
-            $shape = 'active';
-        } elseif (null !== $this->handOff->pendingReturnOf($root)) {
-            $shape = 'subflow_return';
-        } else {
+        $shape = $this->handOff->strandedShapeOf($root);
+
+        if (null === $shape) {
             return false;
         }
 
@@ -245,28 +243,14 @@ final readonly class StrandedAutomationRunRecovery
     }
 
     /**
-     * Every session of the run under {@code $root} — itself and every session below it by `parent_session_id` — of any
-     * status: a child that is already over still counts as the run's last movement.
+     * Every session of the tenant's run under {@code $root}, of any status: a child that is already over still counts
+     * as the run's last movement.
      *
      * @return list<FlowSession>
      */
-    private function sessionsOfRun(FlowSession $root): array
+    private function sessionsOfRun(string $tenantId, FlowSession $root): array
     {
-        $sessions  = [$root];
-        $parentIds = [(string) $root->getKey()];
-
-        for ($depth = 1; $depth < SegmentHandOff::MAX_CHAIN_DEPTH && [] !== $parentIds; ++$depth) {
-            $children = FlowSession::query()->whereIn('parent_session_id', $parentIds)->get()->all();
-
-            if ([] === $children) {
-                break;
-            }
-
-            $sessions  = [...$sessions, ...$children];
-            $parentIds = array_map(static fn (FlowSession $child): string => (string) $child->getKey(), $children);
-        }
-
-        return $sessions;
+        return array_merge(...$this->handOff->sessionsOfRunByLevel($tenantId, $root));
     }
 
     /**
