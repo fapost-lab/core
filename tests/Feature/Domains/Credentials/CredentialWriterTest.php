@@ -302,7 +302,7 @@ final class CredentialWriterTest extends CredentialsTestCase
         $this->assertSame(['name' => 'CRM', 'type' => 'api_key_header', 'allowed_hosts' => ['api.example.com']], $created->attribute_changes?->toArray()['attributes']);
         $this->assertSame('CRM renamed', $updated->attribute_changes?->toArray()['attributes']['name']);
         $this->assertSame(['settings.header', 'settings.prefix'], $updated->attribute_changes?->toArray()['changed']);
-        $this->assertSame(['secret_replaced' => true, 'hosts_widened' => true], $updated->properties?->toArray());
+        $this->assertEquals(['secret_replaced' => true, 'hosts_widened' => true], $updated->properties?->toArray());
         $this->assertSame('CRM renamed', $deleted->subject_label);
 
         $dump = json_encode($entries->map(static fn (ActivityEntry $entry): array => $entry->getAttributes())->all(), JSON_THROW_ON_ERROR);
@@ -344,7 +344,7 @@ final class CredentialWriterTest extends CredentialsTestCase
 
         $this->assertSame(['api.example.com', 'b.example.com'], $fresh->allowed_hosts);
         $this->assertSame(['token' => 'the-same-or-new-value'], $fresh->secret);
-        $this->assertSame(['secret_replaced' => true, 'hosts_widened' => true], ActivityEntry::query()->sole()->properties?->toArray());
+        $this->assertEquals(['secret_replaced' => true, 'hosts_widened' => true], ActivityEntry::query()->sole()->properties?->toArray());
     }
 
     public function test_narrowing_the_hosts_keeps_the_stored_secret(): void
@@ -409,7 +409,8 @@ final class CredentialWriterTest extends CredentialsTestCase
         ]);
 
         $this->assertSame(0, CredentialOAuthGrant::query()->count());
-        $this->assertSame(
+        // Compared as a map: a jsonb column (Postgres) does not keep the key order.
+        $this->assertEquals(
             ['secret_replaced' => false, 'hosts_widened' => true, 'grant_dropped' => true],
             ActivityEntry::query()->sole()->properties?->toArray(),
         );
