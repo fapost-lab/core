@@ -473,7 +473,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
                     channel: $channel,
                     providerFileId: $media->providerFileId,
                     folder: $folder,
-                    providerKind: $incoming->type->value,
+                    providerKind: $media->providerKind,
                 );
             } catch (StorageLimitReachedException) {
                 // No retries and no hint: asking the contact again cannot make room. The author's

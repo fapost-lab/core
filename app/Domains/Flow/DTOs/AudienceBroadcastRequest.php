@@ -7,10 +7,11 @@ namespace App\Domains\Flow\DTOs;
 use App\Domains\Flow\Enums\AudienceKind;
 
 /**
- * A `send_message` node's request to broadcast one message to tags or a segment.
+ * A flow node's request to broadcast one message: a `send_message` node's to tags or a segment, or a legacy `notify`
+ * node's in `contacts` mode to tags or everyone.
  *
  * The message is rendered by the flow at the node and is frozen as it is: `{lang: text}`, or a plain string for the
- * base language. The assistant is the flow's, not the run's.
+ * base language. The assistant is never the run's: `send_message` names the flow's, a legacy `notify` node its own.
  */
 final readonly class AudienceBroadcastRequest
 {

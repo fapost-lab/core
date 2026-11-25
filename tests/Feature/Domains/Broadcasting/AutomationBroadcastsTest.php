@@ -103,6 +103,18 @@ final class AutomationBroadcastsTest extends FeatureTestCase
         $this->assertSame(0, Broadcast::query()->count());
     }
 
+    public function test_everyone_is_an_audience_and_keeps_no_tags(): void
+    {
+        $result = $this->service()->start($this->request('key-1', target: BroadcastTarget::All));
+
+        $this->assertSame(AutomationBroadcastOutcome::Started, $result->outcome);
+
+        $broadcast = Broadcast::query()->findOrFail($result->broadcastId);
+        $this->assertSame(BroadcastTarget::All, $broadcast->target_type);
+        $this->assertNull($broadcast->target_tags);
+        $this->assertNull($broadcast->target_segment_id);
+    }
+
     public function test_a_concurrent_request_of_the_same_node_execution_gets_the_winners_broadcast_back(): void
     {
         $competitor = null;
@@ -200,13 +212,17 @@ final class AutomationBroadcastsTest extends FeatureTestCase
      * @param  list<string>                  $tags
      * @param  array<string, string>|string  $message
      */
-    private function request(string $key, array $tags = ['vip', 'vip'], array|string $message = ['ru' => 'Привет']): AutomationBroadcastRequest
-    {
+    private function request(
+        string $key,
+        array $tags = ['vip', 'vip'],
+        array|string $message = ['ru' => 'Привет'],
+        BroadcastTarget $target = BroadcastTarget::Tags,
+    ): AutomationBroadcastRequest {
         return new AutomationBroadcastRequest(
             tenantId: self::TENANT_ID,
             assistantId: (string) $this->assistant->getKey(),
             name: 'Automation',
-            target: BroadcastTarget::Tags,
+            target: $target,
             tags: $tags,
             segmentId: null,
             message: $message,

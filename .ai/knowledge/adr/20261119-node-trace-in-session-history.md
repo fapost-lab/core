@@ -10,7 +10,9 @@ paths:
   - "app/Domains/Flow/History/**"
   - app/Domains/Flow/Services/FlowEngine.php
   - app/Domains/Flow/Services/FlowSessionInspector.php
+  - app/Http/Controllers/Console/FlowSessionController.php
 summary: The engine writes a masked, size-limited node trace (node_entered/completed/failed) to flow_session_history for every session whatever logging_enabled; only automation runs carry input/output, behind flow.trace.payloads; supersedes ADR-10's history-logging gate
+reviewed_at: 2026-11-25
 ---
 # Every node of every session writes a masked, size-limited trace to flow_session_history, whatever logging_enabled
 
@@ -79,3 +81,21 @@ trace" bullet and its last consequence as narrowed here.
   error class — and never `input`, `output` or the error message.
 - Those stay unread by any screen until a page gated by `ViewRunPayloads` exists. The session page's history still
   filters the trace out.
+
+## Amendment 2026-11-25: a visit's data behind `ViewRunPayloads`
+
+Recorded by the agent of task `flow-run-graph-payloads`; the owner approved its design at the gate ("I accept your
+decisions": every recommended option). It awaits the owner's review in that task's pull request. Read the 2026-11-20
+amendment's second bullet as fulfilled here.
+
+- The run graph shows a node visit's `input`, `output` and error message to a holder of `ViewRunPayloads` (plus
+  `ViewFlowSessions`), one visit a request, through its own endpoint and reader (`RunPayloadReader`,
+  `FlowSessionController::payload()`): a trace row of the run's session or of a subflow child, in the current tenant;
+  anything else is a 404. The response is one row, so it is bounded by the row limit, and is not cached.
+- The status path does not change: `RunGraphReader` keeps its whitelist, and the page's props and the visits list
+  carry no payload, even for a holder. A visit carries its row's `id`, and for a holder a `hasData` flag computed in
+  SQL without reading the values.
+- A conversation's visits show their masked error message to a holder: D-3 excluded only input and output.
+- Viewing is not audited yet; the `audit-log` spec owns that.
+- Rejected: sending payloads inline in the visits list for holders (up to about 100 MiB a response, and the status
+  reader would have to learn payload fields).

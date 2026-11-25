@@ -1,7 +1,9 @@
 # Node: `notify`
 
 Sends a notification from a flow, in one of two modes: to **staff** (admin-panel users) or to **contacts**
-(bot end-users).
+(bot end-users). The contacts mode is **retired**: a node already published in it still runs, as a broadcast started
+through Broadcasting, but publishing one that is new or changed is refused. A message to many contacts is a
+`send_message` to tags or a segment (`adr-20261125-notify-contacts-retired-through-broadcasting`).
 
 **Type:** `notify` · **Version:** 1 · **Category:** `Contact`
 **Class:** `app/Domains/Flow/Handlers/NotifyNodeHandler.php` · **Enums:** `NotifyMode` (`staff`, `contacts`),
@@ -23,7 +25,7 @@ Staff mode:
 }
 ```
 
-Contacts mode:
+Contacts mode (retired; only as already published):
 
 ```json
 {
@@ -43,11 +45,12 @@ Contacts mode:
 | `role` | staff, `target = role` | A `RoleEnum` value |
 | `user_ids` | staff, `target = users` | Explicit staff user ids |
 | `channel` | staff | `in_app` (default), `email`, or `all` (every registered staff transport); an unknown value falls back to in-app |
-| `assistant_id` | contacts | Required: the assistant whose audience is addressed |
+| `assistant_id` | contacts | Required: the assistant whose audience is addressed (the node's own, which may differ from the flow's) |
 | `contact_target` | contacts | `tag` (default) or `all` |
 | `tags` | contacts, `contact_target = tag` | Tag names; the audience is the union of contacts with any of them |
 
-The builder UI is `NotifyConfig.vue`, with search dropdowns (`SearchSelect.vue`) backed by
+The builder UI is `NotifyConfig.vue`. It offers the contacts mode only to a node opened in it, and shows such a node
+as retired; the config schema still lists the mode so that node renders. It has search dropdowns (`SearchSelect.vue`) backed by
 `/builder/staff`, `/builder/assistants` and `/builder/tags`. Tags are assigned to a contact by hand on the
 console's contact card ("Edit tags").
 
@@ -73,38 +76,51 @@ registered in `StaffServiceProvider`; the node does not change. A cache guard on
 
 The text is in the **admin-UI language**, not the content language: it does not go through `LanguageResolver`.
 
-### Contacts mode (`executeContacts`)
+### Contacts mode (`executeContacts`, retired)
 
-1. If `system.contacts_notified.{nodeId}` is `true`, return `Executed` and do nothing.
-2. An empty `assistant_id` or an empty message throws `InvalidNodeConfigException`.
-3. Render the message against the running session (`{{flow.*}}`); a localized map is rendered per entry and the
-   per-recipient language is left to the job.
-4. Dispatch `App\Domains\Contact\Jobs\SendContactNotificationJob` (queue `messaging.broadcast`) and set the marker
-   `system.contacts_notified.{nodeId}`.
+1. If `system.contacts_notified.{nodeId}` is `true`, return `Executed` and do nothing: a session that already passed the
+   node (also one in flight when the mode moved to Broadcasting) does not send again.
+2. An empty `assistant_id` throws `InvalidNodeConfigException`.
+3. A `message` that reads a contact (`{{contact.*}}` or `{{module.*}}` in any language) sends nothing: in a conversation
+   it would put the run's contact's data in front of the whole audience. Outcome `contact_expression_refused`.
+4. Render every language of the message against the running session (`{{flow.*}}`); an empty result throws
+   `InvalidNodeConfigException`. A plain string is the base language's text.
+5. Start a broadcast through `AudienceBroadcasterInterface::start()` (Broadcasting's `AutomationBroadcasts`): the node's
+   `assistant_id`, audience `tags` (`contact_target = tag`) or `all` (only this node can name everyone), the name
+   "<flow name> — Y-m-d H:i", `flow_id`/`flow_session_id`/`flow_node_id`, `origin_key` = sha256 of
+   `idempotencyKey:nodeId` (a retried step gets the same broadcast back, `replayed`), `chain_depth` = the run's + 1.
+   The row is `origin = automation`, shown and cancellable on the console.
+6. Every outcome sets the marker and leaves through `default`; the trace metadata carries `broadcast_outcome`
+   (`started`, `replayed`, `broadcast_running`, `audience_missing`, `message_empty`, `broadcast_failure`,
+   `contact_expression_refused`), with `broadcast_id` and `recipient_count` when one started. Anything but a started
+   or replayed broadcast logs a warning (`flow.notify_contacts_not_sent`, `flow.notify_contacts_refused`).
 
-`SendContactNotificationJob` takes a cache guard on `(tenant, session, node)`, restores the tenant context and
-resolves the recipients: for `tag`, the union of `ContactTagRepository::contactIdsWithTag` intersected with the
-assistant's active `ChannelContact` rows; for `all`, every contact with an active channel binding to the
-assistant. It emits one `BroadcastSendJob` with an `OutboundMessage` per recipient. The content language is
-per recipient through `ContentTranslatorInterface::resolveField` (`contact.language`, then
-`assistant.default_language`, then the tenant fallback), unlike staff mode.
+Compared with the earlier fan-out job, the node now has Broadcasting's limits: while its previous broadcast runs, a
+pass sends nothing (`broadcast_running`); a message without base-language text sends nothing (`message_empty`); and
+the send goes through Broadcasting's backpressure and the `outbound_messages` limit, which cancels the whole broadcast.
 
-Platform limit: only a contact who already has a `channel_contact` for the assistant can be messaged (a first
-contact cannot be initiated on Telegram or WhatsApp). Undeliverable tagged contacts are skipped and logged.
-Send idempotency is a per-message key `{session}:{node}:notify:{contactId}` in `MessageSender`, which also
-rate-limits per `(channel, chat)`.
+`App\Domains\Contact\Jobs\SendContactNotificationJob` is deprecated and no longer dispatched; it stays for one release
+so jobs queued before the change still run.
+
+### Authoring (retired)
+
+`NotifyNodeHandler::validate()` warns about a contacts node (`notify_contacts_deprecated`) and about one whose message
+reads a contact (`notify_contacts_contact_expression`). `PublishFlowService` refuses the publish of a flow's draft or a
+template's draft that adds a contacts node or changes one against the published version (`notify_contacts_retired`,
+`FlowPublishChanges::changedContactNotifications()`: mode, assistant, audience, tags, message, after template
+expansion). A template republishing its hosts is not checked: an unchanged legacy node in a host does not stop it.
 
 ## Tests
 
-`tests/Feature/Domains/Flow/NotifyNodeHandlerTest.php` (both modes: dispatch and marker, idempotency, missing
-assistant, empty message), `tests/Feature/Domains/Staff/StaffNotificationTest.php`,
-`tests/Feature/Domains/Contact/SendContactNotificationJobTest.php` (tag audience limited to reachable contacts,
-`all`, retry idempotency, per-recipient language).
+`tests/Feature/Domains/Flow/NotifyNodeHandlerTest.php` (staff dispatch and marker; the contacts request, marker,
+refusals and failure on `default`, contact placeholders, validation warnings),
+`NotifyContactsBroadcastTest.php` (the broadcast row, `all`, replay and `broadcast_running`),
+`NotifyContactsPublishTest.php` (new, changed, unchanged, template), `tests/Feature/Domains/Staff/StaffNotificationTest.php`,
+`tests/Feature/Domains/Contact/SendContactNotificationJobTest.php` (the deprecated job).
 
 ## Not built
 
-- Backpressure by transactional-queue length in `BroadcastSendJob`: it relies on the `MessageSender` rate limit
-  and the low-priority queue. This gap is wider than this node.
 - Staff-to-messenger identity (delivering staff notifications to a staff member's Telegram or WhatsApp) and
   addressing staff by tag: there is no staff-tag model.
-- A separate output for "no recipients": an empty recipient set is a logged no-op.
+- Removing `SendContactNotificationJob`, `BroadcastSendJob` and Contact's use of `ContactNotifyTarget`, a release after
+  the contacts mode moved to Broadcasting.

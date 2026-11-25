@@ -86,6 +86,7 @@ final class ConversationCaptureFactoryTest extends TestCase
                     mimeType: 'image/jpeg',
                     fileName: 'photo.jpg',
                     size: 1024,
+                    providerKind: 'photo',
                 ),
             ],
         );
@@ -111,6 +112,35 @@ final class ConversationCaptureFactoryTest extends TestCase
             'size'             => 1024,
             'status'           => 'pending',
         ], $entry->media[0]);
+    }
+
+    public function test_each_inbound_file_keeps_the_kind_its_connector_reported(): void
+    {
+        $message = new IncomingMessage(
+            updateId: 'update-3',
+            externalUserId: 'u-1',
+            externalChatId: 'c-1',
+            text: null,
+            type: IncomingMessageType::Document,
+            platform: 'slack',
+            payload: [],
+            media: [
+                new IncomingMedia(providerFileId: 'F1', kind: MediaKind::Document, providerKind: 'document'),
+                new IncomingMedia(providerFileId: 'F2', kind: MediaKind::Audio, providerKind: 'voice'),
+                new IncomingMedia(providerFileId: 'F3', kind: MediaKind::Image),
+            ],
+        );
+
+        $entry = (new ConversationCaptureFactory())->forInbound(
+            tenantId: 't-1',
+            assistantId: 'a-1',
+            contactId: 'ct-1',
+            channelId: 'ch-1',
+            message: $message,
+            idempotencyKey: 'update-3',
+        );
+
+        $this->assertSame(['document', 'voice', null], array_column($entry->media, 'provider_kind'));
     }
 
     /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { drawRunGraph, isUnrolled, loopsOf, statusesFor, UNROLL_MAX_PASSES, type DrawnFrame, type DrawnNode, type RunGraph, type RunGraphFlow, type RunGraphLoop, type RunGraphNode } from './runGraph'
+import { drawRunGraph, isUnrolled, loopsOf, runKindsOf, statusesFor, UNROLL_MAX_PASSES, type DrawnFrame, type DrawnNode, type RunGraph, type RunGraphFlow, type RunGraphLoop, type RunGraphNode } from './runGraph'
 import { layoutRunGraph, toElkGraph } from './runGraphLayout'
 
 function node(id: string, type: string, run: RunGraphNode['run'] = null): RunGraphNode {
@@ -11,7 +11,7 @@ function done(handles: string[] = ['default'], visits = 1): RunGraphNode['run'] 
 }
 
 function flow(overrides: Partial<RunGraphFlow>): RunGraphFlow {
-  return { sessionId: 's1', status: 'completed', flowName: 'Main', nodes: [], edges: [], loops: [], children: [], ...overrides }
+  return { sessionId: 's1', status: 'completed', runKind: 'automation', flowName: 'Main', nodes: [], edges: [], loops: [], children: [], ...overrides }
 }
 
 const branching: RunGraph = {
@@ -254,6 +254,18 @@ describe('unrolled loops', () => {
     })
 
     expect(isUnrolled(nested, 'loop')).toBe(false)
+  })
+})
+
+describe('run kinds', () => {
+  it('maps every drawn session, subflow children included, to its run kind', () => {
+    const grandchild = flow({ sessionId: 's3', runKind: 'automation' })
+    const parent = flow({
+      runKind: 'conversation',
+      children: [{ nodeId: 'call', count: 1, flow: flow({ sessionId: 's2', runKind: 'conversation', children: [{ nodeId: 'deep', count: 1, flow: grandchild }] }) }],
+    })
+
+    expect(runKindsOf(parent)).toEqual({ s1: 'conversation', s2: 'conversation', s3: 'automation' })
   })
 })
 

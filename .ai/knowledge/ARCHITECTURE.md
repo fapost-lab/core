@@ -59,8 +59,8 @@ Credentials' token cache use to delete keys by pattern) carry no domain logic an
 
 Domain folders are bounded contexts in naming more than in isolation: Flow reads Contact, Staff,
 Assistant and Media models directly, and import cycles exist (for example Contact↔Flow through
-`NotifyNodeHandler`, Broadcasting↔Flow through Flow's listener on `BroadcastCompleted`; the other way, `send_message` to tags or a segment
-reaches Broadcasting only through `AudienceBroadcasterInterface`, implemented in `Infrastructure/Flow`). Credentials is another: Flow asks the Foundation `CredentialStoreInterface` (bound to
+Contact's deprecated `SendContactNotificationJob`, which imports Flow and is no longer dispatched, Broadcasting↔Flow through Flow's listener on `BroadcastCompleted`; the other way, `send_message` to tags or a segment
+and the retired `notify` contacts mode reach Broadcasting only through `AudienceBroadcasterInterface`, implemented in `Infrastructure/Flow`). Credentials is another: Flow asks the Foundation `CredentialStoreInterface` (bound to
 Credentials' store) for a call's secret and uses Credentials' type registry, `SecretRedactor` and `HostMatcher` in
 `HttpTransport` (and its Core interfaces `RejectedTokenAwareInterface`, which a 401 from the target reaches, and
 `AuthorizesWithinDeadlineInterface`, which gives an OAuth2 type the call's timeout), while

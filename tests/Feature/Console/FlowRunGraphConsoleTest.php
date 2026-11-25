@@ -6,6 +6,7 @@ namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
@@ -19,12 +20,14 @@ use App\Domains\Tenancy\Models\Tenant;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\RateLimiter;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
 
 /**
  * The run graph of a flow session: the executed definition with what each node did, loop passes, subflow children as
- * frames, a node's visits — and never a node's input, output or error message.
+ * frames, a node's visits — statuses only — and, for a holder of `ViewRunPayloads`, one visit's input, output and
+ * error message at a time.
  */
 final class FlowRunGraphConsoleTest extends FeatureTestCase
 {
@@ -113,9 +116,14 @@ final class FlowRunGraphConsoleTest extends FeatureTestCase
             ->where('urls.visits', "/assistant/{$this->assistant->getKey()}/flow-sessions/{$session->getKey()}/graph/visits")
             ->etc());
 
-        // Neither a node's payloads, its error message nor its config reach the page.
+        // Neither a node's payloads, its error message nor its config reach the page — not even for a holder of
+        // ViewRunPayloads (an admin), nor for a user who may only view sessions.
         $this->assertStringNotContainsString(self::SECRET, (string) $response->getContent());
         $this->assertStringNotContainsString('secret text', (string) $response->getContent());
+
+        $statusesOnly = $this->actingAs($this->userWith(Permission::ViewFlowSessions))->get($this->graphUrl($session))->assertOk();
+
+        $this->assertStringNotContainsString(self::SECRET, (string) $statusesOnly->getContent());
     }
 
     /**
@@ -301,6 +309,13 @@ final class FlowRunGraphConsoleTest extends FeatureTestCase
 
         $this->assertStringNotContainsString(self::SECRET, (string) $response->getContent());
 
+        $statusesOnly = $this->actingAs($this->userWith(Permission::ViewFlowSessions))
+            ->getJson($this->visitsUrl($session, $session, 'call'))
+            ->assertOk()
+            ->assertJsonCount(2, 'visits');
+
+        $this->assertStringNotContainsString(self::SECRET, (string) $statusesOnly->getContent());
+
         $this->actingAs($this->admin())->getJson($this->visitsUrl($session, $child, 'call'))->assertOk()->assertJsonCount(1, 'visits');
         $this->actingAs($this->admin())->getJson($this->visitsUrl($session, $stranger, 'call'))->assertNotFound();
         $this->actingAs($this->admin())->getJson($this->visitsUrl($session, $session, ''))->assertNotFound();
@@ -335,6 +350,144 @@ final class FlowRunGraphConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_the_page_offers_visit_data_only_to_a_holder_of_view_run_payloads(): void
+    {
+        $session = $this->sessionFor($this->publish('Orders', [], []), FlowSessionStatus::Completed, ['run_kind' => FlowRunKind::Automation]);
+        $base    = "/assistant/{$this->assistant->getKey()}/flow-sessions/{$session->getKey()}";
+
+        $this->actingAs($this->userWith(Permission::ViewFlowSessions, Permission::ViewRunPayloads))
+            ->get($this->graphUrl($session))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('canViewPayloads', true)
+                ->where('urls.payload', "{$base}/graph/visits/__ENTRY__")
+                ->where('graph.flow.runKind', 'automation')
+                ->etc());
+
+        $this->actingAs($this->userWith(Permission::ViewFlowSessions))
+            ->get($this->graphUrl($session))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('canViewPayloads', false)
+                ->where('urls.payload', null)
+                ->etc());
+    }
+
+    public function test_a_visit_says_whether_it_carries_data_only_to_a_holder_of_view_run_payloads(): void
+    {
+        $definition = $this->publish('Calls', [['id' => 'call', 'type' => 'call', 'version' => 1, 'config' => []]], []);
+        $session    = $this->sessionFor($definition, FlowSessionStatus::Failed);
+
+        $this->trace($session, 'call', HistoryEventType::NodeEntered, ['type' => 'call']);
+        $this->trace($session, 'call', HistoryEventType::NodeCompleted, ['type' => 'call', 'status' => 'executed', 'output' => ['body' => self::SECRET]]);
+        $this->trace($session, 'call', HistoryEventType::NodeFailed, ['type' => 'call', 'error' => ['class' => 'RuntimeException', 'message' => self::SECRET]]);
+        $this->trace($session, 'call', HistoryEventType::NodeCompleted, ['type' => 'call', 'status' => 'executed', 'error' => ['class' => 'RuntimeException']]);
+
+        $response = $this->actingAs($this->userWith(Permission::ViewFlowSessions, Permission::ViewRunPayloads))
+            ->getJson($this->visitsUrl($session, $session, 'call'))
+            ->assertOk()
+            ->assertJsonCount(4, 'visits')
+            ->assertJsonPath('visits.0.hasData', false)
+            ->assertJsonPath('visits.1.hasData', true)
+            ->assertJsonPath('visits.2.hasData', true)
+            ->assertJsonPath('visits.3.hasData', false);
+
+        $this->assertStringNotContainsString(self::SECRET, (string) $response->getContent());
+
+        $visits = $this->actingAs($this->userWith(Permission::ViewFlowSessions))
+            ->getJson($this->visitsUrl($session, $session, 'call'))
+            ->assertOk()
+            ->json('visits');
+
+        $this->assertIsArray($visits);
+
+        foreach ($visits as $visit) {
+            $this->assertIsArray($visit);
+            $this->assertArrayNotHasKey('hasData', $visit);
+        }
+    }
+
+    public function test_a_holder_of_view_run_payloads_reads_one_visits_data_of_the_run_and_its_subflow_children(): void
+    {
+        $definition = $this->publish('Calls', [['id' => 'call', 'type' => 'call', 'version' => 1, 'config' => []]], []);
+        $session    = $this->sessionFor($definition, FlowSessionStatus::Failed, ['run_kind' => FlowRunKind::Automation]);
+        $child      = $this->sessionFor($definition, FlowSessionStatus::Failed, ['parent_session_id' => $session->getKey(), 'parent_resume_node_id' => 'call']);
+        $holder     = $this->userWith(Permission::ViewFlowSessions, Permission::ViewRunPayloads);
+
+        $completed = $this->trace($session, 'call', HistoryEventType::NodeCompleted, [
+            'type'   => 'call', 'status' => 'executed', 'handle' => 'default',
+            'input'  => '[truncated, 2048 bytes]',
+            'output' => ['body' => ['token' => '***', 'note' => '[truncated, 300 bytes]']],
+        ]);
+        $failed = $this->trace($child, 'call', HistoryEventType::NodeFailed, [
+            'type' => 'call', 'error' => ['class' => 'RuntimeException', 'message' => 'Timeout calling <script>x</script>'],
+        ]);
+
+        $response = $this->actingAs($holder)
+            ->getJson($this->payloadUrl($session, $session, $completed))
+            ->assertOk()
+            ->assertExactJson([
+                'input'        => '[truncated, 2048 bytes]',
+                'output'       => ['body' => ['token' => '***', 'note' => '[truncated, 300 bytes]']],
+                'errorMessage' => null,
+            ]);
+
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        $this->actingAs($holder)
+            ->getJson($this->payloadUrl($session, $child, $failed))
+            ->assertOk()
+            ->assertExactJson(['input' => null, 'output' => null, 'errorMessage' => 'Timeout calling <script>x</script>']);
+    }
+
+    public function test_visit_data_needs_view_run_payloads(): void
+    {
+        $session = $this->sessionFor($this->publish('Calls', [], []), FlowSessionStatus::Failed);
+        $entry   = $this->trace($session, 'call', HistoryEventType::NodeCompleted, ['type' => 'call', 'output' => ['body' => self::SECRET]]);
+
+        $this->actingAs($this->userWith(Permission::ViewFlowSessions))->getJson($this->payloadUrl($session, $session, $entry))->assertForbidden();
+        $this->actingAs($this->userWith(Permission::ViewRunPayloads))->getJson($this->payloadUrl($session, $session, $entry))->assertForbidden();
+    }
+
+    public function test_visit_data_is_throttled_on_a_counter_of_its_own(): void
+    {
+        $session = $this->sessionFor($this->publish('Calls', [], []), FlowSessionStatus::Failed);
+        $entry   = $this->trace($session, 'call', HistoryEventType::NodeCompleted, ['type' => 'call', 'output' => ['body' => 'ok']]);
+        $holder  = $this->userWith(Permission::ViewFlowSessions, Permission::ViewRunPayloads);
+
+        // Use up the per-user counter the unprefixed throttles share (the visits list's 120 a minute).
+        for ($attempt = 0; $attempt < 120; ++$attempt) {
+            RateLimiter::hit(sha1((string) $holder->getKey()), 60);
+        }
+
+        $this->actingAs($holder)->getJson($this->visitsUrl($session, $session, 'call'))->assertTooManyRequests();
+        $this->actingAs($holder)->getJson($this->payloadUrl($session, $session, $entry))->assertOk();
+    }
+
+    public function test_only_a_trace_row_of_a_session_of_the_run_is_found(): void
+    {
+        $definition = $this->publish('Calls', [], []);
+        $session    = $this->sessionFor($definition, FlowSessionStatus::Failed);
+        $stranger   = $this->sessionFor($definition, FlowSessionStatus::Failed);
+        $sibling    = Assistant::factory()->create();
+        $foreign    = $this->sessionFor($definition, FlowSessionStatus::Failed, ['assistant_id' => $sibling->getKey()]);
+        $holder     = $this->admin();
+
+        $strangers   = $this->trace($stranger, 'call', HistoryEventType::NodeCompleted, ['output' => ['body' => self::SECRET]]);
+        $foreigns    = $this->trace($foreign, 'call', HistoryEventType::NodeCompleted, ['output' => ['body' => self::SECRET]]);
+        $state       = $this->trace($session, 'call', HistoryEventType::StateChange, ['input' => self::SECRET]);
+        $otherTenant = $this->trace($session, 'call', HistoryEventType::NodeCompleted, ['output' => ['body' => self::SECRET]], '00000000-0000-0000-0000-000000000002');
+
+        // Another session's row, asked for through the run's own session or through that session.
+        $this->actingAs($holder)->getJson($this->payloadUrl($session, $session, $strangers))->assertNotFound();
+        $this->actingAs($holder)->getJson($this->payloadUrl($session, $stranger, $strangers))->assertNotFound();
+        // Another assistant's run.
+        $this->actingAs($holder)->getJson($this->payloadUrl($foreign, $foreign, $foreigns))->assertNotFound();
+        // A history row that is not the trace, a row of another tenant, an unknown and a malformed id.
+        $this->actingAs($holder)->getJson($this->payloadUrl($session, $session, $state))->assertNotFound();
+        $this->actingAs($holder)->getJson($this->payloadUrl($session, $session, $otherTenant))->assertNotFound();
+        $this->actingAs($holder)->getJson($this->payloadUrl($session, $session, '019a0000-0000-7000-8000-000000000000'))->assertNotFound();
+        $this->actingAs($holder)->getJson($this->payloadUrl($session, $session, 'not-a-uuid'))->assertNotFound();
+    }
+
     private function graphUrl(FlowSession $session): string
     {
         return $this->panelUrl("/assistant/{$this->assistant->getKey()}/flow-sessions/{$session->getKey()}/graph");
@@ -343,6 +496,11 @@ final class FlowRunGraphConsoleTest extends FeatureTestCase
     private function visitsUrl(FlowSession $root, FlowSession $session, string $node): string
     {
         return $this->panelUrl("/assistant/{$this->assistant->getKey()}/flow-sessions/{$root->getKey()}/graph/visits?session={$session->getKey()}&node={$node}");
+    }
+
+    private function payloadUrl(FlowSession $root, FlowSession $session, string $entry): string
+    {
+        return $this->panelUrl("/assistant/{$this->assistant->getKey()}/flow-sessions/{$root->getKey()}/graph/visits/{$entry}?session={$session->getKey()}");
     }
 
     /**
@@ -386,18 +544,18 @@ final class FlowRunGraphConsoleTest extends FeatureTestCase
     /**
      * @param  array<string, mixed>  $metadata
      */
-    private function trace(FlowSession $session, string $nodeId, HistoryEventType $event, array $metadata): void
+    private function trace(FlowSession $session, string $nodeId, HistoryEventType $event, array $metadata, string $tenantId = self::TENANT_ID): string
     {
         $this->clock = $this->clock->copy()->addSecond();
 
-        FlowSessionHistoryEntry::query()->create([
-            'tenant_id'  => self::TENANT_ID,
+        return (string) FlowSessionHistoryEntry::query()->create([
+            'tenant_id'  => $tenantId,
             'session_id' => $session->getKey(),
             'node_id'    => $nodeId,
             'event_type' => $event,
             'metadata'   => $metadata,
             'created_at' => $this->clock,
-        ]);
+        ])->getKey();
     }
 
     private function admin(): User
@@ -408,10 +566,10 @@ final class FlowRunGraphConsoleTest extends FeatureTestCase
         return $user;
     }
 
-    private function userWith(Permission $permission): User
+    private function userWith(Permission ...$permissions): User
     {
         $user = User::factory()->create();
-        $user->givePermissionTo([Permission::ManageAssistants->value, $permission->value]);
+        $user->givePermissionTo([Permission::ManageAssistants->value, ...array_map(static fn (Permission $permission): string => $permission->value, $permissions)]);
         $user->assistants()->attach($this->assistant);
 
         return $user;

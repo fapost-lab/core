@@ -202,8 +202,9 @@ final readonly class AutomationBroadcasts
         return match ($request->target) {
             BroadcastTarget::Tags    => [] !== $tags,
             BroadcastTarget::Segment => null !== $request->segmentId && $this->segmentExists($request->tenantId, $request->segmentId),
-            // Everyone is not an audience a flow may name.
-            BroadcastTarget::All => false,
+            // Only a legacy `notify` node in `contacts` mode names everyone: `send_message` has no such addressee, and
+            // that mode can no longer be added to a flow or changed in one.
+            BroadcastTarget::All => true,
         };
     }
 }

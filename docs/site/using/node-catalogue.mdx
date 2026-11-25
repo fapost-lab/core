@@ -452,15 +452,18 @@ Blocks added before this version keep their single outcome and the Basic method.
 
 ### Notify
 
-Sends a notification, in one of two modes.
+Alerts people on your side (**Staff**) — the escalation path when a conversation
+needs a human.
 
-**Staff** alerts people on your side — the escalation path when a conversation
-needs a human. **Contacts** sends to contacts by tag or to all of them, through
-the assistant, on the broadcast queue.
-
-The second mode is a broadcast raised from inside a flow rather than composed by
-hand, which is why it shares the pacing described in
-[Broadcasts](/using/broadcasts).
+The **Contacts** mode is retired: to message contacts by tag or segment from a
+flow, use [Send message](#send-message) addressed to tags or a segment. A Notify
+block already published in Contacts mode keeps working — it starts a broadcast of
+the assistant it names, marked *From automation* on the
+[Broadcasts](/using/broadcasts) screen, and at most one of its broadcasts runs at a
+time — but a new one cannot be added, and publishing a change to one is refused.
+Its text must not use `contact.*` or `module.*`; if it does, nothing is sent. Such
+a block always goes on through its single exit; the session's trace says when it
+sent nothing, and why.
 
 ## Conversation
 

@@ -176,7 +176,7 @@ return [
             'mode'         => 'Notify',
             'modes'        => [
                 'staff'    => 'Staff (admin users)',
-                'contacts' => 'Contacts (via assistant)',
+                'contacts' => 'Contacts (retired)',
             ],
             'section_staff'    => 'Staff recipients',
             'target'           => 'Recipients',
@@ -207,6 +207,7 @@ return [
             'empty_staff'      => 'No staff',
             'empty_assistants' => 'No assistants',
             'empty_tags'       => 'No tags yet',
+            'contacts_retired' => 'Sending to contacts from Notify is retired. This step still sends as a broadcast, but it cannot be changed: replace it with Send message to tags or a segment.',
         ],
 
         'request_operator' => [
@@ -397,6 +398,7 @@ return [
     'validation' => [
         'template_flow'                                 => 'Template → breaks flow “:flow”',
         'flow_level'                                    => 'Template',
+        'notify_contacts_retired'                       => 'Sending to contacts from Notify is retired: replace this step with Send message to tags or a segment.',
         'invalid_schedule_cron'                         => 'The schedule needs a cron expression of five fields (minute, hour, day of month, month, day of week).',
         'invalid_schedule_timezone'                     => 'The schedule needs a time zone from the IANA list, such as Europe/Berlin.',
         'variable_path_conflict'                        => '":path" is written as a single value by node :nodes but used as a group by :groups. A path cannot be both: rename one of them.',
@@ -512,6 +514,8 @@ return [
             'addressee_broadcast_text_only'          => 'A message to tags or a segment is sent as a broadcast and can only be text: no media and no buttons.',
             'addressee_broadcast_contact_expression' => 'A message to tags or a segment goes to many people and must not read a contact: remove the contact placeholders from \':field\'.',
             'save_broadcast_to_invalid'              => '\'save_broadcast_to\' must name a flow variable, such as \'flow.broadcast\'.',
+            'notify_contacts_deprecated'             => 'Sending to contacts from Notify is retired: this step still sends as a broadcast, but it cannot be added or changed. Replace it with Send message to tags or a segment.',
+            'notify_contacts_contact_expression'     => 'This message reads a contact and goes to many people, so it is not sent: replace this step with Send message to tags or a segment, without contact placeholders.',
             'subflow_invalid_input_mapping'          => 'input_mapping must map child variable names to expressions.',
             'subflow_invalid_input_name'             => 'input_mapping: \':name\' is not a valid variable name for the child flow.',
             'subflow_invalid_input_value'            => 'input_mapping: the value for \':name\' must be an expression or a literal text.',

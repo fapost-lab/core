@@ -50,6 +50,17 @@ export interface RunGraphTranslations {
     empty: string
     loading: string
     failed: string
+    data: string
+    hide_data: string
+    input: string
+    output: string
+    error_message: string
+    payload_loading: string
+    payload_failed: string
+    retry: string
+    payloads_hidden: string
+    payloads_off: string
+    payloads_conversation: string
   }
 }
 
@@ -95,9 +106,13 @@ export interface RunGraphChild {
   flow: RunGraphFlow
 }
 
+/** What started a session (`FlowRunKind`): a conversation's trace never records node input and output. */
+export type RunKind = 'conversation' | 'automation'
+
 export interface RunGraphFlow {
   sessionId: string
   status: string
+  runKind: RunKind
   flowName: string | null
   nodes: RunGraphNode[]
   edges: RunGraphEdge[]
@@ -471,4 +486,15 @@ export function loopsOf(flow: RunGraphFlow): { key: string; sessionId: string; n
   }))
 
   return [...own, ...flow.children.flatMap((child) => loopsOf(child.flow))]
+}
+
+/** The run kind of every session drawn in a flow — the flow's own and its subflow children's, by session id. */
+export function runKindsOf(flow: RunGraphFlow): Record<string, RunKind> {
+  const kinds: Record<string, RunKind> = { [flow.sessionId]: flow.runKind }
+
+  for (const child of flow.children) {
+    Object.assign(kinds, runKindsOf(child.flow))
+  }
+
+  return kinds
 }

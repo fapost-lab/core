@@ -41,8 +41,10 @@ broken.
   the flow's assistant's). `origin_key` is unique, so a retried step gets its broadcast back; a partial unique index on
   `(flow_id, flow_node_id)` over `draft`/`running` rows refuses a second live one (`broadcast_running`). The insert runs
   in its own transaction so a unique violation can be read back on PostgreSQL. Its completion event carries
-  `chain_depth` (`adr-20261123-flow-audience-message-through-broadcasting`). Enforced: `AutomationBroadcastsTest`,
-  `SendMessageBroadcastTest`.
+  `chain_depth` (`adr-20261123-flow-audience-message-through-broadcasting`). Everyone (`BroadcastTarget::All`) is an
+  audience here only because a legacy `notify` node in `contacts` mode names it; `send_message` has no such addressee,
+  and that mode can no longer be added or changed (`adr-20261125-notify-contacts-retired-through-broadcasting`).
+  Enforced: `AutomationBroadcastsTest`, `SendMessageBroadcastTest`, `NotifyContactsBroadcastTest`.
 - **The run is queued after the transaction commits** (`->afterCommit()` in
   `BroadcastDispatcher::start()`), so a job never sees a draft that is already `Running` on the
   other side. Enforced: `BroadcastDispatcherTest`.
@@ -72,7 +74,8 @@ broken.
   Skipped with the reason and the broadcast moves Running → Cancelled with `stop_reason`
   (`limit_reached`), set by one conditional update; later recipient jobs of a Cancelled broadcast
   skip without asking the operator. "Completed is set only by the last recipient" therefore holds
-  for runs that were not stopped. Notify sends (`BroadcastSendJob`) log the refusal and drop.
+  for runs that were not stopped. Notify sends (`BroadcastSendJob`, only from the deprecated
+  `SendContactNotificationJob` still queued) log the refusal and drop.
   Enforced: `OutboundVolumeLimitTest`, `BroadcastSendJobTest`.
 
 ## Rules

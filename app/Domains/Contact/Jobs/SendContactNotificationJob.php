@@ -29,8 +29,14 @@ use Psr\Log\LoggerInterface;
 /**
  * Fans a `notify` node's contacts-mode message out to an assistant's audience.
  *
- * Raised by {@see \App\Domains\Flow\Handlers\NotifyNodeHandler} once the flow
- * has composed the notification text. Runs on the low-priority broadcast queue,
+ * @deprecated Nothing dispatches it any more: a `notify` node in the retired contacts
+ *             mode now starts a broadcast through Flow's `AudienceBroadcasterInterface`.
+ *             It stays for one release, so jobs already queued on `messaging.broadcast`
+ *             when that change is deployed still run; it is removed with
+ *             {@see BroadcastSendJob} afterwards.
+ *
+ * Raised by {@see \App\Domains\Flow\Handlers\NotifyNodeHandler} (before the
+ * contacts mode was retired) once the flow had composed the notification text. Runs on the low-priority broadcast queue,
  * re-establishes tenant context (queue workers carry no HTTP tenant middleware),
  * resolves the recipient set (by tag / all) for the target assistant, and emits
  * one {@see BroadcastSendJob} per deliverable contact.

@@ -17,6 +17,7 @@ use App\Domains\Flow\Services\AutomationRunRerunService;
 use App\Domains\Flow\Services\FlowSessionInspector;
 use App\Domains\Flow\Templates\TemplateNodeOrigins;
 use App\Domains\Flow\Trace\RunGraphReader;
+use App\Domains\Flow\Trace\RunPayloadReader;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Console\RerunFlowSessionRequest;
@@ -41,12 +42,16 @@ use Inertia\Response;
  */
 final class FlowSessionController extends Controller
 {
+    /** Stands for the visit's id in `urls.payload`; the page puts the id in its place. */
+    private const string ENTRY_PLACEHOLDER = '__ENTRY__';
+
     public function __construct(
         private readonly FlowSessionInspector $sessions,
         private readonly CurrentAssistantInterface $assistant,
         private readonly FlowActivityWatchers $watchers,
         private readonly TemplateNodeOrigins $origins,
         private readonly RunGraphReader $graphs,
+        private readonly RunPayloadReader $payloads,
         private readonly AutomationRunRerunService $reruns,
     ) {
     }
@@ -175,7 +180,8 @@ final class FlowSessionController extends Controller
 
     /**
      * The run graph of a session: the definition it executed with what each node did, its loops and its subflow
-     * children. Statuses only ({@see RunGraphReader}); a node's visits load as JSON from {@see visits()}.
+     * children. Statuses only ({@see RunGraphReader}); a node's visits load as JSON from {@see visits()}, and for a holder
+     * of `ViewRunPayloads` one visit's data from {@see payload()} (`urls.payload`, with `__ENTRY__` for the visit's id).
      */
     public function graph(string $assistantKey, string $record): Response
     {
@@ -184,7 +190,8 @@ final class FlowSessionController extends Controller
 
         Gate::authorize('view', $session);
 
-        $key = (string) $session->getKey();
+        $key             = (string) $session->getKey();
+        $canViewPayloads = Gate::allows('viewPayloads', $session);
 
         return Inertia::render('Console/FlowSessions/Graph', [
             'session' => [
@@ -193,18 +200,21 @@ final class FlowSessionController extends Controller
                 'flowName' => $this->text($session->flowDefinition?->name),
                 'isLive'   => in_array($session->status, FlowSessionStatus::live(), true),
             ],
-            'graph' => $this->graphs->graph($session),
-            'live'  => $this->live($assistant),
-            'urls'  => [
+            'graph'           => $this->graphs->graph($session),
+            'canViewPayloads' => $canViewPayloads,
+            'live'            => $this->live($assistant),
+            'urls'            => [
                 'session' => $this->url('flow-sessions.show', $assistant, ['record' => $key]),
                 'visits'  => $this->url('flow-sessions.visits', $assistant, ['record' => $key]),
+                'payload' => $canViewPayloads ? $this->url('flow-sessions.payload', $assistant, ['record' => $key, 'entry' => self::ENTRY_PLACEHOLDER]) : null,
             ],
         ]);
     }
 
     /**
      * The newest visits of one node of the run graph, statuses only. `session` is the run's own session or one of its
-     * subflow children (a frame of the graph); any other session is not found.
+     * subflow children (a frame of the graph); any other session is not found. For a holder of `ViewRunPayloads` each
+     * visit says whether it carries data (`hasData`), never the data itself.
      */
     public function visits(string $assistantKey, string $record, Request $request): JsonResponse
     {
@@ -213,20 +223,43 @@ final class FlowSessionController extends Controller
 
         Gate::authorize('view', $root);
 
-        $sessionId = $request->query('session');
-        $nodeId    = $request->query('node');
+        $nodeId = $request->query('node');
 
-        if (! is_string($sessionId) || ! is_string($nodeId) || '' === $nodeId) {
+        if (! is_string($nodeId) || '' === $nodeId) {
             throw (new ModelNotFoundException())->setModel(FlowSession::class);
         }
 
-        $session = $sessionId === (string) $root->getKey() ? $root : $this->sessions->findFor($assistant, $sessionId);
+        $session = $this->frameSession($assistant, $root, $request);
+        $visits  = $this->graphs->visits($session, $nodeId);
 
-        if (! $this->graphs->belongsTo($root, $session)) {
-            throw (new ModelNotFoundException())->setModel(FlowSession::class, [$sessionId]);
+        if (Gate::allows('viewPayloads', $root)) {
+            $present = $this->payloads->presence($session, array_column($visits, 'id'));
+            $visits  = array_map(static fn (array $visit): array => [...$visit, 'hasData' => isset($present[$visit['id']])], $visits);
         }
 
-        return response()->json(['visits' => $this->graphs->visits($session, $nodeId)]);
+        return response()->json(['visits' => $visits]);
+    }
+
+    /**
+     * The data of one node visit of the run graph — its input, output and error message, masked and limited as the trace
+     * wrote them ({@see RunPayloadReader}) — for a holder of `ViewRunPayloads`. `session` is a frame of the run, as for
+     * {@see visits()}; a visit of any other session, a history row that is not the trace and an unknown id are all
+     * not found. Not cached: it can hold contact data.
+     */
+    public function payload(string $assistantKey, string $record, string $entry, Request $request): JsonResponse
+    {
+        $assistant = $this->assistant->get();
+        $root      = $this->sessions->findFor($assistant, $record);
+
+        Gate::authorize('viewPayloads', $root);
+
+        $payload = $this->payloads->payload($this->frameSession($assistant, $root, $request), $entry);
+
+        if (null === $payload) {
+            throw (new ModelNotFoundException())->setModel(FlowSession::class, [$entry]);
+        }
+
+        return response()->json($payload)->header('Cache-Control', 'no-store');
     }
 
     /**
@@ -270,6 +303,27 @@ final class FlowSessionController extends Controller
             'id'  => (string) $source->getKey(),
             'url' => $this->url('flow-sessions.show', $assistant, ['record' => $source->getKey()]),
         ];
+    }
+
+    /**
+     * The session of a graph frame a node request names in `session`: the run's own session or one of its subflow
+     * children. Any other session is not found.
+     */
+    private function frameSession(Assistant $assistant, FlowSession $root, Request $request): FlowSession
+    {
+        $sessionId = $request->query('session');
+
+        if (! is_string($sessionId)) {
+            throw (new ModelNotFoundException())->setModel(FlowSession::class);
+        }
+
+        $session = $sessionId === (string) $root->getKey() ? $root : $this->sessions->findFor($assistant, $sessionId);
+
+        if (! $this->graphs->belongsTo($root, $session)) {
+            throw (new ModelNotFoundException())->setModel(FlowSession::class, [$sessionId]);
+        }
+
+        return $session;
     }
 
     /**

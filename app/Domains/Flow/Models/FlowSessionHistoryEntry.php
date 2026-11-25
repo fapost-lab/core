@@ -15,7 +15,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Two kinds of rows share the table. The opt-in audit trail — `state_change` and `subflow_*` — is written only when
  * the running flow_definition has logging_enabled = true (otherwise NoOpHistoryWriter absorbs the call). The node
  * trace — `node_entered`, `node_completed`, `node_failed`, see {@see \App\Domains\Flow\Trace\NodeTraceRecorder} — is
- * written for every node of every session, whatever the flag, and no screen reads it yet.
+ * written for every node of every session, whatever the flag; the run graph reads it (statuses through
+ * {@see \App\Domains\Flow\Trace\RunGraphReader}, a visit's data behind `ViewRunPayloads` through
+ * {@see \App\Domains\Flow\Trace\RunPayloadReader}).
  *
  * Distinct from flow_logs (operational, 30-day retention, partitioned). Rows go with their session: an automation
  * run's with the run (AutomationRunPruner), a contact's sessions' with the contact (foreign key cascade); a
