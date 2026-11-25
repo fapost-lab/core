@@ -423,7 +423,11 @@ broken.
   and the comparison and by-id diff of trigger lists live in `Support/FlowTriggerComparison`, which also declares the
   `Trigger` shape (`adr-20261123-flow-schedule-trigger`). Flow deletion also
   cancels the flow's root `pending` runs (a schedule's, not started yet) under their optimistic lock in its transaction,
-  so a frequent schedule never makes its flow undeletable; a run that has started still refuses the delete. Why: a draft edit must not change what runs, and a live
+  so a frequent schedule never makes its flow undeletable; a run that has started still refuses the delete. The
+  schedules stop first in that transaction, before the `pending` runs are read: the write locks their rows, so a slot
+  claim in flight either commits first and its run is cancelled, or fails its compare-and-set — never a run of a
+  deleted flow left to start. A start that loses to the cancel gets false from `FlowEngineInterface::activate()`,
+  not a `FlowConcurrencyException`. Why: a draft edit must not change what runs, and a live
   trigger must survive the release that introduced the list (`adr-20261119-flow-triggers-in-definition-live-on-publish`).
   Enforced: `FlowTriggersPublishTest`, `SaveDraftServiceTest`, `FlowTemplatePublishTest`, `FlowTriggerSetTest`.
 - **An automatic trigger or a new credential reference goes live only with its own right.** Publishing a draft that
@@ -500,7 +504,8 @@ broken.
   up.** `ScheduleTriggerFirer` moves `flow_triggers.next_run_at` from the slot it read to the next one by compare-and-set
   and, in the same transaction, creates the run `pending` (`FlowEngineInterface::prepare()`, fire key
   `schedule:<UTC minute>`, deadline written) or skips the slot: the flow's draft or the draft's assistant is gone
-  (`tick_skipped` `flow_not_live`, and the row moves to no slot: nobody is left to switch the schedule off), more than
+  (`tick_skipped` `flow_not_live`, and the row moves to no slot: nobody is left to switch the schedule off; this fate
+  is decided before the transaction and before lateness), more than
   5 minutes late (`flow.schedule.tick_missed`, the next slot counted from now), no active runnable definition
   (`tick_skipped` `flow_not_live`, the next slot kept), the flow is switched off in the flows list (`tick_skipped`
   `flow_off`, logged at info: the owner chose it), or a previous root run of the

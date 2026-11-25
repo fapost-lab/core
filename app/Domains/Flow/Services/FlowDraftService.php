@@ -10,6 +10,7 @@ use App\Domains\Audit\DTOs\AuditChanges;
 use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Actions\CreateFlowAction;
+use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowWebhookEndpointRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowLimitStatus;
@@ -46,9 +47,10 @@ use Illuminate\Support\Str;
 final readonly class FlowDraftService
 {
     /**
-     * The statuses of a session that is still going: it is started or waiting for the contact, or paused by an
-     * operator or by a subflow. A flow with such a session cannot be deleted; finished ones (completed, ended, failed,
-     * cancelled, expired, terminated) do not hold it back.
+     * The statuses of a session that is still going: it waits to start, is started or waiting for the contact, or is
+     * paused by an operator or by a subflow. Deleting the flow cancels a root `pending` run (a schedule's, not started
+     * yet) instead of being held back by it; a session in any other of these statuses holds the delete back. Finished
+     * ones (completed, ended, failed, cancelled, expired, terminated) do not.
      *
      * @var list<FlowSessionStatus>
      */
@@ -296,10 +298,8 @@ final readonly class FlowDraftService
      */
     public function hasLiveSessions(FlowDraft $flow): bool
     {
-        return FlowSession::query()
-            ->where('tenant_id', $flow->tenant_id)
+        return $this->sessionsOf($flow)
             ->whereIn('status', array_map(static fn (FlowSessionStatus $status): string => $status->value, self::LIVE_SESSION_STATUSES))
-            ->whereIn('flow_definition_id', FlowDefinition::query()->select('id')->where('flow_id', $flow->flow_id))
             ->exists();
     }
 
@@ -312,6 +312,10 @@ final readonly class FlowDraftService
      * back: it is cancelled in the same transaction, so a frequent schedule never makes its flow undeletable and the
      * start job finds nothing to start. A run that has started does hold it back.
      *
+     * The flow's schedules stop first, before the pending runs are read: the write locks their rows, so a slot claim
+     * still in flight either committed before it, and its run is there to be cancelled, or comes after and finds its
+     * slot gone. A refused delete rolls the stop back with the rest.
+     *
      * @throws FlowHasLiveSessionsException when a session of the flow is still going
      * @throws FlowTemplateInUseException when the flow is a template placed in another flow (published or draft)
      */
@@ -322,6 +326,14 @@ final readonly class FlowDraftService
         }
 
         DB::transaction(function () use ($flow): void {
+            // A schedule of a flow nobody can publish again would come due every minute for ever: it stops here, and
+            // leaves the landlord registry after the commit.
+            $schedules = $this->triggers->stopSchedules($flow->flow_id);
+
+            if ([] !== $schedules) {
+                $this->scheduleRegistry->syncAfterCommit((string) $flow->tenant_id, $schedules);
+            }
+
             $this->cancelRunsNotStarted($flow);
 
             // Checked after the cancel, in its transaction: a run whose start won the race is live and refuses the
@@ -337,14 +349,6 @@ final readonly class FlowDraftService
             // The flow's live trigger rows stay (adr-20261119-flow-triggers-in-definition-live-on-publish), but a webhook
             // URL is a secret held by an outside system: with the draft gone nobody could rotate or revoke it.
             $this->webhookEndpoints->deleteForFlow($flow->flow_id);
-
-            // A schedule of a flow nobody can publish again would come due every minute for ever: it stops here, and
-            // leaves the landlord registry after the commit.
-            $schedules = $this->triggers->stopSchedules($flow->flow_id);
-
-            if ([] !== $schedules) {
-                $this->scheduleRegistry->syncAfterCommit((string) $flow->tenant_id, $schedules);
-            }
 
             $this->audit->record(new AuditRecord(
                 action: AuditAction::FlowDeleted,
@@ -398,18 +402,16 @@ final readonly class FlowDraftService
 
     /**
      * Cancels the flow's runs still `pending` (only a schedule creates one). Each is written under its optimistic lock,
-     * so a start job that activates it at the same moment either sees it cancelled and starts nothing, or wins and
-     * leaves it live.
+     * so a start job that activates it at the same moment either wins and leaves it live, or loses: it sees the run
+     * cancelled and starts nothing ({@see FlowEngineInterface::activate()} answers that it did not activate it).
      *
      * @throws FlowHasLiveSessionsException when a run's start got there first
      */
     private function cancelRunsNotStarted(FlowDraft $flow): void
     {
-        $pending = FlowSession::query()
-            ->where('tenant_id', $flow->tenant_id)
+        $pending = $this->sessionsOf($flow)
             ->where('status', FlowSessionStatus::Pending->value)
             ->whereNull('parent_session_id')
-            ->whereIn('flow_definition_id', FlowDefinition::query()->select('id')->where('flow_id', $flow->flow_id))
             ->get();
 
         foreach ($pending as $run) {
@@ -419,6 +421,18 @@ final readonly class FlowDraftService
                 throw new FlowHasLiveSessionsException($flow->flow_id);
             }
         }
+    }
+
+    /**
+     * The sessions of the flow, on any of its published versions, in its tenant.
+     *
+     * @return Builder<FlowSession>
+     */
+    private function sessionsOf(FlowDraft $flow): Builder
+    {
+        return FlowSession::query()
+            ->where('tenant_id', $flow->tenant_id)
+            ->whereIn('flow_definition_id', FlowDefinition::query()->select('id')->where('flow_id', $flow->flow_id));
     }
 
     /**

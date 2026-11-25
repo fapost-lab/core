@@ -6,6 +6,7 @@ namespace Tests\Feature\Domains\Flow\Schedule;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowHasLiveSessionsException;
@@ -360,6 +361,72 @@ final class ScheduleTriggerFirerTest extends FeatureTestCase
         $this->assertNotNull($this->trigger()->next_run_at);
     }
 
+    public function test_a_slot_claim_reaching_the_flow_while_it_is_deleted_leaves_no_run_waiting_to_start(): void
+    {
+        [$draft] = $this->liveSchedule('* * * * *');
+        Carbon::setTestNow('2026-11-20 08:31:00');
+
+        // The firer claims the slot right after the delete checked the flow's live sessions, before its last writes.
+        $this->whenFlowSessionsAreRead('exists', fn (): array => $this->fire());
+
+        $this->app->make(FlowDraftService::class)->delete($draft);
+
+        $this->assertSame(
+            0,
+            FlowSession::query()->where('status', FlowSessionStatus::Pending->value)->count(),
+            'A run claimed while the flow is deleted would be started by its job.',
+        );
+        $this->assertNull($this->trigger()->next_run_at);
+    }
+
+    public function test_a_start_that_activates_the_run_while_the_flow_is_deleted_refuses_the_delete(): void
+    {
+        [$draft] = $this->liveSchedule('* * * * *');
+        Carbon::setTestNow('2026-11-20 08:31:00');
+        $this->fire();
+        $run = FlowSession::query()->sole();
+
+        // The start job activates the run between the delete's read and its cancel.
+        $this->whenFlowSessionsAreRead('parent_session_id', static fn (): int => FlowSession::query()->whereKey($run->getKey())->update([
+            'status'  => FlowSessionStatus::Active->value,
+            'version' => $run->version + 1,
+        ]));
+
+        try {
+            $this->app->make(FlowDraftService::class)->delete($draft);
+            $this->fail('A run whose start won must refuse the delete.');
+        } catch (FlowHasLiveSessionsException) {
+        }
+
+        $this->assertNotNull(FlowDraft::query()->find($draft->getKey()));
+        $this->assertNotNull($this->trigger()->next_run_at, 'The refusal rolls the stop of the schedule back.');
+    }
+
+    public function test_a_start_that_loses_to_the_cancel_of_its_run_starts_nothing_and_does_not_fail(): void
+    {
+        $this->liveSchedule('* * * * *');
+        Carbon::setTestNow('2026-11-20 08:31:00');
+        $this->fire();
+        $run = FlowSession::query()->sole();
+
+        // The flow's deletion cancels the run right after the start read it as pending.
+        $cancelled = false;
+        DB::listen(static function (QueryExecuted $query) use ($run, &$cancelled): void {
+            if ($cancelled || ! str_starts_with($query->sql, 'select') || ! str_contains($query->sql, 'flow_sessions')) {
+                return;
+            }
+
+            $cancelled = true;
+            FlowSession::query()->whereKey($run->getKey())->update([
+                'status'  => FlowSessionStatus::Cancelled->value,
+                'version' => $run->version + 1,
+            ]);
+        });
+
+        $this->assertFalse($this->app->make(FlowEngineInterface::class)->activate($run));
+        $this->assertSame(FlowSessionStatus::Cancelled, $run->refresh()->status);
+    }
+
     public function test_a_flow_switched_off_in_the_flows_list_spends_its_slot_and_is_not_caught_up(): void
     {
         Log::spy();
@@ -424,6 +491,23 @@ final class ScheduleTriggerFirerTest extends FeatureTestCase
     private function fire(): array
     {
         return $this->app->make(ScheduleTriggerFirer::class)->fireDue($this->tenantId, CarbonImmutable::now());
+    }
+
+    /**
+     * Runs {@code $race} once, right after the first read of `flow_sessions` whose SQL holds {@code $marker}: the
+     * deletion's read of the runs waiting to start (`parent_session_id`) or its check for live sessions (`exists`).
+     */
+    private function whenFlowSessionsAreRead(string $marker, callable $race): void
+    {
+        $raced = false;
+        DB::listen(static function (QueryExecuted $query) use ($marker, $race, &$raced): void {
+            if ($raced || ! str_starts_with($query->sql, 'select') || ! str_contains($query->sql, 'flow_sessions') || ! str_contains($query->sql, $marker)) {
+                return;
+            }
+
+            $raced = true;
+            $race();
+        });
     }
 
     private function trigger(): FlowTrigger
