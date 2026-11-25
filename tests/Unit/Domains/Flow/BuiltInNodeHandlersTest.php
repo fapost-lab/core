@@ -1637,6 +1637,9 @@ final class BuiltInNodeHandlersTest extends TestCase
             ->once()
             ->andReturnUsing(function (string $t, string $c, string $s, array $payload) use ($hintText): string {
                 $this->assertSame($hintText, $payload['text']);
+                // Keyed like every other message of the node: its id, and the step's key set apart from the prompt's.
+                $this->assertSame('node-hint', $payload['node_id']);
+                $this->assertSame('hint:idem-1', $payload['idempotency_key']);
 
                 return 'hint-sent';
             });

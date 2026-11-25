@@ -107,6 +107,8 @@ final class FlowPromptDeliveryKeysTest extends FeatureTestCase
             static fn (OutboundMessage $message): string => $message->idempotencyKey,
             $this->outbound->delivered,
         )));
+        // The hint keeps a key of its own under the node, whatever step sends it.
+        $this->assertStringStartsWith((string) $session->getKey() . ':age:hint:', $this->outbound->delivered[1]->idempotencyKey);
     }
 
     public function test_an_input_contact_prompt_with_its_native_button_goes_out(): void
@@ -191,6 +193,7 @@ final class FlowPromptDeliveryKeysTest extends FeatureTestCase
             static fn (OutboundMessage $message): string => $message->idempotencyKey,
             $this->outbound->delivered,
         )));
+        $this->assertStringStartsWith((string) $session->getKey() . ':auth:hint:', $this->outbound->delivered[1]->idempotencyKey);
     }
 
     private function assertWaitingWithoutErrors(FlowSession $session, string $nodeId): void

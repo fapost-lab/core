@@ -554,7 +554,7 @@ final readonly class FlowEngine implements FlowEngineInterface
 
             // The node trace (flow_session_history, always written, outside the step's transaction): the loops the node
             // runs in are read from the state it starts with.
-            $traceContext = new NodeTraceContext($session, $nodeId, $type, $version, LoopIterations::of($definition->nodes ?? [], $session->state ?? [], $budget->activeLoopNodeId()));
+            $traceContext = new NodeTraceContext($session, $nodeId, $type, $version, LoopIterations::of($definition->nodes ?? [], $session->state ?? [], $budget->enteredLoopNodeId()));
             $this->trace->entered($traceContext);
             $startedAt = hrtime(true);
 
@@ -837,7 +837,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                 (string) ($session->current_node_id ?? ''),
                 null,
                 null,
-                LoopIterations::of($definition->nodes ?? [], $session->state ?? [], $budget->activeLoopNodeId()),
+                LoopIterations::of($definition->nodes ?? [], $session->state ?? [], $budget->enteredLoopNodeId()),
             ),
             NodeTraceRecorder::STEP_LIMIT_ERROR,
             $limit->getMessage(),

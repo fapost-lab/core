@@ -289,12 +289,14 @@ broken.
 - **Every payload a handler gives the flow `MessageSenderInterface` carries a non-empty `node_id`
   and an `idempotency_key` that is stable across a retry and unique per message.** The default is the
   node id and the step's `NodeExecutionContext::$idempotencyKey`; a message tied to a record uses the
-  record (`ask_person`'s `question:{id}`), and a second message one step may send (a hint) gets a key
-  of its own. `FlowMessageSender` keys the delivery `{session}:{node_id}:{idempotency_key}` and refuses
+  record (`ask_person`'s `question:{id}`), and a second message one step may send (a hint: `input`'s,
+  `auth_request@2`'s and `send_message`'s waiting hint) keeps the node id and gets `hint:` plus the step's
+  key. `FlowMessageSender` keys the delivery `{session}:{node_id}:{idempotency_key}` and refuses
   a payload without them. Why: a missing key once crashed every input and `auth_request@2` prompt,
   and a default key would be worse — one key for the whole session, so `MessageSender` drops every
-  later message as a duplicate. Enforced for the input and `auth_request@2` prompts:
-  `FlowPromptDeliveryKeysTest` (engine, real `FlowMessageSender`).
+  later message as a duplicate. Enforced for the input and `auth_request@2` prompts and hints:
+  `FlowPromptDeliveryKeysTest` (engine, real `FlowMessageSender`); the refusal: `FlowMessageSenderTest`; `send_message`'s
+  hint: `BuiltInNodeHandlersTest`.
 - **A `call` node's `CallContext::$idempotencyKey` is the engine's execution key plus the node id**
   (`CallNodeHandler::executionKey()`), never `{session}:{node}`. Why: that value repeats on every
   loop pass, so a transport or receiver deduplicating by it (`HttpTransport` sends it as
