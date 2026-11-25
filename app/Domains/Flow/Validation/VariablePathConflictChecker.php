@@ -16,7 +16,7 @@ use App\Domains\Flow\Handlers\LoopNodeHandler;
  * never meets the exception.
  *
  * Writes are read by {@see NodeWriteCollector} from every node that saves a value (`input`, `assign`, `send_message`,
- * `call`, `subflow` output mapping, in the variable contract and the legacy shapes), plus the counter a `loop` keeps in
+ * `ask_person`, `call`, `subflow` output mapping, in the variable contract and the legacy shapes), plus the counter a `loop` keeps in
  * the session. Only writes are compared; a read never throws, so it is not a conflict. Session and contact paths are
  * separate namespaces.
  */

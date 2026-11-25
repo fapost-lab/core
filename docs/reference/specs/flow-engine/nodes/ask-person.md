@@ -5,7 +5,7 @@ addressee is not the run's contact by default, so the node works in a contactles
 as well as in a conversation.
 
 **Type:** `ask_person` · **Version:** 1 · **Category:** `Conversation` · **Context:** `NodeContextRequirement::Any`
-**Class:** `app/Domains/Flow/Handlers/AskPersonNodeHandler.php` · **Implements:** `NamesOwnRecipientInterface`,
+**Class:** `app/Domains/Flow/Handlers/AskPersonNodeHandler.php` · **Implements:** `DeclaresContextRequirementInterface`,
 `NodeConfigValidatorInterface`
 
 The question lives outside the session (`FlowQuestionsInterface`, implemented by `FlowQuestions`, table
@@ -31,7 +31,7 @@ The question lives outside the session (`FlowQuestionsInterface`, implemented by
 |-------|-------------|
 | `addressee` | Required. `kind` is `contact` (the only kind); `contact` is an expression that gives a contact id (`AddresseeResolver`) |
 | `text` | Required. The question, translatable, a template over the session state |
-| `buttons` | Required, 1 to 8 (`FlowQuestionButton::MAX_BUTTONS`). Each has a unique uuid `id` (its exit handle), a translatable `label`, and a language-agnostic `value` |
+| `buttons` | Required, 1 to 8 (`FlowQuestionButton::MAX_BUTTONS`). Each has a unique uuid `id` (its exit handle), a translatable `label`, and a language-agnostic `value`. The id is kept as authored and matched to an edge handle exactly, so it is case-sensitive; two ids that differ only in case are one uuid and are refused as `button_id_duplicate` |
 | `timeout_seconds` | Required, 60 (`MIN_TIMEOUT_SECONDS`) to 604800 (`MAX_TIMEOUT_SECONDS`, 7 days). Default `3600` |
 | `late_answer_text` | Optional text for a press after the decision. Empty gives the system text `flow.ask_person.already_decided` |
 | `save_to_variable` | Optional variable that receives the pressed button's `value`. `storage: contact` writes the run's contact and is skipped in a contactless run |
@@ -44,7 +44,7 @@ Labels live under `builder.nodes.ask_person.*`.
 
 | Handle | When |
 |--------|------|
-| `{button id}` | The addressee pressed that button |
+| `{button id}` | The addressee pressed that button. An edge whose handle names no button id of the node (case included) is refused at publish as `orphaned_button_edge` |
 | `timeout` | Nobody answered before the deadline, or less than a minute of the run was left, so nothing was asked |
 | `error` | The addressee gave no contact id; the run has no assistant or channel to send through; the message could not be sent (including a volume limit); the question was lost; the config is invalid |
 
