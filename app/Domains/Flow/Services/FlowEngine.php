@@ -41,6 +41,7 @@ use App\Domains\Flow\Trace\NodeTraceContext;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Flow\Webhook\WebhookRunEndReply;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
+use Carbon\CarbonInterface;
 use DateTimeImmutable;
 use Fapost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
 use Fapost\Foundation\Analytics\DTO\AnalyticsEvent;
@@ -125,11 +126,11 @@ final readonly class FlowEngine implements FlowEngineInterface
         $deadlineAt = FlowRunKind::Automation === $origin->kind ? $this->runDeadline->for(now()) : null;
 
         $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create(
-            $this->automationSessionRow(
+            $this->newSessionRow(
                 $definition,
-                null !== $contact ? $contact->tenant_id : $definition->tenant_id,
+                (string)(null !== $contact ? $contact->tenant_id : $definition->tenant_id),
                 $assistantId,
-                $contact?->getKey(),
+                null !== $contact ? (string)$contact->getKey() : null,
                 $entry,
                 $baseState,
                 FlowSessionStatus::Active,
@@ -161,9 +162,9 @@ final readonly class FlowEngine implements FlowEngineInterface
         $baseState = $this->buildBaseState($definition, null, $origin->assistantId, $initialState);
 
         return $this->connection->transaction(fn (): FlowSession => $this->sessions->create(
-            $this->automationSessionRow(
+            $this->newSessionRow(
                 $definition,
-                $definition->tenant_id,
+                (string)$definition->tenant_id,
                 $origin->assistantId,
                 null,
                 $entry,
@@ -313,23 +314,25 @@ final readonly class FlowEngine implements FlowEngineInterface
     }
 
     /**
-     * The attributes of a new automation-kind session row; `$extra` carries what only some paths write.
+     * The attributes of a new root session row, for a run of any kind — a conversation, an automation started now or one
+     * prepared ahead of its start; `$extra` carries what only some paths write. A subflow child is built by
+     * {@see \App\Domains\Flow\Subflow\SubflowStarterService} instead.
      *
      * @param  array<string, mixed>  $baseState
      * @param  array<string, mixed>  $extra
      *
      * @return array<string, mixed>
      */
-    private function automationSessionRow(
+    private function newSessionRow(
         FlowDefinition $definition,
-        mixed $tenantId,
-        mixed $assistantId,
-        mixed $contactId,
+        string $tenantId,
+        ?string $assistantId,
+        ?string $contactId,
         ?string $entry,
         array $baseState,
         FlowSessionStatus $status,
         FlowRunOrigin $origin,
-        mixed $deadlineAt,
+        ?CarbonInterface $deadlineAt,
         array $extra = [],
     ): array {
         return [

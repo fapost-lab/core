@@ -19,6 +19,7 @@ use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeTenantLimits;
@@ -270,6 +271,59 @@ final class MediaApiTest extends FeatureTestCase
         } catch (MediaFolderRuleException $e) {
             $this->assertSame('parent_id', $e->attribute);
         }
+    }
+
+    public function test_create_under_a_stale_parent_moved_to_the_depth_limit_is_a_field_error(): void
+    {
+        $service  = $this->app->make(MediaFolderService::class);
+        $parentId = null;
+        $path     = '';
+        for ($i = 1; $i <= 9; $i++) {
+            $path .= "/L{$i}";
+            $parentId = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => "L{$i}", 'parent_id' => $parentId, 'path_cache' => $path])->id;
+        }
+        $p = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'P', 'path_cache' => '/P']);
+
+        // P is loaded at the root, then another request moves it under L9, to depth 10: there is no room under it now.
+        $stale = MediaFolder::query()->findOrFail($p->id);
+        $service->move($p, MediaFolder::query()->findOrFail($parentId));
+
+        try {
+            $service->create('Child', $stale);
+            $this->fail('A parent at the depth limit must be refused, however it was loaded.');
+        } catch (MediaFolderRuleException $e) {
+            $this->assertSame('parent_id', $e->attribute);
+            $this->assertSame(MediaFolderRuleException::TOO_DEEP, $e->reason);
+        }
+
+        $this->assertSame(0, MediaFolder::query()->where('parent_id', $p->id)->count());
+    }
+
+    public function test_rename_of_a_stale_folder_model_builds_the_path_from_its_parent_now(): void
+    {
+        $service = $this->app->make(MediaFolderService::class);
+        $a       = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'A', 'path_cache' => '/A']);
+        $x       = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'X', 'path_cache' => '/X']);
+
+        // X is loaded at the root, then another request moves it under A; ours renames it.
+        $stale = MediaFolder::query()->findOrFail($x->id);
+        $service->move($x, $a);
+
+        $service->rename($stale, 'Y');
+
+        $renamed = MediaFolder::query()->findOrFail($x->id);
+        $this->assertSame($a->id, $renamed->parent_id);
+        $this->assertSame('/A/Y', $renamed->path_cache);
+    }
+
+    public function test_rename_of_a_folder_deleted_since_it_was_loaded_is_not_found(): void
+    {
+        $x = MediaFolder::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'X', 'path_cache' => '/X']);
+        MediaFolder::query()->whereKey($x->id)->delete();
+
+        $this->expectException(ModelNotFoundException::class);
+
+        $this->app->make(MediaFolderService::class)->rename($x, 'Y');
     }
 
     public function test_breadcrumbs_run_from_the_root_down_through_three_levels(): void

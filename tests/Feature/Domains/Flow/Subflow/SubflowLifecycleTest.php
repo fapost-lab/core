@@ -131,6 +131,26 @@ final class SubflowLifecycleTest extends FeatureTestCase
         $this->assertSame('parent-post', $parent->state['flow']['marker'] ?? null);
     }
 
+    /**
+     * What an event the child emits is filtered by (its assistant) and whom it talks to come from the parent: the
+     * starter copies them, nothing else does.
+     */
+    public function test_the_starter_gives_the_child_the_parents_tenant_assistant_and_contact(): void
+    {
+        $parent = $this->runParentWithChildNodes(
+            [['id' => 'c-mark', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'child-ran']]],
+            [],
+        );
+
+        /** @var FlowSession $child */
+        $child = FlowSession::query()->where('parent_session_id', $parent->getKey())->firstOrFail();
+
+        $this->assertSame((string) $this->assistant->getKey(), (string) $parent->assistant_id);
+        $this->assertSame((string) $parent->assistant_id, (string) $child->assistant_id);
+        $this->assertSame((string) $parent->tenant_id, (string) $child->tenant_id);
+        $this->assertSame((string) $parent->contact_id, (string) $child->contact_id);
+    }
+
     public function test_subflow_failed_routes_parent_through_failed_handle(): void
     {
         $childFlowId = (string) Str::uuid();
