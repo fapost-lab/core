@@ -227,6 +227,10 @@ final readonly class CredentialWriter
     public function delete(Credential $credential): void
     {
         DB::transaction(function () use ($credential): void {
+            // The credential's row first, then its grant: the order a consent takes them in, so a reconnect and a
+            // delete at once wait for each other instead of deadlocking.
+            $this->grants->lockedCredential((string) $credential->getKey());
+
             // The foreign key cascades too; deleted here so it does not depend on the connection enforcing it.
             $this->grants->delete((string) $credential->getKey());
             $credential->delete();

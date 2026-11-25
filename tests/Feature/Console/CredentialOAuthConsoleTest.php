@@ -19,6 +19,7 @@ use App\Domains\Staff\Models\User;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use Inertia\Support\SessionKey;
@@ -281,6 +282,26 @@ final class CredentialOAuthConsoleTest extends CredentialsTestCase
         $this->assertStringNotContainsString(self::CODE, json_encode(session()->all(), JSON_THROW_ON_ERROR) . $response->getContent());
         $this->assertSame(0, CredentialOAuthGrant::query()->count());
         $this->assertSame(0, ActivityEntry::query()->count());
+    }
+
+    public function test_a_grant_whose_tokens_cannot_be_decrypted_is_reconnected_without_disconnecting_first(): void
+    {
+        Http::fake([self::TOKEN_URL => Http::response(['access_token' => self::ACCESS, 'refresh_token' => self::REFRESH, 'expires_in' => 3600])]);
+        $credential = $this->oauthCredential();
+        $this->grant($credential, ['status' => OAuth2GrantStatus::ReconnectNeeded]);
+        // Written with another application key: the stored tokens cannot be decrypted any more.
+        DB::table('credential_oauth_grants')->update(['access_token' => 'garbage', 'refresh_token' => 'garbage']);
+        $state = $this->stateOf($this->connect($credential));
+
+        $this->get($this->callbackUrl(['state' => $state, 'code' => self::CODE]))
+            ->assertRedirect("/admin/credentials/{$credential->id}/edit");
+
+        $grant = CredentialOAuthGrant::query()->sole();
+        $this->assertSame(OAuth2GrantStatus::Connected, $grant->status);
+        $this->assertSame(self::ACCESS, $grant->access_token);
+        $this->assertSame(self::REFRESH, $grant->refresh_token);
+        $this->assertSame($this->admin->id, $grant->connected_by);
+        $this->assertSame('credential.connected', ActivityEntry::query()->sole()->description);
     }
 
     public function test_disconnect_deletes_the_grant_and_records_it(): void

@@ -18,6 +18,7 @@ use App\Domains\Flow\Call\Egress\GuardedHttpClient;
 use Fapost\Foundation\Credentials\Contracts\CredentialStoreInterface;
 use Fapost\Foundation\Credentials\DTO\CredentialSecret;
 use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
+use Illuminate\Cache\ArrayLock;
 use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Cache\Lock;
@@ -291,6 +292,24 @@ final class OAuth2AuthorizationCodeTypeTest extends CredentialsTestCase
         }
 
         $this->assertFalse($ran);
+    }
+
+    public function test_a_lock_store_that_fails_on_release_keeps_what_the_callback_did(): void
+    {
+        $store = new class () extends ArrayStore {
+            public function lock($name, $seconds = 0, $owner = null): Lock
+            {
+                return new class ($this, $name, $seconds, $owner) extends ArrayLock {
+                    public function release(): bool
+                    {
+                        throw new RuntimeException('Connection lost [tcp://redis.internal:6379]');
+                    }
+                };
+            }
+        };
+        $lock = new OAuth2GrantLock(new Repository($store), 0);
+
+        $this->assertSame('committed', $lock->run($this->tenantId, (string) Str::ulid(), static fn (): string => 'committed'));
     }
 
     public function test_a_grant_whose_tokens_cannot_be_decrypted_is_unavailable_not_a_crash(): void

@@ -154,6 +154,22 @@ review findings of the store and the OAuth2 work.
 - **Audit and unknown types.** `credential.updated` marks each changed setting as `settings.<key>`; an update of a
   credential whose type is no longer registered is refused (`type_unknown`) instead of overwriting it with nothing.
 
+## Amendment: grant writes (task `credentials-oauth2-fixes-2`, 2026-11-25)
+
+Review findings closed without a design choice; recorded because nothing in the code would stop a later change from
+undoing them.
+
+- **A reconnect replaces the grant row, never updates it.** `OAuth2GrantRepository::connect` deletes the old row and
+  inserts a new one inside the consent's transaction. An Eloquent update compares the new tokens with the stored
+  ones, which decrypts the stored ones; a grant written under another application key could then never be
+  reconnected, only disconnected first.
+- **Credential row first, then the grant row.** Every write path that touches both takes the credential's row
+  first: the consent locks it (`lockedCredential`) before writing the grant, `CredentialWriter::update` saves the
+  credential before dropping the grant, and `CredentialWriter::delete` locks it before deleting the grant. A path
+  that took the grant first could deadlock against a reconnect on Postgres.
+- **Releasing the refresh lock never fails the caller.** What ran under the lock is done; a cache store that fails on
+  release is ignored and the lock runs out after its 30 s.
+
 ## Alternatives
 
 - The transport resolves the credential by id itself. Rejected: the transport is a process-wide singleton, and
