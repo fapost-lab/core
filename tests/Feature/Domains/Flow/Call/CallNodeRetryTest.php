@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow\Call;
 
+use App\Domains\Flow\Call\CallCredentialResolver;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
@@ -363,7 +364,7 @@ final class CallNodeRetryTest extends TestCase
         $registry->register($transport);
 
         return [
-            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger(), new InMemoryCredentialStore()),
+            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter), new InMemoryCallExecutionLedger(), new CallCredentialResolver(new InMemoryCredentialStore())),
             $transport,
         ];
     }

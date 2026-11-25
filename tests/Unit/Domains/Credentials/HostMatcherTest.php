@@ -116,4 +116,27 @@ final class HostMatcherTest extends TestCase
     {
         $this->assertTrue(HostMatcher::matches('b.test', ['a.test', 'b.test']));
     }
+
+    public function test_an_exact_host_is_covered_by_itself_or_a_wildcard_over_it(): void
+    {
+        $this->assertTrue(HostMatcher::covers('API.example.com.', ['api.example.com']));
+        $this->assertTrue(HostMatcher::covers('api.example.com', ['*.example.com']));
+        $this->assertFalse(HostMatcher::covers('example.com', ['*.example.com']));
+        $this->assertFalse(HostMatcher::covers('collector.attacker.test', ['api.example.com']));
+    }
+
+    public function test_a_wildcard_is_covered_only_by_the_same_or_a_wider_wildcard(): void
+    {
+        $this->assertTrue(HostMatcher::covers('*.example.com', ['*.example.com']));
+        $this->assertTrue(HostMatcher::covers('*.eu.example.com', ['*.example.com']));
+        $this->assertFalse(HostMatcher::covers('*.example.com', ['api.example.com', 'b.example.com']));
+        $this->assertFalse(HostMatcher::covers('*.example.com', ['*.eu.example.com']));
+        $this->assertFalse(HostMatcher::covers('*.example.com', ['example.com']));
+    }
+
+    public function test_an_invalid_pattern_is_never_covered(): void
+    {
+        $this->assertFalse(HostMatcher::covers('*', ['*.example.com']));
+        $this->assertFalse(HostMatcher::covers('https://api.example.com', ['api.example.com']));
+    }
 }

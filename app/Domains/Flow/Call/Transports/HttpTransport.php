@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Call\Transports;
 
+use App\Domains\Credentials\Contracts\AuthorizesWithinDeadlineInterface;
 use App\Domains\Credentials\Contracts\RejectedTokenAwareInterface;
 use App\Domains\Credentials\CredentialTypeRegistry;
 use App\Domains\Credentials\HostMatcher;
 use App\Domains\Credentials\SecretRedactor;
 use App\Domains\Flow\Call\CallAttempt;
 use App\Domains\Flow\Call\CallSuccessStatuses;
+use App\Domains\Flow\Call\CredentialMaskedException;
 use App\Domains\Flow\Call\Egress\EgressDeniedException;
 use App\Domains\Flow\Call\Egress\GuardedHttpClient;
 use Fapost\Foundation\Credentials\DTO\CredentialSecret;
@@ -24,6 +26,7 @@ use Illuminate\Http\Client\PendingRequest;
 use InvalidArgumentException;
 use JsonException;
 use Psr\Log\LoggerInterface;
+use Throwable;
 
 /**
  * Built-in HTTP transport for the {@code call} node.
@@ -52,14 +55,18 @@ use Psr\Log\LoggerInterface;
  * a redirect, ends in the `egress_denied` error code without a connection.
  *
  * A request that carries a saved credential ({@see CallRequest::$credential}) is sent as follows:
- *  - the target host must match the credential's allowed hosts, else `credential_host_denied` and no connection
- *    (nor a token request);
+ *  - the target must be an https URL, else `credential_insecure_target`, and its host must match the credential's
+ *    allowed hosts, else `credential_host_denied`; either way there is no connection (nor a token request);
+ *  - a type that makes requests to authorize ({@see AuthorizesWithinDeadlineInterface}, OAuth2) spends at most the
+ *    call's timeout on them;
  *  - the credential's type supplies the headers and query, which replace the author's of the same name (headers
- *    compared case-insensitively); the author's `auth.bearer` / `auth.basic.*` are ignored;
+ *    compared case-insensitively; a query key the author wrote in the URL itself is removed too); the author's
+ *    `auth.bearer` / `auth.basic.*` are ignored;
  *  - a redirect is not followed, the 3xx is the answer;
  *  - every returned result, error ones and exception messages included (a header value or URL the HTTP client
  *    refuses is `transport_failure`, not a thrown exception), has the credential's secret strings
- *    replaced by `***` ({@see SecretRedactor}), so what the ledger, the state and the logs get is already masked;
+ *    replaced by `***` ({@see SecretRedactor}), so what the ledger, the state and the logs get is already masked; any
+ *    other exception the client throws that quotes a secret is thrown again as a {@see CredentialMaskedException};
  *  - a type that cannot authorize (the OAuth2 endpoint did not give a token, a setting is missing) is
  *    `credential_unavailable`; a 401 from the target tells a type that keeps a token
  *    ({@see RejectedTokenAwareInterface}) to stop using it.
@@ -117,17 +124,18 @@ final readonly class HttpTransport implements CallTransportInterface
             return $this->send($method, $url, $request, $context, null);
         }
 
+        // An OAuth2 token request spends the call's own time: the type gets the timeout as its limit and the target what
+        // is left of it, so a cold token cache cannot stretch the node past the window the flow runtime sizes its jobs
+        // and locks by.
+        $timeout       = (int) ($request->options['timeout'] ?? self::DEFAULT_TIMEOUT_SECONDS);
         $startedAt     = hrtime(true);
-        $authorization = $this->authorize($credential, $url, $context);
+        $authorization = $this->authorize($credential, $url, $context, $timeout);
 
         if ($authorization instanceof CallResult) {
             return $authorization;
         }
 
-        // An OAuth2 token request spends the call's own time: the target gets what is left of the timeout, so a cold
-        // token cache cannot stretch the node past the window the flow runtime sizes its jobs and locks by.
-        $timeout = (int) ($request->options['timeout'] ?? self::DEFAULT_TIMEOUT_SECONDS);
-        $left    = $timeout - (hrtime(true) - $startedAt) / 1e9;
+        $left = $timeout - (hrtime(true) - $startedAt) / 1e9;
 
         if ($timeout > 0 && $left < min(self::MIN_TARGET_SECONDS, $timeout / 2)) {
             $this->logger->warning('Call node credential took the whole timeout to authorize; the request was not sent.', [
@@ -146,6 +154,8 @@ final readonly class HttpTransport implements CallTransportInterface
             // the credential's (an IdP may hand back any token): the message leaves here masked, as a result, never
             // as an exception a worker log or the builder would print.
             $result = CallResult::error('transport_failure', metadata: ['exception' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            throw $this->maskedException($exception, $authorization);
         }
 
         if (401 === ($result->metadata['status_code'] ?? null)) {
@@ -161,13 +171,39 @@ final readonly class HttpTransport implements CallTransportInterface
     }
 
     /**
-     * Checks the target host against the credential's allowed hosts and asks its type for the authorization.
-     * A refusal comes back as the result to return; nothing is sent, and no token is requested for a denied host.
+     * The decoded name of a `name=value` query pair, without a trailing `[]` or `[key]`.
      */
-    private function authorize(CredentialSecret $credential, string $url, CallContext $context): HttpAuthorization|CallResult
+    private static function queryName(string $pair): string
+    {
+        $name    = urldecode(explode('=', $pair, 2)[0]);
+        $bracket = mb_strpos($name, '[');
+
+        return false !== $bracket && $bracket > 0 ? mb_substr($name, 0, $bracket) : $name;
+    }
+
+    /**
+     * Checks the target's scheme and host against the credential and asks its type for the authorization, within the
+     * timeout when the type makes requests of its own. A refusal comes back as the result to return; nothing is sent,
+     * and no token is requested for a refused target.
+     *
+     * @param  int  $timeout  the call's timeout in seconds; 0 or less for none
+     */
+    private function authorize(CredentialSecret $credential, string $url, CallContext $context, int $timeout): HttpAuthorization|CallResult
     {
         $host = parse_url($url, PHP_URL_HOST);
         $host = is_string($host) ? $host : '';
+
+        if ('https' !== mb_strtolower((string) parse_url($url, PHP_URL_SCHEME))) {
+            // The URL path and query are left out on purpose: they carry tokens.
+            $this->logger->warning('Call node request refused: a credential is sent only to an https target.', [
+                'tenant_id'     => $context->tenantId,
+                'node_id'       => $context->nodeId,
+                'host'          => $host,
+                'credential_id' => $credential->id,
+            ]);
+
+            return CallResult::error('credential_insecure_target', metadata: ['host' => $host]);
+        }
 
         if (! HostMatcher::matches($host, $credential->allowedHosts)) {
             // The URL path and query are left out on purpose: they carry tokens.
@@ -182,7 +218,11 @@ final readonly class HttpTransport implements CallTransportInterface
         }
 
         try {
-            return $this->credentialTypes->get($credential->type)->authorize($credential);
+            $type = $this->credentialTypes->get($credential->type);
+
+            return $type instanceof AuthorizesWithinDeadlineInterface && $timeout > 0
+                ? $type->authorizeWithin($credential, (float) $timeout)
+                : $type->authorize($credential);
         } catch (InvalidArgumentException|CredentialUnavailableException $exception) {
             $this->logger->warning('Call node credential cannot be applied.', [
                 'tenant_id'     => $context->tenantId,
@@ -208,6 +248,22 @@ final readonly class HttpTransport implements CallTransportInterface
         $metadata = SecretRedactor::redact($result->metadata, $secrets);
 
         return new CallResult($result->success, SecretRedactor::redact($result->payload, $secrets), $result->errorCode, $metadata);
+    }
+
+    /**
+     * The exception to throw on: as it is when its message quotes no secret of the authorization, else a
+     * {@see CredentialMaskedException} with the masked message and without the original as its previous.
+     */
+    private function maskedException(Throwable $exception, HttpAuthorization $authorization): Throwable
+    {
+        $message = $exception->getMessage();
+        $masked  = SecretRedactor::redact($message, $authorization->secrets());
+
+        if (! is_string($masked) || $masked === $message) {
+            return $exception;
+        }
+
+        return new CredentialMaskedException($masked, (int) $exception->getCode());
     }
 
     /**
@@ -262,6 +318,10 @@ final readonly class HttpTransport implements CallTransportInterface
             $body   = [];
         }
 
+        // A GET sends its query as a whole (the client replaces the URL's own); the other methods append to the URL,
+        // where an author's key of the credential's name must not stay beside the credential's.
+        $credentialNames = array_map(strval(...), array_keys($credentialQuery));
+
         try {
             $response = match ($method) {
                 'GET' => $client->get($url, $query),
@@ -269,11 +329,11 @@ final readonly class HttpTransport implements CallTransportInterface
                 // Without a body the author's query travels as the request data, as before; the credential's query
                 // always goes in the URL, where the target reads it.
                 'DELETE' => [] === $body
-                    ? $client->delete($this->appendQuery($url, $credentialQuery), array_diff_key($query, $credentialQuery))
-                    : $client->delete($this->appendQuery($url, $credentialQuery), $body),
-                'POST'  => $client->post($this->appendQuery($url, $query), $body),
-                'PUT'   => $client->put($this->appendQuery($url, $query), $body),
-                'PATCH' => $client->patch($this->appendQuery($url, $query), $body),
+                    ? $client->delete($this->appendQuery($url, $credentialQuery, $credentialNames), array_diff_key($query, $credentialQuery))
+                    : $client->delete($this->appendQuery($url, $credentialQuery, $credentialNames), $body),
+                'POST'  => $client->post($this->appendQuery($url, $query, $credentialNames), $body),
+                'PUT'   => $client->put($this->appendQuery($url, $query, $credentialNames), $body),
+                'PATCH' => $client->patch($this->appendQuery($url, $query, $credentialNames), $body),
                 default => null,
             };
         } catch (EgressDeniedException $exception) {
@@ -398,17 +458,42 @@ final readonly class HttpTransport implements CallTransportInterface
     }
 
     /**
+     * The URL with the query appended, after the pairs of its own query whose name is one of `$replaced` were removed.
+     * The other pairs stay byte for byte (no re-encoding, so a key such as `a.b` survives), and a fragment stays last.
+     *
      * @param  array<string, mixed>  $query
+     * @param  list<string>  $replaced  decoded names; `name[]` and `name[x]` count as `name`
      */
-    private function appendQuery(string $url, array $query): string
+    private function appendQuery(string $url, array $query, array $replaced = []): string
     {
-        if ([] === $query) {
+        if ([] === $query && [] === $replaced) {
             return $url;
         }
 
-        $separator = str_contains($url, '?') ? '&' : '?';
+        $fragment = '';
+        $hashAt   = mb_strpos($url, '#');
 
-        return $url . $separator . http_build_query($query);
+        if (false !== $hashAt) {
+            $fragment = mb_substr($url, $hashAt);
+            $url      = mb_substr($url, 0, $hashAt);
+        }
+
+        $queryAt = mb_strpos($url, '?');
+        $pairs   = [];
+
+        if (false !== $queryAt) {
+            $pairs = array_values(array_filter(
+                explode('&', mb_substr($url, $queryAt + 1)),
+                static fn (string $pair): bool => '' !== $pair && ! in_array(self::queryName($pair), $replaced, true),
+            ));
+            $url = mb_substr($url, 0, $queryAt);
+        }
+
+        if ([] !== $query) {
+            $pairs[] = http_build_query($query);
+        }
+
+        return $url . ([] === $pairs ? '' : '?' . implode('&', $pairs)) . $fragment;
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Credentials\Types;
 
+use App\Domains\Credentials\Contracts\AuthorizesWithinDeadlineInterface;
 use App\Domains\Credentials\Contracts\RejectedTokenAwareInterface;
 use App\Domains\Credentials\OAuth2\OAuth2TokenEndpoint;
 use App\Domains\Credentials\OAuth2\OAuth2TokenRequestFailedException;
@@ -20,9 +21,10 @@ use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
  * {@see OAuth2TokenCache}) and is sent as `Authorization: Bearer <token>`.
  *
  * The token request goes through {@see OAuth2TokenEndpoint}: https, an allowed host, the egress guard, no redirect,
- * and a failure reported by its status alone. A 401 from the target drops the cached token.
+ * and a failure reported by its status alone, within what is left of the call's timeout when the transport gives one
+ * ({@see AuthorizesWithinDeadlineInterface}). A 401 from the target drops the cached token of this version.
  */
-final readonly class OAuth2ClientCredentialsType implements HttpCredentialTypeInterface, RejectedTokenAwareInterface
+final readonly class OAuth2ClientCredentialsType implements AuthorizesWithinDeadlineInterface, HttpCredentialTypeInterface, RejectedTokenAwareInterface
 {
     public const string ID = 'oauth2_client_credentials';
 
@@ -64,6 +66,24 @@ final readonly class OAuth2ClientCredentialsType implements HttpCredentialTypeIn
 
     public function authorize(CredentialSecret $secret): HttpAuthorization
     {
+        return $this->authorizeWithLimit($secret, null);
+    }
+
+    public function authorizeWithin(CredentialSecret $secret, float $seconds): HttpAuthorization
+    {
+        return $this->authorizeWithLimit($secret, $seconds);
+    }
+
+    public function tokenRejected(CredentialSecret $secret): void
+    {
+        $this->cache->forgetVersion($secret);
+    }
+
+    /**
+     * @param  float|null  $seconds  the most the token request may take; null for the endpoint's own limit
+     */
+    private function authorizeWithLimit(CredentialSecret $secret, ?float $seconds): HttpAuthorization
+    {
         $clientId     = (string) $secret->setting('client_id');
         $clientSecret = (string) $secret->value('client_secret');
         $token        = null;
@@ -76,7 +96,7 @@ final readonly class OAuth2ClientCredentialsType implements HttpCredentialTypeIn
         }
 
         if (null === $token) {
-            $token = $this->fetchToken($secret);
+            $token = $this->fetchToken($secret, $seconds);
         }
 
         return new HttpAuthorization(
@@ -85,12 +105,7 @@ final readonly class OAuth2ClientCredentialsType implements HttpCredentialTypeIn
         );
     }
 
-    public function tokenRejected(CredentialSecret $secret): void
-    {
-        $this->cache->forget($secret->tenantId, $secret->id);
-    }
-
-    private function fetchToken(CredentialSecret $secret): string
+    private function fetchToken(CredentialSecret $secret, ?float $seconds): string
     {
         $form  = ['grant_type' => 'client_credentials'];
         $scope = $secret->setting('scope');
@@ -100,7 +115,7 @@ final readonly class OAuth2ClientCredentialsType implements HttpCredentialTypeIn
         }
 
         try {
-            $response = $this->endpoint->request($secret, $form);
+            $response = $this->endpoint->request($secret, $form, $seconds);
         } catch (OAuth2TokenRequestFailedException $failure) {
             throw CredentialUnavailableException::because($secret->id, $failure->getMessage());
         }

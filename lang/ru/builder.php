@@ -500,6 +500,7 @@ return [
             'call_invalid_credential'                => 'credential_id должен быть id сохранённого доступа.',
             'call_credential_unsupported'            => 'Сохранённый доступ можно использовать только с транспортом http.',
             'call_credential_not_found'              => 'Сохранённый доступ не существует.',
+            'call_credential_insecure_target'        => 'Сохранённый доступ отправляется только на https-адрес.',
             'addressee_cannot_wait'                  => 'Сообщение адресату не может ждать ответа: уберите \':field\' или адресата.',
             'start_flow_invalid_busy_window'         => 'busy_window_minutes должно быть целым числом от 0 до :max.',
             'webhook_response_invalid_status'        => 'Статус ответа должен быть целым числом от :min до :max.',

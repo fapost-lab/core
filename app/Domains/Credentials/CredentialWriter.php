@@ -34,10 +34,16 @@ use Illuminate\Validation\ValidationException;
  * the type does not declare is dropped. On an update a secret left empty keeps the stored one, and the type never
  * changes. A refusal is a {@see ValidationException} whose messages never carry a value.
  *
+ * The secret is write-only, so an edit may not send a stored one somewhere new: when the allowed hosts gain a host the
+ * old list did not cover, or the token URL moves to another host, every secret field must be entered again, and the
+ * consent grant of an `oauth2_authorization_code` credential is dropped. Narrowing the list needs neither. A
+ * credential whose type is no longer registered cannot be updated.
+ *
  * A type may add rules of its own for a setting ({@see ValidatesOwnSettingsInterface}).
  *
- * Each write and its audit entry commit together. The entry names the credential's name, type and hosts and the fact
- * that settings changed or the secret was replaced; no setting or secret value is recorded. After an update or a
+ * Each write and its audit entry commit together. The entry names the credential's name, type and hosts, which
+ * settings changed (`settings.<key>`), whether the secret was replaced and whether the hosts were widened; no setting
+ * or secret value is recorded. After an update or a
  * delete has committed, the cached OAuth2 token of the credential is dropped. The consent grant of an
  * `oauth2_authorization_code` credential is deleted in the same transaction when the client it was given to changes
  * (a setting of {@see OAuth2AuthorizationCodeType::GRANT_BOUND_SETTINGS} or the secret), and with the credential.
@@ -51,6 +57,11 @@ final readonly class CredentialWriter
     public const int MAX_NAME_LENGTH = 120;
 
     public const int MAX_SETTING_LENGTH = 255;
+
+    /** The setting of the OAuth2 types that names where the client secret is sent. */
+    private const string TOKEN_URL_SETTING = 'token_url';
+
+    private const string SETTINGS_MARKER = 'settings.';
 
     public function __construct(
         private TenantContextInterface $tenants,
@@ -141,24 +152,34 @@ final readonly class CredentialWriter
      */
     public function update(Credential $credential, array $data): Credential
     {
-        $type   = $this->types->has($credential->type) ? $this->types->get($credential->type) : null;
-        $fields = $type?->fields() ?? [];
+        if (!$this->types->has($credential->type)) {
+            // Its fields are unknown, so whatever was saved would be read as nothing and overwritten.
+            throw ValidationException::withMessages(['type' => __('credential_validation.type_unknown')]);
+        }
+
+        $type   = $this->types->get($credential->type);
+        $fields = $type->fields();
         $errors = [];
 
         $name     = $this->validName($data['name'] ?? null, $credential, $errors);
         $hosts    = $this->validHosts($data['allowed_hosts'] ?? null, $errors);
         $settings = $this->validSettings($type, $fields, $data['settings'] ?? null, $hosts, $errors);
         $stored   = $this->storedSecrets($credential);
-        $secrets  = $this->validSecrets($fields, $data['secrets'] ?? null, $stored, $errors);
+
+        $hostsWidened   = self::hostsWidened($credential->allowed_hosts, $hosts);
+        $tokenHostMoved = self::tokenHostMoved($credential, $settings);
+
+        $secrets = $this->validSecrets($fields, $data['secrets'] ?? null, $stored, $errors, $hostsWidened || $tokenHostMoved);
 
         $this->failOn($errors);
 
         $secretReplaced = self::sorted($secrets) !== self::sorted($stored);
-        $clientChanged  = $secretReplaced || self::grantBoundSettingsChanged($credential, $settings);
+        // A grant's tokens are a person's, not the admin's to re-enter: a host they could newly reach drops them too.
+        $clientChanged = $secretReplaced || $hostsWidened || self::grantBoundSettingsChanged($credential, $settings);
 
         try {
-            DB::transaction(function () use ($credential, $name, $settings, $hosts, $secrets, $secretReplaced, $clientChanged): void {
-                $before = ['name' => $credential->name, 'allowed_hosts' => $credential->allowed_hosts, 'settings' => $credential->settings];
+            DB::transaction(function () use ($credential, $name, $settings, $hosts, $secrets, $secretReplaced, $clientChanged, $hostsWidened): void {
+                $before = ['name' => $credential->name, 'allowed_hosts' => $credential->allowed_hosts, ...self::settingsFlat($credential->settings)];
 
                 $credential->fill(['name' => $name, 'settings' => $settings, 'allowed_hosts' => $hosts]);
 
@@ -168,14 +189,20 @@ final readonly class CredentialWriter
 
                 $credential->save();
 
-                $changes = AuditChanges::between(
-                    $before,
-                    ['name' => $credential->name, 'allowed_hosts' => $credential->allowed_hosts, 'settings' => $credential->settings],
-                    ['name', 'allowed_hosts'],
-                    ['settings'],
-                );
+                $after   = ['name' => $credential->name, 'allowed_hosts' => $credential->allowed_hosts, ...self::settingsFlat($credential->settings)];
+                $markers = array_values(array_unique(array_filter(
+                    [...array_keys($before), ...array_keys($after)],
+                    static fn (string $key): bool => str_starts_with($key, self::SETTINGS_MARKER),
+                )));
+                sort($markers);
+
+                $changes = AuditChanges::between($before, $after, ['name', 'allowed_hosts'], $markers);
 
                 $properties = ['secret_replaced' => $secretReplaced];
+
+                if ($hostsWidened) {
+                    $properties['hosts_widened'] = true;
+                }
 
                 if ($clientChanged && $this->grants->delete((string) $credential->getKey())) {
                     $properties['grant_dropped'] = true;
@@ -228,6 +255,67 @@ final readonly class CredentialWriter
         }
 
         return false;
+    }
+
+    /**
+     * Whether the new list lets the secret reach a host the old one did not ({@see HostMatcher::covers()}): an added
+     * host, or a wildcard over hosts only some of which were listed. Removing a host, or replacing hosts by a
+     * wildcard the old list already had, is not.
+     *
+     * @param  list<string>  $old
+     * @param  list<string>  $new
+     */
+    private static function hostsWidened(array $old, array $new): bool
+    {
+        foreach ($new as $pattern) {
+            if (!HostMatcher::covers($pattern, $old)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the token URL, where the client secret (and a refresh token) is sent, moves to another host.
+     *
+     * @param  array<string, string>  $settings  the settings about to be saved
+     */
+    private static function tokenHostMoved(Credential $credential, array $settings): bool
+    {
+        $old = $credential->settings[self::TOKEN_URL_SETTING] ?? null;
+        $new = $settings[self::TOKEN_URL_SETTING] ?? null;
+
+        if (!is_string($new) || '' === $new) {
+            return false;
+        }
+
+        $newHost = parse_url($new, PHP_URL_HOST);
+        $oldHost = is_string($old) ? parse_url($old, PHP_URL_HOST) : null;
+
+        if (!is_string($oldHost) || '' === $oldHost) {
+            return true;
+        }
+
+        return !is_string($newHost) || HostMatcher::normalize($newHost) !== HostMatcher::normalize($oldHost);
+    }
+
+    /**
+     * The settings under `settings.<key>`, so the audit marks each changed one by name.
+     *
+     * @param  array<string, mixed>  $settings
+     *
+     * @return array<string, mixed>
+     */
+    private static function settingsFlat(array $settings): array
+    {
+        $flat = [];
+
+        foreach ($settings as $key => $value) {
+            $flat[self::SETTINGS_MARKER . $key] = $value;
+        }
+
+        return $flat;
     }
 
     /**
@@ -423,10 +511,12 @@ final readonly class CredentialWriter
      * @param  list<CredentialField>  $fields
      * @param  array<string, mixed>  $stored  the secrets already saved, on an update
      * @param  array<string, string>  $errors
+     * @param  bool  $reenter  the secret may now reach a host it could not before: a stored secret is not kept, every
+     *                         secret field must be entered again
      *
      * @return array<string, string> the secrets to keep: stored ones the input leaves alone, and the new ones
      */
-    private function validSecrets(array $fields, mixed $input, array $stored, array &$errors): array
+    private function validSecrets(array $fields, mixed $input, array $stored, array &$errors, bool $reenter = false): array
     {
         $input   = is_array($input) ? $input : [];
         $secrets = [];
@@ -448,7 +538,9 @@ final readonly class CredentialWriter
             if (null === $raw || '' === $raw) {
                 $kept = $stored[$field->key] ?? null;
 
-                if (is_string($kept) && '' !== $kept) {
+                if (is_string($kept) && '' !== $kept && $reenter) {
+                    $errors[$path] = __('credential_validation.secret_reenter_for_new_host');
+                } elseif (is_string($kept) && '' !== $kept) {
                     $secrets[$field->key] = $kept;
                 } elseif ($field->required) {
                     $errors[$path] = __('credential_validation.secret_required');

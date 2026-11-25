@@ -156,7 +156,7 @@ final class RedisCallExecutionLedgerRedisTest extends FeatureTestCase
             new \App\Domains\Flow\State\Variables\VariableResolver(),
             \Tests\Support\UsageGates::quota(),
             $this->ledger(),
-            new \Tests\Support\InMemoryCredentialStore(),
+            new \App\Domains\Flow\Call\CallCredentialResolver(new \Tests\Support\InMemoryCredentialStore()),
         );
         $node = ['id' => 'call-1', 'config' => [
             'transport'      => 'counting',

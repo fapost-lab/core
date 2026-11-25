@@ -10,6 +10,8 @@ use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Call\CallExecutionLedgerInterface;
+use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Enums\FlowRunKind;
@@ -23,11 +25,16 @@ use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
+use Fapost\Foundation\Flow\Call\CallContext;
+use Fapost\Foundation\Flow\Call\CallRequest;
+use Fapost\Foundation\Flow\Call\CallResult;
+use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\InMemoryCallExecutionLedger;
 
 /**
  * A flow session without a contact or an assistant — the base of runs started by schedule, event, webhook and API.
@@ -237,6 +244,65 @@ final class ContactlessFlowSessionTest extends FeatureTestCase
         $this->assertSame('501', (string) $session->state['system']['sent_messages']['tell']);
         Http::assertSent(static fn (Request $request): bool => 'chat-777' === (string) ($request['chat_id'] ?? null)
             && 'Order 42 has shipped' === ($request['text'] ?? null));
+    }
+
+    public function test_a_contactless_run_executes_a_call_node(): void
+    {
+        $transport = new class () implements CallTransportInterface {
+            /** @var list<CallContext> */
+            public array $contexts = [];
+
+            public function id(): string
+            {
+                return 'contactless_probe';
+            }
+
+            public function execute(CallRequest $request, CallContext $context): CallResult
+            {
+                $this->contexts[] = $context;
+
+                return CallResult::ok(['ok' => true], ['status_code' => 200]);
+            }
+        };
+        $this->app->make(CallTransportRegistry::class)->register($transport);
+        $this->app->instance(CallExecutionLedgerInterface::class, new InMemoryCallExecutionLedger());
+
+        $definition = $this->definition([
+            ['id' => 'call', 'type' => 'call', 'version' => 1, 'config' => ['transport' => 'contactless_probe', 'target' => 'anything']],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [['id' => 'e1', 'from' => 'call', 'to' => 'end', 'handle' => 'success']]);
+
+        $session = $this->engine()->start($definition, null, [], FlowRunOrigin::automation((string) Str::uuid()));
+
+        $this->assertSame(FlowSessionStatus::Ended, $session->status);
+        $this->assertNull($session->contact_id);
+        $this->assertCount(1, $transport->contexts);
+        $this->assertNull($transport->contexts[0]->contactId);
+        $this->assertSame($this->tenantId, $transport->contexts[0]->tenantId);
+        $this->assertSame((string) $session->getKey(), $transport->contexts[0]->sessionId);
+    }
+
+    public function test_a_contactless_legacy_call_node_sends_a_null_contact_id(): void
+    {
+        Http::fake(['hooks.example.com/*' => Http::response(['ok' => true], 200)]);
+        $this->app->instance(CallExecutionLedgerInterface::class, new InMemoryCallExecutionLedger());
+
+        $definition = $this->definition([
+            ['id' => 'call', 'type' => 'call', 'version' => 1, 'config' => ['url' => 'https://hooks.example.com/notify']],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [['id' => 'e1', 'from' => 'call', 'to' => 'end', 'handle' => 'success']]);
+
+        $session = $this->engine()->start($definition, null, [], FlowRunOrigin::automation((string) Str::uuid()));
+
+        $this->assertSame(FlowSessionStatus::Ended, $session->status);
+        Http::assertSent(static function (Request $request) use ($session): bool {
+            $payload = json_decode($request->body(), true, 512, JSON_THROW_ON_ERROR);
+
+            return 'https://hooks.example.com/notify' === $request->url()
+                && array_key_exists('contact_id', $payload)
+                && null === $payload['contact_id']
+                && (string) $session->getKey() === $payload['session_id'];
+        });
     }
 
     private function engine(): FlowEngineInterface

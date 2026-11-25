@@ -1613,7 +1613,7 @@ return [
         'sections'   => [
             'general' => ['title' => 'General', 'description' => 'The name flows pick this credential by, and its type.'],
             'secret'  => ['title' => 'Connection', 'description' => 'The values the type needs. Secret values are stored encrypted and are not shown again.'],
-            'hosts'   => ['title' => 'Allowed hosts', 'description' => 'The secret is only sent to these hosts. Use a name such as api.example.com, or *.example.com for every subdomain.'],
+            'hosts'   => ['title' => 'Allowed hosts', 'description' => 'The secret is only sent to these hosts, over https. Use a name such as api.example.com, or *.example.com for every subdomain. Adding a host asks for the secret again.'],
         ],
         'fields' => [
             'name'               => 'Name',

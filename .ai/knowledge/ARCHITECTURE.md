@@ -54,14 +54,16 @@ deletion events, so every domain may call the audit trail while Audit itself dep
 
 `Presale` (the public site's lead form) and `Shared` (base model concerns, and the Postgres
 monthly-partition helper `Shared/Infrastructure/PostgresMonthlyPartitions` that Flow and Conversation
-both use to list and drop partitions) carry no domain logic and have no knowledge pack.
+both use to list and drop partitions, and the scoped `Shared/Infrastructure/RedisKeyPurger` that Flow's ledger and
+Credentials' token cache use to delete keys by pattern) carry no domain logic and have no knowledge pack.
 
 Domain folders are bounded contexts in naming more than in isolation: Flow reads Contact, Staff,
 Assistant and Media models directly, and import cycles exist (for example Contact↔Flow through
 `NotifyNodeHandler`, Broadcasting↔Flow through Flow's listener on `BroadcastCompleted`; the other way, `send_message` to tags or a segment
 reaches Broadcasting only through `AudienceBroadcasterInterface`, implemented in `Infrastructure/Flow`). Credentials is another: Flow asks the Foundation `CredentialStoreInterface` (bound to
 Credentials' store) for a call's secret and uses Credentials' type registry, `SecretRedactor` and `HostMatcher` in
-`HttpTransport` (and its Core interface `RejectedTokenAwareInterface`, which a 401 from the target reaches), while
+`HttpTransport` (and its Core interfaces `RejectedTokenAwareInterface`, which a 401 from the target reaches, and
+`AuthorizesWithinDeadlineInterface`, which gives an OAuth2 type the call's timeout), while
 Credentials' OAuth2 types fetch their tokens through Flow's `GuardedHttpClient`, the egress guard
 (`EgressGuardTest` covers `App\Domains\Credentials` too). The rules below are the boundaries that do hold.
 

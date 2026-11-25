@@ -19,6 +19,7 @@ use App\Domains\Flow\Api\FlowApiTriggerReceiver;
 use App\Domains\Flow\Auth\AuthCodeStore;
 use App\Domains\Flow\Auth\EmailOneTimeCodeSender;
 use App\Domains\Flow\Auth\OneTimeCodeSenderRegistry;
+use App\Domains\Flow\Call\CallCredentialResolver;
 use App\Domains\Flow\Call\CallExecutionLedgerInterface;
 use App\Domains\Flow\Call\CallLedgerCacheForgetter;
 use App\Domains\Flow\Call\CallTransportRegistry;
@@ -754,6 +755,8 @@ final class FlowServiceProvider extends ServiceProvider
         // Scoped: it reads a platform setting.
         $this->app->scoped(CallExecutionLedgerInterface::class, RedisCallExecutionLedger::class);
         $this->app->tag(CallLedgerCacheForgetter::class, 'tenancy.cache_forgetters');
+        // Scoped: it reads the current tenant's credentials.
+        $this->app->scoped(CallCredentialResolver::class);
         $this->app->singleton(HttpTransport::class);
         $this->app->singleton(HandlerTransport::class);
         $this->app->singleton(BuiltinCommandsRegistry::class);

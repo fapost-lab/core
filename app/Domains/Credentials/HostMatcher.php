@@ -91,6 +91,47 @@ final readonly class HostMatcher
         return false;
     }
 
+    /**
+     * Whether every host the pattern stands for is already covered by one of the patterns. An exact host is covered
+     * when it matches them ({@see self::matches()}); `*.domain` only by `*.domain` itself or by a wildcard over a
+     * parent of the domain, never by exact hosts (it stands for subdomains nobody listed). An invalid pattern is
+     * never covered.
+     *
+     * @param  list<string>  $patterns
+     */
+    public static function covers(string $pattern, array $patterns): bool
+    {
+        if (!self::isValidPattern($pattern)) {
+            return false;
+        }
+
+        $pattern = self::normalize($pattern);
+
+        if (!str_starts_with($pattern, self::WILDCARD)) {
+            return self::matches($pattern, $patterns);
+        }
+
+        $domain = mb_substr($pattern, 2, null, '8bit');
+
+        foreach ($patterns as $candidate) {
+            if (!self::isValidPattern($candidate)) {
+                continue;
+            }
+
+            $candidate = self::normalize($candidate);
+
+            if (!str_starts_with($candidate, self::WILDCARD)) {
+                continue;
+            }
+
+            if ($candidate === $pattern || self::matches($domain, [$candidate])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static function isHostName(string $host): bool
     {
         if ('' === $host || mb_strlen($host, '8bit') > 253) {

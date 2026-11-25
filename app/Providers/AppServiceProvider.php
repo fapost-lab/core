@@ -10,6 +10,7 @@ use App\Console\Platform\TenantUnservedChannelsFinder;
 use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Flow\Logging\DatabaseAnalyticsWriter;
 use App\Domains\Shared\Infrastructure\ModelAttributeRegistry;
+use App\Domains\Shared\Infrastructure\RedisKeyPurger;
 use App\Http\Shell\SolutionExtensions;
 use App\Http\Shell\SolutionImportMap;
 use App\Http\Shell\SolutionUi;
@@ -47,6 +48,8 @@ final class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(ModelAttributeRegistry::class);
         $this->app->singleton(ModelAttributeResolverInterface::class, ModelAttributeRegistry::class);
+        // Scoped: it holds the config repository (the Redis key prefix).
+        $this->app->scoped(RedisKeyPurger::class);
         $this->app->scoped(DatabaseAnalyticsWriter::class);
         $this->app->scoped(AnalyticsWriterInterface::class, DatabaseAnalyticsWriter::class);
         // Per request: what a Solution adds depends on the tenant's active Solutions and on the user.

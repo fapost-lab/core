@@ -368,14 +368,16 @@ call; the secret is applied when the call runs and is not stored in the flow. Th
 **Bearer** and **Basic** modes put the secret in the flow definition itself, which is why the
 builder marks them as stored there. A saved credential is sent only to its allowed hosts:
 a call to another host is not made and takes the failure outcome with
-`error_code = credential_host_denied`. Redirects are not followed when a credential is used.
+`error_code = credential_host_denied`, and a call to an `http://` address is not made either
+(`error_code = credential_insecure_target`). Redirects are not followed when a credential is used.
 The credential's headers or query parameter replace any of the same name the author set, and the
 author's `Host` and the headers that carry a host (`X-Forwarded-Host`, `Forwarded`, `X-Original-Host`,
 `X-Host`) are dropped. The secret is shown as `***` in the result,
 the saved variables and the flow log. The other failures are `credential_not_found` (the
 credential was deleted), `credential_unsupported` (the block does not use the HTTP transport) and
 `credential_unavailable` (the secret cannot be read, for example after the application key changed).
-Publishing is refused while the block names a missing credential or does not use the HTTP transport.
+Publishing is refused while the block names a missing credential, does not use the HTTP transport, or
+sends a credential to an address written out as `http://`.
 
 Each run of the block counts against the tenant's call executions for the
 period, and so does every **Test call** in the builder. When they are used up the

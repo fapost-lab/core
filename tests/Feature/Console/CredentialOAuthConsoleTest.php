@@ -359,7 +359,7 @@ final class CredentialOAuthConsoleTest extends CredentialsTestCase
         $credential = $this->oauthCredential();
         $this->grant($credential);
 
-        $writer->update($credential, ['name' => 'Renamed', 'settings' => $credential->settings, 'allowed_hosts' => ['api.example.com', 'auth.example.com', 'b.example.com']]);
+        $writer->update($credential, ['name' => 'Renamed', 'settings' => $credential->settings, 'allowed_hosts' => ['auth.example.com', 'api.example.com']]);
         $this->assertSame(1, CredentialOAuthGrant::query()->count());
 
         $writer->update($credential->fresh() ?? $credential, ['name' => 'Renamed', 'settings' => [...$credential->settings, 'client_id' => 'client-2'], 'allowed_hosts' => ['api.example.com', 'auth.example.com']]);

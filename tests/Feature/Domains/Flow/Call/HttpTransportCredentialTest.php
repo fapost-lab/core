@@ -4,20 +4,26 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow\Call;
 
+use App\Domains\Credentials\Contracts\AuthorizesWithinDeadlineInterface;
+use App\Domains\Credentials\CredentialTypeRegistry;
 use App\Domains\Credentials\Models\Credential;
 use App\Domains\Credentials\Models\CredentialOAuthGrant;
 use App\Domains\Credentials\Types\OAuth2ClientCredentialsType;
+use App\Domains\Flow\Call\CredentialMaskedException;
 use App\Domains\Flow\Call\Egress\EgressGuardMiddleware;
 use App\Domains\Flow\Call\Egress\GuardedHttpClient;
 use App\Domains\Flow\Call\Transports\HttpTransport;
 use Fapost\Foundation\Credentials\Contracts\CredentialStoreInterface;
+use Fapost\Foundation\Credentials\Contracts\HttpCredentialTypeInterface;
 use Fapost\Foundation\Credentials\DTO\CredentialSecret;
+use Fapost\Foundation\Credentials\DTO\HttpAuthorization;
 use Fapost\Foundation\Flow\Call\CallContext;
 use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 use Tests\Feature\Domains\Credentials\CredentialsTestCase;
 
 /**
@@ -33,6 +39,15 @@ final class HttpTransportCredentialTest extends CredentialsTestCase
         foreach ([HttpTransport::class, GuardedHttpClient::class, EgressGuardMiddleware::class] as $class) {
             $this->app->forgetInstance($class);
         }
+    }
+
+    protected function tearDown(): void
+    {
+        DeadlineAwareFakeCredentialType::$seconds    = [];
+        DeadlineAwareFakeCredentialType::$plainCalls = 0;
+        PlainFakeCredentialType::$calls              = 0;
+
+        parent::tearDown();
     }
 
     public function test_the_credential_headers_replace_the_authors_even_in_another_case_and_inline_auth_is_ignored(): void
@@ -341,6 +356,140 @@ final class HttpTransportCredentialTest extends CredentialsTestCase
         $this->assertCount(1, $this->redis->values);
     }
 
+    public function test_a_plain_http_target_is_refused_without_a_connection(): void
+    {
+        Http::fake();
+        $bearer = $this->secretOf($this->credential());
+        $oauth  = $this->secretOf($this->credential([
+            'type'          => OAuth2ClientCredentialsType::ID,
+            'allowed_hosts' => ['api.example.com', 'auth.example.com'],
+            'settings'      => ['token_url' => 'https://auth.example.com/oauth/token', 'client_id' => 'client-1', 'client_auth' => 'basic'],
+            'secret'        => ['client_secret' => self::SECRET],
+        ]));
+
+        foreach ([$bearer, $oauth] as $secret) {
+            $result = $this->execute(new CallRequest('GET http://api.example.com/x?k=1', credential: $secret));
+
+            $this->assertFalse($result->success);
+            $this->assertSame('credential_insecure_target', $result->errorCode);
+            $this->assertSame(['host' => 'api.example.com'], $result->metadata);
+        }
+
+        // Neither the target nor the token request of the OAuth2 credential went out.
+        Http::assertNothingSent();
+    }
+
+    public function test_an_uppercase_https_scheme_is_accepted(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+
+        $result = $this->execute(new CallRequest('GET HTTPS://api.example.com/x', credential: $this->secretOf($this->credential())));
+
+        $this->assertTrue($result->success);
+    }
+
+    public function test_the_call_timeout_reaches_a_type_that_authorizes_within_a_deadline(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+        $this->app->make(CredentialTypeRegistry::class)->register(DeadlineAwareFakeCredentialType::class);
+        $secret = new CredentialSecret($this->tenantId, 'id-1', DeadlineAwareFakeCredentialType::ID, 'v1', [], ['api.example.com'], []);
+
+        $result = $this->execute(new CallRequest('GET https://api.example.com/x', options: ['timeout' => 7], credential: $secret));
+
+        $this->assertTrue($result->success);
+        $this->assertSame([7.0], DeadlineAwareFakeCredentialType::$seconds);
+        $this->assertSame(0, DeadlineAwareFakeCredentialType::$plainCalls);
+        Http::assertSent(static fn (Request $request): bool => ['Bearer fake-deadline'] === $request->header('Authorization'));
+    }
+
+    public function test_a_type_without_the_deadline_interface_still_gets_authorize(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+        $this->app->make(CredentialTypeRegistry::class)->register(PlainFakeCredentialType::class);
+        $secret = new CredentialSecret($this->tenantId, 'id-2', PlainFakeCredentialType::ID, 'v1', [], ['api.example.com'], []);
+
+        $result = $this->execute(new CallRequest('GET https://api.example.com/x', options: ['timeout' => 7], credential: $secret));
+
+        $this->assertTrue($result->success);
+        $this->assertSame(1, PlainFakeCredentialType::$calls);
+        Http::assertSent(static fn (Request $request): bool => ['Bearer fake-plain'] === $request->header('Authorization'));
+    }
+
+    public function test_a_post_and_a_delete_keep_the_authors_other_query_pairs_byte_for_byte_and_drop_the_authors_credential_key(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+        $secret = $this->secretOf($this->credential([
+            'type'     => 'api_key_query',
+            'settings' => ['parameter' => 'api_key'],
+            'secret'   => ['key' => self::SECRET],
+        ]));
+        $target = 'https://api.example.com/x?api_key=author&keep=1&a.b=1';
+
+        $this->execute(new CallRequest('POST ' . $target, ['body.id' => '5'], credential: $secret));
+        $this->execute(new CallRequest('DELETE ' . $target, ['body.id' => '5'], credential: $secret));
+        $this->execute(new CallRequest('DELETE ' . $target, credential: $secret));
+
+        $expected = 'https://api.example.com/x?keep=1&a.b=1&api_key=' . self::SECRET;
+        $sent     = [];
+
+        Http::assertSent(static function (Request $request) use (&$sent): bool {
+            $sent[] = $request->method() . ' ' . $request->url();
+
+            return true;
+        });
+
+        $this->assertSame(['POST ' . $expected, 'DELETE ' . $expected, 'DELETE ' . $expected], $sent);
+    }
+
+    public function test_a_bracketed_author_key_counts_as_the_same_name_as_the_credential_key(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+        $secret = $this->secretOf($this->credential([
+            'type'     => 'api_key_query',
+            'settings' => ['parameter' => 'api_key'],
+            'secret'   => ['key' => self::SECRET],
+        ]));
+
+        $this->execute(new CallRequest('PUT https://api.example.com/x?api_key[]=x&api_key%5Bk%5D=y&keep=1#frag', credential: $secret));
+
+        Http::assertSent(static fn (Request $request): bool => 'https://api.example.com/x?keep=1&api_key=' . self::SECRET . '#frag' === $request->url());
+    }
+
+    public function test_an_exception_quoting_the_secret_leaves_the_transport_masked_and_without_a_previous(): void
+    {
+        $secret = $this->secretOf($this->credential());
+
+        Http::fake(['api.example.com/*' => static function (): never {
+            throw new RuntimeException('client blew up near Bearer ' . self::SECRET);
+        }]);
+
+        try {
+            $this->execute(new CallRequest('GET https://api.example.com/x', credential: $secret));
+            $this->fail('The exception must leave the transport.');
+        } catch (CredentialMaskedException $exception) {
+            $this->assertSame('client blew up near Bearer ***', $exception->getMessage());
+            $this->assertNull($exception->getPrevious());
+            $this->assertStringNotContainsString(self::SECRET, $exception->getTraceAsString());
+        }
+    }
+
+    public function test_an_exception_without_a_secret_is_rethrown_as_it_is(): void
+    {
+        $secret   = $this->secretOf($this->credential());
+        $original = new RuntimeException('plain failure');
+
+        Http::fake(['api.example.com/*' => static function () use ($original): never {
+            throw $original;
+        }]);
+
+        try {
+            $this->execute(new CallRequest('GET https://api.example.com/x', credential: $secret));
+            $this->fail('The exception must leave the transport.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame($original, $exception);
+        }
+    }
+
     private function execute(CallRequest $request): CallResult
     {
         return $this->app->make(HttpTransport::class)->execute($request, new CallContext(
@@ -355,5 +504,73 @@ final class HttpTransportCredentialTest extends CredentialsTestCase
     private function secretOf(Credential $credential): CredentialSecret
     {
         return $this->app->make(CredentialStoreInterface::class)->secret($credential->id);
+    }
+}
+
+final class DeadlineAwareFakeCredentialType implements AuthorizesWithinDeadlineInterface, HttpCredentialTypeInterface
+{
+    public const string ID = 'fake_deadline';
+
+    /** @var list<float> */
+    public static array $seconds = [];
+
+    public static int $plainCalls = 0;
+
+    public function id(): string
+    {
+        return self::ID;
+    }
+
+    public function label(): string
+    {
+        return 'Fake deadline';
+    }
+
+    public function fields(): array
+    {
+        return [];
+    }
+
+    public function authorize(CredentialSecret $secret): HttpAuthorization
+    {
+        self::$plainCalls++;
+
+        return new HttpAuthorization(headers: ['Authorization' => 'Bearer fake-deadline']);
+    }
+
+    public function authorizeWithin(CredentialSecret $secret, float $seconds): HttpAuthorization
+    {
+        self::$seconds[] = $seconds;
+
+        return new HttpAuthorization(headers: ['Authorization' => 'Bearer fake-deadline']);
+    }
+}
+
+final class PlainFakeCredentialType implements HttpCredentialTypeInterface
+{
+    public const string ID = 'fake_plain';
+
+    public static int $calls = 0;
+
+    public function id(): string
+    {
+        return self::ID;
+    }
+
+    public function label(): string
+    {
+        return 'Fake plain';
+    }
+
+    public function fields(): array
+    {
+        return [];
+    }
+
+    public function authorize(CredentialSecret $secret): HttpAuthorization
+    {
+        self::$calls++;
+
+        return new HttpAuthorization(headers: ['Authorization' => 'Bearer fake-plain']);
     }
 }

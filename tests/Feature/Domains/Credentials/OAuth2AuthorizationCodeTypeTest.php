@@ -213,6 +213,47 @@ final class OAuth2AuthorizationCodeTypeTest extends CredentialsTestCase
         Http::assertNothingSent();
     }
 
+    public function test_the_wait_for_a_held_lock_is_cut_to_what_is_left_of_the_call(): void
+    {
+        Http::fake();
+        $this->app->instance(OAuth2GrantLock::class, new OAuth2GrantLock(Cache::store(), 5));
+        $credential = $this->oauthCredential();
+        $this->grant($credential, ['access_expires_at' => now()->subMinute()]);
+
+        $held = Cache::lock("credentials:oauth2-refresh:{$this->tenantId}:{$credential->id}", 30);
+        $this->assertTrue($held->get());
+        $startedAt = hrtime(true);
+
+        try {
+            $this->type()->authorizeWithin($this->secretOf($credential), 0.3);
+            $this->fail('A refresh without the lock must not happen.');
+        } catch (CredentialUnavailableException) {
+            $this->assertLessThan(2.0, (hrtime(true) - $startedAt) / 1e9, 'The 5 s lock wait must be cut to the call\'s time.');
+        } finally {
+            $held->release();
+        }
+
+        Http::assertNothingSent();
+    }
+
+    public function test_the_refresh_request_gets_what_is_left_of_the_calls_time(): void
+    {
+        $timeouts = [];
+        Http::fake(static function (Request $request, array $options) use (&$timeouts) {
+            $timeouts[] = $options['timeout'] ?? null;
+
+            return Http::response(['access_token' => 'access-token-2', 'expires_in' => 3600]);
+        });
+        $credential = $this->oauthCredential();
+        $this->grant($credential, ['access_expires_at' => now()->subMinute()]);
+
+        $this->type()->authorizeWithin($this->secretOf($credential), 4.0);
+
+        $this->assertCount(1, $timeouts);
+        $this->assertGreaterThan(3.0, $timeouts[0]);
+        $this->assertLessThanOrEqual(4.0, $timeouts[0]);
+    }
+
     public function test_the_grant_is_read_again_under_the_lock_and_one_refreshed_meanwhile_is_not_refreshed_twice(): void
     {
         Http::fake();

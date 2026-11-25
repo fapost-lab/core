@@ -9,7 +9,7 @@ paths:
   - app/Domains/Flow/Call/CallRetryPolicy.php
   - app/Domains/Flow/Handlers/CallNodeHandler.php
 summary: Why a call node retries in process inside an 18 s window from the first send (lock TTL between nodes, segment budget's slowest node) instead of parking the session for long backoff
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-25
 ---
 # A `call` retries in process, inside an 18-second node window, never by parking the session
 
@@ -59,6 +59,12 @@ Task `call-retry-backoff`, T2, decided by the agent on autopilot (unattended) as
 - **A window equal to the lock TTL (30 s).** Breaks the segment arithmetic (30 + 30 + lock wait > 60 s job timeout).
 - **Retries inside `HttpTransport`.** Rejected for the same reason as the ledger: the loop must work for every
   transport and stay beside the attempt counter.
+- **A monotonic clock for the window** (review finding of PR #421, dismissed by the owner in
+  `flow-credentials-call-hardening`, 2026-11-25). The window is measured with the wall clock: within about 18 s an NTP
+  correction slews rather than steps, and the window tests drive time through `Carbon::setTestNow` and
+  `Sleep::fake(syncWithCarbon: true)`. A monotonic clock needs a clock seam in the handler and a rewrite of
+  `CallNodeRetryTest` for a step that rarely happens; the transport and the egress guard already time their own parts
+  with `hrtime`.
 
 ## Consequences
 
