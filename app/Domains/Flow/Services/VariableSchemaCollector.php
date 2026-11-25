@@ -11,10 +11,11 @@ use InvalidArgumentException;
 /**
  * Scans a published flow's node list and extracts all variable declarations.
  *
- * Understands the three node types that declare variables:
+ * Understands the node types that declare variables:
  *  - `input`        → config.variable
  *  - `assign`       → config.operations[*].variable
  *  - `send_message` → config.save_to_variable
+ *  - `ask_person`   → config.save_to_variable
  *
  * Returns Variable instances enriched with the declaring node_id so
  * PublishFlowService can record provenance in tenant_variable_schema.
@@ -47,7 +48,8 @@ final class VariableSchemaCollector
             $found = match ($type) {
                 'input'        => $this->collectFromInput($config),
                 'assign'       => $this->collectFromAssign($config),
-                'send_message' => $this->collectFromSendMessage($config),
+                'send_message' => $this->collectSaveToVariable($config),
+                'ask_person'   => $this->collectSaveToVariable($config),
                 default        => [],
             };
 
@@ -142,7 +144,7 @@ final class VariableSchemaCollector
      *
      * @return list<Variable>
      */
-    private function collectFromSendMessage(array $config): array
+    private function collectSaveToVariable(array $config): array
     {
         $raw = $config['save_to_variable'] ?? null;
 

@@ -110,6 +110,30 @@ final class VariableSchemaCollectorTest extends TestCase
         $this->assertSame(VariableType::Select, $result[0]['variable']->type);
     }
 
+    public function test_collects_ask_person_save_to_variable(): void
+    {
+        $nodes = [
+            [
+                'id'     => 'node-ask',
+                'type'   => 'ask_person',
+                'config' => [
+                    'save_to_variable' => [
+                        'name'    => 'decision',
+                        'storage' => 'contact',
+                        'type'    => 'text',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $this->collector->collect($nodes);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('node-ask', $result[0]['node_id']);
+        $this->assertSame('decision', $result[0]['variable']->name);
+        $this->assertSame(VariableType::Text, $result[0]['variable']->type);
+    }
+
     public function test_falls_back_to_text_when_type_absent(): void
     {
         $nodes = [

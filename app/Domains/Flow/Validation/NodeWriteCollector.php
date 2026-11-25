@@ -15,6 +15,14 @@ use InvalidArgumentException;
  * (`save_to_variable`, legacy `save_to`), `ask_person` (`save_to_variable`), `call` (`save_to_variable`,
  * `save_response_to`, `result_mapping`) and `subflow` (`output_mapping` keys). A `loop` node's own counter is not here: it belongs to the loop, and each checker decides
  * how to treat it. Shared by {@see LoopConfigChecker} and {@see VariablePathConflictChecker}.
+ *
+ * Which node types save a variable, and under which config key, is not declared in one place yet. A node type that
+ * gains or changes a save target must be checked against every place that lists them: this class,
+ * {@see \App\Domains\Flow\Services\VariableSchemaCollector} (publish-time type conflicts and `tenant_variable_schema`),
+ * {@see FlowGraphStructureValidator::variableContractErrors()} (the variable contract),
+ * `resources/js/builder/composables/useFlowVariables.ts` (the builder's variable picker), the docblocks of
+ * {@see LoopConfigChecker} and {@see VariablePathConflictChecker}, and `docs/reference/specs/flow-engine/06-validation.md`
+ * (`variable_path_conflict`, the no-name rule and the loop writes).
  */
 final readonly class NodeWriteCollector
 {

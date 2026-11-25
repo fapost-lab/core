@@ -21,6 +21,7 @@ use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Events\CoreEventCatalog;
 use App\Domains\Flow\Events\EventTriggerAssistantFilter;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
+use App\Domains\Flow\Handlers\AskPersonNodeHandler;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\LoopNodeHandler;
@@ -1195,9 +1196,12 @@ final readonly class ValidateFlowService
     }
 
     /**
-     * Verifies that every non-default edge originating from a send_message node references
+     * Verifies that every non-default edge originating from a send_message or ask_person node references
      * a button id that actually exists in that node's buttons array. Orphaned handles arise
-     * when a button is deleted without removing the corresponding outgoing edge.
+     * when a button is deleted without removing the corresponding outgoing edge, or when an
+     * imported ask_person edge differs from its button id in case: the engine matches a handle
+     * to the id exactly, so such a branch would never be taken. ask_person's own `timeout` and
+     * `error` handles are not buttons and are skipped.
      *
      * @param  array<string, array<string, mixed>>  $nodeMap
      * @param  array<int, array<string, mixed>>     $edges
@@ -1218,7 +1222,13 @@ final readonly class ValidateFlowService
             }
 
             $node = $nodeMap[$fromId] ?? null;
-            if (null === $node || ($node['type'] ?? null) !== 'send_message') {
+            $type = is_array($node) ? ($node['type'] ?? null) : null;
+
+            if ('send_message' !== $type && AskPersonNodeHandler::TYPE !== $type) {
+                continue;
+            }
+
+            if (AskPersonNodeHandler::TYPE === $type && in_array($handle, [AskPersonNodeHandler::TIMEOUT, AskPersonNodeHandler::ERROR], true)) {
                 continue;
             }
 

@@ -25,7 +25,8 @@ use App\Domains\Flow\Handlers\LoopNodeHandler;
  *
  * Writes are read from the config shapes of the nodes that save a variable: `input`, `assign` (operations and the
  * legacy `target` / `key` form), `send_message` and `call` (including their legacy `save_to` / `save_response_to`
- * strings) and `subflow` (`output_mapping`). Annotation nodes must be removed by the caller.
+ * strings), `ask_person` (`save_to_variable`) and `subflow` (`output_mapping`). Annotation nodes must be removed by
+ * the caller.
  */
 final readonly class LoopConfigChecker
 {

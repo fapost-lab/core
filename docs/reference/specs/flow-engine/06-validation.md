@@ -43,7 +43,7 @@ chain), and returns every problem it finds:
 | `variable_contract_invalid`, `variable_contract_invalid_operation`, `variable_contract_duplicate_target` | a variable has a name but does not construct a valid `Variable` (unknown storage, no storage, reserved name, a group on a session variable); an `assign` operation is malformed, has no name / storage, or repeats a `(storage, group, name)` target |
 | `branch_rules_*` | a branch rule is not an object, or its `left` has an unknown `ref`, a missing name / source / field, or a source outside `contact`, `rag`, `call`, `system`, `flow`, `module.*` |
 
-A variable object **with no name** is "no save target", not an error, for `input`, `send_message` and
+A variable object **with no name** is "no save target", not an error, for `input`, `send_message`, `ask_person` and
 branch rules: the runtime reads it that way (`Variable::tryFromArray()` returns `null`) and the builder
 keeps `{type, storage}` defaults in a draft the author has not filled in. An `input` without a target is
 `input_missing_save_target` in `ValidateFlowService`. An `assign` operation without a name or storage
@@ -89,7 +89,7 @@ Annotation nodes (`comment`) are exempt from node-level checks. Per node:
 | `loop_invalid_iterator_name`, `loop_reserved_iterator_name`, `loop_count_exceeds_budget` | iterator name is an identifier and not one of `id, language, meta, tenant_id, external_id`; a literal count above `flow.execution.max_loop_iterations` (default 1000) is rejected |
 | `loop_iterator_variable_conflict`, `loop_count_not_numeric` | `LoopConfigChecker` (path `nodes.<loop>.config.iterator_name` / `.config.count_source`): no node writes a session variable named like a loop's `iterator_name` or `{iterator_name}_total` (the `_total` name is checked for counted loops only; a legacy `save_to` / `save_response_to` string counts as a write); a counted loop's literal `count_source` is a number (a numeric string counts) |
 | `list_max_size_invalid` | `ListSizeChecker` (path `nodes.<node>`): a list variable's `properties.max_size` is a whole number from 1 to 1000 and is set only on a list saved to the contact |
-| `variable_path_conflict` | `VariablePathConflictChecker` (path `nodes.<first writer of the single value>`): one state path is written as a single value by one node and as a group by another (`contact.profile` and `contact.profile.name`; legacy `flow.a` and an `assign` key `a.b`). Covers `input`, `send_message`, `assign` (variable contract and legacy `target` + `key`), `call` (`save_to_variable`, `save_response_to`, `result_mapping`), `subflow` `output_mapping` keys, the legacy `save_to` string and a `loop`'s counter (`flow.<iterator>` and, for a counted loop, `flow.<iterator>_total`). Session and contact are separate namespaces; only writes are compared. The runtime guard stays |
+| `variable_path_conflict` | `VariablePathConflictChecker` (path `nodes.<first writer of the single value>`): one state path is written as a single value by one node and as a group by another (`contact.profile` and `contact.profile.name`; legacy `flow.a` and an `assign` key `a.b`). Covers `input`, `send_message`, `ask_person` (`save_to_variable`), `assign` (variable contract and legacy `target` + `key`), `call` (`save_to_variable`, `save_response_to`, `result_mapping`), `subflow` `output_mapping` keys, the legacy `save_to` string and a `loop`'s counter (`flow.<iterator>` and, for a counted loop, `flow.<iterator>_total`). Session and contact are separate namespaces; only writes are compared. The runtime guard stays |
 | `loop_end_missing_loop_node_id`, `loop_end_invalid_loop_node_id` | `loop_end.loop_node_id` references an existing `loop` node |
 
 Graph-level checks (need `edges`):
@@ -99,7 +99,7 @@ Graph-level checks (need `edges`):
 | `end_node_has_outgoing_edge` | an `end` node is terminal |
 | `loop_nested_not_allowed`, `loop_missing_loop_end` | no nested loops; every loop reaches its `loop_end` |
 | `keyboard_node_must_be_terminal` | a `send_message` with `content_type = text_with_keyboard` has no `default` successor and is the last root in its sequence |
-| `orphaned_button_edge` | a non-default edge from `send_message` matches an existing button id |
+| `orphaned_button_edge` | a non-default edge from `send_message`, or from `ask_person` other than its `timeout` and `error` handles, matches an existing button id of that node exactly (case-sensitive) |
 | `button_value_type_mismatch` | a button value matches the declared `save_to` variable type |
 | call-graph codes (`CallGraphViolation::$code`) | subflow cycles and depth over the limit, via `CallGraphValidator`; skipped when no flow id is known |
 
@@ -153,6 +153,7 @@ channels gets none. Annotation nodes are skipped.
 | same, `keyboard_mode` `reply` | `ReplyButtons`; a button with `special` `request_contact` / `request_location` needs `ShareContact` / `ShareLocation` instead |
 | `input` expecting `select` or `confirm` | `CallbackButtons` |
 | `input` expecting `contact` / `location` | `ShareContact` / `ShareLocation` |
+| `ask_person` | `CallbackButtons` and `RemoveButtons` |
 | `auth_request` method `phone` | `ShareContact` |
 | `auth_request` method `sms_code` / `email_code` with a `resend_label` | `CallbackButtons` |
 
@@ -164,7 +165,7 @@ while the platform mailer only logs); warning `auth_destination_from_flow` (the 
 `LoopConfigChecker` emits `loop_while_condition_unchanged` (path `nodes.{loop}.config.condition`) for a `while` loop whose
 condition reads a session or contact variable (or `flow.*` / `contact.*` source) that no node of the loop body writes.
 The body is everything reachable from the `loop` handle up to the loop's own `loop_end`; writes are read from the save
-targets of `input`, `assign` (operations and the legacy form), `send_message`, `call` (`save_to_variable`, `result_mapping`)
+targets of `input`, `assign` (operations and the legacy form), `send_message`, `ask_person` (`save_to_variable`), `call` (`save_to_variable`, `result_mapping`)
 and `subflow` (`output_mapping`); a legacy `save_to` (`send_message`) or `save_response_to` (`call`) string counts as a write. Unlike the other warnings it is produced on every `execute()`, with or without an assistant
 id, and is never an error: the value may change from outside the flow. It is skipped when the condition is on the loop's
 own iterator, on a path the check cannot follow (`module.*`, `rag.*`), or when the body holds a Solution node (it may

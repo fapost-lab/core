@@ -368,7 +368,8 @@ broken.
   goes on only through `ContinueAfterFlowQuestionJob` under the run's own lock, never under the presser's. No other
   payload may start with `q1`: `send_message` and `input` drop an author's `callback_payload`. A button's id is kept
   as authored, since it becomes the branch's source handle and edges are matched exactly; two ids that differ only
-  in case are refused as duplicates. Why: a press decides for a run
+  in case are refused as duplicates, and an edge whose handle names no button id exactly (other than `timeout` and
+  `error`) is refused at publish (`orphaned_button_edge`). Why: a press decides for a run
   with side effects elsewhere, and an answer to someone else's run must not become input to the presser's own
   conversation (`adr-20261123-ask-person-question-outside-the-run`). Enforced: `AskPersonNodeTest`,
   `MessageRouterTest`, `FlowQuestionResumerRedisTest`, `FlowTelegramMarkupCharacterizationTest` (`input`).

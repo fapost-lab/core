@@ -486,6 +486,61 @@ final class PublishFlowServiceTest extends TestCase
         app(PublishFlowService::class)->execute($flowIdB);
     }
 
+    public function test_publish_rejects_a_type_conflict_with_an_ask_person_answer(): void
+    {
+        $flowIdA  = '00000000-0000-0000-0000-000000000904';
+        $flowIdB  = '00000000-0000-0000-0000-000000000905';
+        $tenantId = '00000000-0000-0000-0000-000000000001';
+        $approve  = '7b0c8f8a-1d2e-4f3a-9b4c-5d6e7f8a9b11';
+
+        // Flow A declares `decision` as `number`.
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowIdA,
+            'tenant_id' => $tenantId,
+            'nodes'     => [
+                [
+                    'id'      => 'inp-a',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => ['name' => 'decision', 'storage' => 'session', 'type' => 'number'],
+                    ],
+                ],
+            ],
+        ]);
+        app(PublishFlowService::class)->execute($flowIdA);
+
+        // Flow B saves the answer of a question into `decision` as `text`.
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowIdB,
+            'tenant_id' => $tenantId,
+            'nodes'     => [
+                [
+                    'id'      => 'ask-b',
+                    'type'    => 'ask_person',
+                    'version' => 1,
+                    'config'  => [
+                        'addressee'        => ['kind' => 'contact', 'contact' => '{{flow.manager_id}}'],
+                        'text'             => ['en' => 'Approve?'],
+                        'buttons'          => [['id' => $approve, 'label' => ['en' => 'Approve'], 'value' => 'approve']],
+                        'timeout_seconds'  => 3600,
+                        'save_to_variable' => ['name' => 'decision', 'storage' => 'session', 'type' => 'text'],
+                    ],
+                ],
+            ],
+        ]);
+
+        try {
+            app(PublishFlowService::class)->execute($flowIdB);
+            $this->fail('A type conflict with an ask_person answer must refuse the publish.');
+        } catch (FlowValidationException $exception) {
+            $this->assertContains(
+                'variable_type_conflict',
+                array_map(static fn (FlowValidationErrorDto $error): string => $error->code, $exception->errors),
+            );
+        }
+    }
+
     public function test_publish_rejects_cross_flow_array_item_type_conflict(): void
     {
         $flowIdA  = '00000000-0000-0000-0000-000000000912';

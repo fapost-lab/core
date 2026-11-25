@@ -21,6 +21,7 @@ use App\Domains\Flow\Handlers\AskPersonNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowQuestion;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Services\ValidateFlowService;
 use App\Domains\Flow\Support\FlowQuestionButton;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
@@ -407,6 +408,58 @@ final class AskPersonNodeTest extends FeatureTestCase
         $expected = \App\Domains\Flow\Support\CallbackDataCodec::encode((string) $session->getKey(), self::APPROVE);
         Http::assertSent(static fn (Request $request): bool => str_contains((string) json_encode($request['reply_markup'] ?? null), $expected));
         Http::assertNotSent(static fn (Request $request): bool => str_contains((string) json_encode($request['reply_markup'] ?? null), 'q1aaaa'));
+    }
+
+    public function test_two_button_ids_that_differ_only_in_case_are_refused_as_duplicates(): void
+    {
+        $id     = (string) Str::uuid();
+        $issues = $this->app->make(AskPersonNodeHandler::class)->validate(['config' => [
+            'addressee' => ['kind' => 'contact', 'contact' => '{{flow.manager_id}}'],
+            'text'      => ['en' => 'Approve?'],
+            'buttons'   => [
+                ['id' => mb_strtolower($id), 'label' => ['en' => 'Approve'], 'value' => 'approve'],
+                ['id' => mb_strtoupper($id), 'label' => ['en' => 'Reject'], 'value' => 'reject'],
+            ],
+            'timeout_seconds' => 3600,
+        ]]);
+
+        $this->assertSame(
+            ['button_id_duplicate@buttons.1.id'],
+            array_map(static fn (\Fapost\Foundation\Flow\DTO\NodeConfigIssue $issue): string => "{$issue->code}@{$issue->field}", $issues),
+        );
+    }
+
+    public function test_an_edge_whose_handle_names_no_button_exactly_is_refused_at_publish(): void
+    {
+        $nodes = [
+            'ask' => ['id' => 'ask', 'type' => 'ask_person', 'version' => 1, 'config' => [
+                'addressee' => ['kind' => 'contact', 'contact' => '{{flow.manager_id}}'],
+                'text'      => ['en' => 'Approve?'],
+                'buttons'   => [
+                    ['id' => mb_strtoupper(self::APPROVE), 'label' => ['en' => 'Approve'], 'value' => 'approve'],
+                    ['id' => self::REJECT, 'label' => ['en' => 'Reject'], 'value' => 'reject'],
+                ],
+                'timeout_seconds' => 3600,
+            ]],
+            'yes'    => ['id' => 'yes', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            'no'     => ['id' => 'no', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            'late'   => ['id' => 'late', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            'failed' => ['id' => 'failed', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [
+            // The button id is upper case; an edge authored in lower case would never be taken.
+            ['id' => 'e1', 'from' => 'ask', 'to' => 'yes', 'handle' => self::APPROVE],
+            ['id' => 'e2', 'from' => 'ask', 'to' => 'no', 'handle' => self::REJECT],
+            ['id' => 'e3', 'from' => 'ask', 'to' => 'late', 'handle' => AskPersonNodeHandler::TIMEOUT],
+            ['id' => 'e4', 'from' => 'ask', 'to' => 'failed', 'handle' => AskPersonNodeHandler::ERROR],
+        ];
+
+        $result  = $this->app->make(ValidateFlowService::class)->execute(nodes: $nodes, edges: $edges);
+        $orphans = array_values(array_filter($result->errors, static fn ($error): bool => 'orphaned_button_edge' === $error->code));
+
+        $this->assertCount(1, $orphans);
+        $this->assertSame('nodes.ask', $orphans[0]->path);
+        $this->assertStringContainsString(self::APPROVE, $orphans[0]->message);
     }
 
     private function buttonPress(string $payload, string $updateId): \Fapost\Foundation\DTO\IncomingMessage
