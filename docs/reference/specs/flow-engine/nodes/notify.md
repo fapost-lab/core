@@ -99,8 +99,10 @@ Compared with the earlier fan-out job, the node now has Broadcasting's limits: w
 pass sends nothing (`broadcast_running`); a message without base-language text sends nothing (`message_empty`); and
 the send goes through Broadcasting's backpressure and the `outbound_messages` limit, which cancels the whole broadcast.
 
-`App\Domains\Contact\Jobs\SendContactNotificationJob` is deprecated and no longer dispatched; it stays for one release
-so jobs queued before the change still run.
+`App\Domains\Contact\Jobs\SendContactNotificationJob` and `App\Jobs\Messaging\BroadcastSendJob` are deprecated and no
+longer dispatched; they still deliver what an older release queued, since the session's marker keeps the node from
+sending it again. The fan-out job no longer imports Flow (it copies the translator's field resolution). Both go once a
+Core release has shipped them without a dispatcher.
 
 ### Authoring (retired)
 
@@ -116,11 +118,11 @@ expansion). A template republishing its hosts is not checked: an unchanged legac
 refusals and failure on `default`, contact placeholders, validation warnings),
 `NotifyContactsBroadcastTest.php` (the broadcast row, `all`, replay and `broadcast_running`),
 `NotifyContactsPublishTest.php` (new, changed, unchanged, template), `tests/Feature/Domains/Staff/StaffNotificationTest.php`,
-`tests/Feature/Domains/Contact/SendContactNotificationJobTest.php` (the deprecated job).
+`tests/Feature/Domains/Contact/SendContactNotificationJobTest.php` (the deprecated job, including a payload an older release queued).
 
 ## Not built
 
 - Staff-to-messenger identity (delivering staff notifications to a staff member's Telegram or WhatsApp) and
   addressing staff by tag: there is no staff-tag model.
-- Removing `SendContactNotificationJob`, `BroadcastSendJob` and Contact's use of `ContactNotifyTarget`, a release after
-  the contacts mode moved to Broadcasting.
+- Removing the deprecated `SendContactNotificationJob` and `BroadcastSendJob`, once a Core release has
+  shipped them.

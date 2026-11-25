@@ -244,7 +244,7 @@ broken.
   `EventChainContext`); one deeper than `FlowTriggerEventPublisherInterface::MAX_CHAIN_DEPTH` starts nothing
   (`flow.event.chain_depth_exceeded`), on the contact path too. The Core domains raise plain events: the event classes
   reference nothing of Flow, Flow only listens, and `PublishCoreEvents` never throws into them. Conversation as a whole
-  does not depend on Flow; Contact and Broadcasting import Flow elsewhere (`ContactCard`, `SendContactNotificationJob`,
+  does not depend on Flow; Contact and Broadcasting import Flow elsewhere (`ContactCard`,
   `SendBroadcastRecipientJob`), so for them this holds by review only. Why: a retried fan-out must not start a run
   twice, a flow must not fake a Core fact, and flows that set each other off must stop (`adr-20261119-core-events-start-contactless-runs`).
   Enforced: `CoreEventTriggersTest`, `QueuedFlowTriggerEventPublisherTest`, `PublishCoreEventsTest`,

@@ -16,7 +16,7 @@ paths:
   - "resources/js/pages/Console/Contacts/**"
   - "app/Http/Requests/Console/*Contact*"
   - "resources/js/pages/Console/ContactSegments/**"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-11-25
 ---
 # Contact rules
 
@@ -46,7 +46,7 @@ broken.
   (`ContactSegmentResolver`).
 - **The notify fan-out runs once per `(session, node)`** (a `Cache::add` guard in
   `SendContactNotificationJob`). The job is deprecated and no longer dispatched; the guard matters only for jobs
-  queued before the retired `notify` contacts mode moved to Broadcasting.
+  an older release queued before the retired `notify` contacts mode moved to Broadcasting.
 
 - **A contact is visible in an assistant's console only through `channel_contacts` to
   `channels.assistant_id`, and every query filters `tenant_id` explicitly.** A contact belongs to the
@@ -66,6 +66,7 @@ broken.
 - **The "deliverable contact" query and the language fallback exist twice** — the query in
   `SendContactNotificationJob::deliverableChannelContacts` and in Broadcasting's
   `BroadcastRecipientResolver`; the language fallback in `resolveLanguage` of
-  `SendContactNotificationJob` and of Broadcasting's `SendBroadcastRecipientJob`. Change both
-  together, or extract them first. Review only. *(proposed)* The job is deprecated and goes a release after
-  `adr-20261125-notify-contacts-retired-through-broadcasting`, which ends the duplication.
+  `SendContactNotificationJob` and of Broadcasting's `SendBroadcastRecipientJob`; the job's `resolveField` copies
+  Flow's `CachedContentTranslator::resolveField` so it imports nothing of Flow. Change them together, or extract them
+  first. Review only. *(proposed)* The job is deprecated and goes once a Core release has shipped it without a
+  dispatcher, which ends the duplication.

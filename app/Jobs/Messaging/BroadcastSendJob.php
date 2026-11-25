@@ -19,11 +19,14 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
- * Queue job responsible for low-priority broadcast outbound deliveries.
+ * Delivers one prepared outbound message on the low-priority broadcast queue.
  *
- * Delivery runs inside the owning tenant's context (resolved from the envelope's
- * tenantId) so future per-recipient bookkeeping — broadcast_recipients status,
- * delivery logs — lands in the correct schema without reworking the job contract.
+ * @deprecated Nothing dispatches it: it carried the per-contact messages of a `notify` node's retired contacts
+ *             mode, whose fan-out job is deprecated too, and Broadcasting sends through its own
+ *             `SendBroadcastRecipientJob`. It still delivers, so the already prepared messages an older release
+ *             queued at the deploy are not cut short. Remove it once a Core release has shipped with it.
+ *
+ * Delivery runs inside the owning tenant's context, resolved from the envelope's tenantId.
  */
 final class BroadcastSendJob implements ShouldQueue, TenantAccessGatedJob
 {
