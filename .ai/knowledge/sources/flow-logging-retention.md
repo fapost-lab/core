@@ -10,8 +10,8 @@ paths:
   - "app/Domains/Flow/Logging/**"
 source: docs/platform/architecture/platform/11-logging-retention.md
 summary: What flow_logs and analytics_events record, partition retention jobs, and what is not pruned or aggregated
-source_hash: 9ecbf1021f5d39d722a7b9d9ca9ff7fb9e87d9c2
-reviewed_at: 2026-10-05
+source_hash: 7d81d65b0404e12c651a1ae89d0ca6decd762657
+reviewed_at: 2026-11-25
 ---
 # 11 — Logging and Retention
 

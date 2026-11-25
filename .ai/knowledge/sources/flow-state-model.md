@@ -8,8 +8,8 @@ paths:
   - "app/Domains/Flow/State/**"
 source: docs/reference/specs/flow-engine/01-state-model.md
 summary: State namespace ownership, contact addressing, reserved keys and depth limits
-source_hash: 2fd503273e0de1ac7cb9c5bb1100e9acba03e11f
-reviewed_at: 2026-11-11
+source_hash: f6f1eb3903ed100962873afe6b614575c711a27f
+reviewed_at: 2026-11-25
 ---
 # 01. State Model
 

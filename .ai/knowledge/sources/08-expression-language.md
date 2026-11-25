@@ -8,8 +8,8 @@ paths:
   - "app/Domains/Flow/Expression/**"
 source: docs/platform/architecture/adr/08-expression-language.md
 summary: Pluggable expression engine snapshotted per flow definition; V1 ships the template engine only
-source_hash: b87dd2862d335c0822aeeca2c57498aa0c4789e5
-reviewed_at: 2026-10-05
+source_hash: 0305e575c21769fd264ecd899d31de57a7851457
+reviewed_at: 2026-11-25
 ---
 # ADR-08 — Expression Language Pluggability
 

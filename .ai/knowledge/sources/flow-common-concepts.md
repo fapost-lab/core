@@ -8,8 +8,8 @@ paths:
   - "app/Domains/Flow/State/Variables/**"
 source: docs/reference/specs/flow-engine/02-common-concepts.md
 summary: VariableDef, expressions, output handles and the node JSON shape
-source_hash: 2a7b46767ff2ebabc5fad56816df4fc109374db2
-reviewed_at: 2026-10-05
+source_hash: f07911c4aa2f1536ff90d9f37cd3904aec2ba127
+reviewed_at: 2026-11-25
 ---
 # 02. Common Concepts
 

@@ -8,8 +8,8 @@ paths:
   - "app/Domains/Flow/Subflow/**"
 source: docs/reference/diagrams/06-subflow-lifecycle.md
 summary: Sequence of a subflow start, interaction and parent resume
-source_hash: 2e7cf819b303419dbb76274a3ef48e8ebec44950
-reviewed_at: 2026-10-05
+source_hash: e37a36ea7ca67682a67b4e5a21cf8ad2d88b09fc
+reviewed_at: 2026-11-25
 ---
 # Subflow Lifecycle: starting a nested flow and returning control
 

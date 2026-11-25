@@ -9,8 +9,8 @@ paths:
   - app/Domains/Flow/Handlers/LoopEndNodeHandler.php
 source: docs/reference/specs/flow-engine/nodes/11-loop.md
 summary: loop and loop_end nodes and the array variable model
-source_hash: 530a6d87fb806869d2e5fc1d89b666df314b678d
-reviewed_at: 2026-10-05
+source_hash: b8e23b9d49af406de8d2b7df8ecd4bb2cf3730db
+reviewed_at: 2026-11-25
 ---
 # Node: `loop` / `loop_end`
 

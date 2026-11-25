@@ -8,8 +8,8 @@ paths:
   - "app/Domains/Channels/**"
 source: docs/site/extending/channel-drivers.mdx
 summary: The channel driver contract and what an integration must provide
-source_hash: 9a5dc5e6d821e5fc8cfe75e86b1ff654ca72fd10
-reviewed_at: 2026-11-18
+source_hash: 54e1a7939104af9dafc89c5161c082aa8a788147
+reviewed_at: 2026-11-25
 ---
 # Channel drivers
 

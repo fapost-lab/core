@@ -8,8 +8,8 @@ paths:
   - app/Domains/Flow/Services/FlowEngine.php
 source: docs/reference/diagrams/02-flow-engine-loop.md
 summary: Flowchart of the engine loop, including the end, loop_end and subflow special cases
-source_hash: a1defc468df6cc007bef1a743bc174a08723d9b0
-reviewed_at: 2026-10-16
+source_hash: d581fe0105c9d4c500f0e436c72fbd9797b7bb90
+reviewed_at: 2026-11-25
 ---
 # Flow Engine: the execution loop
 

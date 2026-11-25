@@ -9,8 +9,8 @@ paths:
   - "resources/js/builder/components/editor/config/**"
 source: docs/platform/runtime/flow/09-node-config-conventions.md
 summary: Naming, versioning, state-key and configSchema conventions for node config
-source_hash: 3db24f3c40594988c367e3dc4df0cd764629f7be
-reviewed_at: 2026-10-05
+source_hash: 9668244b8f1d006540ab81d78e0e43d9f3a8cce9
+reviewed_at: 2026-11-25
 ---
 # 09. Node Config Conventions
 

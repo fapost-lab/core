@@ -10,8 +10,8 @@ paths:
   - app/Domains/Flow/Models/FlowDefinition.php
 source: docs/platform/architecture/platform/09-flow-versioning.md
 summary: Flow definition snapshots, session pinning to a version and rules for removing a deprecated node handler
-source_hash: b61ddfab34e4c5d3ed858cb222cfedc8aa6a551a
-reviewed_at: 2026-11-13
+source_hash: 866d21cd6abe05ccf6ecfcb55c8d0efde2fd2502
+reviewed_at: 2026-11-25
 ---
 # 09 — Flow Versioning
 

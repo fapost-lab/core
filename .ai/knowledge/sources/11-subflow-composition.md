@@ -9,8 +9,8 @@ paths:
   - app/Domains/Flow/Handlers/SubflowNodeHandler.php
 source: docs/platform/architecture/adr/11-subflow-composition.md
 summary: "Subflow V1: wait-mode child session, depth 3, no recursion, latest active version"
-source_hash: 37b2bebbe8d06a6f41f6f8896bbf9ee75b5ac6e3
-reviewed_at: 2026-10-05
+source_hash: f06f971d21b48bf444d8e104290de43267432ef6
+reviewed_at: 2026-11-25
 ---
 # ADR-11 — Subflow Composition
 

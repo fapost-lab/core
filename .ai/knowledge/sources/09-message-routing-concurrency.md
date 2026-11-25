@@ -10,8 +10,8 @@ paths:
   - app/Infrastructure/Flow/FlowExecutionGuard.php
 source: docs/platform/architecture/adr/09-message-routing-concurrency.md
 summary: Message routing pipeline, global commands and the Redis session lock with heartbeat
-source_hash: 070555c3802cbd8c0593f76781faddb500f89879
-reviewed_at: 2026-10-05
+source_hash: 32f3d2fa621d6d23a729834c8285cc1b8ee0f056
+reviewed_at: 2026-11-25
 ---
 # ADR-09 — Message Routing & Concurrency Control
 
