@@ -21,8 +21,8 @@ use Throwable;
  * Reuses the upload pipeline (and therefore the deduplication path) so an inbound copy
  * of an already-known blob does not re-upload to storage. The original provider_file_id
  * is cached so the same file can be forwarded back through the same channel without an
- * extra upload. `providerKind` is how the provider carried the file in (Telegram: photo, voice, document…), so the
- * cached id is sent back by the matching method.
+ * extra upload. `providerKind` is the kind the connector reported on the incoming file (Telegram: photo, voice,
+ * document…), so the cached id is sent back by the matching method; null when the connector did not say.
  */
 final readonly class MediaIngestor implements MediaIngestorInterface
 {

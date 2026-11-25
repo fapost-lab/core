@@ -71,7 +71,7 @@ final class ConversationCaptureFactory
             contentType: $contentType,
             text: $text,
             payload: $payload,
-            media: $this->mapInboundMedia($message->media, $message->type->value),
+            media: $this->mapInboundMedia($message->media),
             providerMessageId: null,
             replyToProviderMessageId: null,
             origin: MessageOrigin::Flow,
@@ -165,20 +165,20 @@ final class ConversationCaptureFactory
     }
 
     /**
-     * `provider_kind` is how the message carried the file (photo, voice, document…): the cached id has to be sent
-     * back the same way.
+     * `provider_kind` is the kind the connector reported for each file ({@see IncomingMedia::$providerKind}: photo,
+     * voice, document…), null when it did not say: the cached id has to be sent back the same way.
      *
      * @param  list<IncomingMedia>  $media
      * @return list<array<string, mixed>>
      */
-    private function mapInboundMedia(array $media, string $providerKind): array
+    private function mapInboundMedia(array $media): array
     {
         $descriptors = [];
 
         foreach ($media as $item) {
             $descriptors[] = [
                 'provider_file_id' => $item->providerFileId,
-                'provider_kind'    => $providerKind,
+                'provider_kind'    => $item->providerKind,
                 'kind'             => $item->kind->value,
                 'mime'             => $item->mimeType,
                 'file_name'        => $item->fileName,

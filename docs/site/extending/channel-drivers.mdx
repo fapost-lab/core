@@ -128,6 +128,12 @@ unchanged. See [Buttons and capabilities](/extending/connectors#buttons-and-capa
   cached), but when sending Core takes the message type from the MIME type instead. For a marked uploader, a cached id with no kind
   predates this and is uploaded again once, so the kind gets stored. An uploader without the
   marker keeps its cached ids as they are.
+
+  Files that come in are cached the same way, so the adapter's `normalize()` sets the kind on each
+  `IncomingMedia` it returns, in the same vocabulary: `IncomingMedia::$providerKind` (needs
+  `fapost/foundation` `^0.49`). Telegram's adapter sets the field the file came in, such as `voice`
+  or `document`. Core stores what you report and does not derive it from the message type; when it
+  is null, the incoming file id is cached without a kind, as described above.
 - A provider that accepts pictures, video and files only as a URL it fetches itself registers
   `ChannelMediaLinkPolicyInterface` instead. Core then puts a signed public link to the file in
   the outgoing payload, issued just before delivery: `media.url`, with `mime_type`, `size`
