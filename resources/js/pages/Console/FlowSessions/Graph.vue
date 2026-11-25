@@ -52,9 +52,9 @@ const props = defineProps<{
   session: { id: string; status: FlowSessionStatus; flowName: string | null; isLive: boolean }
   graph: RunGraph
   live: LiveChannel | null
-  canViewPayloads: boolean
-  /** One visit's data, with `__ENTRY__` for the visit's id; null without ViewRunPayloads. */
-  urls: { session: string; visits: string; payload: string | null }
+  can: { viewPayloads: boolean }
+  /** One visit's data: a URL template with `placeholder` standing for the visit's id; null without ViewRunPayloads. */
+  urls: { session: string; visits: string; payload: { template: string; placeholder: string } | null }
 }>()
 
 const POLL_MS = 15_000
@@ -94,6 +94,20 @@ function shownIndex(key: string, count: number): number {
   return loop?.loop?.index ?? count - 1
 }
 
+/** GETs JSON from the console with the session's cookies; a response that is not OK throws. */
+async function getJson<T>(url: string, query: URLSearchParams): Promise<T> {
+  const response = await fetch(`${url}?${query.toString()}`, {
+    headers: { Accept: 'application/json', ...xsrfHeaders() },
+    credentials: 'same-origin',
+  })
+
+  if (!response.ok) {
+    throw new Error(String(response.status))
+  }
+
+  return (await response.json()) as T
+}
+
 // The node panel: the node's newest visits, statuses only, loaded when it opens; a visit's data loads on demand below.
 const panelOpen = ref(false)
 const visits = ref<Visit[] | null>(null)
@@ -112,16 +126,7 @@ async function openNode(box: DrawnNode): Promise<void> {
   const query = new URLSearchParams({ session: box.sessionId, node: box.node.id })
 
   try {
-    const response = await fetch(`${props.urls.visits}?${query.toString()}`, {
-      headers: { Accept: 'application/json', ...xsrfHeaders() },
-      credentials: 'same-origin',
-    })
-
-    if (!response.ok) {
-      throw new Error(String(response.status))
-    }
-
-    const body = (await response.json()) as { visits: Visit[] }
+    const body = await getJson<{ visits: Visit[] }>(props.urls.visits, query)
 
     if (request === visitsRequest) {
       visits.value = body.visits
@@ -162,21 +167,13 @@ async function loadPayload(visit: Visit): Promise<void> {
   payloadRequests.set(visit.id, request)
   payloads.value = { ...payloads.value, [visit.id]: { status: 'loading' } }
 
-  const url = props.urls.payload.replace('__ENTRY__', encodeURIComponent(visit.id))
+  const { template, placeholder } = props.urls.payload
+  const url = template.replace(placeholder, encodeURIComponent(visit.id))
   const query = new URLSearchParams({ session: box.sessionId })
   let state: PayloadState
 
   try {
-    const response = await fetch(`${url}?${query.toString()}`, {
-      headers: { Accept: 'application/json', ...xsrfHeaders() },
-      credentials: 'same-origin',
-    })
-
-    if (!response.ok) {
-      throw new Error(String(response.status))
-    }
-
-    state = { status: 'loaded', payload: (await response.json()) as VisitPayload }
+    state = { status: 'loaded', payload: await getJson<VisitPayload>(url, query) }
   } catch {
     state = { status: 'failed' }
   }
@@ -186,11 +183,18 @@ async function loadPayload(visit: Visit): Promise<void> {
   }
 }
 
-/** Why a completed visit shows no input and output: a conversation never records them, an automation did not while recording was off. */
-function missingDataNote(): string {
+/**
+ * Why a visit shows no input and output, or null when it needs no word: a conversation never records them, on any
+ * visit; an automation's completed visit did not while recording was off.
+ */
+function missingDataNote(visit: Visit): string | null {
   const kind = selectedNode.value ? runKinds.value[selectedNode.value.sessionId] : undefined
 
-  return kind === 'conversation' ? g.value.node.payloads_conversation : g.value.node.payloads_off
+  if (kind === 'conversation') {
+    return g.value.node.payloads_conversation
+  }
+
+  return visit.event === 'node_completed' ? g.value.node.payloads_off : null
 }
 
 /** The parts of a loaded visit's data to show, in order; a part the visit does not carry is left out. */
@@ -303,7 +307,7 @@ function iterationsText(iterations: Record<string, number>): string {
           </SheetDescription>
         </SheetHeader>
         <div class="flex flex-col gap-3 px-4 pb-4">
-          <p v-if="!canViewPayloads" class="text-muted-foreground text-xs">{{ g.node.payloads_hidden }}</p>
+          <p v-if="!can.viewPayloads" class="text-muted-foreground text-xs">{{ g.node.payloads_hidden }}</p>
           <p v-if="visitsFailed" class="text-destructive text-sm">{{ g.node.failed }}</p>
           <p v-else-if="visits === null" class="text-muted-foreground text-sm">{{ g.node.loading }}</p>
           <p v-else-if="visits.length === 0" class="text-muted-foreground text-sm">{{ g.node.empty }}</p>
@@ -335,7 +339,7 @@ function iterationsText(iterations: Record<string, number>): string {
                   <dd class="truncate font-mono">{{ visit.errorClass }}</dd>
                 </template>
               </dl>
-              <template v-if="canViewPayloads">
+              <template v-if="can.viewPayloads">
                 <div v-if="visit.hasData" class="flex flex-col gap-2 pt-1">
                   <Button variant="ghost" size="sm" class="-ml-2 w-fit" :aria-expanded="payloads[visit.id]?.status === 'loaded'" @click="togglePayload(visit)">
                     {{ payloads[visit.id]?.status === 'loaded' ? g.node.hide_data : g.node.data }}
@@ -352,10 +356,10 @@ function iterationsText(iterations: Record<string, number>): string {
                         <pre class="bg-muted/40 max-h-96 overflow-auto rounded-md p-2 font-mono text-xs break-all whitespace-pre-wrap">{{ payloadText(part.value) }}</pre>
                       </div>
                     </template>
-                    <p v-if="visit.event === 'node_completed' && !hasInputOrOutput(payloads[visit.id])" class="text-muted-foreground text-xs">{{ missingDataNote() }}</p>
+                    <p v-if="!hasInputOrOutput(payloads[visit.id]) && missingDataNote(visit)" class="text-muted-foreground text-xs">{{ missingDataNote(visit) }}</p>
                   </template>
                 </div>
-                <p v-else-if="visit.event === 'node_completed'" class="text-muted-foreground pt-1 text-xs">{{ missingDataNote() }}</p>
+                <p v-else-if="missingDataNote(visit)" class="text-muted-foreground pt-1 text-xs">{{ missingDataNote(visit) }}</p>
               </template>
             </li>
           </ol>

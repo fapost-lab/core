@@ -358,15 +358,15 @@ final class FlowRunGraphConsoleTest extends FeatureTestCase
         $this->actingAs($this->userWith(Permission::ViewFlowSessions, Permission::ViewRunPayloads))
             ->get($this->graphUrl($session))
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('canViewPayloads', true)
-                ->where('urls.payload', "{$base}/graph/visits/__ENTRY__")
+                ->where('can.viewPayloads', true)
+                ->where('urls.payload', ['template' => "{$base}/graph/visits/__ENTRY__", 'placeholder' => '__ENTRY__'])
                 ->where('graph.flow.runKind', 'automation')
                 ->etc());
 
         $this->actingAs($this->userWith(Permission::ViewFlowSessions))
             ->get($this->graphUrl($session))
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('canViewPayloads', false)
+                ->where('can.viewPayloads', false)
                 ->where('urls.payload', null)
                 ->etc());
     }
@@ -380,15 +380,19 @@ final class FlowRunGraphConsoleTest extends FeatureTestCase
         $this->trace($session, 'call', HistoryEventType::NodeCompleted, ['type' => 'call', 'status' => 'executed', 'output' => ['body' => self::SECRET]]);
         $this->trace($session, 'call', HistoryEventType::NodeFailed, ['type' => 'call', 'error' => ['class' => 'RuntimeException', 'message' => self::SECRET]]);
         $this->trace($session, 'call', HistoryEventType::NodeCompleted, ['type' => 'call', 'status' => 'executed', 'error' => ['class' => 'RuntimeException']]);
+        // A handler that throws an exception without a message: the payload reads the empty message as none.
+        $this->trace($session, 'call', HistoryEventType::NodeFailed, ['type' => 'call', 'error' => ['class' => 'RuntimeException', 'message' => '']]);
 
         $response = $this->actingAs($this->userWith(Permission::ViewFlowSessions, Permission::ViewRunPayloads))
             ->getJson($this->visitsUrl($session, $session, 'call'))
             ->assertOk()
-            ->assertJsonCount(4, 'visits')
+            ->assertJsonCount(5, 'visits')
+            // Newest first.
             ->assertJsonPath('visits.0.hasData', false)
-            ->assertJsonPath('visits.1.hasData', true)
+            ->assertJsonPath('visits.1.hasData', false)
             ->assertJsonPath('visits.2.hasData', true)
-            ->assertJsonPath('visits.3.hasData', false);
+            ->assertJsonPath('visits.3.hasData', true)
+            ->assertJsonPath('visits.4.hasData', false);
 
         $this->assertStringNotContainsString(self::SECRET, (string) $response->getContent());
 
