@@ -30,12 +30,14 @@ use Throwable;
  * Claims the due slots of one tenant's schedule triggers and creates their runs (adr-20261123-flow-schedule-trigger).
  *
  * The truth is the tenant's `flow_triggers.next_run_at`. A slot is claimed by a compare-and-set on it — the row moves
- * to its next slot only if it still holds the one this pass read — and, in the same transaction of the tenant
- * connection, the slot's fate is decided and written:
+ * on (to its next slot, or to none) only if it still holds the one this pass read — and the slot's fate is decided and
+ * written:
  *
  *  - a flow nobody can manage any more — its draft or the draft's assistant is gone — starts nothing
  *    (`flow.schedule.tick_skipped`, `flow_not_live`) and its schedule stops: the row moves to no slot, as when the flow
- *    is deleted, since nobody is left to switch it off;
+ *    is deleted, since nobody is left to switch it off. This fate alone is decided first, before the transaction and
+ *    whether the slot is late; every other one below is decided in one transaction of the tenant connection with the
+ *    move to the next slot;
  *  - a slot claimed more than {@see self::LATE_AFTER_SECONDS} after it came due (the platform or the tenant was down)
  *    starts nothing and logs `flow.schedule.tick_missed`; the next slot is counted from now, so a downtime is one line
  *    and the missed slots are never caught up;

@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Contracts;
 
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\DTOs\FlowRunOrigin;
+use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use Fapost\Foundation\DTO\IncomingMessage;
@@ -96,9 +97,12 @@ interface FlowEngineInterface
     /**
      * Moves a `pending` run to `active` (optimistic lock on its version) and records its `FlowStarted` event once, after
      * commit; the caller then runs it with {@see runSession()}. A session that is no longer `pending` is left as it
-     * is.
+     * is, also when it leaves `pending` between the read and the write (a flow deletion cancels it): that lock conflict
+     * answers false instead of failing.
      *
      * @return bool whether this call activated the session
+     *
+     * @throws FlowConcurrencyException when the run's version moved but it is still `pending`
      */
     public function activate(FlowSession $session): bool;
 

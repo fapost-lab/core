@@ -184,17 +184,25 @@ final readonly class FlowEngine implements FlowEngineInterface
             return false;
         }
 
-        $this->connection->transaction(function () use ($session): void {
+        return $this->connection->transaction(function () use ($session): bool {
             try {
                 $session->saveWithOptimisticLock(['status' => FlowSessionStatus::Active]);
             } catch (OptimisticLockConflictException $exception) {
+                // Lost to a write that took the run out of `pending` (a flow deletion cancelling it, another start):
+                // there is nothing to activate, which is not a failure.
+                $session->refresh();
+
+                if (FlowSessionStatus::Pending !== $session->status) {
+                    return false;
+                }
+
                 throw FlowConcurrencyException::forSession((string)$session->getKey(), $exception);
             }
 
             $this->recordFlowStarted($session);
-        });
 
-        return true;
+            return true;
+        });
     }
 
     /**
