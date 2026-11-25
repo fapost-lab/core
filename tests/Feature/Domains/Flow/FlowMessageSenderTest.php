@@ -31,14 +31,26 @@ use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Mockery;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeUsageMeter;
 use Tests\Support\UsageGates;
 
 final class FlowMessageSenderTest extends FeatureTestCase
 {
+    /**
+     * @return array<string, array{0: array<string, mixed>}>
+     */
+    public static function payloadsWithoutTheirDeliveryKeys(): array
+    {
+        return [
+            'no idempotency key' => [['node_id' => 'node-1']],
+            'an empty node id'   => [['node_id' => '', 'idempotency_key' => 'idem-1']],
+        ];
+    }
     public function test_it_builds_inline_keyboard_payload_for_latest_active_channel(): void
     {
         $tenantId  = '00000000-0000-0000-0000-000000000001';
@@ -648,6 +660,39 @@ final class FlowMessageSenderTest extends FeatureTestCase
             'content_type'    => 'image',
             'media_file_id'   => $mediaFile->id,
             'caption'         => null,
+        ]);
+    }
+
+    /**
+     * A defaulted key would give every message of a session one delivery key, and MessageSender would drop all but the
+     * first as duplicates: a payload without its keys is refused before anything goes out.
+     *
+     * @param  array<string, mixed>  $keys
+     */
+    #[DataProvider('payloadsWithoutTheirDeliveryKeys')]
+    public function test_a_payload_without_a_node_id_or_an_idempotency_key_is_refused_and_nothing_goes_out(array $keys): void
+    {
+        [$tenantId, $contact, $session] = $this->mediaScenario('k');
+
+        $outbound = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('send');
+        });
+
+        $flowSender = new FlowMessageSender(
+            $outbound,
+            Mockery::mock(MediaDispatcherInterface::class),
+            $this->recordingLogger(),
+            new ConversationCaptureFactory(),
+            UsageGates::gate(),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
+            'session_id'   => (string) $session->getKey(),
+            'content_type' => 'text',
+            'text'         => 'Hello',
+            ...$keys,
         ]);
     }
 

@@ -74,6 +74,16 @@ final class LoopNodeHandler extends AbstractVersionedHandler implements Declares
         return is_string($raw) && '' !== $raw ? $raw : self::DEFAULT_ITERATOR_NAME;
     }
 
+    /**
+     * {@see iteratorNameOf()} for a node as stored in the definition, whose `config` may be missing or malformed.
+     *
+     * @param  array<array-key, mixed>  $node
+     */
+    public static function iteratorNameOfNode(array $node): string
+    {
+        return self::iteratorNameOf(is_array($node['config'] ?? null) ? $node['config'] : []);
+    }
+
     public function version(): int
     {
         return 1;

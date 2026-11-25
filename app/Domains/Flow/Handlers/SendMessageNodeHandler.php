@@ -786,6 +786,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
             $hint = $this->translator->translate('errors.waiting_for_button', $lang);
         }
 
+        // A key of its own, stable across a retry of the step: the hint never shares one with the prompt.
         try {
             $this->sender->send(
                 tenantId: $context->tenantId,
@@ -798,8 +799,8 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler implements N
                     'media_file_id'   => null,
                     'keyboard_mode'   => null,
                     'session_id'      => $context->sessionId,
-                    'node_id'         => $context->nodeId . ':hint',
-                    'idempotency_key' => 'hint:' . ($context->incoming?->updateId ?? uniqid('', true)),
+                    'node_id'         => $context->nodeId,
+                    'idempotency_key' => 'hint:' . $context->idempotencyKey,
                 ],
             );
         } catch (Throwable) {

@@ -190,6 +190,19 @@ final class StepBudgetTest extends TestCase
         $this->assertSame('loop', $segment->activeLoopNodeId());
     }
 
+    public function test_the_entered_loop_is_only_a_loop_node_that_passed_never_the_segments_guess(): void
+    {
+        $segment = StepBudget::forAutomationRun(maxSharedSteps: 10, maxLoopIterations: 5, sharedSteps: 1, loopSteps: 0, iterationSteps: 0, nodes: [self::LOOP], state: ['flow' => ['i' => 2]]);
+        $this->assertSame('loop', $segment->activeLoopNodeId());
+        $this->assertNull($segment->enteredLoopNodeId());
+
+        $this->assertNull($segment->record(self::LOOP, $this->intoBody(), ['flow' => ['i' => 2]]));
+        $this->assertSame('loop', $segment->enteredLoopNodeId());
+
+        $this->assertNull($segment->record(self::LOOP, new NodeExecutionResult(status: NodeExecutionStatus::Executed, sourceHandle: 'default'), []));
+        $this->assertNull($segment->enteredLoopNodeId());
+    }
+
     public function test_the_loop_iterations_limit_leaves_room_for_three_steps_an_iteration_and_a_reserve(): void
     {
         $this->assertLessThanOrEqual(

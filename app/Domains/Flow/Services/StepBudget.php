@@ -53,6 +53,9 @@ final class StepBudget
     /** @var array<string, int> per loop node, the iterations it had started before this call reached it */
     private array $iteratorBaselines = [];
 
+    /** The loop a `loop` node of this budget last entered or went round; never the loop a segment starts in */
+    private ?string $enteredLoopNodeId = null;
+
     /**
      * @param  CarbonImmutable|null  $startedAt  when the conversation's outermost engine call started; null for an
      *                                           automation run, whose segments bound its time
@@ -160,11 +163,20 @@ final class StepBudget
     /**
      * The loop whose body the next step counts in: the loop a `loop` node last entered or went round, or the one a
      * segment started in; null outside loop bodies and, in a conversation call, until the call passes a `loop` node.
-     * The node trace attributes an iterator several loops share to it.
      */
     public function activeLoopNodeId(): ?string
     {
         return $this->activeLoopNodeId;
+    }
+
+    /**
+     * The loop a `loop` node last entered or went round under this budget; null outside loop bodies and until a `loop`
+     * node passes. Unlike {@see activeLoopNodeId()} it is never the loop an automation segment guesses it starts in
+     * (the first loop whose iterator is set), so the node trace attributes an iterator several loops share to it only.
+     */
+    public function enteredLoopNodeId(): ?string
+    {
+        return $this->enteredLoopNodeId;
     }
 
     /**
@@ -205,8 +217,9 @@ final class StepBudget
         if (LoopNodeHandler::LOOP_HANDLE !== $result->sourceHandle) {
             // The loop exits: what follows counts against the shared budget again, and a later pass through the
             // loop in this call counts its iterations afresh.
-            $this->activeLoopNodeId = null;
-            $this->iterationSteps   = 0;
+            $this->activeLoopNodeId  = null;
+            $this->enteredLoopNodeId = null;
+            $this->iterationSteps    = 0;
             unset($this->iteratorBaselines[$nodeId]);
 
             return null;
@@ -230,7 +243,8 @@ final class StepBudget
             $this->iterationSteps = 0;
         }
 
-        $this->activeLoopNodeId = $nodeId;
+        $this->activeLoopNodeId  = $nodeId;
+        $this->enteredLoopNodeId = $nodeId;
 
         return null;
     }
@@ -250,20 +264,12 @@ final class StepBudget
                 continue;
             }
 
-            if (null !== data_get($state, 'flow.' . self::iteratorName($node))) {
+            if (null !== data_get($state, 'flow.' . LoopNodeHandler::iteratorNameOfNode($node))) {
                 return $node['id'];
             }
         }
 
         return null;
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $node
-     */
-    private static function iteratorName(array $node): string
-    {
-        return LoopNodeHandler::iteratorNameOf(is_array($node['config'] ?? null) ? $node['config'] : []);
     }
 
     /**
@@ -274,7 +280,7 @@ final class StepBudget
      */
     private function iterator(array $node, NodeExecutionResult $result, array $state): int
     {
-        $path = 'flow.' . self::iteratorName($node);
+        $path = 'flow.' . LoopNodeHandler::iteratorNameOfNode($node);
 
         $value = array_key_exists($path, $result->stateChanges)
             ? $result->stateChanges[$path]
