@@ -48,10 +48,12 @@ use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Mockery;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeUsageMeter;
@@ -453,6 +455,27 @@ final class TriggerRunAdmissionTest extends FeatureTestCase
         $this->app->call([$job, 'handle']);
 
         $this->assertSame(1, $manager->notifications()->count(), 'The retry is not a no-op.');
+    }
+
+    public function test_a_pause_notice_for_a_flow_deleted_since_is_announced_to_nobody(): void
+    {
+        $this->seed(TenantAclSeeder::class);
+        [$draft, $triggerId] = $this->liveSchedule();
+        $manager             = User::factory()->create();
+        $manager->givePermissionTo([Permission::ManageAutomations->value, Permission::ManageFlowDefinitions->value]);
+        $manager->assistants()->attach($this->assistant->getKey());
+        $pausedAt = CarbonImmutable::now()->format(DATE_ATOM);
+        $logger   = Mockery::spy(LoggerInterface::class);
+        $this->app->instance(LoggerInterface::class, $logger);
+
+        FlowDraft::query()->whereKey($draft->getKey())->delete();
+        $this->app->call([new NotifyTriggerPausedJob($this->tenantId, $draft->flow_id, $triggerId, 'schedule', $pausedAt), 'handle']);
+
+        $this->assertSame(0, $manager->notifications()->count());
+        $this->assertFalse(Cache::has('flow_trigger_paused_notice:' . $this->tenantId . ':' . $triggerId . ':' . $pausedAt));
+        $logger->shouldHaveReceived('info')
+            ->with('flow.trigger.paused_notice_no_flow', Mockery::on(static fn (array $context): bool => $draft->flow_id === $context['flow_id']))
+            ->once();
     }
 
     private function inMemoryChannel(): Channel

@@ -243,7 +243,7 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
         $this->assertSame([], $this->logged('flow.event.started'));
     }
 
-    public function test_a_duplicate_that_won_the_race_past_the_lock_is_a_quiet_exit(): void
+    public function test_a_duplicate_that_won_the_race_past_the_lock_is_logged_as_a_duplicate(): void
     {
         $triggerId = (string) Str::uuid();
         $startKey  = 'event:' . hash('sha256', $triggerId . ':event:event-1');
@@ -269,6 +269,7 @@ final class StartFlowFromEventJobTest extends FeatureTestCase
 
         $this->assertSame(1, FlowSession::query()->where('start_key', $startKey)->count());
         $this->assertSame([], $this->logged('flow.event.started'));
+        $this->assertCount(1, $this->logged('flow.event.start_duplicate'));
     }
 
     public function test_a_job_queued_before_the_ids_existed_starts_once_keyed_by_its_own_id(): void

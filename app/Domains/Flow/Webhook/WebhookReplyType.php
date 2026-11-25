@@ -22,6 +22,19 @@ enum WebhookReplyType: string
         return is_string($value) ? self::tryFrom($value) : null;
     }
 
+    /**
+     * Builder dropdown options: value → localized label (admin-UI locale).
+     *
+     * @return array<string, string>
+     */
+    public static function options(): array
+    {
+        return [
+            self::Json->value => (string) __('builder.nodes.webhook_response.body_types.json'),
+            self::Text->value => (string) __('builder.nodes.webhook_response.body_types.text'),
+        ];
+    }
+
     public function contentType(): string
     {
         return match ($this) {

@@ -81,6 +81,10 @@ final class WebhookResponseNodeValidationTest extends FeatureTestCase
         $this->assertSame(['webhook_response_invalid_status'], $codes(['status' => 'ok', 'body_type' => 'json']));
         $this->assertSame(['webhook_response_invalid_body_type'], $codes(['status' => 200, 'body_type' => 'xml']));
         $this->assertSame(['webhook_response_invalid_body_type'], $codes(['status' => 200, 'body_type' => ['json']]));
+        $this->assertSame(
+            'The body type must be json or text.',
+            $this->validate($this->draft($this->respond(['status' => 200, 'body_type' => 'xml']), 'sync'))->errors[0]->message,
+        );
         $this->assertSame(['webhook_response_invalid_body'], $codes(['status' => 200, 'body_type' => 'json', 'body' => 'not json']));
         $this->assertSame([], $codes(['status' => '204', 'body_type' => 'text', 'text' => '']));
     }
