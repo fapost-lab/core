@@ -33,6 +33,10 @@ return [
         'segment_steps'   => (int) env('FLOW_AUTOMATION_SEGMENT_STEPS', 50),
         'segment_seconds' => (int) env('FLOW_AUTOMATION_SEGMENT_SECONDS', 20),
         'max_run_hours'   => (int) env('FLOW_AUTOMATION_MAX_RUN_HOURS', 24),
+        // Only the default of the platform setting `flow.automation.recover_after_minutes`: how long an automation run
+        // may stay without movement and without a job before the same every-minute pass queues its continuation again.
+        // Held within 2 to 240.
+        'recover_after_minutes' => (int) env('FLOW_AUTOMATION_RECOVER_AFTER_MINUTES', 10),
         // Only the default of the platform setting `flow.automations.runs_per_trigger_per_minute`: how many runs one
         // trigger other than a message may start in a minute before the run rate breaker pauses it.
         'runs_per_trigger_per_minute' => (int) env('FLOW_AUTOMATION_RUNS_PER_TRIGGER_PER_MINUTE', 60),

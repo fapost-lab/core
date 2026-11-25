@@ -20,7 +20,10 @@ use App\Domains\Flow\Exceptions\SessionLockLostException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Orchestration\AutomationRunner;
+use App\Domains\Flow\Orchestration\StrandedAutomationRunRecovery;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Services\SegmentHandOff;
+use App\Domains\Flow\Subflow\SubflowResumerInterface;
 use App\Domains\Flow\Subflow\SubflowTimeoutSweeper;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Jobs\Flow\ContinueAutomationRunJob;
@@ -951,6 +954,183 @@ final class AutomationRunTest extends FeatureTestCase
         $this->assertSame(['k1' => 1, 'p1' => 1], AutomationProbeTestHandler::$runs);
     }
 
+    public function test_a_start_that_broke_off_before_the_parent_took_its_child_s_end_is_retried_into_the_parent(): void
+    {
+        config(['flow.automation.segment_steps' => 50]);
+        $this->failFirstSubflowResume();
+        $parentFlowId = $this->subflowParent($this->childOfProbes(1));
+
+        try {
+            $this->start($parentFlowId, 'slot-1');
+            $this->fail('The broken resume must abort the start.');
+        } catch (RuntimeException) {
+        }
+
+        $parent = FlowSession::query()->whereNull('parent_session_id')->sole();
+        $child  = FlowSession::query()->whereNotNull('parent_session_id')->sole();
+        $this->assertSame(FlowSessionStatus::PausedSubflow, $parent->status);
+        $this->assertSame(FlowSessionStatus::Ended, $child->status);
+
+        $this->start($parentFlowId, 'slot-1');
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
+        $this->assertSame(['k1' => 1, 'p1' => 1], AutomationProbeTestHandler::$runs);
+    }
+
+    public function test_a_continuation_that_broke_off_before_the_parent_took_its_child_s_end_is_retried_into_the_parent(): void
+    {
+        config(['flow.automation.segment_steps' => 3]);
+        $this->failFirstSubflowResume();
+        $parentFlowId = $this->subflowParent($this->childOfProbes(3));
+
+        // The start runs k1–k3 in the child; its continuation ends the child and breaks off before the parent resumes.
+        $this->start($parentFlowId, 'slot-1');
+        $continuation = $this->pushedContinuations()[0];
+
+        try {
+            $this->app->call([$continuation, 'handle']);
+            $this->fail('The broken resume must abort the continuation.');
+        } catch (RuntimeException) {
+        }
+
+        $parent = FlowSession::query()->whereNull('parent_session_id')->sole();
+        $this->assertSame(FlowSessionStatus::PausedSubflow, $parent->status);
+
+        $this->app->call([$continuation, 'handle']);
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
+        $this->assertSame(['k1' => 1, 'k2' => 1, 'k3' => 1, 'p1' => 1], AutomationProbeTestHandler::$runs);
+    }
+
+    public function test_a_parent_left_waiting_on_a_failed_child_takes_the_failed_exit_once_handed_on(): void
+    {
+        config(['flow.automation.segment_steps' => 50]);
+        $childFlowId  = $this->childOfProbes(1);
+        $parentFlowId = $this->flow([
+            ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H']],
+            ['id' => 'p-ok', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'p-fail', 'type' => 'automation_probe_test', 'version' => 1, 'config' => []],
+            ['id' => 'p-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], [
+            ['id' => 'pe1', 'from' => 'p-sub', 'to' => 'p-ok', 'handle' => 'success'],
+            ['id' => 'pe2', 'from' => 'p-sub', 'to' => 'p-fail', 'handle' => 'failed'],
+            ['id' => 'pe3', 'from' => 'p-ok', 'to' => 'p-end', 'handle' => 'default'],
+            ['id' => 'pe4', 'from' => 'p-fail', 'to' => 'p-end', 'handle' => 'default'],
+        ]);
+        $parent = $this->automationSession($parentFlowId, 'p-sub', FlowSessionStatus::PausedSubflow, ['fire_key' => 'slot-1']);
+        $child  = $this->automationSession($childFlowId, 'k1', FlowSessionStatus::Failed, [
+            'parent_session_id'     => $parent->getKey(),
+            'parent_resume_node_id' => 'p-sub',
+        ]);
+
+        // A delay wake-up or a sweep that broke off on this run hands it to the automation queue.
+        $this->app->make(SegmentHandOff::class)->handOnIfStranded($child);
+
+        $this->assertCount(1, $this->pushedContinuations());
+        $this->assertSame(FlowSessionStatus::PausedSubflow, $parent->refresh()->status, 'Only the continuation resumes it.');
+
+        $this->drain();
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
+        $this->assertSame(['p-fail' => 1], AutomationProbeTestHandler::$runs);
+    }
+
+    public function test_only_a_parent_still_waiting_on_its_latest_child_that_is_over_has_a_child_s_end_to_take(): void
+    {
+        $handOff      = $this->app->make(SegmentHandOff::class);
+        $childFlowId  = $this->childOfProbes(1);
+        $parentFlowId = $this->subflowParent($childFlowId);
+        $parent       = fn (FlowSessionStatus $status = FlowSessionStatus::PausedSubflow): FlowSession => $this->automationSession($parentFlowId, 'p-sub', $status);
+        $child        = fn (FlowSession $of, FlowSessionStatus $status, string $resumeNode = 'p-sub'): FlowSession => $this->automationSession($childFlowId, 'k1', $status, [
+            'parent_session_id'     => $of->getKey(),
+            'parent_resume_node_id' => $resumeNode,
+        ]);
+
+        $waiting = $parent();
+        $ended   = $child($waiting, FlowSessionStatus::Ended);
+        $this->assertTrue($ended->is($handOff->pendingReturnOf($waiting)));
+
+        $running = $parent();
+        $child($running, FlowSessionStatus::Active);
+        $this->assertNull($handOff->pendingReturnOf($running), 'A live child runs on; it has no end to hand back yet.');
+
+        $elsewhere = $parent();
+        $child($elsewhere, FlowSessionStatus::Ended, 'p-other');
+        $this->assertNull($handOff->pendingReturnOf($elsewhere), 'The parent waits on another node than the one that started it.');
+
+        $failedRun = $parent(FlowSessionStatus::Failed);
+        $child($failedRun, FlowSessionStatus::Failed);
+        $this->assertNull($handOff->pendingReturnOf($failedRun), 'A run failed as a whole is over.');
+
+        $looping = $parent();
+        $child($looping, FlowSessionStatus::Ended);
+        $this->travel(1)->seconds();
+        $child($looping, FlowSessionStatus::WaitingInput);
+        $this->assertNull($handOff->pendingReturnOf($looping), 'An earlier iteration\'s child is not the one it waits on.');
+    }
+
+    public function test_a_run_whose_continuation_never_reached_the_queue_is_recovered_with_the_same_segment_and_runs_to_its_end(): void
+    {
+        config(['flow.automation.segment_steps' => 2]);
+        $this->start($this->probeChain(4), 'slot-1');
+        // The push of the continuation the segment queued was lost: the run is `active` with nothing queued.
+        $segmentId     = FlowSession::query()->sole()->segment_id;
+        $this->handled = count($this->pushedContinuations());
+        $recovery      = fn (): array => $this->app->make(StrandedAutomationRunRecovery::class)->recover(self::TENANT_ID);
+
+        $this->travel(9)->minutes();
+        $this->assertSame(['recovered_runs' => 0, 'skipped_busy' => 0], $recovery());
+
+        $this->travel(2)->minutes();
+        $this->assertSame(['recovered_runs' => 1, 'skipped_busy' => 0], $recovery());
+        $this->assertSame($segmentId, $this->pushedContinuations()[$this->handled]->segmentId);
+        $this->assertSame(['recovered_runs' => 0, 'skipped_busy' => 0], $recovery(), 'Queued again once per threshold.');
+
+        $this->drain();
+
+        $this->assertSame(FlowSessionStatus::Ended, FlowSession::query()->sole()->status);
+        $this->assertSame(['c1' => 1, 'c2' => 1, 'c3' => 1, 'c4' => 1], AutomationProbeTestHandler::$runs);
+    }
+
+    public function test_a_parent_left_waiting_on_a_child_that_ended_is_recovered_into_its_success_exit(): void
+    {
+        config(['flow.automation.segment_steps' => 50]);
+        $this->failFirstSubflowResume();
+        $parentFlowId = $this->subflowParent($this->childOfProbes(1));
+
+        try {
+            $this->start($parentFlowId, 'slot-1');
+        } catch (RuntimeException) {
+            // The start job ran out of attempts: nothing retries it.
+        }
+
+        $this->travel(11)->minutes();
+        $report = $this->app->make(StrandedAutomationRunRecovery::class)->recover(self::TENANT_ID);
+
+        $this->assertSame(['recovered_runs' => 1, 'skipped_busy' => 0], $report);
+        $this->assertCount(1, $this->pushedContinuations());
+
+        $this->drain();
+
+        $this->assertSame(FlowSessionStatus::Ended, FlowSession::query()->whereNull('parent_session_id')->sole()->status);
+        $this->assertSame(['k1' => 1, 'p1' => 1], AutomationProbeTestHandler::$runs);
+    }
+
+    public function test_the_recovery_threshold_is_held_within_its_bounds(): void
+    {
+        config(['flow.automation.segment_steps' => 2]);
+        config(['flow.automation.recover_after_minutes' => 0]);
+        $this->start($this->probeChain(4), 'slot-1');
+        $this->handled = count($this->pushedContinuations());
+        $recovery      = fn (): array => $this->app->make(StrandedAutomationRunRecovery::class)->recover(self::TENANT_ID);
+
+        $this->travel(1)->minutes();
+        $this->assertSame(0, $recovery()['recovered_runs'], 'Never sooner than two minutes.');
+
+        $this->travel(2)->minutes();
+        $this->assertSame(1, $recovery()['recovered_runs']);
+    }
+
     public function test_a_run_gets_its_deadline_at_its_start_and_its_subflow_child_carries_the_same(): void
     {
         Carbon::setTestNow('2026-11-19 12:00:00');
@@ -1237,6 +1417,36 @@ final class AutomationRunTest extends FeatureTestCase
                 }
 
                 return $this->real->runInScope($scope, $callback);
+            }
+        });
+    }
+
+    /**
+     * The first time a subflow child hands its end to its parent, the job breaks off — after the child's last step
+     * committed and before the parent was resumed; every later hand-back goes to the real resumer.
+     */
+    private function failFirstSubflowResume(): void
+    {
+        $real = $this->app->make(SubflowResumerInterface::class);
+        // Whatever was built with the real resumer is built again with this one.
+        $this->app->forgetScopedInstances();
+
+        $this->app->instance(SubflowResumerInterface::class, new class ($real) implements SubflowResumerInterface {
+            private bool $failed = false;
+
+            public function __construct(private readonly SubflowResumerInterface $real)
+            {
+            }
+
+            public function resumeIfChild(FlowSession $child, string $endStatus): void
+            {
+                if (! $this->failed) {
+                    $this->failed = true;
+
+                    throw new RuntimeException('The job broke off before the parent was resumed.');
+                }
+
+                $this->real->resumeIfChild($child, $endStatus);
             }
         });
     }

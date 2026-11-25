@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-11-23
+reviewed_at: 2026-11-25
 ---
 # Flow rules
 
@@ -176,13 +176,18 @@ broken.
   next node after `flow.automation.segment_steps` or `flow.automation.segment_seconds` (whichever first, at least one
   step), and only the outermost call queues the continuation, after writing a new `segment_id` on the run's root
   session. A continuation runs only while the root carries its `segment_id`, and then runs the run's one `active`
-  session (down the `paused_subflow` chain); a start runs only when `(trigger_id, fire_key)` has no run yet, and
-  otherwise continues the run's `active` session (a `pending` root, which a schedule creates when it claims its slot, is
-  activated first). Jobs on `flow.automations` keep their timeout below the connection's
+  session (down the `paused_subflow` chain) — or, with none, hands a subflow child that is already over back to the
+  parent still waiting on it (`SegmentHandOff::pendingReturnOf()`); a start runs only when `(trigger_id, fire_key)` has
+  no run yet, and otherwise continues the run the same way (a `pending` root, which a schedule creates when it claims
+  its slot, is activated first). Copies of a continuation of the same `segment_id` may be queued (the recovery pass);
+  the run's lock serializes them and the first moves the run on. A run left without a job — no movement for
+  `flow.automation.recover_after_minutes` (10) — is handed on by the recovery pass of
+  `flow:sweep-overdue-automation-runs` (`StrandedAutomationRunRecovery`, after the deadline pass), which queues the
+  root's current segment again (a first one for a root that has none) and runs no node (`adr-20261125-stranded-automation-run-recovery`). Jobs on `flow.automations` keep their timeout below the connection's
   `retry_after`, and the seconds setting's maximum keeps a segment plus the slowest node under that timeout. Why: a
   second runner or a re-reserved job repeats `call` side effects in somebody else's system, silently
   (`adr-20261118-segmented-automation-runs`). Enforced: `AutomationRunTest`, `AutomationRunLockRedisTest`,
-  `ExecutionSegmentTest`, `HorizonAutomationsSupervisorTest`.
+  `ExecutionSegmentTest`, `HorizonAutomationsSupervisorTest`, `StrandedAutomationRunRecoveryTest`.
 - **An automation run has a deadline frozen at its start; past it the whole run fails and runs no node.**
   `FlowEngine::start()` writes `deadline_at` = start + `flow.automation.max_run_hours` (24) for `run_kind = automation`
   only, and a subflow child copies its parent's; a row without one counts from `created_at`. Every minute
@@ -303,7 +308,7 @@ broken.
   builds it from the session's columns (callers that only ever hold a contact's session — buttons, operator requests,
   event starts, `start_flow` starts — still pass the triple). `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
   `FlowQuestionResumer` (`ContinueAfterFlowQuestionJob`),
-  `StartFlowFromEventJob`, `StartFlowForContactJob`, `SubflowTimeoutSweeper`, `AutomationRunDeadlineSweeper` and `AutomationRunner` follow it
+  `StartFlowFromEventJob`, `StartFlowForContactJob`, `SubflowTimeoutSweeper`, `AutomationRunDeadlineSweeper`, `StrandedAutomationRunRecovery` and `AutomationRunner` follow it
   (`tests/Feature/Redis`); the sweepers skip a parent or run whose lock is busy and retry on their next run, and skip
   with a warning one they cannot lock at all, so one never ends the pass.
 - **A contactless session never reaches a contact through an empty id.** Without a contact,

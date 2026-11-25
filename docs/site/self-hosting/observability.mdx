@@ -55,7 +55,7 @@ running:
 | `flow:fire-scheduled-triggers` | Every minute | No [schedule trigger](/using/schedule-trigger) runs; the moments missed meanwhile are not caught up |
 | `flow:rebuild-schedule-registry` | Hourly | A schedule whose registry entry was lost stays silent |
 | `flow:sweep-subflow-timeouts` | Every minute | Parent flows waiting on expired subflows never resume |
-| `flow:sweep-overdue-automation-runs` | Every minute | Overdue automation runs stay live; their triggers stay blocked and their flows cannot be deleted |
+| `flow:sweep-overdue-automation-runs` | Every minute | Overdue automation runs stay live; their triggers stay blocked and their flows cannot be deleted. Runs whose job was lost are not handed on and wait for their deadline |
 | `logs:create-partition` | Monthly, on the 1st | Next month's flow-log partition is missing |
 | `logs:prune-flow` | Daily, 03:00 | Old log partitions accumulate |
 | `conversations:prune` | Daily, 03:15 | Nothing is pruned; the transcript keeps growing (a no-op while retention is `0`) |

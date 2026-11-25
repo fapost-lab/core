@@ -16,7 +16,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
-reviewed_at: 2026-11-23
+reviewed_at: 2026-11-25
 ---
 # Flow glossary
 
@@ -137,6 +137,14 @@ The moment an automation run must be over, `deadline_at` on its sessions: its st
 failed whole by `flow:sweep-overdue-automation-runs`, with a **failure reason** (`failure_reason`:
 `deadline_exceeded`, or `start_lost` for a run that never left `pending`); a session the engine failed itself has
 none (`adr-20261119-automation-run-deadline`). Not the subflow timeout (`expires_at`).
+
+## Stranded run
+
+An automation run still live with no job to run it: its continuation never reached the queue, its job ran out of
+attempts, or a parent waits in `paused_subflow` over a child that is already over. After
+`flow.automation.recover_after_minutes` without movement, the recovery pass of `flow:sweep-overdue-automation-runs`
+hands it on (`adr-20261125-stranded-automation-run-recovery`). Not a parked run: one in a `delay` or waiting for an
+answer has its own wake-up.
 
 ## Routing decision
 
