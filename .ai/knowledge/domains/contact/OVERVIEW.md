@@ -28,7 +28,9 @@ what the filters and segment rules offer) — and the link between a contact and
 (explicit member lists) and segments (saved rules evaluated on demand). A segment rule on a platform no
 installed integration serves any more is kept and still evaluated, but the segment cannot be saved again until that
 condition is removed (`ContactSegmentRequest` validates against `ContactPlatforms`, failing closed). It also holds
-`SendContactNotificationJob`, which fans Flow's `notify` node out to contacts.
+`SendContactNotificationJob`, which fanned Flow's `notify` node out to contacts: deprecated and no longer dispatched
+(the node's retired `contacts` mode now sends through Broadcasting), kept one release for jobs already queued
+(`adr-20261125-notify-contacts-retired-through-broadcasting`).
 
 ## Boundaries
 
@@ -54,7 +56,7 @@ condition is removed (`ContactSegmentRequest` validates against `ContactPlatform
 
 - `Services/ContactService.php`, `Repositories/ContactTagRepository.php`,
   `Services/ContactSegmentResolver.php`.
-- `Jobs/SendContactNotificationJob.php` (queue `messaging.broadcast`).
+- `Jobs/SendContactNotificationJob.php` (queue `messaging.broadcast`; deprecated, nothing dispatches it).
 - Policies `ContactPolicy`, `ContactGroupPolicy`.
 - Inertia console: `App\Http\Controllers\Console\ContactController` with `Services/AssistantContactService.php`
   (the assistant's contacts and the two writes, tags and groups) and `Services/ContactCard.php` (the card's

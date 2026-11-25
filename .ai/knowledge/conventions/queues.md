@@ -56,7 +56,8 @@ Queue assignment by purpose, as it exists in the codebase today:
 - `messaging.broadcast`: `app/Domains/Broadcasting/Jobs/RunBroadcastJob.php`,
   `SendBroadcastRecipientJob.php`, `app/Jobs/Messaging/BroadcastSendJob.php`, and, as a deviation,
   `app/Domains/Contact/Jobs/SendContactNotificationJob.php` (line 61): it is a service
-  notification that runs on the low-priority broadcast queue.
+  notification that runs on the low-priority broadcast queue. It is deprecated and no longer dispatched (the
+  `notify` contacts mode sends through Broadcasting); it stays a release for jobs already queued.
 - `messaging.system`: `app/Jobs/Messaging/SyncChannelWebhookJob.php`,
   `app/Jobs/Flow/SendOneTimeCodeJob.php` (the encrypted one-time code of an `auth_request` node),
   `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,

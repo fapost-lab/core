@@ -8,8 +8,8 @@ use App\Domains\Flow\DTOs\AudienceBroadcastRequest;
 use App\Domains\Flow\DTOs\AudienceBroadcastResult;
 
 /**
- * Flow's port to Broadcasting: a `send_message` node whose addressee is tags or a segment starts a broadcast through it
- * and goes on. Implemented in `app/Infrastructure/Flow`, so the Flow runtime does not depend on Broadcasting.
+ * Flow's port to Broadcasting: a `send_message` node whose addressee is tags or a segment, and a legacy `notify` node in
+ * `contacts` mode, start a broadcast through it and go on. Implemented in `app/Infrastructure/Flow`, so the Flow runtime does not depend on Broadcasting.
  *
  * {@see start()} never throws for an expected refusal: it answers with an outcome. A request whose `originKey` started a
  * broadcast before gets that broadcast back, so a retried step starts nothing twice; a node with a broadcast still

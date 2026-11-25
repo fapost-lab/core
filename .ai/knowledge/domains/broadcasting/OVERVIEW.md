@@ -49,8 +49,9 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
 - Console UI: `app/Http/Controllers/Console/BroadcastController.php` over
   `Services/BroadcastService.php` (the console's writes and the send guard), with the requests in
   `app/Http/Requests/Console/*Broadcast*` and the pages in `resources/js/pages/Console/Broadcasts`. The list shows a row's `stop_reason` under its status.
-- `Services/AutomationBroadcasts.php`: the automation's entry, called by Flow's `send_message` through
-  `App\Infrastructure\Flow\BroadcastingAudienceBroadcaster` (`AudienceBroadcasterInterface`); it creates the broadcast
-  as `origin = automation` and starts it at once. The console list marks such rows and names their flow.
+- `Services/AutomationBroadcasts.php`: the automation's entry, called by Flow's `send_message` and by a `notify` node
+  published in its retired `contacts` mode, through `App\Infrastructure\Flow\BroadcastingAudienceBroadcaster`
+  (`AudienceBroadcasterInterface`); it creates the broadcast as `origin = automation` and starts it at once. The console
+  list marks such rows and names their flow.
 - `Support/BroadcastMessage.php` cleans the message and checks the base language, for the console's
   request and service.

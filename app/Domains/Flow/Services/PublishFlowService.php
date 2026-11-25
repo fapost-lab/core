@@ -56,6 +56,7 @@ final readonly class PublishFlowService
         private FlowTriggerRepositoryInterface $triggerRows,
         private FlowWebhookEndpointRepositoryInterface $webhookEndpoints,
         private ScheduleRegistrySync $scheduleRegistry,
+        private FlowPublishChanges $changes,
     ) {
     }
 
@@ -188,6 +189,13 @@ final readonly class PublishFlowService
         );
         if (!$result->valid) {
             throw new FlowValidationException($result->errors);
+        }
+
+        // A notify node in the retired contacts mode may stay as published, but not be added or changed. Only a publish
+        // of the draft is checked: a template republishing its hosts carries their published nodes, and an unchanged
+        // legacy node in a host must not stop the template's publish.
+        if (null === $source && null === $republishedBy) {
+            $this->refuseChangedContactNotifications($draft);
         }
 
         // Cross-assistant subflow rejection: a flow may only invoke other
@@ -409,6 +417,10 @@ final readonly class PublishFlowService
         if ([] !== $errors) {
             throw new FlowValidationException($errors);
         }
+
+        // A template copies its nodes into every host on publish, so it may not bring a notify node in the retired
+        // contacts mode, nor change one, either.
+        $this->refuseChangedContactNotifications($draft);
 
         // A template never starts on its own: it has no triggers.
         $definition = $this->createDefinition($draft, $nodes, $edges, [], FlowKind::Template, $engineId);
@@ -728,6 +740,29 @@ final readonly class PublishFlowService
         }
 
         return $errors;
+    }
+
+    /**
+     * Refuses a draft that adds a `notify` node in the retired `contacts` mode or changes one against the published
+     * version: such a broadcast is now a `send_message` to tags or a segment.
+     *
+     * @throws FlowValidationException
+     */
+    private function refuseChangedContactNotifications(FlowDraft $draft): void
+    {
+        $errors = [];
+
+        foreach ($this->changes->changedContactNotifications($draft) as $nodeId) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "nodes.{$nodeId}.config.mode",
+                code: 'notify_contacts_retired',
+                message: (string) __('builder.validation.notify_contacts_retired'),
+            );
+        }
+
+        if ([] !== $errors) {
+            throw new FlowValidationException($errors);
+        }
     }
 
     /**

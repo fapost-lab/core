@@ -26,7 +26,8 @@ The audience rule: `All`, `Tags` or `Segment`.
 ## Origin
 
 Who started a broadcast: `console` (a person confirmed a revision on the broadcasts screen) or `automation` (a flow's
-`send_message` node to tags or a segment, through `AutomationBroadcasts`). An automation broadcast also carries
+`send_message` node to tags or a segment, or a `notify` node published in its retired `contacts` mode, through
+`AutomationBroadcasts`). An automation broadcast also carries
 `flow_id`, `flow_session_id`, `flow_node_id` and `origin_key`, the hash of the node execution that started it.
 
 ## Chain depth
