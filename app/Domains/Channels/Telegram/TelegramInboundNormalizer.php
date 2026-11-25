@@ -194,6 +194,9 @@ final class TelegramInboundNormalizer
      * returns a 0- or 1-element list, but the contract is array to stay consistent with
      * channels that deliver many files in one message.
      *
+     * Each file carries its provider kind — the Telegram field it came from (`photo`, `document`, `video`, `voice`,
+     * `audio`) — so a cached file id is later sent back by the matching method.
+     *
      * @param  array<string, mixed>  $message
      *
      * @return array{0: IncomingMessageType, 1: array<int, IncomingMedia>}
@@ -213,6 +216,7 @@ final class TelegramInboundNormalizer
                             mimeType: 'image/jpeg',
                             fileName: null,
                             size: isset($largest['file_size']) ? (int)$largest['file_size'] : null,
+                            providerKind: 'photo',
                         ),
                     ],
                 ];
@@ -246,6 +250,7 @@ final class TelegramInboundNormalizer
                         mimeType: is_string($payload['mime_type'] ?? null) ? $payload['mime_type'] : null,
                         fileName: is_string($payload['file_name'] ?? null) ? $payload['file_name'] : null,
                         size: isset($payload['file_size']) ? (int)$payload['file_size'] : null,
+                        providerKind: $field,
                     ),
                 ],
             ];

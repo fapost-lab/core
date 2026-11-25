@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Channels\Telegram\TelegramInboundNormalizer;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Enums\MediaSource;
 use App\Domains\Media\Models\MediaFile;
@@ -32,7 +33,38 @@ final class InputNodeProviderKindTest extends FeatureTestCase
         );
     }
 
-    public function test_the_way_the_message_carried_the_file_reaches_the_ingestor(): void
+    public function test_the_kind_telegram_reported_for_the_file_reaches_the_ingestor(): void
+    {
+        $incoming = (new TelegramInboundNormalizer())->normalize([
+            'update_id' => 1,
+            'message'   => [
+                'message_id' => 10,
+                'chat'       => ['id' => 1],
+                'from'       => ['id' => 2],
+                'voice'      => ['file_id' => 'AwAD', 'mime_type' => 'audio/ogg'],
+            ],
+        ]);
+
+        $this->assertSame('voice', $this->kindTheIngestorWasGiven($incoming->type, $incoming->media[0]));
+    }
+
+    public function test_the_kind_comes_from_the_file_not_from_the_message_type(): void
+    {
+        $this->assertSame('document', $this->kindTheIngestorWasGiven(
+            IncomingMessageType::Voice,
+            new IncomingMedia('AwAD', MediaKind::Audio, 'audio/ogg', providerKind: 'document'),
+        ));
+    }
+
+    public function test_a_file_without_a_reported_kind_is_ingested_without_one(): void
+    {
+        $this->assertNull($this->kindTheIngestorWasGiven(
+            IncomingMessageType::Voice,
+            new IncomingMedia('AwAD', MediaKind::Audio, 'audio/ogg'),
+        ));
+    }
+
+    private function kindTheIngestorWasGiven(IncomingMessageType $type, IncomingMedia $media): ?string
     {
         $seen = new ArrayObject();
 
@@ -57,13 +89,15 @@ final class InputNodeProviderKindTest extends FeatureTestCase
                     }
                 },
                 'voice',
-                IncomingMessageType::Voice,
-                new IncomingMedia('AwAD', MediaKind::Audio, 'audio/ogg'),
+                $type,
+                $media,
             );
         } catch (RuntimeException) {
             // The stub ingests nothing; only what it was asked to store matters here.
         }
 
-        $this->assertSame('voice', $seen['kind']);
+        $this->assertTrue($seen->offsetExists('kind'), 'The ingestor was not called.');
+
+        return $seen['kind'];
     }
 }

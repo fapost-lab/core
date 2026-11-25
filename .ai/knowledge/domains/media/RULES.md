@@ -39,11 +39,13 @@ broken.
   goes by it.** A file id cannot be sent by another method than the one that minted it (a voice id through
   `sendAudio` is refused), and the provider may answer with another kind than the method asked for (a WAV sent as
   audio can come back as a `document`). The uploader reports it in `UploadResult::$providerKind`; the inbound path
-  stores how the message carried the file (`MediaIngestor`, `provider_kind` in the transcript descriptor).
+  stores the kind the connector reported on `IncomingMedia::$providerKind` (`MediaIngestor`, `provider_kind` in the
+  transcript descriptor), never one derived from `IncomingMessageType`: a connector that does not say leaves it null.
   `DeliveryKind::payloadType()` picks the message type: the stored kind, else the format's; a stored kind Core cannot send by (not photo, video, audio, voice or document) goes by the format too, and the ref stays cached, since the kind is stored as given and validated only on read. An uploader that
   implements Foundation's `ReportsProviderKind` (Telegram's) has a ref without a kind treated as a cache miss and
   uploaded again once, since a migration cannot backfill it; an uploader without the marker keeps its refs.
-  Enforced: `MediaDispatcherTest`, `DeliveryKindTest`, `MediaIngestorTest`, `MediaChannelRefRepositoryTest`.
+  Enforced: `MediaDispatcherTest`, `DeliveryKindTest`, `MediaIngestorTest`, `MediaChannelRefRepositoryTest`,
+  `InputNodeProviderKindTest`, `ConversationCaptureFactoryTest`, `TelegramInboundNormalizerMediaTest`.
 - **The storage disk is built per call: the tenant's `media.storage` when it names a driver,
   otherwise the installation's `config('media.storage')` (`MEDIA_STORAGE_DRIVER`, `MEDIA_S3_*`)** —
   local by default, s3 (endpoint and path-style for MinIO) optional, anything else throws; a tenant

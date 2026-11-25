@@ -7,10 +7,24 @@ namespace Tests\Unit\Domains\Channels\Telegram;
 use App\Domains\Channels\Telegram\TelegramInboundNormalizer;
 use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\Media\Enums\MediaKind;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 final class TelegramInboundNormalizerMediaTest extends TestCase
 {
+    /**
+     * @return array<string, array{0: string, 1: array<string, mixed>}>
+     */
+    public static function telegram_attachments(): array
+    {
+        return [
+            'photo'    => ['photo', [['file_id' => 'p1', 'file_size' => 100]]],
+            'document' => ['document', ['file_id' => 'd1', 'mime_type' => 'audio/x-wav']],
+            'video'    => ['video', ['file_id' => 'v1', 'mime_type' => 'video/mp4']],
+            'voice'    => ['voice', ['file_id' => 'vo1', 'mime_type' => 'audio/ogg']],
+            'audio'    => ['audio', ['file_id' => 'a1', 'mime_type' => 'audio/mpeg']],
+        ];
+    }
     public function test_extracts_largest_photo_variant(): void
     {
         $update = [
@@ -122,5 +136,29 @@ final class TelegramInboundNormalizerMediaTest extends TestCase
         $message = (new TelegramInboundNormalizer())->normalize($update);
 
         $this->assertSame('group-1', $message->payload['media_group_id'] ?? null);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attachment
+     */
+    #[DataProvider('telegram_attachments')]
+    public function test_each_file_carries_the_telegram_field_it_came_in_as_its_provider_kind(
+        string $field,
+        array $attachment,
+    ): void {
+        $update = [
+            'update_id' => 6,
+            'message'   => [
+                'message_id' => 15,
+                'chat'       => ['id' => 1],
+                'from'       => ['id' => 2],
+                $field       => $attachment,
+            ],
+        ];
+
+        $message = (new TelegramInboundNormalizer())->normalize($update);
+
+        $this->assertCount(1, $message->media);
+        $this->assertSame($field, $message->media[0]->providerKind);
     }
 }
