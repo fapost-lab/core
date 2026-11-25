@@ -8,7 +8,7 @@ paths:
   - "app/Http/Controllers/**"
   - "app/Jobs/**"
 summary: Controllers/jobs orchestrate; domain services take collaborators via constructor, not app()/resolve()
-reviewed_at: 2026-10-05
+reviewed_at: 2026-11-25
 ---
 # Domain code boundaries
 
@@ -26,6 +26,17 @@ domain/service layer itself. Eloquent models live in `Domains/{Domain}/Models`, 
 relations stay defined on the model when Eloquent's query capabilities (eager
 loading, `whereHas`, ...) are what's needed, rather than being reimplemented in a
 service.
+
+The database is such a collaborator too: a domain service that opens a transaction
+takes `Illuminate\Database\ConnectionResolverInterface` and asks it for
+`connection()` at the moment it writes, never `ConnectionInterface` in the
+constructor. A tenant switch moves the *default* connection the Eloquent models write
+through (`TenantDatabaseManager::switchTo()`), and a service — or the controller that
+receives it — may be built before that switch; a connection captured at construction
+would then open its transaction on another connection than the models' writes, and
+the write and its audit entry would silently stop being atomic.
+`CredentialWriter` and `OAuth2Consent` (`app/Domains/Credentials/`) follow this;
+`CredentialWriterTest` pins it with `tests/Support/RecordingConnectionResolver.php`.
 
 ## Example
 

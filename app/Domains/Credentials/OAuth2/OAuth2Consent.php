@@ -15,8 +15,8 @@ use Fapost\Foundation\Credentials\Contracts\CredentialStoreInterface;
 use Fapost\Foundation\Credentials\Exceptions\CredentialNotFoundException;
 use Fapost\Foundation\Credentials\Exceptions\CredentialUnavailableException;
 use Illuminate\Contracts\Session\Session;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -38,6 +38,11 @@ final readonly class OAuth2Consent
 
     public const int MAX_PENDING = 5;
 
+    /**
+     * @param  ConnectionResolverInterface  $db  resolved to the default connection on each call, never captured: a
+     *                                         tenant switch moves the default connection the models write through,
+     *                                         and a transaction on a connection taken earlier would not cover them
+     */
     public function __construct(
         private TenantContextInterface $tenants,
         private CredentialStoreInterface $store,
@@ -45,6 +50,7 @@ final readonly class OAuth2Consent
         private OAuth2TokenEndpoint $endpoint,
         private OAuth2GrantLock $lock,
         private AuditTrailInterface $audit,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -152,7 +158,7 @@ final readonly class OAuth2Consent
         }
 
         try {
-            return $this->lock->run($attempt['tenant_id'], $credentialId, fn (): Credential => DB::transaction(function () use ($attempt, $credentialId, $tokens, $userId): Credential {
+            return $this->lock->run($attempt['tenant_id'], $credentialId, fn (): Credential => $this->db->connection()->transaction(function () use ($attempt, $credentialId, $tokens, $userId): Credential {
                 // The code exchange took time: an edit of the client (which drops the grant) or a delete may have
                 // committed meanwhile. Read the credential again under a row lock, so the grant is written only for
                 // the client the person consented to, and never for a credential that is gone.
@@ -184,7 +190,7 @@ final readonly class OAuth2Consent
      */
     public function disconnect(Credential $credential): bool
     {
-        return DB::transaction(function () use ($credential): bool {
+        return $this->db->connection()->transaction(function () use ($credential): bool {
             if (!$this->grants->delete((string) $credential->getKey())) {
                 return false;
             }
