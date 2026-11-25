@@ -61,7 +61,12 @@ final readonly class OAuth2GrantLock
         try {
             return $callback();
         } finally {
-            $lock->release();
+            try {
+                $lock->release();
+            } catch (Throwable) {
+                // What the callback did is done (a grant committed, a refresh stored); a store that fails now must not
+                // turn it into an error. The lock runs out after TTL_SECONDS.
+            }
         }
     }
 }

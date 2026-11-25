@@ -82,12 +82,18 @@ final readonly class OAuth2GrantRepository
     }
 
     /**
-     * Stores the grant a consent gave, over any grant the credential had.
+     * Stores the grant a consent gave, over any grant the credential had. The old row is deleted and a new one
+     * inserted, never updated: an update compares the new tokens with the stored ones, which decrypts them, and a
+     * grant whose tokens cannot be decrypted (the application key changed) could then never be reconnected. Call it
+     * inside a transaction, so the credential is never left without the grant it had.
      */
     public function connect(string $credentialId, OAuth2TokenResponse $tokens, ?string $connectedBy): CredentialOAuthGrant
     {
-        $now   = Carbon::now();
-        $grant = $this->find($credentialId) ?? new CredentialOAuthGrant(['credential_id' => $credentialId, 'tenant_id' => $this->tenantId()]);
+        $now = Carbon::now();
+
+        $this->delete($credentialId);
+
+        $grant = new CredentialOAuthGrant(['credential_id' => $credentialId, 'tenant_id' => $this->tenantId()]);
 
         $grant->fill([
             'status'             => OAuth2GrantStatus::Connected,

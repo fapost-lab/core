@@ -126,7 +126,7 @@ final readonly class OAuth2Consent
             throw OAuth2ConsentFailedException::stale();
         }
 
-        if (OAuth2AuthorizationCodeType::ID !== $credential->type || EloquentCredentialStore::versionOf($credential) !== $attempt['version']) {
+        if (!self::isUnchanged($credential, $attempt)) {
             throw OAuth2ConsentFailedException::stale($credentialId);
         }
 
@@ -162,7 +162,7 @@ final readonly class OAuth2Consent
                     throw OAuth2ConsentFailedException::stale();
                 }
 
-                if (OAuth2AuthorizationCodeType::ID !== $current->type || EloquentCredentialStore::versionOf($current) !== $attempt['version']) {
+                if (!self::isUnchanged($current, $attempt)) {
                     throw OAuth2ConsentFailedException::stale($credentialId);
                 }
 
@@ -229,6 +229,17 @@ final readonly class OAuth2Consent
         }
 
         return is_int($attempt['expires_at'] ?? null);
+    }
+
+    /**
+     * Whether the credential is still the `oauth2_authorization_code` client the person was sent to consent to: same
+     * type, same version as when the attempt started.
+     *
+     * @param  array{version: string}  $attempt
+     */
+    private static function isUnchanged(Credential $credential, array $attempt): bool
+    {
+        return OAuth2AuthorizationCodeType::ID === $credential->type && EloquentCredentialStore::versionOf($credential) === $attempt['version'];
     }
 
     /**
