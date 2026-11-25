@@ -24,7 +24,7 @@ paths:
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
   - "app/Domains/Flow/Templates/**"
-reviewed_at: 2026-11-23
+reviewed_at: 2026-11-25
 ---
 # Flow
 
@@ -51,6 +51,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 | Subflow | `Subflow/` (starter, resumer, call-graph validator, timeout sweeper) |
 | Flow templates | `Templates/` (`TemplateExpander` copies a template's active definition into a host at publish, `TemplateUsageRepository` over `flow_template_usages`, `TemplateUsageFinder`, `TemplateNodeOrigins` labels copied nodes by `origin` on the session and log screens); handlers `TemplateNodeHandler`, `TemplateOutputNodeHandler` are pass-throughs (`adr-20261111-flow-templates-expanded-at-publish`) |
 | Triggers and events | `Services/Resolvers/`, `Services/FlowTriggerSet` (a flow's trigger list; synced into `flow_triggers` on publish), `ResolveEventTriggersService`, `Events/`, `app/Jobs/Flow/` |
+| Publish rights | `Services/FlowPublishChanges` (what a publish changes that needs a right beyond `PublishFlow`), `Support/AudienceMessageCone` (the cone of a broadcast compared at publish); asked by `Policies/FlowDraftPolicy::publishChanges()` |
 | Call, RAG, Action, Expression | `Call/`, `Rag/`, `Action/`, `Expression/` — small registries |
 | One-time codes | `Auth/` (`AuthCodeStore`: the keyed hash of a pending code and the per-destination cap; `OneTimeCodeSenderRegistry`, Core's `EmailOneTimeCodeSender` and `OneTimeCodeMail`), `app/Jobs/Flow/SendOneTimeCodeJob.php` — used by `auth_request@2` |
 | History and logging | `History/`, `Logging/` (partitioned `flow_logs`), `Trace/` (node trace in `flow_session_history`) |

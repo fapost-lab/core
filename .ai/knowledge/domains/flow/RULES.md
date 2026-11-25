@@ -434,7 +434,17 @@ broken.
   `FlowDraftPolicy::publishChanges()` refuses with a translated reason, asked by the builder's publish after
   `publish`; credentials and triggers are compared on the draft before template expansion, so a credential a template
   brings is checked when the template is published, while audience messages are compared after expansion (a template
-  can bring one, and a host's parameter value rewrites its text; copies keep stable ids). The `ManageBroadcast` check covers the audience node's own fields only: what its `{{flow.*}}` placeholders read upstream and the graph leading to it (edges, loops, `call` nodes) are not compared, so a publisher with `PublishFlow` alone can still change an approved broadcast's content and frequency that way; extending the right is an open owner decision. Turning on a flow with a live automatic trigger needs `ManageAutomations`
+  can bring one, and a host's parameter value rewrites its text; copies keep stable ids). `ManageBroadcast` also covers
+  what leads to such a node (`FlowPublishChanges::changesWhatLeadsToAudienceMessages()`, its own refusal
+  `publish_denied.broadcasts_upstream`): its cone (`AudienceMessageCone` — the node, every node that reaches it by an
+  edge or a `loop_end`'s jump back, the edges into them; type, version, config, parameters, keys sorted, a `loop_end`'s
+  `iterator_name` left out) differing from the published cone of that id, and on a flow with such a node any trigger
+  change (`message` included) or a changed expression engine; a `subflow`/`start_flow` node starting a flow whose
+  active definition has such a node counts as one (its `input_mapping` feeds that broadcast). A changed template (graph or engine) needs it when its
+  own audience node's cone changed or any host's active definition has an audience node. Removing such a node and
+  changes outside the cone need nothing; a `subflow` callee's output, a broadcasting flow two calls away and outside
+  data (an emitted event's payload included) are not compared
+  (`adr-20261125-broadcast-publish-right-covers-what-leads-to-it`). Turning on a flow with a live automatic trigger needs `ManageAutomations`
   (`FlowDraftPolicy::activate()`), since its automatic triggers start runs only while it is on; turning it off does not; the builder's credential list and a call test with a
   credential need `UseCredentials` (`CredentialPolicy::use()`). Saving a draft checks neither: nothing saved runs.
   Why: `PublishFlow` alone would let an author start runs nobody asked for or spend a secret an administrator

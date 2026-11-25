@@ -34,8 +34,11 @@ that exists (a [Core event](/reference/events#core-events) always does). A flow 
 
 Some changes need a permission beyond publishing. Adding, changing or removing a schedule, webhook, API or event
 trigger needs **Manage automations**; a Call block that uses a saved credential the live version does not use needs
-**Use credentials**. Without the permission the publish is refused with the reason, and nothing changes. Editing
-steps, message triggers, or leaving those triggers and credentials as they are needs neither.
+**Use credentials**; a Send message block to tags or a segment that is new or changed, or a change to what leads to
+it (the blocks and links before it, the flow's triggers, message triggers included, or its expression engine), needs
+**Manage broadcasts**. Without the permission the publish is refused with the reason, and nothing changes. Editing
+other steps, message triggers on a flow without such a block, or leaving those triggers and credentials as they are
+needs none of these.
 
 ## The version badge
 

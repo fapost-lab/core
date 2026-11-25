@@ -18,8 +18,8 @@ use Illuminate\Foundation\Auth\User as AuthUser;
  * Authoring drafts requires {@see Permission::ManageFlowDefinitions}.
  * Publishing requires the additional {@see Permission::PublishFlow} gate, and what a publish changes may need more
  * ({@see self::publishChanges()}): a new saved credential needs {@see Permission::UseCredentials}, a changed automatic
- * trigger {@see Permission::ManageAutomations}, a new or changed message to tags or a segment
- * {@see Permission::ManageBroadcast}. Turning on a flow with an automatic trigger needs the right to manage automations.
+ * trigger {@see Permission::ManageAutomations}, a new or changed message to tags or a segment, or a change to what leads
+ * to one, {@see Permission::ManageBroadcast}. Turning on a flow with an automatic trigger needs the right to manage automations.
  * Everything that targets a concrete draft also requires access to the draft's assistant
  * ({@see User::hasAssistantAccess()}), so a permission alone never reaches another assistant's flows.
  */
@@ -84,8 +84,11 @@ final class FlowDraftPolicy
     /**
      * Whether the user may publish what the draft changes against what runs now, on top of {@see self::publish()}:
      * a `call` node bound to a saved credential the published version does not use needs the right to use credentials;
-     * adding, changing or removing a trigger other than `message` needs the right to manage automations. Removing a
-     * credential reference, and editing nodes, need neither.
+     * adding, changing or removing a trigger other than `message` needs the right to manage automations. A message to
+     * tags or a segment added or changed, or a change to what leads to one (the blocks and links before it, the flow's
+     * triggers or its expression engine, or a template some flow with such a message places), needs the right to manage
+     * broadcasts ({@see FlowPublishChanges::changesWhatLeadsToAudienceMessages()}). Removing a credential reference or
+     * a broadcast, and editing other nodes, need none of these.
      */
     public function publishChanges(AuthUser $authUser, FlowDraft $draft): Response
     {
@@ -103,6 +106,10 @@ final class FlowDraftPolicy
 
         if (! $authUser->can(Permission::ManageBroadcast->value) && $this->changes->changesAudienceMessages($draft)) {
             return Response::deny(__('builder.publish_denied.broadcasts'));
+        }
+
+        if (! $authUser->can(Permission::ManageBroadcast->value) && $this->changes->changesWhatLeadsToAudienceMessages($draft)) {
+            return Response::deny(__('builder.publish_denied.broadcasts_upstream'));
         }
 
         return Response::allow();

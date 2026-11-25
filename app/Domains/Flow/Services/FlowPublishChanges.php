@@ -10,16 +10,22 @@ use App\Domains\Flow\Enums\NotifyMode;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\NotifyNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
+use App\Domains\Flow\Handlers\StartFlowNodeHandler;
+use App\Domains\Flow\Handlers\SubflowNodeHandler;
+use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
+use App\Domains\Flow\Subflow\SubflowPin;
 use App\Domains\Flow\Support\AddresseeResolver;
+use App\Domains\Flow\Support\AudienceMessageCone;
 use App\Domains\Flow\Support\FlowTriggerComparison;
 use App\Domains\Flow\Templates\TemplateExpander;
+use App\Domains\Flow\Templates\TemplateUsageRepository;
 
 /**
  * What publishing a draft would change that needs a right beyond publishing: a saved credential the published version
  * does not reference yet, an automatic trigger (any type but `message`) made live, changed or removed, and a message to
- * tags or a segment (a broadcast) added or changed. And what publishing may not change at all: a `notify` node in the
+ * tags or a segment (a broadcast) added or changed, or what leads to one. And what publishing may not change at all: a `notify` node in the
  * retired `contacts` mode added or changed.
  *
  * Both compare the draft with what runs now: credentials with the flow's published definition (a template's too),
@@ -35,6 +41,7 @@ final readonly class FlowPublishChanges
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowTriggerSet $triggerSet,
         private TemplateExpander $templates,
+        private TemplateUsageRepository $templateUsages,
     ) {
     }
 
@@ -66,10 +73,7 @@ final readonly class FlowPublishChanges
      * (UUIDv5 of the reference and the template node), and the published definition is stored expanded, so the two
      * compare by node id. A draft whose expansion fails is compared as it is: its publish is refused anyway.
      *
-     * The comparison covers the node's own fields only. What its `{{flow.*}}` placeholders read (set by an `assign` or
-     * an `input` node upstream) and the edges, loops and `call` nodes leading to it are not compared, so a publisher
-     * without `ManageBroadcast` can still change what an approved broadcast says and how often it goes out that way.
-     * Whether the right should reach that far is an open authorization decision, not an oversight here.
+     * The comparison covers the node's own fields; what leads to it is {@see changesWhatLeadsToAudienceMessages()}.
      */
     public function changesAudienceMessages(FlowDraft $draft): bool
     {
@@ -89,6 +93,58 @@ final readonly class FlowPublishChanges
         }
 
         return false;
+    }
+
+    /**
+     * Whether publishing the draft changes what leads to a `send_message` node to tags or a segment, and with it what
+     * the broadcast says (every `{{flow.*}}` it reads is written upstream) or how often it goes out
+     * (`adr-20261125-broadcast-publish-right-covers-what-leads-to-it`). For a flow's draft, compared as
+     * {@see changesAudienceMessages()} compares (after template expansion, by node id, against the published version):
+     *
+     * - a node's cone ({@see AudienceMessageCone}) — the node, every node that can reach it by an edge or a `loop_end`'s
+     *   jump back to its `loop`, and the edges into them — differs from the cone of the same id, or the id is new;
+     * - or the flow has such a node and the draft changes its expression engine or any of its triggers, `message`
+     *   included: the triggers start the graph that leads to the node and set how often it runs.
+     *
+     * A `subflow` or `start_flow` node that starts a flow whose active definition has such a node counts as one too:
+     * its `input_mapping` seeds the variables that flow's broadcast reads, and how often it runs is how often that flow
+     * starts. Its cone is compared the same way.
+     *
+     * A template's draft is compared unexpanded with the template's published version. When its graph or its engine
+     * changed, it needs the right if a node of its own of that kind has a changed cone, or if the active definition of
+     * any flow that places the template has one: publishing a template republishes those flows without their own check.
+     *
+     * Removing such a node, and every change outside the cones, needs nothing. What a `subflow` callee returns is not
+     * compared: the callee is another flow, checked by its own publish; nor is data from outside (a trigger's payload,
+     * an event another flow emits, an API's answer, a contact's input), which is not part of a version.
+     */
+    public function changesWhatLeadsToAudienceMessages(FlowDraft $draft): bool
+    {
+        [$nodes, $edges] = $this->expandedGraph($draft);
+        $published       = $this->definitions->findLatestPublishedByFlowId($draft->flow_id);
+        $drafted         = AudienceMessageCone::of($nodes, $edges, $this->leadingNodeIds($nodes));
+
+        if ($draft->isTemplate()) {
+            return $this->templateChangesWhatLeadsToAudienceMessages($draft, $nodes, $edges, $drafted, $published);
+        }
+
+        if ([] === $drafted) {
+            return false;
+        }
+
+        if (null === $published) {
+            return true;
+        }
+
+        if (self::changesCones($drafted, $published)) {
+            return true;
+        }
+
+        if ((string) $draft->expression_engine !== (string) $published->expression_engine) {
+            return true;
+        }
+
+        return $this->changesTriggers($draft);
     }
 
     /**
@@ -284,6 +340,138 @@ final readonly class FlowPublishChanges
     }
 
     /**
+     * Whether a drafted cone is new or differs from the published cone of the same node id.
+     *
+     * @param  array<string, string>  $drafted
+     */
+    private static function changesCones(array $drafted, FlowDefinition $published): bool
+    {
+        if ([] === $drafted) {
+            return false;
+        }
+
+        $current = AudienceMessageCone::of(
+            is_array($published->nodes) ? $published->nodes : [],
+            is_array($published->edges) ? $published->edges : [],
+            array_keys($drafted),
+        );
+
+        foreach ($drafted as $id => $cone) {
+            if (($current[$id] ?? null) !== $cone) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The ids of the nodes whose cone the right covers: every `send_message` to tags or a segment, and every `subflow` or
+     * `start_flow` node that starts a flow whose definition it runs has one — the pinned version of a pinned `subflow`,
+     * the active definition otherwise.
+     *
+     * @param  array<array-key, mixed>  $nodes
+     *
+     * @return list<string>
+     */
+    private function leadingNodeIds(array $nodes): array
+    {
+        $ids        = AudienceMessageCone::audienceMessageIds($nodes);
+        $broadcasts = [];
+
+        foreach ($nodes as $node) {
+            if (! is_array($node) || ! in_array($node['type'] ?? null, [SubflowNodeHandler::TYPE, StartFlowNodeHandler::TYPE], true)) {
+                continue;
+            }
+
+            $id     = $node['id'] ?? null;
+            $flowId = is_array($node['config'] ?? null) && is_string($node['config']['flow_id'] ?? null) ? mb_trim($node['config']['flow_id']) : '';
+
+            if (! is_scalar($id) || '' === $flowId) {
+                continue;
+            }
+
+            // A subflow pinned to a version runs that version, active or not; anything else runs the active one.
+            $pin = SubflowNodeHandler::TYPE === $node['type'] && is_array($node['config']) ? SubflowPin::read($node['config']) : null;
+            $key = $flowId . '@' . (is_int($pin) ? $pin : 'active');
+
+            if (! array_key_exists($key, $broadcasts)) {
+                $callee = is_int($pin)
+                    ? $this->definitions->findRunnableByFlowIdAndVersion($flowId, $pin)
+                    : $this->definitions->findLatestPublishedByFlowId($flowId);
+
+                $broadcasts[$key] = null !== $callee
+                    && [] !== AudienceMessageCone::audienceMessageIds(is_array($callee->nodes) ? $callee->nodes : []);
+            }
+
+            if ($broadcasts[$key]) {
+                $ids[] = (string) $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * @param  array<array-key, mixed>   $nodes
+     * @param  array<array-key, mixed>   $edges
+     * @param  array<string, string>     $drafted  the cones of the template's own audience messages
+     */
+    private function templateChangesWhatLeadsToAudienceMessages(
+        FlowDraft $draft,
+        array $nodes,
+        array $edges,
+        array $drafted,
+        ?FlowDefinition $published,
+    ): bool {
+        if (null === $published) {
+            return [] !== $drafted;
+        }
+
+        $publishedNodes = is_array($published->nodes) ? $published->nodes : [];
+        $publishedEdges = is_array($published->edges) ? $published->edges : [];
+
+        $changed = AudienceMessageCone::ofGraph($nodes, $edges) !== AudienceMessageCone::ofGraph($publishedNodes, $publishedEdges)
+            || (string) $draft->expression_engine !== (string) $published->expression_engine;
+
+        if (! $changed) {
+            return false;
+        }
+
+        if (self::changesCones($drafted, $published)) {
+            return true;
+        }
+
+        foreach ($this->templateUsages->hostsOf($draft->flow_id) as $hostFlowId) {
+            $host = $this->definitions->findLatestPublishedByFlowId($hostFlowId);
+
+            if (null !== $host && [] !== $this->leadingNodeIds(is_array($host->nodes) ? $host->nodes : [])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether publishing the draft adds, removes or changes any of the flow's triggers, `message` included. A draft
+     * whose list was never written publishes the live rows as they are.
+     */
+    private function changesTriggers(FlowDraft $draft): bool
+    {
+        if (! is_array($draft->triggers)) {
+            return false;
+        }
+
+        $diff = FlowTriggerComparison::diff(
+            $this->triggerSet->live($draft->flow_id),
+            FlowTriggerSet::normalize($draft->triggers),
+        );
+
+        return [] !== $diff['added'] || [] !== $diff['changed'] || [] !== $diff['removed'];
+    }
+
+    /**
      * The draft's nodes with its template references replaced by their copies, as {@see PublishFlowService} publishes
      * them; a template's own draft is published unexpanded.
      *
@@ -291,13 +479,25 @@ final readonly class FlowPublishChanges
      */
     private function expandedNodes(FlowDraft $draft): array
     {
+        return $this->expandedGraph($draft)[0];
+    }
+
+    /**
+     * The draft's nodes and edges without annotations and with its template references replaced by their copies, as
+     * {@see PublishFlowService} publishes them; a template's own draft is published unexpanded. A draft whose expansion
+     * fails is returned as it is: its publish is refused anyway.
+     *
+     * @return array{0: array<int, mixed>, 1: array<int, mixed>}
+     */
+    private function expandedGraph(FlowDraft $draft): array
+    {
         [$nodes, $edges] = AnnotationNodeTypes::strip(
             is_array($draft->nodes) ? $draft->nodes : [],
             is_array($draft->edges) ? $draft->edges : [],
         );
 
         if ($draft->isTemplate()) {
-            return $nodes;
+            return [$nodes, $edges];
         }
 
         $expansion = $this->templates->expand(
@@ -307,6 +507,6 @@ final readonly class FlowPublishChanges
             (string) $draft->expression_engine,
         );
 
-        return [] === $expansion->errors ? $expansion->nodes : $nodes;
+        return [] === $expansion->errors ? [$expansion->nodes, $expansion->edges] : [$nodes, $edges];
     }
 }

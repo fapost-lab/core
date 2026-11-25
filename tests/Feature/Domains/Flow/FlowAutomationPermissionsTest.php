@@ -6,6 +6,7 @@ namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
+use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
@@ -14,6 +15,8 @@ use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use Database\Seeders\TenantAclSeeder;
+use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
+use Fapost\Foundation\Flow\DTO\ExpressionContext;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -22,11 +25,15 @@ use Tests\Feature\Domains\Credentials\CredentialsTestCase;
 /**
  * Publishing what a draft changes against what runs now: a new saved credential in a `call` node needs
  * `UseCredentials`, a changed automatic trigger (any type but `message`) needs `ManageAutomations`, a new or changed
- * message to tags or a segment needs `ManageBroadcast`; turning on a flow with an automatic trigger needs
- * `ManageAutomations` too. The content manager holds both, an admin passes everything.
+ * message to tags or a segment, or a change to what leads to one, needs `ManageBroadcast`; turning on a flow with an
+ * automatic trigger needs `ManageAutomations` too. The content manager holds both, an admin passes everything.
  */
 final class FlowAutomationPermissionsTest extends CredentialsTestCase
 {
+    private const string TRIGGER = '0193a6a4-6f1e-7c3b-9a52-1d4e8b7c2f01';
+
+    private const string OTHER_TRIGGER = '0193a6a4-6f1e-7c3b-9a52-1d4e8b7c2f02';
+
     private Assistant $assistant;
 
     protected function setUp(): void
@@ -211,6 +218,283 @@ final class FlowAutomationPermissionsTest extends CredentialsTestCase
         $this->publish($this->author(), $host)->assertForbidden();
     }
 
+    /**
+     * What leads to a message to tags or a segment decides what it says and how often it goes out: an upstream node, an
+     * edge into the cone, a removed predecessor or a node that leads back to it through a loop needs the right.
+     */
+    public function test_changing_what_leads_to_a_message_to_tags_needs_the_right(): void
+    {
+        $draft = $this->draft($this->upstreamNodes('a'), attributes: ['edges' => $this->upstreamEdges()]);
+        $this->publish($this->author(Permission::ManageBroadcast), $draft)->assertSuccessful();
+
+        // The assign that writes what the broadcast reads.
+        $draft->forceFill(['nodes' => $this->upstreamNodes('b')])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+
+        // A node put between them, so a new edge leads into the broadcast.
+        $draft->forceFill([
+            'nodes' => [...$this->upstreamNodes('a'), $this->assignNode('more', 'c')],
+            'edges' => [
+                ['id' => 'e0', 'from' => 'set', 'to' => 'more', 'handle' => 'default'],
+                ['id' => 'e3', 'from' => 'more', 'to' => 'tell', 'handle' => 'default'],
+                ['id' => 'e1', 'from' => 'tell', 'to' => 'end', 'handle' => 'default'],
+            ],
+        ])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+
+        // The predecessor removed.
+        $draft->forceFill(['nodes' => $this->audienceNodes('Hello {{session.x}}'), 'edges' => $this->audienceEdges()])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+    }
+
+    public function test_a_node_after_a_message_to_tags_in_a_loop_leads_back_to_it_and_needs_the_right(): void
+    {
+        $draft = $this->draft($this->loopNodes('a'), attributes: ['edges' => $this->loopEdges()]);
+        $this->publish($this->author(Permission::ManageBroadcast), $draft)->assertSuccessful();
+
+        // Unchanged: the loop_end's iterator name publishing wrote is not a change.
+        $this->publish($this->author(), $draft)->assertSuccessful();
+
+        $draft->forceFill(['nodes' => $this->loopNodes('b')])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+    }
+
+    /**
+     * Edits outside the cone need nothing: a node after the broadcast, a node on another branch, the canvas position, the
+     * label, edge ids and the key order of a config. Moving the broadcast to the other branch changes only the links
+     * into it, and needs the right.
+     */
+    public function test_changes_outside_what_leads_to_a_message_to_tags_need_no_right_and_a_relinked_one_does(): void
+    {
+        $nodes = static fn (string $after, string $other): array => [
+            ['id' => 'check', 'type' => 'branch', 'version' => 1, 'config' => ['rules' => [
+                ['left' => 'session.x', 'operator' => 'eq', 'value' => 'a', 'handle' => 'high'],
+            ]]],
+            ['id' => 'tell', 'type' => 'send_message', 'version' => 1, 'config' => [
+                'content_type' => 'text',
+                'text'         => ['en' => 'Hello'],
+                'addressee'    => ['kind' => 'tags', 'tags' => ['vip']],
+            ]],
+            ['id' => 'after', 'type' => 'assign', 'version' => 1, 'config' => ['operations' => [['variable' => ['name' => 'y', 'storage' => 'session'], 'value' => $after]]]],
+            ['id' => 'other', 'type' => 'assign', 'version' => 1, 'config' => ['operations' => [['variable' => ['name' => 'z', 'storage' => 'session'], 'value' => $other]]]],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [
+            ['id' => 'e1', 'from' => 'check', 'to' => 'tell', 'handle' => 'high'],
+            ['id' => 'e2', 'from' => 'tell', 'to' => 'after', 'handle' => 'default'],
+            ['id' => 'e3', 'from' => 'check', 'to' => 'other', 'handle' => 'default'],
+            ['id' => 'e4', 'from' => 'other', 'to' => 'end', 'handle' => 'default'],
+        ];
+
+        $draft = $this->draft($nodes('a', 'a'), attributes: ['edges' => $edges]);
+        $this->publish($this->author(Permission::ManageBroadcast), $draft)->assertSuccessful();
+
+        $draft->forceFill(['nodes' => $nodes('b', 'b')])->save();
+        $this->publish($this->author(), $draft)->assertSuccessful();
+
+        $moved    = $nodes('b', 'b');
+        $moved[0] = ['label' => 'Check', 'position' => ['x' => 40, 'y' => 80], ...$moved[0]];
+        $moved[1] = ['id' => 'tell', 'type' => 'send_message', 'version' => 1, 'position' => ['x' => 10, 'y' => 20], 'label' => 'Tell them', 'config' => [
+            'addressee'    => ['tags' => ['vip'], 'kind' => 'tags'],
+            'text'         => ['en' => 'Hello'],
+            'content_type' => 'text',
+        ]];
+        $draft->forceFill(['nodes' => $moved, 'edges' => [...array_map(static fn (array $edge): array => ['id' => 'x' . $edge['id'], ...array_diff_key($edge, ['id' => true])], $edges)]])->save();
+        $this->publish($this->author(), $draft)->assertSuccessful();
+
+        // The same nodes, but the broadcast now hangs off the other branch: the links into it changed.
+        $swapped              = $edges;
+        $swapped[0]['handle'] = 'default';
+        $swapped[2]['handle'] = 'high';
+        $draft->forceFill(['nodes' => $nodes('b', 'b'), 'edges' => $swapped])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+    }
+
+    /**
+     * The triggers start the graph that leads to the broadcast and set how often it goes out, so on a flow with one any
+     * trigger change needs the right, `message` included; the expression engine reads every placeholder in the cone.
+     */
+    public function test_a_trigger_or_engine_change_on_a_flow_with_a_message_to_tags_needs_the_right(): void
+    {
+        $engine = new class () implements ExpressionEngineInterface {
+            public function id(): string
+            {
+                return 'publish_right_test';
+            }
+
+            public function version(): int
+            {
+                return 1;
+            }
+
+            public function evaluate(string $source, ExpressionContext $context): mixed
+            {
+                return $source;
+            }
+
+            public function validate(string $source): void
+            {
+            }
+
+            public function extractReferences(string $source): array
+            {
+                return [];
+            }
+        };
+        $this->app->make(ExpressionEngineRegistry::class)->register($engine);
+
+        $draft = $this->draft($this->upstreamNodes('a'), [$this->message(self::TRIGGER)], ['edges' => $this->upstreamEdges()]);
+        $this->publish($this->author(Permission::ManageBroadcast), $draft)->assertSuccessful();
+
+        // Unchanged, with its trigger: no right.
+        $this->publish($this->author(), $draft)->assertSuccessful();
+
+        $draft->forceFill(['triggers' => [[...$this->message(self::TRIGGER), 'config' => ['phrases' => ['hi'], 'keywords' => []]]]])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+
+        $draft->forceFill(['triggers' => [$this->message(self::TRIGGER)], 'expression_engine' => 'publish_right_test'])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+
+        // Without a message to tags, the same changes need nothing.
+        $plain = $this->draft(attributes: ['triggers' => [[...$this->message(self::OTHER_TRIGGER), 'config' => ['phrases' => ['bye'], 'keywords' => []]]]]);
+        $this->publish($this->author(), $plain)->assertSuccessful();
+        $plain->forceFill(['triggers' => [[...$this->message(self::OTHER_TRIGGER), 'config' => ['phrases' => ['ciao'], 'keywords' => []]]]])->save();
+        $this->publish($this->author(), $plain)->assertSuccessful();
+    }
+
+    /**
+     * A template placed before a host's broadcast: the host's parameter values rewrite the copy, which is in the cone.
+     * Publishing the template republishes its hosts without their check, so a changed template needs the right while
+     * any host's active definition has a message to tags or a segment; an unchanged one does not.
+     */
+    public function test_a_template_leading_to_a_hosts_message_to_tags_needs_the_right(): void
+    {
+        $templateNodes = static fn (string $text): array => [
+            ['id' => 't-loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                'mode'          => 'counted',
+                'iterator_name' => 'i',
+                'count_source'  => ['type' => 'literal', 'value' => 2],
+            ]],
+            ['id' => 't-le', 'type' => 'loop_end', 'version' => 1, 'config' => ['loop_node_id' => 't-loop']],
+            ['id' => 't-say', 'type' => 'send_message', 'version' => 1, 'parameters' => [['key' => 'greeting', 'label' => null, 'field' => 'text']], 'config' => [
+                'content_type' => 'text',
+                'text'         => ['en' => $text],
+                'addressee'    => ['kind' => 'contact', 'contact' => '{{flow.customer_id}}'],
+            ]],
+            ['id' => 't-done', 'type' => 'template_output', 'version' => 1, 'config' => ['name' => 'done']],
+        ];
+        $template = FlowDraft::factory()->template()->create([
+            'tenant_id'    => $this->tenantId,
+            'assistant_id' => $this->assistant->getKey(),
+            'nodes'        => $templateNodes('Hi'),
+            'edges'        => [
+                ['id' => 'te0', 'from' => 't-loop', 'to' => 't-say', 'handle' => 'loop'],
+                ['id' => 'te1', 'from' => 't-say', 'to' => 't-le', 'handle' => 'default'],
+                ['id' => 'te2', 'from' => 't-loop', 'to' => 't-done', 'handle' => 'default'],
+            ],
+        ]);
+        $this->publish($this->author(), $template)->assertSuccessful();
+
+        $reference = static fn (array $values): array => ['id' => 'ref', 'type' => 'template', 'version' => 1, 'config' => array_filter([
+            'template_flow_id' => $template->flow_id,
+            'outputs'          => [['name' => 'done', 'label' => null]],
+            'parameter_values' => $values,
+        ])];
+        $host = $this->draft(
+            [$reference([]), ...$this->audienceNodes('Hello')],
+            attributes: ['edges' => [
+                ['id' => 'e0', 'from' => 'ref', 'to' => 'tell', 'handle' => 'done'],
+                ...$this->audienceEdges(),
+            ]],
+        );
+        $this->publish($this->author(Permission::ManageBroadcast), $host)->assertSuccessful();
+        $this->publish($this->author(), $host)->assertSuccessful();
+
+        $host->forceFill(['nodes' => [$reference(['greeting' => ['en' => 'Pay now']]), ...$this->audienceNodes('Hello')]])->save();
+        $this->publish($this->author(), $host)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+
+        // The template itself: unchanged it republishes freely, changed it needs the right.
+        $this->publish($this->author(), $template)->assertSuccessful();
+
+        $template->forceFill(['nodes' => $templateNodes('Hi there')])->save();
+        $this->publish($this->author(), $template)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+        $this->publish($this->author(Permission::ManageBroadcast), $template)->assertSuccessful();
+
+        // The host's live version now comes from the template's republish: an unchanged host still needs nothing.
+        $host->forceFill(['nodes' => [$reference([]), ...$this->audienceNodes('Hello')]])->save();
+        $this->publish($this->author(Permission::ManageBroadcast), $host)->assertSuccessful();
+        $this->publish($this->author(Permission::ManageBroadcast), $template)->assertSuccessful();
+        $this->publish($this->author(), $host)->assertSuccessful();
+    }
+
+    /**
+     * A subflow seeds the variables of the flow it starts: a caller of a flow with a message to tags is checked like
+     * what leads to that message, and a caller of a flow without one is not.
+     */
+    public function test_a_subflow_that_starts_a_flow_with_a_message_to_tags_needs_the_right(): void
+    {
+        $broadcaster = $this->draft($this->audienceNodes('Hi {{flow.offer}}'), attributes: ['edges' => $this->audienceEdges()]);
+        $this->publish($this->author(Permission::ManageBroadcast), $broadcaster)->assertSuccessful();
+        $quiet = $this->draft();
+        $this->publish($this->author(), $quiet)->assertSuccessful();
+
+        $caller = static fn (string $flowId, string $offer): array => [
+            ['id' => 'sub', 'type' => 'subflow', 'version' => 1, 'config' => [
+                'flow_id'       => $flowId,
+                'timeout'       => 'PT1H',
+                'input_mapping' => ['offer' => $offer],
+            ]],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [['id' => 'e1', 'from' => 'sub', 'to' => 'end', 'handle' => 'default']];
+
+        $draft = $this->draft($caller($broadcaster->flow_id, '10%'), attributes: ['edges' => $edges]);
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+        $this->publish($this->author(Permission::ManageBroadcast), $draft)->assertSuccessful();
+        $this->publish($this->author(), $draft)->assertSuccessful();
+
+        $draft->forceFill(['nodes' => $caller($broadcaster->flow_id, 'anything')])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+
+        // Pinned to the version with the broadcast, after a later version dropped it: the pinned version decides.
+        $broadcaster->forceFill(['nodes' => [['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']]], 'edges' => []])->save();
+        $this->publish($this->author(), $broadcaster)->assertSuccessful();
+        $pinned                              = $caller($broadcaster->flow_id, 'pinned');
+        $pinned[0]['config']['flow_version'] = 1;
+        $pinnedDraft                         = $this->draft($pinned, attributes: ['edges' => $edges]);
+        $this->publish($this->author(), $pinnedDraft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+        $this->publish($this->author(), $this->draft($caller($broadcaster->flow_id, 'latest'), attributes: ['edges' => $edges]))->assertSuccessful();
+
+        $plain = $this->draft($caller($quiet->flow_id, '10%'), attributes: ['edges' => $edges]);
+        $this->publish($this->author(), $plain)->assertSuccessful();
+        $plain->forceFill(['nodes' => $caller($quiet->flow_id, 'anything')])->save();
+        $this->publish($this->author(), $plain)->assertSuccessful();
+    }
+
     public function test_a_flow_without_audience_messages_publishes_without_the_right_to_broadcast(): void
     {
         $draft = $this->draft($this->audienceNodes('Hello', addressee: ['kind' => 'contact', 'contact' => '{{flow.customer_id}}']), attributes: ['edges' => $this->audienceEdges()]);
@@ -366,6 +650,67 @@ final class FlowAutomationPermissionsTest extends CredentialsTestCase
     private function audienceEdges(): array
     {
         return [['id' => 'e1', 'from' => 'tell', 'to' => 'end', 'handle' => 'default']];
+    }
+
+    /**
+     * An assign that writes what the broadcast after it reads.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function upstreamNodes(string $value): array
+    {
+        return [$this->assignNode('set', $value), ...$this->audienceNodes('Hello {{session.x}}')];
+    }
+
+    /**
+     * @return list<array<string, string>>
+     */
+    private function upstreamEdges(): array
+    {
+        return [['id' => 'e0', 'from' => 'set', 'to' => 'tell', 'handle' => 'default'], ...$this->audienceEdges()];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function assignNode(string $id, string $value): array
+    {
+        return ['id' => $id, 'type' => 'assign', 'version' => 1, 'config' => [
+            'operations' => [['variable' => ['name' => 'x', 'storage' => 'session'], 'value' => $value]],
+        ]];
+    }
+
+    /**
+     * A counted loop whose body sends to tags, then runs `after` before the loop_end jumps back.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function loopNodes(string $after): array
+    {
+        return [
+            ['id' => 'loop', 'type' => 'loop', 'version' => 1, 'config' => [
+                'mode'          => 'counted',
+                'iterator_name' => 'i',
+                'count_source'  => ['type' => 'literal', 'value' => 3],
+            ]],
+            $this->audienceNodes('Hello {{session.x}}')[0],
+            $this->assignNode('after', $after),
+            ['id' => 'le', 'type' => 'loop_end', 'version' => 1, 'config' => ['loop_node_id' => 'loop']],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+    }
+
+    /**
+     * @return list<array<string, string>>
+     */
+    private function loopEdges(): array
+    {
+        return [
+            ['id' => 'e1', 'from' => 'loop', 'to' => 'tell', 'handle' => 'loop'],
+            ['id' => 'e2', 'from' => 'tell', 'to' => 'after', 'handle' => 'default'],
+            ['id' => 'e3', 'from' => 'after', 'to' => 'le', 'handle' => 'default'],
+            ['id' => 'e4', 'from' => 'loop', 'to' => 'end', 'handle' => 'default'],
+        ];
     }
 
     /**

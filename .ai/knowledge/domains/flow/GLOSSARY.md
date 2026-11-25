@@ -197,6 +197,14 @@ The evaluator used for templates in node config. The author chooses it per flow 
 and publishing snapshots its id onto the definition (`adr-20261119-expression-engine-chosen-per-flow`). Only the
 `template` engine exists.
 
+## Audience message cone
+
+What leads to a node, as publishing compares it: the node, every node that can reach it by an edge or by a
+`loop_end`'s jump back to its `loop`, and the edges into them (`Support/AudienceMessageCone`). Publishing needs
+`ManageBroadcast` when the cone of a `send_message` to tags or a segment — or of a `subflow`/`start_flow` node that
+starts a flow with one — differs from the published one
+(`adr-20261125-broadcast-publish-right-covers-what-leads-to-it`).
+
 ## Content translator
 
 `ContentTranslatorInterface`: resolves a translation key to text in the content language —
