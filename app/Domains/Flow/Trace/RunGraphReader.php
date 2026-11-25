@@ -25,9 +25,10 @@ use stdClass;
  * executed, what each node did, the passes of each loop, and the subflow children drawn inside it.
  *
  * Statuses only. Every trace field is read by name from a whitelist ({@see self::FIELDS}) — the node's input, output and
- * error message never leave the database here, so a screen gated by `ViewFlowSessions` alone may show the result. Full
- * node data waits for `ViewRunPayloads` (spec flow-automations). The definition's node config is not passed either: it
- * can hold what the trace masks (a token in a `call` URL).
+ * error message never leave the database here, so a screen gated by `ViewFlowSessions` alone may show the result. A
+ * visit's full data is read one visit at a time by {@see RunPayloadReader}, behind `ViewRunPayloads`; a visit carries
+ * only its row's `id` to ask for it. The definition's node config is not passed either: it can hold what the trace masks
+ * (a token in a `call` URL).
  *
  * Every query is bounded by the current tenant; a session is found by the caller.
  *
@@ -39,7 +40,7 @@ use stdClass;
  * @phpstan-type PassNode array{id: string, status: string, handle: string|null}
  * @phpstan-type GraphLoop array{nodeId: string, passes: list<array{pass: int, nodes: list<PassNode>}>}
  * @phpstan-type GraphChild array{nodeId: string, count: int, flow: array<string, mixed>}
- * @phpstan-type GraphFlow array{sessionId: string, status: string, flowName: string|null, nodes: list<GraphNode>, edges: list<GraphEdge>, loops: list<GraphLoop>, children: list<GraphChild>}
+ * @phpstan-type GraphFlow array{sessionId: string, status: string, runKind: string, flowName: string|null, nodes: list<GraphNode>, edges: list<GraphEdge>, loops: list<GraphLoop>, children: list<GraphChild>}
  *
  * A child's `flow` is a `GraphFlow` one level deeper; a type alias cannot name itself, so it stays `array<string, mixed>`.
  */
@@ -92,9 +93,10 @@ final readonly class RunGraphReader
     }
 
     /**
-     * The newest {@see self::VISIT_LIMIT} trace rows of one node, statuses only.
+     * The newest {@see self::VISIT_LIMIT} trace rows of one node, statuses only. `id` is the trace row's, the key a holder
+     * of `ViewRunPayloads` reads the visit's data by ({@see RunPayloadReader}).
      *
-     * @return list<array{event: string, at: string|null, status: string, handle: string|null, next: string|null, durationMs: float|null, iterations: array<string, int>, errorClass: string|null}>
+     * @return list<array{id: string, event: string, at: string|null, status: string, handle: string|null, next: string|null, durationMs: float|null, iterations: array<string, int>, errorClass: string|null}>
      */
     public function visits(FlowSession $session, string $nodeId): array
     {
@@ -113,6 +115,7 @@ final readonly class RunGraphReader
             }
 
             $visits[] = [
+                'id'         => (string) $row->id,
                 'event'      => (string) $row->event_type,
                 'at'         => null === $row->created_at ? null : (string) $row->created_at,
                 'status'     => self::statusOf($row),
@@ -361,6 +364,7 @@ final readonly class RunGraphReader
         return [
             'sessionId' => (string) $session->getKey(),
             'status'    => $session->status->value,
+            'runKind'   => $session->run_kind->value,
             'flowName'  => $definition?->name,
             'nodes'     => $this->nodes($nodes, array_filter($runs)),
             'edges'     => self::edges($edges),

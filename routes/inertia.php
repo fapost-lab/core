@@ -316,6 +316,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::get('assistant/{assistant}/flow-sessions/{record}', [FlowSessionController::class, 'show'])->name('console.flow-sessions.show');
         Route::get('assistant/{assistant}/flow-sessions/{record}/graph', [FlowSessionController::class, 'graph'])->name('console.flow-sessions.graph');
         Route::get('assistant/{assistant}/flow-sessions/{record}/graph/visits', [FlowSessionController::class, 'visits'])->middleware('throttle:120,1')->name('console.flow-sessions.visits');
+        // One node visit's data (input, output, error message) for a holder of ViewRunPayloads: one trace row a request,
+        // throttled on a counter of its own (the key prefix), apart from the visits list and the run's other actions.
+        Route::get('assistant/{assistant}/flow-sessions/{record}/graph/visits/{entry}', [FlowSessionController::class, 'payload'])->middleware('throttle:60,1,flow-run-payload')->name('console.flow-sessions.payload');
         // Re-running a failed automation run from the start sends its calls and messages again: throttled, and a
         // repeated request before the new run exists starts it once (its fire key is the same).
         Route::post('assistant/{assistant}/flow-sessions/{record}/rerun', [FlowSessionController::class, 'rerun'])->middleware('throttle:10,1')->name('console.flow-sessions.rerun');

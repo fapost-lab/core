@@ -200,7 +200,7 @@ broken.
   `AutomationRunDeadlineSweeperRedisTest`, `SweepOverdueAutomationRunsCommandTest`, `AutomationRunTest`.
 
 - **The node trace is always written, masked and limited before it is written, never inside a step's transaction,
-  and read by screens for statuses only.** `FlowEngine` calls `NodeTraceRecorder` for every node of every session: `node_entered`,
+  and read by screens for statuses, its data one visit at a time behind `ViewRunPayloads`.** `FlowEngine` calls `NodeTraceRecorder` for every node of every session: `node_entered`,
   then `node_completed` or `node_failed`, into `flow_session_history`, whatever `logging_enabled` (which still gates
   `state_change` and `subflow_*`). Only an automation run's rows carry `input`/`output`, and only while
   `flow.trace.payloads` is on: nothing deletes a conversation's history, so a conversation's trace keeps no payloads
@@ -213,8 +213,11 @@ broken.
   `NodeTraceRecorder::EVENT_TYPES` out of the session's history. The run graph (`RunGraphReader`, behind
   `ViewFlowSessions`) reads the trace through a whitelist of envelope fields selected by JSON path — type, status,
   handle, next node, duration, loop iterations, error class — so `input`, `output` and the error message never leave
-  the database; they wait for a screen gated by `ViewRunPayloads` (spec `flow-automations`: `ViewFlowSessions` shows
-  the graph and statuses only). Code that reads the trace for another screen keeps the same whitelist. A handler's
+  the database through it, not even for a holder of `ViewRunPayloads` (spec `flow-automations`: `ViewFlowSessions`
+  shows the graph and statuses only). Those are read only by `RunPayloadReader`, after `FlowSessionPolicy::viewPayloads()`,
+  one trace row of a session of the run a request (`FlowSessionController::payload()`, throttled, `no-store`); a
+  visit carries only its row's `id` and, for a holder, whether it has data (checked in SQL). Code that reads the trace
+  for another screen keeps the same whitelist or goes through `RunPayloadReader` behind the same ability. A handler's
   `NodeExecutionResult::$trace` goes to the trace only. Enforced: `NodeTraceRecordingTest`, `CallNodeTraceTest`,
   `TracePayloadMaskerTest`, `TracePayloadLimiterTest`, `FlowSessionsConsoleTest`, `FlowRunGraphConsoleTest`
   (`adr-20261119-node-trace-in-session-history`).

@@ -34,7 +34,8 @@ final class FlowSessionPolicy
 
     /**
      * Whether the user may read the full input and output of the nodes in the session's trace: what outside services
-     * answered, contact data included. No screen shows them yet: the run graph page draws statuses only.
+     * answered, contact data included. The run graph page draws statuses for anyone who may view the session; this
+     * ability opens one visit's data (`FlowSessionController::payload()`, {@see \App\Domains\Flow\Trace\RunPayloadReader}).
      */
     public function viewPayloads(AuthUser $authUser, FlowSession $session): bool
     {
