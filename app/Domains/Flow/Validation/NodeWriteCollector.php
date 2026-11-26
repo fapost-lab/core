@@ -21,8 +21,9 @@ use InvalidArgumentException;
  * {@see \App\Domains\Flow\Services\VariableSchemaCollector} (publish-time type conflicts and `tenant_variable_schema`),
  * {@see FlowGraphStructureValidator::variableContractErrors()} (the variable contract),
  * `resources/js/builder/composables/useFlowVariables.ts` (the builder's variable picker), the docblocks of
- * {@see LoopConfigChecker} and {@see VariablePathConflictChecker}, and `docs/reference/specs/flow-engine/06-validation.md`
- * (`variable_path_conflict`, the no-name rule and the loop writes).
+ * {@see LoopConfigChecker} and {@see VariablePathConflictChecker}, `docs/reference/specs/flow-engine/06-validation.md`
+ * (`variable_path_conflict`, the no-name rule and the loop writes) and
+ * `docs/reference/specs/builder/storage/10-variable-type-coercion.md` (what publish collects into the schema).
  */
 final readonly class NodeWriteCollector
 {

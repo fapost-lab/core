@@ -265,14 +265,7 @@ final readonly class RunGraphReader
             return $run;
         }
 
-        $endStatus = $child->getAttribute('end_status');
-        $handle    = match (true) {
-            is_string($endStatus) && '' !== $endStatus                                                              => EndStatus::tryFrom($endStatus),
-            FlowSessionStatus::Failed === $child->status, FlowSessionStatus::Expired === $child->status             => EndStatus::Failed,
-            FlowSessionStatus::Cancelled === $child->status, FlowSessionStatus::TerminatedByUser === $child->status => EndStatus::Cancelled,
-            default                                                                                                 => EndStatus::Success,
-        };
-        $handle = match ($handle) {
+        $handle = match (EndStatus::handedBackBy($child->getAttribute('end_status'), $child->status)) {
             EndStatus::Cancelled => SubflowNodeHandler::HANDLE_CANCELLED,
             EndStatus::Failed    => SubflowNodeHandler::HANDLE_FAILED,
             default              => SubflowNodeHandler::HANDLE_SUCCESS,

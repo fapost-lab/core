@@ -55,7 +55,8 @@ attributes) until another publish re-declares it.
 `flow_definitions`:
 
 1. `VariableSchemaCollector::collect()` extracts declarations from `input` (`config.variable`),
-   `assign` (`config.operations[*].variable`) and `send_message` (`config.save_to_variable`).
+   `assign` (`config.operations[*].variable`), `send_message` (`config.save_to_variable`) and `ask_person`
+   (`config.save_to_variable`).
 2. `assertNoVariableTypeConflicts()` compares each declaration with the existing row owned by a
    different flow. A different `type` yields `variable_type_conflict` (message from
    `VariableTypeConflictException`: `Variable "{path}" is declared as "{existing}" in flow "{name}", cannot redeclare as "{new}"`).

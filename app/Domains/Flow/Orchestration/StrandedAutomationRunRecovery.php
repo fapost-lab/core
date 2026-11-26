@@ -37,7 +37,10 @@ use Throwable;
  * per threshold, not one per pass.
  *
  * Bound `scoped`: the setting is read through the scoped settings reader. Tenant context is owned by the caller; the
- * tenant is passed explicitly as well, and every query is filtered by it.
+ * tenant is passed explicitly as well. The candidate roots and the sessions of a run are filtered by it, and a root read
+ * again under the lock is checked against it; the walks along a subflow chain ({@see SegmentHandOff::chainOf()},
+ * {@see SegmentHandOff::strandedShapeOf()}) follow `parent_session_id` from a session of the tenant and are not
+ * filtered again.
  */
 final readonly class StrandedAutomationRunRecovery
 {

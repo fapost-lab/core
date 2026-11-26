@@ -506,9 +506,10 @@ broken.
 - **A schedule claims its slot in the tenant, creates its run `pending` in the same transaction, and never catches
   up.** `ScheduleTriggerFirer` moves `flow_triggers.next_run_at` from the slot it read to the next one by compare-and-set
   and, in the same transaction, creates the run `pending` (`FlowEngineInterface::prepare()`, fire key
-  `schedule:<UTC minute>`, deadline written) or skips the slot: the flow's draft or the draft's assistant is gone
-  (`tick_skipped` `flow_not_live`, and the row moves to no slot: nobody is left to switch the schedule off; this fate
-  is decided before the transaction and before lateness), more than
+  `schedule:<UTC minute>`, deadline written) or skips the slot: the trigger's config can never run
+  (`flow.schedule.unusable_config`, the row moves to no slot), the flow's draft or the draft's assistant is gone
+  (`tick_skipped` `flow_not_live`, and the row moves to no slot: nobody is left to switch the schedule off; these two
+  fates are decided before the transaction and before lateness), more than
   5 minutes late (`flow.schedule.tick_missed`, the next slot counted from now), no active runnable definition
   (`tick_skipped` `flow_not_live`, the next slot kept), the flow is switched off in the flows list (`tick_skipped`
   `flow_off`, logged at info: the owner chose it), or a previous root run of the

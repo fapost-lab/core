@@ -169,6 +169,44 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertSame('nodes.sm_1', $result->errors[0]->path);
     }
 
+    public function test_ask_person_edge_with_the_default_handle_or_none_is_an_orphaned_button_edge(): void
+    {
+        $service = $this->makeServiceWithSendMessage();
+        $button  = '0192f0c4-7d1e-7a3b-8c4d-5e6f708192a3';
+
+        $result = $service->execute(
+            nodes: [
+                'ask' => [
+                    'id'      => 'ask',
+                    'type'    => 'ask_person',
+                    'version' => 1,
+                    'config'  => [
+                        'buttons' => [['id' => $button, 'label' => ['en' => 'Approve'], 'value' => 'approve']],
+                    ],
+                ],
+                'sm_1' => ['id' => 'sm_1', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                'sm_2' => ['id' => 'sm_2', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                'sm_3' => ['id' => 'sm_3', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                'sm_4' => ['id' => 'sm_4', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+            ],
+            edges: [
+                // ask_person has no default branch: the engine never takes either of these.
+                ['id' => 'e1', 'from' => 'ask', 'to' => 'sm_1', 'handle' => 'default'],
+                ['id' => 'e2', 'from' => 'ask', 'to' => 'sm_2'],
+                ['id' => 'e3', 'from' => 'ask', 'to' => 'sm_3', 'handle' => $button],
+                ['id' => 'e4', 'from' => 'ask', 'to' => 'sm_4', 'handle' => 'timeout'],
+            ],
+        );
+
+        $orphans = array_values(array_filter(
+            $result->errors,
+            static fn ($error): bool => 'orphaned_button_edge' === $error->code,
+        ));
+
+        $this->assertCount(2, $orphans);
+        $this->assertSame(['nodes.ask', 'nodes.ask'], array_map(static fn ($error): string => $error->path, $orphans));
+    }
+
     public function test_reply_keyboard_with_default_edge_successor_fails_validation(): void
     {
         $service = $this->makeServiceWithSendMessage();

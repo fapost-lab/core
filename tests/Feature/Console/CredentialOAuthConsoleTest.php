@@ -18,14 +18,17 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use Inertia\Support\SessionKey;
 use Inertia\Testing\AssertableInertia;
+use ReflectionProperty;
 use Tests\Feature\Domains\Credentials\CredentialsTestCase;
 use Tests\Support\FakeTenantAccessMode;
+use Tests\Support\RecordingConnectionResolver;
 
 /**
  * Connecting an `oauth2_authorization_code` credential from the console: the authorization URL with state and PKCE,
@@ -315,6 +318,32 @@ final class CredentialOAuthConsoleTest extends CredentialsTestCase
 
         $this->assertSame(0, CredentialOAuthGrant::query()->count());
         $this->assertSame('credential.disconnected', ActivityEntry::query()->sole()->description);
+    }
+
+    public function test_disconnect_opens_its_transaction_on_the_connection_current_when_it_is_called(): void
+    {
+        $credential = $this->oauthCredential();
+        $this->grant($credential);
+
+        $resolver = new RecordingConnectionResolver($this->app->make('db'));
+        $this->app->instance(ConnectionResolverInterface::class, $resolver);
+
+        $consent = $this->app->make(OAuth2Consent::class);
+
+        $this->assertSame([], $resolver->resolved, 'A connection captured when the consent is built would outlive a tenant switch.');
+
+        // A tenant switch after the consent was built: another default connection, over the same database here.
+        config(['database.connections.switched' => config('database.connections.' . DB::getDefaultConnection())]);
+        $switched = DB::connection('switched');
+        $switched->setPdo(DB::connection()->getPdo());
+        // The test's own transaction is open on that shared PDO already: the switched connection nests in it.
+        (new ReflectionProperty($switched, 'transactions'))->setValue($switched, DB::connection()->transactionLevel());
+        DB::setDefaultConnection('switched');
+
+        $this->assertTrue($consent->disconnect($credential));
+
+        $this->assertSame(['switched'], $resolver->resolved);
+        $this->assertSame(0, CredentialOAuthGrant::query()->count());
     }
 
     public function test_only_an_oauth2_authorization_code_credential_connects(): void

@@ -226,6 +226,36 @@ final class AutomationRunDeadlineSweeperTest extends FeatureTestCase
         ], $kept));
     }
 
+    public function test_a_row_of_another_tenant_under_a_run_is_not_part_of_it_and_is_left_alone(): void
+    {
+        $otherTenantId = (string) Str::uuid();
+        $root          = $this->automation(FlowSessionStatus::Active, ['deadline_at' => $this->now->subMinute()]);
+        $foreign       = $this->automation(FlowSessionStatus::Active, [
+            'tenant_id'         => $otherTenantId,
+            'deadline_at'       => $this->now->subMinute(),
+            'parent_session_id' => $root->getKey(),
+        ]);
+        // A live, overdue row of this tenant below the foreign one: only the walk's tenant filter keeps it out of the run.
+        $foreignChild = $this->automation(FlowSessionStatus::Paused, [
+            'deadline_at'       => $this->now->subMinute(),
+            'parent_session_id' => $foreign->getKey(),
+        ]);
+
+        $this->assertSame($otherTenantId, FlowSession::query()->whereKey($foreign->getKey())->value('tenant_id'));
+        $this->assertSame((string) $root->tenant_id, (string) FlowSession::query()->whereKey($foreignChild->getKey())->value('tenant_id'));
+
+        $report = $this->sweep();
+
+        $this->assertSame(['failed_runs' => 1, 'failed_sessions' => 1, 'skipped_busy' => 0], $report);
+        $this->assertSame(FlowSessionStatus::Failed, $root->refresh()->status);
+
+        foreach ([$foreign, $foreignChild] as $row) {
+            $row->refresh();
+            $this->assertNotSame(FlowSessionStatus::Failed, $row->status);
+            $this->assertSame(1, $row->version);
+        }
+    }
+
     public function test_a_run_whose_lock_is_busy_is_skipped_and_the_others_are_still_swept(): void
     {
         Log::spy();

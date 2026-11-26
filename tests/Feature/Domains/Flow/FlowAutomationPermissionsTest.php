@@ -446,6 +446,86 @@ final class FlowAutomationPermissionsTest extends CredentialsTestCase
     }
 
     /**
+     * A template whose hosts hold no message to tags or a segment, and which holds none itself, leads to no broadcast:
+     * changing its graph needs nothing. (Its engine cannot change on its own here: a host's republish refuses a
+     * template whose engine differs from its own.)
+     */
+    public function test_a_changed_template_whose_hosts_have_no_message_to_tags_publishes_without_the_right(): void
+    {
+        $templateNodes = static fn (string $value): array => [
+            ['id' => 't-set', 'type' => 'assign', 'version' => 1, 'config' => [
+                'operations' => [['variable' => ['name' => 'x', 'storage' => 'session'], 'value' => $value]],
+            ]],
+            ['id' => 't-done', 'type' => 'template_output', 'version' => 1, 'config' => ['name' => 'done']],
+        ];
+        $template = FlowDraft::factory()->template()->create([
+            'tenant_id'    => $this->tenantId,
+            'assistant_id' => $this->assistant->getKey(),
+            'nodes'        => $templateNodes('a'),
+            'edges'        => [['id' => 'te0', 'from' => 't-set', 'to' => 't-done', 'handle' => 'default']],
+        ]);
+        $this->publish($this->author(), $template)->assertSuccessful();
+
+        $host = $this->draft(
+            [
+                ['id' => 'ref', 'type' => 'template', 'version' => 1, 'config' => [
+                    'template_flow_id' => $template->flow_id,
+                    'outputs'          => [['name' => 'done', 'label' => null]],
+                ]],
+                ...$this->audienceNodes('Hello', addressee: ['kind' => 'contact', 'contact' => '{{flow.customer_id}}']),
+            ],
+            attributes: ['edges' => [
+                ['id' => 'e0', 'from' => 'ref', 'to' => 'tell', 'handle' => 'done'],
+                ...$this->audienceEdges(),
+            ]],
+        );
+        $this->publish($this->author(), $host)->assertSuccessful();
+
+        $template->forceFill(['nodes' => $templateNodes('b')])->save();
+        $this->publish($this->author(), $template)->assertSuccessful();
+    }
+
+    /**
+     * With no host at all, a template's own message to tags is judged by its cone: what an upstream node of the
+     * template writes into the text needs the right, and an unchanged republish does not.
+     */
+    public function test_a_templates_own_message_to_tags_with_a_changed_cone_needs_the_right(): void
+    {
+        $templateNodes = fn (string $value): array => [
+            $this->assignNode('t-set', $value),
+            ['id' => 't-say', 'type' => 'send_message', 'version' => 1, 'config' => [
+                'content_type' => 'text',
+                'text'         => ['en' => 'Hello {{session.x}}'],
+                'addressee'    => ['kind' => 'tags', 'tags' => ['vip']],
+            ]],
+            ['id' => 't-done', 'type' => 'template_output', 'version' => 1, 'config' => ['name' => 'done']],
+        ];
+        $template = FlowDraft::factory()->template()->create([
+            'tenant_id'    => $this->tenantId,
+            'assistant_id' => $this->assistant->getKey(),
+            'nodes'        => $templateNodes('a'),
+            'edges'        => [
+                ['id' => 'te0', 'from' => 't-set', 'to' => 't-say', 'handle' => 'default'],
+                ['id' => 'te1', 'from' => 't-say', 'to' => 't-done', 'handle' => 'default'],
+            ],
+        ]);
+
+        // New template with a message to tags: the right is needed, and then the version is live.
+        $this->publish($this->author(), $template)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts'));
+        $this->publish($this->author(Permission::ManageBroadcast), $template)->assertSuccessful();
+        $this->publish($this->author(), $template)->assertSuccessful();
+
+        // Only an upstream node changed; the message node's own fields did not.
+        $template->forceFill(['nodes' => $templateNodes('b')])->save();
+        $this->publish($this->author(), $template)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+        $this->publish($this->author(Permission::ManageBroadcast), $template)->assertSuccessful();
+    }
+
+    /**
      * A subflow seeds the variables of the flow it starts: a caller of a flow with a message to tags is checked like
      * what leads to that message, and a caller of a flow without one is not.
      */
@@ -493,6 +573,110 @@ final class FlowAutomationPermissionsTest extends CredentialsTestCase
         $this->publish($this->author(), $plain)->assertSuccessful();
         $plain->forceFill(['nodes' => $caller($quiet->flow_id, 'anything')])->save();
         $this->publish($this->author(), $plain)->assertSuccessful();
+    }
+
+    /**
+     * A `start_flow` node seeds the variables of the flow it starts like a `subflow` does: what it hands over is in the
+     * cone, and a node that starts a flow without such a message is not checked.
+     */
+    public function test_a_start_flow_that_starts_a_flow_with_a_message_to_tags_needs_the_right(): void
+    {
+        $broadcaster = $this->draft($this->audienceNodes('Hi {{flow.offer}}'), attributes: ['edges' => $this->audienceEdges()]);
+        $this->publish($this->author(Permission::ManageBroadcast), $broadcaster)->assertSuccessful();
+        $quiet = $this->draft();
+        $this->publish($this->author(), $quiet)->assertSuccessful();
+
+        $caller = static fn (string $flowId, string $offer): array => [
+            ['id' => 'start', 'type' => 'start_flow', 'version' => 1, 'config' => [
+                'flow_id'       => $flowId,
+                'addressee'     => ['kind' => 'contact', 'contact' => '{{flow.customer_id}}'],
+                'input_mapping' => ['offer' => $offer],
+            ]],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [['id' => 'e1', 'from' => 'start', 'to' => 'end', 'handle' => 'default']];
+
+        $draft = $this->draft($caller($broadcaster->flow_id, '10%'), attributes: ['edges' => $edges]);
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+        $this->publish($this->author(Permission::ManageBroadcast), $draft)->assertSuccessful();
+        $this->publish($this->author(), $draft)->assertSuccessful();
+
+        $draft->forceFill(['nodes' => $caller($broadcaster->flow_id, 'anything')])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+
+        $plain = $this->draft($caller($quiet->flow_id, '10%'), attributes: ['edges' => $edges]);
+        $this->publish($this->author(), $plain)->assertSuccessful();
+        $plain->forceFill(['nodes' => $caller($quiet->flow_id, 'anything')])->save();
+        $this->publish($this->author(), $plain)->assertSuccessful();
+    }
+
+    /**
+     * A caller holds no message of its own, but how often it starts the broadcasting flow follows its triggers, and
+     * every placeholder it hands over is read by its expression engine.
+     */
+    public function test_a_trigger_or_engine_change_on_a_caller_of_a_flow_with_a_message_to_tags_needs_the_right(): void
+    {
+        $engine = new class () implements ExpressionEngineInterface {
+            public function id(): string
+            {
+                return 'publish_right_caller_test';
+            }
+
+            public function version(): int
+            {
+                return 1;
+            }
+
+            public function evaluate(string $source, ExpressionContext $context): mixed
+            {
+                return $source;
+            }
+
+            public function validate(string $source): void
+            {
+            }
+
+            public function extractReferences(string $source): array
+            {
+                return [];
+            }
+        };
+        $this->app->make(ExpressionEngineRegistry::class)->register($engine);
+
+        $broadcaster = $this->draft($this->audienceNodes('Hi {{flow.offer}}'), attributes: ['edges' => $this->audienceEdges()]);
+        $this->publish($this->author(Permission::ManageBroadcast), $broadcaster)->assertSuccessful();
+
+        $draft = $this->draft(
+            [
+                ['id' => 'sub', 'type' => 'subflow', 'version' => 1, 'config' => [
+                    'flow_id'       => $broadcaster->flow_id,
+                    'timeout'       => 'PT1H',
+                    'input_mapping' => ['offer' => '10%'],
+                ]],
+                ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            [$this->message(self::TRIGGER)],
+            ['edges' => [['id' => 'e1', 'from' => 'sub', 'to' => 'end', 'handle' => 'default']]],
+        );
+        $this->publish($this->author(Permission::ManageBroadcast), $draft)->assertSuccessful();
+
+        // Unchanged, with its trigger: no right.
+        $this->publish($this->author(), $draft)->assertSuccessful();
+
+        $draft->forceFill(['triggers' => [[...$this->message(self::TRIGGER), 'config' => ['phrases' => ['hi'], 'keywords' => []]]]])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+
+        $draft->forceFill(['triggers' => [$this->message(self::TRIGGER)], 'expression_engine' => 'publish_right_caller_test'])->save();
+        $this->publish($this->author(), $draft)
+            ->assertForbidden()
+            ->assertJsonPath('message', __('builder.publish_denied.broadcasts_upstream'));
+        $this->publish($this->author(Permission::ManageBroadcast), $draft)->assertSuccessful();
     }
 
     public function test_a_flow_without_audience_messages_publishes_without_the_right_to_broadcast(): void

@@ -233,7 +233,7 @@ final readonly class AutomationRunner
             return;
         }
 
-        $endStatus = $this->endStatusOf($child);
+        $endStatus = EndStatus::handedBackBy($child->getAttribute('end_status'), $child->status)->value;
 
         $this->logger->info('flow.automation.subflow_return_recovered', [
             'root_id'    => (string) $root->getKey(),
@@ -243,23 +243,5 @@ final readonly class AutomationRunner
         ]);
 
         $this->subflowResumer->resumeIfChild($child, $endStatus);
-    }
-
-    /**
-     * The end a child hands its parent, as the engine hands it when the child's last step runs: its `end` node's
-     * status, or success for a child that ran off its graph and failed for one that failed — or that the subflow
-     * sweeper expired, as the sweeper itself hands it back.
-     */
-    private function endStatusOf(FlowSession $child): string
-    {
-        $endStatus = $child->getAttribute('end_status');
-
-        if (is_string($endStatus) && '' !== $endStatus) {
-            return $endStatus;
-        }
-
-        return in_array($child->status, [FlowSessionStatus::Failed, FlowSessionStatus::Expired], true)
-            ? EndStatus::Failed->value
-            : EndStatus::Success->value;
     }
 }

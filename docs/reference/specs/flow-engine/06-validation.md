@@ -99,7 +99,7 @@ Graph-level checks (need `edges`):
 | `end_node_has_outgoing_edge` | an `end` node is terminal |
 | `loop_nested_not_allowed`, `loop_missing_loop_end` | no nested loops; every loop reaches its `loop_end` |
 | `keyboard_node_must_be_terminal` | a `send_message` with `content_type = text_with_keyboard` has no `default` successor and is the last root in its sequence |
-| `orphaned_button_edge` | a non-default edge from `send_message`, or from `ask_person` other than its `timeout` and `error` handles, matches an existing button id of that node exactly (case-sensitive) |
+| `orphaned_button_edge` | a non-default edge from `send_message`, or any edge from `ask_person` other than its `timeout` and `error` handles (`default` or no handle included: `ask_person` has no default branch), matches an existing button id of that node exactly (case-sensitive) |
 | `button_value_type_mismatch` | a button value matches the declared `save_to` variable type |
 | call-graph codes (`CallGraphViolation::$code`) | subflow cycles and depth over the limit, via `CallGraphValidator`; skipped when no flow id is known |
 

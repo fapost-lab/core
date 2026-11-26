@@ -10,6 +10,7 @@ use App\Domains\Credentials\Models\Credential;
 use App\Domains\Credentials\Models\CredentialOAuthGrant;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -254,6 +255,29 @@ final class CredentialWriterTest extends CredentialsTestCase
 
         $this->assertNull(Credential::query()->find($credential->id));
         $this->assertSame(["credentials:oauth2:{$this->tenantId}:{$other->id}:v1"], array_keys($this->redis->values));
+    }
+
+    public function test_delete_locks_the_credential_row_before_it_deletes_the_grant(): void
+    {
+        $credential = $this->oauthCredential();
+        $this->grant($credential);
+
+        /** @var list<string> $statements */
+        $statements = [];
+        DB::listen(static function (QueryExecuted $query) use (&$statements): void {
+            $statements[] = mb_strtolower($query->sql);
+        });
+
+        $this->writer()->delete($credential);
+
+        $lockedAt = $this->firstStatement($statements, static fn (string $sql): bool => str_starts_with($sql, 'select') && str_contains($sql, 'from "credentials"'));
+        $grantAt  = $this->firstStatement($statements, static fn (string $sql): bool => str_starts_with($sql, 'delete') && str_contains($sql, 'from "credential_oauth_grants"'));
+
+        $this->assertNotNull($lockedAt, 'The credential row is read (locked) first.');
+        $this->assertNotNull($grantAt, 'The grant is deleted.');
+        $this->assertLessThan($grantAt, $lockedAt, 'The credential row comes before its grant: the order a consent takes them in.');
+        $this->assertSame(0, CredentialOAuthGrant::query()->count());
+        $this->assertNull(Credential::query()->find($credential->id));
     }
 
     public function test_an_update_drops_the_cached_tokens_of_the_credential(): void
@@ -506,6 +530,21 @@ final class CredentialWriterTest extends CredentialsTestCase
         }
 
         $this->assertSame($count, Credential::query()->count());
+    }
+
+    /**
+     * @param  list<string>  $statements
+     * @param  callable(string): bool  $matches
+     */
+    private function firstStatement(array $statements, callable $matches): ?int
+    {
+        foreach ($statements as $index => $sql) {
+            if ($matches($sql)) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 
     private function writer(): CredentialWriter
