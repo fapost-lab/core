@@ -60,6 +60,15 @@ value stored in the database wins over them, and resetting the stored value brin
 | `FLOW_AUTOMATION_SUCCEEDED_RETENTION_DAYS` | `7` | `flow.automation_runs.succeeded_retention_days`: how many days a succeeded automation run is kept before `flow:prune-automation-runs` deletes it; `0` keeps them forever. A value that is not a whole number from 0 to 3650 is ignored |
 | `FLOW_AUTOMATION_FAILED_RETENTION_DAYS` | `30` | `flow.automation_runs.failed_retention_days`: the same for every other finished automation run |
 | `FLOW_TRACE_PAYLOADS` | `true` | `flow.trace.payloads`: whether an automation run's node trace keeps each node's masked input and output; conversation traces never do |
+| `FLOW_AUTOMATION_RUNS_PER_TRIGGER_PER_MINUTE` | `60` | `flow.automations.runs_per_trigger_per_minute`: how many runs one trigger other than a message may start in a minute before it is paused |
+| `FLOW_WEBHOOK_PER_TOKEN_PER_MINUTE` | `120` | `flow.webhook.per_token_per_minute`: how many requests one [webhook trigger](/using/webhook-trigger) URL accepts in a minute before it answers `429` |
+| `FLOW_WEBHOOK_SYNC_WAIT_SECONDS` | `30` | `flow.webhook.sync_wait_seconds`: how long a webhook or API request that waits for the flow's answer is held open, at most 30 |
+| `FLOW_WEBHOOK_SYNC_WAITERS_MAX` | `5` | `flow.webhook.sync_waiters_max`: how many such requests may wait at once across all tenants; each holds a PHP worker |
+| `FLOW_WEBHOOK_SYNC_WAITERS_PER_TENANT` | `2` | `flow.webhook.sync_waiters_per_tenant`: how many of them one tenant may have waiting at once |
+| `API_TOKEN_DEFAULT_TTL_DAYS` | `90` | `api_tokens.default_ttl_days`: how many days a new [API token](/using/api-tokens) lives when its issuer picks no other expiry |
+| `API_TOKEN_MAX_TTL_DAYS` | `365` | `api_tokens.max_ttl_days`: the longest expiry an issuer may give an API token |
+| `API_TOKEN_ROTATION_GRACE_HOURS` | `24` | `api_tokens.rotation_grace_hours`: how many hours a rotated API token keeps working next to its successor; `0` ends it at once |
+| `API_TOKEN_PER_MINUTE` | `60` | `api_tokens.per_minute`: how many requests one API token may make in a minute |
 | `TENANCY_RENAME_REDIRECT_DAYS` | `30` | `tenancy.rename.redirect_days`, described above |
 | `AUDIT_RETENTION_DAYS` | `365` | `audit.retention_days`: how many days an entry of the [activity log](/using/activity-log) is kept, for every tenant; `0` keeps it forever. A value that is not a whole number from 0 to 3650 is ignored |
 

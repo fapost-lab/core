@@ -35,8 +35,10 @@ supervisors by priority:
 | `low`      | `messaging.broadcast`, `messaging.system`, `messaging.logging` | Bulk sends and bookkeeping, niced down |
 | `default`  | `default`                                                   | Anything unclassified |
 
-A supervisor of its own, `solution-jobs`, serves the `solution-jobs.<id>` queues of installed
-[Solutions](/extending/solutions#background-jobs) on `redis-long`. It exists only while at
+Two supervisors of their own run on `redis-long` for [Solutions](/extending/solutions): `solutions`
+(one process) serves `solutions.migrate`, which prepares a Solution's tables in a tenant schema, and
+`solution-jobs` serves the `solution-jobs.<id>` queues of installed
+[Solutions](/extending/solutions#background-jobs). `solution-jobs` exists only while at
 least one Solution is installed, with one worker per Solution and one more for the busiest. A Solution installed later has its queue served after
 `php artisan horizon:terminate`, which every upgrade runs.
 

@@ -64,15 +64,9 @@ again, and later Composer commands run with `COMPOSER=composer.local.json`; see
 The overlay file, post-install steps and the options of `composer overlay` are described in
 [Development setup](/extending/development-setup#packages-core-does-not-require).
 
-## Changing the link
+## The link
 
-The **Find more Solutions** link is the [platform setting](/self-hosting/platform-settings)
-`solutions.marketplace_url`, by default this page. Point it at your own catalogue, or make it empty to hide
-the link:
-
-```bash
-php artisan platform:settings:set solutions.marketplace_url https://example.com/solutions
-php artisan platform:settings:set solutions.marketplace_url ""
-```
+The **Find more Solutions** link of a self-hosted install points at `https://fapost.in/solutions`, a
+redirect on FaPost's website to this page. It is not configurable.
 
 A platform that sells Solutions through an operator package shows its own offers instead, and no link.
