@@ -1,7 +1,7 @@
 ---
 id: adr-20261125-broadcast-publish-right-covers-what-leads-to-it
 type: adr
-status: proposed
+status: accepted
 date: 2026-11-25
 domains:
   - flow

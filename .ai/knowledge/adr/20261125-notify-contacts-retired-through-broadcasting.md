@@ -1,7 +1,7 @@
 ---
 id: adr-20261125-notify-contacts-retired-through-broadcasting
 type: adr
-status: proposed
+status: accepted
 date: 2026-11-25
 domains:
   - flow
