@@ -256,8 +256,22 @@ flaws fixed on 21 October 2026.
 
 ## Extension packages and Foundation
 
-Core now requires `fapost/foundation` ^0.29. A Solution, connector or operator package
-installed next to it must accept that version, or Composer will not install the upgrade.
+Core now requires `fapost/foundation` ^0.49. A Solution, connector or operator package
+installed next to it (`fapost/saas` included) must accept that version, or Composer will not
+install the upgrade. Two changes on the way can reach a package's code:
+
+- A flow run may now have no contact (schedule, webhook, API and event starts). A node that declares
+  `none` or `any` through Foundation's `DeclaresContextRequirementInterface` then gets `null` for
+  `NodeExecutionContext::$contactId` and `$platform`, and an action behind a `call` node gets `null` for
+  `CallContext::$contactId`. A node that declares nothing is refused at publish in such a flow. See the
+  [handler contract](/extending/flow-nodes/handler-contract).
+- Core's `ActionAvailabilityInterface` is now `SolutionAvailabilityInterface` and gained
+  `isReady()`; code that type-hints or implements the old name must follow.
+- `platform:update` now refuses, before migrating anything, a Solution or connector that registers
+  migrations through `loadMigrationsFrom()`; such a package stops the upgrade until it declares them in
+  its manifest (see [Solutions](/extending/solutions#tenant-migrations)).
+- A Solution's console UI built for a kit, Vue or Inertia outside the range Core ships is no longer
+  served: staff see a page asking for an update, and the Solutions screen marks it *Needs an update*.
 
 ## Host-mode installs: sessions are now checked
 
@@ -292,6 +306,71 @@ Schedule triggers run from this release on, through `flow:fire-scheduled-trigger
 adds the table `flow_schedule_registry`, so run `platform:update` (or the landlord migration) as usual. A schedule
 published before the upgrade does not run until its flow is published again: open each flow with a schedule and
 publish it. See [Schedule trigger](/using/schedule-trigger).
+
+## Three more Horizon supervisors
+
+Horizon gains `automations` (the `flow.automations` queue: flows started by a trigger rather than a
+message), `solutions` (`solutions.migrate`, on `redis-long`) and, while at least one Solution is
+installed, `solution-jobs`. They start with the `horizon:terminate` every upgrade ends with; until
+then no automation run moves. See [Queues](/reference/queues#which-worker-takes-which).
+
+## Seven more scheduled tasks
+
+The scheduler runs seven more tasks (`flow:fire-scheduled-triggers`, `flow:rebuild-schedule-registry`,
+`flow:sweep-overdue-automation-runs`, `flow:prune-automation-runs`, `audit:prune`,
+`credentials:refresh-oauth2-grants`, `api-tokens:notify-expiring`), so `schedule:run` must be running
+every minute. `flow:prune-automation-runs` deletes finished automation runs after 7 days (succeeded)
+or 30 days (all others) unless the [platform settings](/self-hosting/platform-settings) say otherwise.
+
+## New permissions and custom roles
+
+The upgrade adds permissions and grants them to the built-in roles only:
+
+| Permission | Granted to |
+|---|---|
+| **Manage automations**, **Use credentials**, **View run payloads**, **Re-run failed automation runs** | Admin, Content manager |
+| **Manage credentials**, **Manage API tokens**, **Start flow runs through the API**, **View the activity log** | Admin |
+
+A custom role gets none of them, and some things it could do before now need one: publishing a change
+to a schedule, webhook, API or event trigger, and switching on a flow that has one, needs
+**Manage automations**, and publishing a change to a
+message to tags or a segment, or to what leads to one, needs **Manage broadcasts**. Edit custom roles
+after the upgrade; see [Roles and permissions](/using/roles-and-permissions).
+
+## Switched-off flows stop their automatic triggers
+
+The on/off switch in the flows list now applies to every trigger other than a message: a flow that is
+switched off starts no run from a schedule, webhook, API call, event or a Solution's trigger, and its webhook and API
+addresses answer `404`. A flow that was switched off long ago but whose triggers kept firing stops
+after the upgrade. Conversations are not affected. See [Publishing](/using/publishing).
+
+## Notify's contacts mode sends through Broadcasting
+
+A published *notify* node in contacts mode keeps running, but each pass now creates a broadcast
+(shown as *From automation* on the Broadcasts screen) and is throttled like any broadcast. While one
+broadcast of the node is running another pass sends nothing, and a text with `{{contact.*}}` or
+`{{module.*}}` sends nothing. A draft that adds or changes a node in this mode is refused at publish;
+use *Send message* to tags or a segment instead. See [Broadcasts](/using/broadcasts).
+
+The two jobs the old mode queued are kept in 0.25 so that notifications queued before the upgrade are
+still delivered, and are removed after it: upgrade to 0.25 first and let the `messaging.broadcast`
+queue drain there before moving to a later release.
+
+## Stricter publish checks
+
+Publishing now refuses structurally broken graphs, loop mistakes, variable path clashes, invalid
+trigger settings and *ask person* edges that match no button exactly. Flows already published keep
+running; they are refused only on their next publish. To find the structurally broken ones first:
+
+```bash
+php artisan flow:audit-graph
+```
+
+## The Solutions directory link is fixed
+
+`SOLUTIONS_MARKETPLACE_URL` and the platform setting `solutions.marketplace_url` are gone; a stored
+value is ignored. The **Find more Solutions** link of a self-hosted install always points at
+`https://fapost.in/solutions`. Remove the variable from your environment.
 
 ## Console route names and the assistant parameter
 
