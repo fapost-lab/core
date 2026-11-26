@@ -33,9 +33,11 @@ use Throwable;
  * on (to its next slot, or to none) only if it still holds the one this pass read — and the slot's fate is decided and
  * written:
  *
+ *  - a trigger whose config can never run (published under an older validator) starts nothing
+ *    (`flow.schedule.unusable_config`) and its schedule stops: the row moves to no slot;
  *  - a flow nobody can manage any more — its draft or the draft's assistant is gone — starts nothing
  *    (`flow.schedule.tick_skipped`, `flow_not_live`) and its schedule stops: the row moves to no slot, as when the flow
- *    is deleted, since nobody is left to switch it off. This fate alone is decided first, before the transaction and
+ *    is deleted, since nobody is left to switch it off. These two fates are decided first, before the transaction and
  *    whether the slot is late; every other one below is decided in one transaction of the tenant connection with the
  *    move to the next slot;
  *  - a slot claimed more than {@see self::LATE_AFTER_SECONDS} after it came due (the platform or the tenant was down)

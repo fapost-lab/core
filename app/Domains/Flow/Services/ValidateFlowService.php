@@ -1196,12 +1196,13 @@ final readonly class ValidateFlowService
     }
 
     /**
-     * Verifies that every non-default edge originating from a send_message or ask_person node references
-     * a button id that actually exists in that node's buttons array. Orphaned handles arise
+     * Verifies that every non-default edge originating from a send_message node, and every edge from an ask_person
+     * node, references a button id that actually exists in that node's buttons array. Orphaned handles arise
      * when a button is deleted without removing the corresponding outgoing edge, or when an
      * imported ask_person edge differs from its button id in case: the engine matches a handle
      * to the id exactly, so such a branch would never be taken. ask_person's own `timeout` and
-     * `error` handles are not buttons and are skipped.
+     * `error` handles are not buttons and are skipped; it has no `default` branch, so an edge with that handle or
+     * none is never taken either.
      *
      * @param  array<string, array<string, mixed>>  $nodeMap
      * @param  array<int, array<string, mixed>>     $edges
@@ -1217,7 +1218,7 @@ final readonly class ValidateFlowService
             $fromId = $edge['from'] ?? null;
             $handle = $edge['handle'] ?? 'default';
 
-            if (! is_string($fromId) || 'default' === $handle) {
+            if (! is_string($fromId)) {
                 continue;
             }
 
@@ -1225,6 +1226,10 @@ final readonly class ValidateFlowService
             $type = is_array($node) ? ($node['type'] ?? null) : null;
 
             if ('send_message' !== $type && AskPersonNodeHandler::TYPE !== $type) {
+                continue;
+            }
+
+            if ('send_message' === $type && 'default' === $handle) {
                 continue;
             }
 

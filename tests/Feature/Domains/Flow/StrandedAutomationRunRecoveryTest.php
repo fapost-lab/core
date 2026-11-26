@@ -175,6 +175,20 @@ final class StrandedAutomationRunRecoveryTest extends FeatureTestCase
         Queue::assertNothingPushed();
     }
 
+    public function test_a_recently_moved_row_of_another_tenant_under_the_run_does_not_keep_it_from_idling(): void
+    {
+        $run     = $this->automation(FlowSessionStatus::Active, ['segment_id' => (string) Str::uuid()], idleMinutes: 11);
+        $foreign = $this->automation(FlowSessionStatus::Active, [
+            'tenant_id'         => (string) Str::uuid(),
+            'parent_session_id' => $run->getKey(),
+        ], idleMinutes: 0);
+
+        $this->assertNotSame($this->tenantId, FlowSession::query()->whereKey($foreign->getKey())->value('tenant_id'));
+
+        $this->assertSame(['recovered_runs' => 1, 'skipped_busy' => 0], $this->recover());
+        $this->assertSame((string) $run->getKey(), Queue::pushed(ContinueAutomationRunJob::class)->sole()->sessionId);
+    }
+
     public function test_the_threshold_follows_the_setting(): void
     {
         config(['flow.automation.recover_after_minutes' => 30]);

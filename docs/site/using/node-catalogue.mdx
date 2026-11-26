@@ -60,9 +60,10 @@ starts a flow with such a block counts as one too: what it hands over fills that
 broadcast's text. Publishing a template that changed needs
 it too when a flow that places the template has such a block. Blocks after it, on
 another branch, and deleting it need nothing. Not covered: what a flow called by a
-**Subflow** block returns (that flow's own publish is checked) and data from
-outside, such as a trigger's payload, an event another flow emits, or an API's
-answer. To act when the broadcast is done, start a flow on the
+**Subflow** block returns (that flow's own publish is checked), a flow with such a
+block two calls away (flow A starts B, B starts C, and C broadcasts what A handed
+B: only B's publish is checked), and data from outside, such as a trigger's
+payload, an event another flow emits, or an API's answer. To act when the broadcast is done, start a flow on the
 `core.broadcast.completed` event.
 
 If the send fails, the flow leaves through the block's **error** exit, and the flow log

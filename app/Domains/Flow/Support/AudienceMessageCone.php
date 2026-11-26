@@ -14,11 +14,12 @@ use App\Domains\Flow\Handlers\SendMessageNodeHandler;
  * A node's cone is the node and every node it can be reached from: by an edge `from → to`, and by the implicit jump a
  * `loop_end` makes back to its `loop` (`config.loop_node_id`), so a node in a loop body after the broadcast still leads
  * to its next pass. Its fingerprint is each cone node's `type`, `version`, `config` and `parameters` by id, and each
- * edge into a cone node as `(from, handle, to)`. The canvas position, the label, an edge's id and the key order of a
- * config are not part of it; nor is a `loop_end`'s `iterator_name`, which publishing writes from its `loop`'s config,
- * itself in the cone. Every node that can write a `{{flow.*}}` the node reads before it runs is in its cone, so a cone
- * that compares equal means this version reaches and fills the node as the published one did; what a `subflow` callee
- * returns and data from outside (a trigger's payload, an API's answer) are not part of a version.
+ * edge into a cone node as `(from, handle, to)` with the types they were written with (a missing handle is `default`).
+ * The canvas position, the label, an edge's id and the key order of a config are not part of it; nor is a `loop_end`'s
+ * `iterator_name`, which publishing writes from its `loop`'s config, itself in the cone. Every node that can write a
+ * `{{flow.*}}` the node reads before it runs is in its cone, so a cone that compares equal means this version reaches
+ * and fills the node as the published one did; what a `subflow` callee returns and data from outside (a trigger's
+ * payload, an API's answer) are not part of a version.
  */
 final class AudienceMessageCone
 {
@@ -84,9 +85,11 @@ final class AudienceMessageCone
     }
 
     /**
+     * Whether the node is a `send_message` to tags or a segment.
+     *
      * @param  array<array-key, mixed>  $node
      */
-    private static function isAudienceMessage(array $node): bool
+    public static function isAudienceMessage(array $node): bool
     {
         if (SendMessageNodeHandler::TYPE !== ($node['type'] ?? null) || ! is_array($node['config'] ?? null)) {
             return false;
@@ -114,9 +117,14 @@ final class AudienceMessageCone
     }
 
     /**
+     * The edges with a scalar source and target. A missing or null handle is `default`, as the engine reads it
+     * ({@see \App\Domains\Flow\Services\FlowGraphResolver::resolveNextNode()}); any other handle is kept as it is,
+     * type included, so an edge the engine never follows (an empty or a non-string handle) does not compare equal to
+     * one it does. Such an edge still counts as a way in: a wider cone is the cautious side of the check.
+     *
      * @param  array<array-key, mixed>  $edges
      *
-     * @return list<array{from: string, handle: string, to: string}>
+     * @return list<array{from: string, to: string, key: string}>  `key` is the edge as the fingerprint compares it
      */
     private static function edgeList(array $edges): array
     {
@@ -127,12 +135,12 @@ final class AudienceMessageCone
                 continue;
             }
 
-            $handle = $edge['handle'] ?? null;
+            $handle = $edge['handle'] ?? 'default';
 
             $list[] = [
-                'from'   => (string) $edge['from'],
-                'handle' => is_scalar($handle) && '' !== (string) $handle ? (string) $handle : 'default',
-                'to'     => (string) $edge['to'],
+                'from' => (string) $edge['from'],
+                'to'   => (string) $edge['to'],
+                'key'  => json_encode([$edge['from'], self::canonical($handle), $edge['to']], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             ];
         }
 
@@ -143,7 +151,7 @@ final class AudienceMessageCone
      * The ids each node can be entered from: an edge's source, and every `loop_end` that jumps back to a `loop`.
      *
      * @param  array<string, array<array-key, mixed>>                    $byId
-     * @param  list<array{from: string, handle: string, to: string}>     $edges
+     * @param  list<array{from: string, to: string, key: string}>  $edges
      *
      * @return array<string, list<string>>
      */
@@ -195,7 +203,7 @@ final class AudienceMessageCone
     /**
      * @param  array<string, true>                                     $ids
      * @param  array<string, array<array-key, mixed>>                  $byId
-     * @param  list<array{from: string, handle: string, to: string}>   $edges
+     * @param  list<array{from: string, to: string, key: string}>  $edges
      */
     private static function fingerprint(array $ids, array $byId, array $edges): string
     {
@@ -211,7 +219,7 @@ final class AudienceMessageCone
 
         foreach ($edges as $edge) {
             if (isset($ids[$edge['to']])) {
-                $into[] = $edge['from'] . "\0" . $edge['handle'] . "\0" . $edge['to'];
+                $into[] = $edge['key'];
             }
         }
 

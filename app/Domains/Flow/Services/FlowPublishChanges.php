@@ -9,7 +9,6 @@ use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Enums\NotifyMode;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\NotifyNodeHandler;
-use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\StartFlowNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
@@ -237,17 +236,15 @@ final readonly class FlowPublishChanges
         $messages = [];
 
         foreach ($nodes as $node) {
-            if (! is_array($node) || SendMessageNodeHandler::TYPE !== ($node['type'] ?? null) || ! is_array($node['config'] ?? null)) {
+            $id = is_array($node) ? ($node['id'] ?? null) : null;
+
+            if (! is_array($node) || ! is_scalar($id) || ! AudienceMessageCone::isAudienceMessage($node)) {
                 continue;
             }
 
+            /** @var array<array-key, mixed> $config */
             $config    = $node['config'];
             $addressee = AddresseeResolver::parse($config);
-            $id        = $node['id'] ?? null;
-
-            if (! AddresseeResolver::isAudience($addressee['kind']) || ! is_scalar($id)) {
-                continue;
-            }
 
             $tags = $addressee['tags'];
             sort($tags);

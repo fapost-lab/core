@@ -387,16 +387,32 @@ final class ScheduleTriggerFirerTest extends FeatureTestCase
         $run = FlowSession::query()->sole();
 
         // The start job activates the run between the delete's read and its cancel.
-        $this->whenFlowSessionsAreRead('parent_session_id', static fn (): int => FlowSession::query()->whereKey($run->getKey())->update([
-            'status'  => FlowSessionStatus::Active->value,
-            'version' => $run->version + 1,
-        ]));
+        $raced = false;
+        $this->whenFlowSessionsAreRead('parent_session_id', static function () use ($run, &$raced): int {
+            $raced = true;
+
+            return FlowSession::query()->whereKey($run->getKey())->update([
+                'status'  => FlowSessionStatus::Active->value,
+                'version' => $run->version + 1,
+            ]);
+        });
+
+        // The delete's own check for live sessions (`select exists ...`): it must not be what refuses the delete.
+        $lateChecks = 0;
+        DB::listen(static function (QueryExecuted $query) use (&$raced, &$lateChecks): void {
+            if ($raced && str_starts_with($query->sql, 'select exists') && str_contains($query->sql, 'flow_sessions')) {
+                ++$lateChecks;
+            }
+        });
 
         try {
             $this->app->make(FlowDraftService::class)->delete($draft);
             $this->fail('A run whose start won must refuse the delete.');
         } catch (FlowHasLiveSessionsException) {
         }
+
+        $this->assertTrue($raced, 'The start must have won the race inside the delete.');
+        $this->assertSame(0, $lateChecks, 'The refusal comes from the lost optimistic-lock write of the cancel, before the live-sessions check.');
 
         $this->assertNotNull(FlowDraft::query()->find($draft->getKey()));
         $this->assertNotNull($this->trigger()->next_run_at, 'The refusal rolls the stop of the schedule back.');
