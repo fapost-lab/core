@@ -8,8 +8,8 @@ paths:
   - app/Domains/Flow/Handlers/NotifyNodeHandler.php
 source: docs/reference/specs/flow-engine/nodes/notify.md
 summary: "notify node: staff and contacts modes, queues, idempotency markers"
-source_hash: 5a0f0e7318a6f3fa7639d8a83ba16d7c6a13dff6
-reviewed_at: 2026-10-21
+source_hash: 2c940b31c5120b8afa13b0903f2d9ab62300e92a
+reviewed_at: 2026-11-26
 ---
 # Node: `notify`
 
