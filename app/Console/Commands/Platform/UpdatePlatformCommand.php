@@ -14,6 +14,7 @@ use App\Domains\Solution\DTO\ExtensionDiscovery;
 use App\Domains\Solution\DTO\InstalledConnector;
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\DTO\SolutionDiscovery;
+use App\Domains\Solution\DTO\SolutionViolation;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
@@ -23,28 +24,42 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Migrations\Migrator;
 
 /**
- * The one command of an upgrade: check the installed Solutions, migrate, publish their console UI, remember the result.
+ * The one command of an upgrade, in five phases. A phase that fails is reported by its number and name, and what it
+ * leaves undone is said; migrations only go up, so nothing a finished phase applied is ever taken back.
  *
- * Validation comes first and decides everything: a manifest with a violation, or a console UI that does not hold up
- * (`fapost-ui.json`, the files it lists, the components the Solution's PHP declarations name), stops the command before
- * the database, `public/` or the cache is touched. `--validate-only` stops after that check and needs no database,
- * so an extension's CI and a derived image's build can run it.
- *
- * Migrations: the landlord, every tenant's schema, then each Solution's tables where they already are
- * ({@see MigrateSolutionsCommand}). An extension that registered a migration path with
- * Laravel's migrator (`loadMigrationsFrom()`) is refused before that: the landlord migration would run it on the
- * landlord, where no extension keeps tables; a Solution declares `extra.fapost.migrations` instead.
- *
- * After the migrations it warns, per tenant and type, about channels no installed integration serves any more.
+ * 1. Validate: the manifests and the console UI (`fapost-ui.json`, the files it lists, the components the Solution's
+ *    PHP declarations name). A failure stops the command before the database, `public/` or the cache is touched.
+ * 2. Boot validation: the registries this process built when it booted hold what the manifests declare (actions, node
+ *    types, channel types), and no extension registered a migration path with Laravel's migrator (`loadMigrationsFrom()`
+ *    would run it on the landlord, where no extension keeps tables; a Solution declares `extra.fapost.migrations`).
+ *    It needs no database, so a failure here also touches nothing. `--validate-only` stops after this phase, so an
+ *    extension's CI and a derived image's build can run it.
+ * 3. Migrate the platform: the landlord, then every tenant's schema. A landlord failure stops everything after it. A
+ *    failed tenant does not hold the others back, and the Solutions are still migrated, but the activate phase is
+ *    skipped.
+ * 4. Migrate the Solutions, each on its own ({@see MigrateSolutionsCommand}): a Solution's run in one tenant schema is
+ *    one transaction, so a failing Solution is rolled back alone there, keeps answering `solution_not_ready` in that
+ *    tenant until a run succeeds, and the platform and the other Solutions stay migrated.
+ * 5. Activate: warn about channels no installed integration serves any more, publish the console UI and cache the
+ *    catalog. It runs after a Solution failed too, since that Solution degrades only itself; the exit code still fails.
  */
 final class UpdatePlatformCommand extends Command
 {
+    /** @var array<int, string> */
+    private const array PHASES = [
+        1 => 'validate',
+        2 => 'boot validation',
+        3 => 'migrate platform',
+        4 => 'migrate Solutions',
+        5 => 'activate',
+    ];
+
     /** @var string */
     protected $signature = 'platform:update
         {--validate-only : Only check the installed Solutions and connectors; touch neither the database nor the cache}';
 
     /** @var string */
-    protected $description = 'Validate installed Solutions and connectors, migrate the landlord and tenant schemas, and cache the Solution catalog';
+    protected $description = 'Validate installed Solutions and connectors, migrate the landlord, tenant and Solution schemas, and cache the Solution catalog';
 
     public function handle(
         SolutionDiscoverer $discoverer,
@@ -59,6 +74,8 @@ final class UpdatePlatformCommand extends Command
         UnservedChannelsFinderInterface $unserved,
         Migrator $schemaMigrator,
     ): int {
+        $this->phase(1, 'manifests and console UI');
+
         $all       = $discoverer->discoverAll();
         $discovery = $all->solutions;
 
@@ -94,13 +111,7 @@ final class UpdatePlatformCommand extends Command
         }
 
         if ([] !== $ui['problems']) {
-            $this->components->error(sprintf('%d console UI problem(s). Nothing was changed.', count($ui['problems'])));
-
-            foreach ($ui['problems'] as $problem) {
-                $this->line('  ' . $problem);
-            }
-
-            return self::FAILURE;
+            return $this->refuse(1, sprintf('%d console UI problem(s). Nothing was changed.', count($ui['problems'])), $ui['problems']);
         }
 
         $this->components->info(sprintf('Solution manifests are valid (%d installed).', count($discovery->valid)));
@@ -109,51 +120,64 @@ final class UpdatePlatformCommand extends Command
         $this->components->info(sprintf('Connector manifests are valid (%d installed).', count($all->connectors->valid)));
         $this->reportConnectors($all->connectors);
 
+        $this->phase(2, 'registries and migration paths');
+
         $unregistered = $this->unregisteredActions($discovery, $actions, $nodes);
 
         if ([] !== $unregistered) {
-            $this->components->error(sprintf('%d declared action(s) and node type(s) are not registered. Nothing was changed.', count($unregistered)));
-
-            foreach ($unregistered as $line) {
-                $this->line('  ' . $line);
-            }
-
-            return self::FAILURE;
+            return $this->refuse(2, sprintf('%d declared action(s) and node type(s) are not registered. Nothing was changed.', count($unregistered)), $unregistered);
         }
 
         $unregisteredChannels = $this->unregisteredChannels($all->connectors, $connectorChannels);
 
         if ([] !== $unregisteredChannels) {
-            $this->components->error(sprintf('%d declared channel type(s) are not registered. Nothing was changed.', count($unregisteredChannels)));
-
-            foreach ($unregisteredChannels as $line) {
-                $this->line('  ' . $line);
-            }
-
-            return self::FAILURE;
+            return $this->refuse(2, sprintf('%d declared channel type(s) are not registered. Nothing was changed.', count($unregisteredChannels)), $unregisteredChannels);
         }
 
         $landlordPaths = $this->extensionMigrationPaths($all, $schemaMigrator);
 
         if ([] !== $landlordPaths) {
-            $this->components->error(sprintf('%d extension migration path(s) were registered with the landlord migrator. Nothing was changed.', count($landlordPaths)));
-
-            foreach ($landlordPaths as $line) {
-                $this->line('  ' . $line);
-            }
-
-            return self::FAILURE;
+            return $this->refuse(2, sprintf('%d extension migration path(s) were registered with the landlord migrator. Nothing was changed.', count($landlordPaths)), $landlordPaths);
         }
 
         if ((bool) $this->option('validate-only')) {
             return self::SUCCESS;
         }
 
-        if (!$migrator->migrate($this->output)) {
-            $this->components->error('Migrations failed. The Solution catalog was not cached; fix the failure and run the update again.');
+        $this->phase(3, 'the landlord, then every tenant schema');
 
-            return self::FAILURE;
+        if (!$migrator->migrateLandlord($this->output)) {
+            return $this->refuse(3, 'Landlord migrations failed. Nothing after them ran: no tenant or Solution was migrated, and the Solution catalog was not cached; fix the failure and run the update again.');
         }
+
+        $tenantsMigrated = $migrator->migrateTenants($this->output);
+
+        if (!$tenantsMigrated) {
+            $this->components->error(sprintf('Phase 3 (%s): tenant migrations failed for at least one tenant (listed above); the other tenants are migrated.', self::PHASES[3]));
+        }
+
+        $this->phase(4, 'each Solution on its own');
+
+        $failedSolutions = $migrator->migrateSolutions($this->solutionsWithMigrations($discovery), $this->output);
+
+        foreach ($failedSolutions as $solutionId) {
+            $this->components->error(sprintf(
+                'Phase 4 (%s): Solution "%s" failed to migrate in at least one tenant (the ✘ lines above name them). A migration that failed was rolled back in its tenant schema, where the Solution answers solution_not_ready until a run succeeds; the platform and the other Solutions stay migrated.',
+                self::PHASES[4],
+                $solutionId,
+            ));
+        }
+
+        // Each Solution's pass walks every tenant, so a tenant that cannot be switched into or read fails all of them.
+        if (!$tenantsMigrated && [] !== $failedSolutions) {
+            $this->components->warn('A tenant that failed in phase 3 fails every Solution\'s pass as well: a ✘ line that names a tenant and no Solution is that tenant failing, not the Solution.');
+        }
+
+        if (!$tenantsMigrated) {
+            return $this->refuse(3, 'The update stopped before activation: the console UI was not published and the Solution catalog was not cached; fix the failed tenants and run the update again.');
+        }
+
+        $this->phase(5, 'publish the console UI and cache the catalog');
 
         // Never a refusal: the channels stay, unavailable, and come back when the connector is installed again.
         foreach ($unserved->find() as $row) {
@@ -176,7 +200,57 @@ final class UpdatePlatformCommand extends Command
         $this->components->info('Solution catalog cached.');
         $this->line('Restart the queue workers so they run the new code: php artisan horizon:terminate');
 
+        if ([] !== $failedSolutions) {
+            return $this->refuse(4, sprintf(
+                'The update finished for everything else, but %d Solution(s) failed to migrate: %s. Fix them and run the update again.',
+                count($failedSolutions),
+                implode(', ', $failedSolutions),
+            ));
+        }
+
         return self::SUCCESS;
+    }
+
+    private function phase(int $number, string $what): void
+    {
+        $this->newLine();
+        $this->line(sprintf('<options=bold>Phase %d of %d: %s</> (%s)', $number, count(self::PHASES), self::PHASES[$number], $what));
+    }
+
+    /**
+     * Reports a failed phase by its number and name, with one indented line per problem.
+     *
+     * @param  list<string>  $lines
+     */
+    private function refuse(int $phase, string $message, array $lines = []): int
+    {
+        $this->components->error(sprintf('Phase %d (%s): %s', $phase, self::PHASES[$phase], $message));
+
+        foreach ($lines as $line) {
+            $this->line('  ' . $line);
+        }
+
+        return self::FAILURE;
+    }
+
+    /**
+     * The Solutions whose package ships migrations: one without them has no tables to bring current.
+     *
+     * @return list<string>
+     */
+    private function solutionsWithMigrations(SolutionDiscovery $discovery): array
+    {
+        $ids = [];
+
+        foreach ($discovery->valid as $solution) {
+            if (null !== $solution->migrationsDigest) {
+                $ids[] = $solution->id;
+            }
+        }
+
+        sort($ids);
+
+        return $ids;
     }
 
     /**
@@ -230,11 +304,10 @@ final class UpdatePlatformCommand extends Command
     {
         $violations = $discovery->violations();
 
-        $this->components->error(sprintf('%d manifest problem(s). Nothing was changed.', count($violations)));
-
-        foreach ($violations as $violation) {
-            $this->line('  ' . $violation->line());
-        }
+        $this->refuse(1, sprintf('%d manifest problem(s). Nothing was changed.', count($violations)), array_map(
+            static fn (SolutionViolation $violation): string => $violation->line(),
+            $violations,
+        ));
     }
 
     private function reportSolutions(SolutionDiscovery $discovery): void

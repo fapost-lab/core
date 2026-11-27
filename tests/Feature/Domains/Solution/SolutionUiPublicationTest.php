@@ -9,7 +9,7 @@ use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionCache;
 use Illuminate\Filesystem\Filesystem;
-use Symfony\Component\Console\Output\OutputInterface;
+use Tests\Support\FakePlatformMigrator;
 use Tests\Support\InstallsShowcaseSolution;
 use Tests\Support\NoUnservedChannels;
 use Tests\TestCase;
@@ -22,7 +22,7 @@ final class SolutionUiPublicationTest extends TestCase
 {
     use InstallsShowcaseSolution;
 
-    private int $migrations = 0;
+    private FakePlatformMigrator $migrator;
 
     /** @var list<string> */
     private array $copies = [];
@@ -32,18 +32,8 @@ final class SolutionUiPublicationTest extends TestCase
         parent::setUp();
 
         $this->app->instance(UnservedChannelsFinderInterface::class, new NoUnservedChannels());
-        $this->app->instance(PlatformMigratorInterface::class, new class ($this) implements PlatformMigratorInterface {
-            public function __construct(private readonly SolutionUiPublicationTest $test)
-            {
-            }
-
-            public function migrate(OutputInterface $output): bool
-            {
-                $this->test->recordMigration();
-
-                return true;
-            }
-        });
+        $this->migrator = new FakePlatformMigrator();
+        $this->app->instance(PlatformMigratorInterface::class, $this->migrator);
     }
 
     protected function tearDown(): void
@@ -57,11 +47,6 @@ final class SolutionUiPublicationTest extends TestCase
         parent::tearDown();
     }
 
-    public function recordMigration(): void
-    {
-        $this->migrations++;
-    }
-
     public function test_the_update_publishes_the_bundle_under_its_hash_and_caches_it(): void
     {
         $this->installShowcase(publish: false);
@@ -73,7 +58,7 @@ final class SolutionUiPublicationTest extends TestCase
         $hash      = mb_substr(hash_file('sha256', self::showcasePackage() . '/dist/fapost-ui.json'), 0, 12);
         $published = public_path("solutions/showcase/{$hash}");
 
-        $this->assertSame(1, $this->migrations);
+        $this->assertSame(1, $this->migrator->landlordRuns);
         $this->assertFileExists($published . '/fapost-ui.json');
         $this->assertFileEquals(self::showcasePackage() . '/dist/assets/board-index-4c1d2a.js', $published . '/assets/board-index-4c1d2a.js');
         $this->assertFileExists($published . '/assets/showcase-8f3d2c.css');
@@ -115,7 +100,7 @@ final class SolutionUiPublicationTest extends TestCase
             ->expectsOutputToContain('showcase: fapost-ui.json: extra: unknown field')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertDirectoryDoesNotExist(public_path('solutions'));
         $this->assertFileDoesNotExist($this->app->make(SolutionCache::class)->path());
     }
@@ -130,7 +115,7 @@ final class SolutionUiPublicationTest extends TestCase
             ->expectsOutputToContain('showcase: fapost-ui.json: components.Widgets/Stats: "assets/widgets-stats-5a2f08.js" does not exist')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
     }
 
     public function test_a_component_declared_in_php_but_not_listed_stops_the_update(): void
@@ -146,7 +131,7 @@ final class SolutionUiPublicationTest extends TestCase
             ->expectsOutputToContain('showcase: fapost-ui.json: components: "showcase::Widgets/Stats" is declared in PHP but not listed')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
     }
 
     public function test_a_missing_description_file_stops_the_update(): void
@@ -205,7 +190,7 @@ final class SolutionUiPublicationTest extends TestCase
             ->expectsOutputToContain('showcase: fapost-ui.json: pages.Board/Index: "assets/board-index-4c1d2a.js" cannot be published')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertDirectoryDoesNotExist(public_path('solutions'));
     }
 
@@ -221,7 +206,7 @@ final class SolutionUiPublicationTest extends TestCase
                 ->assertExitCode(1);
         }
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertDirectoryDoesNotExist(public_path('solutions'));
     }
 
@@ -235,7 +220,7 @@ final class SolutionUiPublicationTest extends TestCase
             ->expectsOutputToContain('showcase: fapost-ui.json: "assets/shell.php" is PHP')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertDirectoryDoesNotExist(public_path('solutions'));
     }
 
@@ -249,7 +234,7 @@ final class SolutionUiPublicationTest extends TestCase
             ->expectsOutputToContain('showcase: fapost-ui.json: "assets/leak.js" is a link that leads outside the bundle directory')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
     }
 
     public function test_a_bundle_at_the_package_root_stops_the_update(): void
@@ -267,7 +252,7 @@ final class SolutionUiPublicationTest extends TestCase
             ->expectsOutputToContain('showcase: extra.fapost.ui: "fapost-ui.json" sits at the package root')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
     }
 
     public function test_pruning_ignores_what_is_not_a_build_and_removes_leftover_copies(): void

@@ -8,23 +8,31 @@ use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Runs the two commands the upgrade guide has always listed, then brings the tables of the Solutions present in each
- * tenant's schema up to the installed packages.
+ * Runs the two commands the upgrade guide has always listed, then `solutions:migrate` once per Solution: each pass walks
+ * the tenants for that Solution alone, so a failure is known by the Solution that caused it.
  */
 final class ArtisanPlatformMigrator implements PlatformMigratorInterface
 {
-    public function migrate(OutputInterface $output): bool
+    public function migrateLandlord(OutputInterface $output): bool
     {
-        if (0 !== Artisan::call('migrate', ['--database' => 'landlord', '--force' => true], $output)) {
-            return false;
+        return 0 === Artisan::call('migrate', ['--database' => 'landlord', '--force' => true], $output);
+    }
+
+    public function migrateTenants(OutputInterface $output): bool
+    {
+        return 0 === Artisan::call('ops:tenants-migrate', [], $output);
+    }
+
+    public function migrateSolutions(array $solutionIds, OutputInterface $output): array
+    {
+        $failed = [];
+
+        foreach ($solutionIds as $solutionId) {
+            if (0 !== Artisan::call('solutions:migrate', ['--solution' => $solutionId], $output)) {
+                $failed[] = $solutionId;
+            }
         }
 
-        $tenants = 0 === Artisan::call('ops:tenants-migrate', [], $output);
-
-        // A tenant whose schema failed does not hold the others back: each command goes on past a failed tenant, and the
-        // Solutions of the ones that did migrate are brought current too.
-        $solutions = 0 === Artisan::call('solutions:migrate', [], $output);
-
-        return $tenants && $solutions;
+        return $failed;
     }
 }

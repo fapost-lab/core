@@ -188,9 +188,18 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   `ActionHandlerRegistry` (`<package>: extra.fapost.actions[i]: "<id>" is declared but not registered`, exit 1), and every
   declared node type in `NodeHandlerRegistry` (`extra.fapost.nodes[i]`), after the manifest and console UI checks and before any migration.
   `InstalledSolution` carries `nodes` and `state`; a compiled cache without them is stale.
-- `platform:update` (`app/Console/Commands/Platform`): validate the manifests and the console UI bundles, then
-  (unless `--validate-only`) `App\Console\Platform\PlatformMigratorInterface` (landlord migrate and `ops:tenants-migrate`; console-level and deliberately outside this domain, which only validates, publishes and caches), then publish the bundles, then write the cache with them.
-  Any violation exits 1 before the database or the cache is touched. `--validate-only` needs no
+- `platform:update` (`app/Console/Commands/Platform`) runs in five phases and reports a failure as `Phase <n> (<name>)`:
+  validate (manifests, console UI bundles), boot validation (the registry checks above and the landlord-path refusal),
+  then (unless `--validate-only`) migrate platform and migrate Solutions through
+  `App\Console\Platform\PlatformMigratorInterface` (`migrateLandlord`, `migrateTenants`, `migrateSolutions` — one
+  `solutions:migrate --solution=<id>` pass per Solution that ships migrations, so a failure is known by its Solution, at the cost of one tenant walk per such Solution instead of one in all; a tenant that cannot be read fails every pass, which the phase-4 report says;
+  console-level and deliberately outside this domain, which only validates, publishes and caches), then activate
+  (publish the bundles, write the cache with them). Rollback per phase means: nothing applied is taken back (migrations
+  only go up); a landlord failure stops the update; a failed tenant still lets the Solutions migrate but skips activate;
+  a failed Solution is rolled back alone by its per-tenant transaction and activate still runs, with exit 1 — it
+  degrades only itself through `solution_not_ready`. Boot validation runs before any migration on purpose: the
+  registries are built when the command boots and need no database. Proof on the real migrator:
+  `PlatformUpdateSolutionRollbackTest`. Any validation violation exits 1 before the database or the cache is touched. `--validate-only` needs no
   database. `solutions:cache` / `solutions:clear` hang on `optimize` / `optimize:clear`; the container
   entrypoint runs `solutions:cache` with the other caches.
 
@@ -200,7 +209,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler`, `registerNodeHandler` and `registerTriggerType` (`registerMigrations` stays refused: migrations are declared in the manifest), per-phase rollback of `platform:update`, chained or batched Solution jobs.
+- Not here yet: registrar methods other than `registerActionHandler`, `registerNodeHandler` and `registerTriggerType` (`registerMigrations` stays refused: migrations are declared in the manifest), chained or batched Solution jobs.
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not

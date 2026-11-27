@@ -53,11 +53,11 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Inertia;
 use Mockery;
-use Symfony\Component\Console\Output\OutputInterface;
 use Tests\Feature\FeatureTestCase;
 use Tests\Fixtures\Solution\FeedbackCalls;
 use Tests\Fixtures\Solution\FeedbackProbe;
 use Tests\Support\FakeSolutionEntitlement;
+use Tests\Support\FakePlatformMigrator;
 use Tests\Support\FakeVendor;
 use Tests\Support\InMemorySolutionActivationStore;
 use Tests\Support\InstallsFeedbackSolution;
@@ -93,7 +93,7 @@ final class SolutionLifecycleTest extends FeatureTestCase
 
     private TenantInterface $alpha;
 
-    private int $migrations = 0;
+    private FakePlatformMigrator $migrator;
 
     protected function setUp(): void
     {
@@ -105,20 +105,9 @@ final class SolutionLifecycleTest extends FeatureTestCase
         $this->app->instance(FeedbackCalls::class, $this->calls);
         $this->app->scoped(FeedbackProbe::class);
 
-        $this->migrations = 0;
         $this->app->instance(UnservedChannelsFinderInterface::class, new NoUnservedChannels());
-        $this->app->instance(PlatformMigratorInterface::class, new class ($this) implements PlatformMigratorInterface {
-            public function __construct(private readonly SolutionLifecycleTest $test)
-            {
-            }
-
-            public function migrate(OutputInterface $output): bool
-            {
-                $this->test->recordMigration();
-
-                return true;
-            }
-        });
+        $this->migrator = new FakePlatformMigrator();
+        $this->app->instance(PlatformMigratorInterface::class, $this->migrator);
 
         // What the image holds and a booting application does with it: the two packages, their providers, their
         // routes, and (after `installShowcase`) the actions the feedback provider registers.
@@ -139,11 +128,6 @@ final class SolutionLifecycleTest extends FeatureTestCase
         parent::tearDown();
     }
 
-    public function recordMigration(): void
-    {
-        $this->migrations++;
-    }
-
     public function test_a_solution_goes_from_the_image_to_a_tenant_and_back_without_touching_the_others(): void
     {
         $beta = $this->secondTenant();
@@ -152,11 +136,11 @@ final class SolutionLifecycleTest extends FeatureTestCase
         $this->artisan('platform:update', ['--validate-only' => true])
             ->expectsOutputToContain('Solution manifests are valid (2 installed)')
             ->assertExitCode(0);
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertFileDoesNotExist($this->app->make(SolutionCache::class)->path());
 
         $this->artisan('platform:update')->expectsOutputToContain('Solution catalog cached')->assertExitCode(0);
-        $this->assertSame(1, $this->migrations);
+        $this->assertSame(1, $this->migrator->landlordRuns);
         $this->assertSame(['feedback', 'showcase'], array_map(static fn ($solution): string => $solution->id, $this->app->make(SolutionCache::class)->read()));
         $this->forgetSolutionState();
 
