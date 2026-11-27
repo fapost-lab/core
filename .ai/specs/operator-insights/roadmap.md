@@ -11,7 +11,7 @@ recipients with their outcome, and the panel shows flow starts and completions p
 
 - [x] `broadcast-report` — Broadcast report: page, recipients drill-down, dashboard widget (after: ui-foundation phase 2 — the screen is built on the kit)
 - [x] `flow-analytics-view` — Flow analytics view over `analytics_events` (after: ui-foundation phase 3 — it replaces `FlowActivityChart` on the kit's admin dashboard)
-- [ ] Node usage in the panel (after: ui-foundation phase 3 — the screen is built on the kit)
+- [ ] `node-usage-panel` — Node usage in the panel (after: ui-foundation phase 3 — the screen is built on the kit)
 
 ## Phase 2 — A live inbox
 
