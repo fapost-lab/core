@@ -10,7 +10,7 @@ conversation messages, session history and old flow versions, and next month's m
 exists before the first write of the month.
 
 - [x] `conversation-retention` — Conversation retention: `retention_days` read and enforced by a scheduled prune
-- [ ] Message partitions pre-created ahead of writes
+- [ ] `message-partitions-ahead` — Message partitions pre-created ahead of writes
 - [ ] `flow_session_history` retention
 - [ ] Keep the last N published flow versions
 
