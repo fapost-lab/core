@@ -65,7 +65,7 @@ Nothing at the moment. Step 8, the last area listed here, was specified on 2026-
 
 ## Out of scope
 
-- **Staff activity log** — no section of the brief justifies it; its stated purpose is selling to tenants with several staff, and earning money is explicitly not this stage's goal. Detail is kept in the spec `.ai/specs/audit-log/`, outside the product order.
+- **Staff activity log** — no section of the brief justifies it, so it stayed outside the product order; it was built anyway on the owner's request of 2026-10-15 (`admin/activity`, `adr-20261111-audit-log-explicit-recording`), and its spec is closed.
 - **Model-integration server surface** — no section of the brief justifies it; it closes none of the three positioning pillars. Detail is kept in the spec `.ai/specs/mcp-server/`, outside the product order.
 - **Web forms data collection** — a product feature with no anchor in the brief; it neither tests extensibility nor shortens the first-contact path. Detail is kept in the spec `.ai/specs/forms-data-collection/`, outside the product order.
 - **Multi-tenant shell and billing** — the owner's separate closed product, not part of the open distribution (idea-brief.md §5 Out of scope).
