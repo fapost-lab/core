@@ -14,7 +14,7 @@ exists before the first write of the month.
 - [ ] `flow_session_history` retention
 - [ ] Keep the last N published flow versions
 
-- [ ] `fix-flow-log-partition-listing` — `logs:prune-flow` sees and counts only the current tenant schema's `flow_logs` partitions and reads a partition's month correctly on any day (after: `conversation-retention` — found in its review)
+- [x] `fix-flow-log-partition-listing` — `logs:prune-flow` sees and counts only the current tenant schema's `flow_logs` partitions and reads a partition's month correctly on any day (after: `conversation-retention` — found in its review)
 
 ## Phase 2 — Deletion means deletion
 
