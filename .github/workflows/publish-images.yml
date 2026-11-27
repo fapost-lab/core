@@ -7,6 +7,13 @@
 # Multi-architecture on purpose. Developer machines are increasingly arm64 while
 # most servers are amd64, and an image built for one silently refuses to start on
 # the other.
+#
+# A release is usually tagged by the Release tag workflow when its notes pull
+# request merges; that workflow calls this one with the version, because a tag
+# pushed with the automatic token starts no workflow by itself. A tag pushed by
+# hand (a maintenance branch, a release tag retried) runs it through `push`.
+# In a call, `github.ref` is the caller's (`refs/heads/main`), so everything
+# that needs the tag reads `inputs.version` first.
 
 name: Publish images
 
@@ -15,6 +22,18 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      version:
+        description: The v* tag to publish. It must already exist.
+        required: true
+        type: string
+      notes-sha256:
+        description: >-
+          The sha256 of the release text the caller validated; the release is
+          published only if the pull request body still yields exactly that text.
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -22,6 +41,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
+  # The tag this run publishes; empty on a manual run, which publishes no release.
+  RELEASE_TAG: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '' }}
 
 jobs:
   publish:
@@ -49,6 +70,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.version || '' }}
 
       # QEMU lets an amd64 runner emit arm64 layers.
       - uses: docker/setup-qemu-action@v4
@@ -68,11 +91,16 @@ jobs:
           # The short SHA is always applied, so any running container can be
           # traced back to a commit. `latest` follows final releases only: a
           # pre-release tag such as v1.5.0-rc.1 contains a hyphen and must not
-          # move what an operator tracking `latest` receives.
+          # move what an operator tracking `latest` receives. `value` gives the
+          # semver tags the version in a call, where the ref is a branch; on a
+          # tag push it is empty and the tag is read from the ref, as before.
+          # `latest` is only ever the explicit line below.
+          flavor: |
+            latest=false
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
+            type=semver,pattern={{version}},value=${{ inputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }}
+            type=raw,value=latest,enable=${{ env.RELEASE_TAG != '' && !contains(env.RELEASE_TAG, '-') }}
             type=sha,format=short
 
       - uses: docker/build-push-action@v7
@@ -85,36 +113,87 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=${{ env.RELEASE_TAG || github.ref_name }}
           # Layer cache: without it every run recompiles the PHP extensions and
           # reinstalls Composer packages from scratch.
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   # Publishes the GitHub release for the tag once its images exist, so a tag never
-  # stays without release notes. Notes are generated from the merged pull request
-  # titles; the maintainer then moves breaking changes and operator actions to the
-  # top. A release someone already published for the tag is left untouched. A tag
-  # with a `-` becomes a pre-release; manual runs publish nothing.
+  # stays without release notes. When the tagged commit is the squash of a release
+  # notes pull request whose body marks its release text
+  # (`<!-- release-notes:start -->` ... `<!-- release-notes:end -->`), that text is
+  # the release. A call from Release tag requires that text (its detect job already
+  # refused a release without it). Only a tag pushed by hand falls back to notes
+  # generated from the merged pull request titles, which the maintainer then edits
+  # to put breaking changes and operator actions on top. A release someone already
+  # published for the tag is left untouched. A tag with a `-` becomes a
+  # pre-release; manual runs publish nothing.
   release:
     needs: publish
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ inputs.version != '' || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
       - name: Create the GitHub release
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
+          CALLED: ${{ inputs.version != '' }}
+          NOTES_SHA256: ${{ inputs.notes-sha256 }}
         run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            echo "::notice::A release for ${GITHUB_REF_NAME} already exists; left as it is."
+          tag="$RELEASE_TAG"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "::notice::A release for ${tag} already exists; left as it is."
             exit 0
           fi
-          prerelease=""
-          case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
-          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes $prerelease
+          prerelease=()
+          case "$tag" in *-*) prerelease=(--prerelease) ;; esac
+
+          notes=(--generate-notes)
+          sha=$(git rev-parse "refs/tags/${tag}^{commit}" 2>/dev/null || git rev-parse HEAD)
+          # A tag cut before the script existed (a maintenance branch) keeps
+          # generated notes.
+          if [ -f .github/scripts/release-tag.sh ]; then
+            pr=$(gh api "repos/${GH_REPO}/commits/${sha}/pulls" \
+              --jq ".[] | select(.merged_at != null and .base.ref == \"main\" and .merge_commit_sha == \"${sha}\") | .number")
+            if [ "$(printf '%s' "$pr" | grep -c .)" -gt 1 ]; then
+              echo "::error::Commit ${sha} is the merge of more than one pull request: ${pr//$'\n'/ }"
+              exit 1
+            fi
+            if [ -n "$pr" ]; then
+              gh api "repos/${GH_REPO}/pulls/${pr}" --jq .body | tr -d '\r' > "$RUNNER_TEMP/pr-body"
+              code=0
+              bash .github/scripts/release-tag.sh notes "$RUNNER_TEMP/pr-body" > "$RUNNER_TEMP/release-notes.md" || code=$?
+              case "$code" in
+                0) notes=(--notes-file "$RUNNER_TEMP/release-notes.md")
+                   echo "Release text taken from pull request #${pr}." ;;
+                3) echo "Pull request #${pr} marks no release text; generating notes." ;;
+                *) echo "::error::The release text of pull request #${pr} is malformed; the tag ${tag} and its images exist, the release does not."
+                   exit 1 ;;
+              esac
+            fi
+          fi
+          if [ "$CALLED" = true ]; then
+            if [ "${notes[0]}" = --generate-notes ]; then
+              echo "::error::No release text found for ${tag} (the release pull request's body needs the release-notes markers); the tag and its images exist, the release does not. Publish it with gh release create ${tag} --notes-file <file>."
+              exit 1
+            fi
+            # The body may have been edited since Release tag validated it.
+            actual=$(sha256sum "$RUNNER_TEMP/release-notes.md" | cut -d' ' -f1)
+            if [ "$actual" != "$NOTES_SHA256" ]; then
+              echo "::error::The release text of pull request #${pr} changed after Release tag validated it (sha256 ${actual}, expected ${NOTES_SHA256}); the tag and its images exist, the release does not. Publish it with gh release create ${tag} --notes-file <file>."
+              exit 1
+            fi
+          fi
+          gh release create "$tag" --verify-tag "${notes[@]}" "${prerelease[@]}"
 
   # Tells fapost/saas that a stable Core release has its images, so the SaaS
   # image is built for the new version pair. Pre-release tags (with a `-`) and
@@ -122,7 +201,7 @@ jobs:
   # on fapost-lab/saas) is optional: without it the job says so and passes.
   notify-saas:
     needs: publish
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
+    if: ${{ (inputs.version != '' || startsWith(github.ref, 'refs/tags/v')) && !contains(inputs.version || github.ref_name, '-') }}
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch core-release to fapost/saas
@@ -130,7 +209,7 @@ jobs:
           GH_TOKEN: ${{ secrets.SAAS_DISPATCH_TOKEN }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::notice::SAAS_DISPATCH_TOKEN is not set; fapost/saas was not told about ${GITHUB_REF_NAME}."
+            echo "::notice::SAAS_DISPATCH_TOKEN is not set; fapost/saas was not told about ${RELEASE_TAG}."
             exit 0
           fi
-          gh api repos/fapost-lab/saas/dispatches -f event_type=core-release -f "client_payload[core_version]=${GITHUB_REF_NAME}"
+          gh api repos/fapost-lab/saas/dispatches -f event_type=core-release -f "client_payload[core_version]=${RELEASE_TAG}"

@@ -1,0 +1,192 @@
+# Tags the release when its notes pull request merges into main.
+#
+# Merging the release notes pull request is the instruction to release. A push
+# to main is a release when the pull request it squashes carries the
+# `Release-Notes-Through:` trailer `jig task ship` writes for a notes task, in
+# its commits or as a line of its body (a release epic); the version is the
+# `Release-Version: vX.Y.Z` line of its body and the version in its title, which
+# must agree, and its body must mark the release text. Only a pull request titled
+# `docs(release): ... vX.Y.Z` by an OWNER, MEMBER or COLLABORATOR releases, and HTML
+# comments in it are ignored; anything else that reads like a release is refused.
+# Publish images publishes the release text only if it is still the one validated
+# here (its sha256 is passed along). `.github/scripts/release-tag.sh` decides, and is
+# tested by `release-tag.test.sh` in CI.
+#
+# Any doubt is a red run and no tag: a release-looking commit without the
+# trailer, a trailer that is not the commit's parent (something reached main the
+# notes do not describe), a malformed or disagreeing version, a tag that exists,
+# a version not above the latest `v*` tag or not the next one, missing or broken
+# release text markers, or CI not green on the commit. A pushed tag publishes images and
+# is never moved. A refused release is fixed at its cause — the pull request's
+# body, CI — and the failed jobs re-run, which runs every check again; or it is
+# tagged by hand.
+#
+# The tag is pushed with the automatic token, which starts no workflow, so the
+# images and the GitHub release are published by calling Publish images here.
+# Re-run a failed run with "Re-run failed jobs": "Re-run all jobs" after the tag
+# exists is refused by the tag check, as it should be.
+
+name: Release tag
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A group per commit: a later push never cancels or drops a pending release run.
+# Two release runs at once cannot both tag: each checks the tags again just
+# before it pushes, and git refuses a tag that exists.
+concurrency:
+  group: release-tag-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    name: Detect the release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      release: ${{ steps.detect.outputs.release }}
+      version: ${{ steps.detect.outputs.version }}
+      notes-sha256: ${{ steps.detect.outputs.notes-sha256 }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Read the commit, its pull request and the tags
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          dir="$RUNNER_TEMP/release"
+          mkdir -p "$dir"
+          git log -1 --format=%B "$SHA" | tr -d '\r' > "$dir/message"
+          git rev-parse "${SHA}^1" > "$dir/parent"
+          git ls-remote --tags origin 'refs/tags/v*' | bash .github/scripts/release-tag.sh tags > "$dir/tags"
+
+          # The pull request a squash merge came from; the API can lag a merge by
+          # a few seconds. None found leaves only the commit itself to judge, and
+          # a commit that reads like a release without proof is refused.
+          prs=""
+          for attempt in 1 2 3 4 5 6; do
+            prs=$(gh api "repos/${GH_REPO}/commits/${SHA}/pulls" \
+              --jq ".[] | select(.merged_at != null and .base.ref == \"main\" and .merge_commit_sha == \"${SHA}\") | .number")
+            [ -n "$prs" ] && break
+            [ "$attempt" = 6 ] || sleep 10
+          done
+          count=$(printf '%s' "$prs" | grep -c . || true)
+          if [ "$count" -gt 1 ]; then
+            echo "::error::Commit ${SHA} is the merge of more than one pull request: ${prs//$'\n'/ }"
+            exit 1
+          fi
+          if [ "$count" = 1 ]; then
+            echo "Pull request #${prs}."
+            gh api "repos/${GH_REPO}/pulls/${prs}" --jq .title | tr -d '\r' > "$dir/pr-title"
+            gh api "repos/${GH_REPO}/pulls/${prs}" --jq .author_association > "$dir/pr-author-association"
+            gh api "repos/${GH_REPO}/pulls/${prs}" --jq .body | tr -d '\r' > "$dir/pr-body"
+            gh api --paginate "repos/${GH_REPO}/pulls/${prs}/commits" --jq '.[].commit.message' \
+              | tr -d '\r' > "$dir/pr-commits"
+          else
+            echo "No pull request found for ${SHA}."
+          fi
+
+      - name: Decide
+        id: detect
+        shell: bash
+        run: |
+          code=0
+          version=$(bash .github/scripts/release-tag.sh detect "$RUNNER_TEMP/release") || code=$?
+          case "$code" in
+            0) # The release text as validated now; Publish images reads the body
+               # again later and publishes it only if it is still this text.
+               notes_sha256=$(bash .github/scripts/release-tag.sh notes "$RUNNER_TEMP/release/pr-body" | sha256sum | cut -d' ' -f1)
+               echo "Release ${version}, release text sha256 ${notes_sha256}."
+               { echo "release=true"; echo "version=${version}"; echo "notes-sha256=${notes_sha256}"; } >> "$GITHUB_OUTPUT" ;;
+            3) echo "Not a release commit."
+               echo "release=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::Not tagged: see the refusal above."
+               exit 1 ;;
+          esac
+
+  # The push-to-main run of CI checks the commit a tag points at as merged; a
+  # release is tagged only once it is green.
+  ci:
+    name: Wait for CI
+    needs: detect
+    if: needs.detect.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      actions: read
+    steps:
+      - name: Wait for CI on the release commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          while :; do
+            run=$(gh api "repos/${GH_REPO}/actions/workflows/ci.yml/runs?head_sha=${SHA}&event=push&per_page=1" \
+              --jq '.workflow_runs[0] // empty | [.status, (.conclusion // ""), .html_url] | @tsv')
+            if [ -n "$run" ]; then
+              IFS=$'\t' read -r status conclusion url <<< "$run"
+              if [ "$status" = completed ]; then
+                if [ "$conclusion" = success ]; then
+                  echo "CI is green: ${url}"
+                  exit 0
+                fi
+                echo "::error::CI on ${SHA} ended ${conclusion}: ${url}. Re-run it, then re-run the failed jobs of this run."
+                exit 1
+              fi
+              echo "CI is ${status}: ${url}"
+            else
+              echo "CI has not started on ${SHA} yet."
+            fi
+            sleep 30
+          done
+
+  tag:
+    name: Tag the release
+    needs: [detect, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Create and push the annotated tag
+        shell: bash
+        env:
+          VERSION: ${{ needs.detect.outputs.version }}
+          SHA: ${{ github.sha }}
+        run: |
+          # Tags may have appeared while CI ran: check again just before pushing.
+          git ls-remote --tags origin 'refs/tags/v*' | bash .github/scripts/release-tag.sh tags > "$RUNNER_TEMP/tags"
+          bash .github/scripts/release-tag.sh check "$VERSION" "$RUNNER_TEMP/tags"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "$VERSION" "$SHA"
+          git push origin "refs/tags/${VERSION}"
+          echo "Tagged ${VERSION} on ${SHA}."
+
+  publish:
+    name: Publish
+    needs: [detect, tag]
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: read
+    uses: ./.github/workflows/publish-images.yml
+    with:
+      version: ${{ needs.detect.outputs.version }}
+      notes-sha256: ${{ needs.detect.outputs.notes-sha256 }}
+    secrets: inherit
