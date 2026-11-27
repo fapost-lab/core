@@ -52,7 +52,7 @@ leaves the install serving every other flow, and a Solution migration that fails
 - [ ] Failure isolation at boot: a Solution that fails to boot is marked degraded, new sessions of
       its flows do not start, running ones finish (after: activation storage — degraded is a state
       of an activation)
-- [ ] `platform-update-phased-rollback` — `platform:update` with per-phase rollback: validate, migrate platform, migrate each Solution
+- [x] `platform-update-phased-rollback` — `platform:update` with per-phase rollback: validate, migrate platform, migrate each Solution
       separately, boot validation, activate (after: the manifest — phase 1 validates it)
 
 ## Waves
