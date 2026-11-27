@@ -115,10 +115,11 @@ Options: `--tenant` for a single slug and `--json`.
 
 `logs:prune-flow` accepts `--dry-run` to preview which partitions would be dropped.
 
-## Conversation retention
+## Conversation partitions and retention
 
 | Command | Does |
 |---|---|
+| `conversations:create-partition` | Create the current and next month's `conversation_messages` partitions when missing, in every active tenant. Runs daily |
 | `conversations:prune` | Drop `conversation_messages` monthly partitions older than the platform setting `conversation.retention_days` (default from `CONVERSATION_RETENTION_DAYS`), in every active tenant. Does nothing when it is `0` or unset |
 
 `conversations:prune` accepts `--dry-run`. Dropping is irreversible; threads and
