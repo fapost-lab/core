@@ -17,8 +17,9 @@ use Throwable;
 /**
  * Applies the Foundation manifest rules to every candidate package, then the checks that need the
  * whole installation: the provider class exists and is a Solution provider, and no two packages
- * claim the same id. Fails closed: a package with a violation, and both packages of a collision,
- * never reach `valid`.
+ * claim the same id or the same chat command (commands carry no id prefix, since a contact types
+ * them). Fails closed: a package with a violation, and both packages of a collision, never reach
+ * `valid`.
  */
 final class SolutionManifestValidator
 {
@@ -111,10 +112,57 @@ final class SolutionManifestValidator
             $valid[] = $solutions[0];
         }
 
+        [$valid, $commandViolations] = $this->withoutCommandCollisions($valid);
+        $violations                  = [...$violations, ...$commandViolations];
+
         usort($valid, static fn (InstalledSolution $a, InstalledSolution $b): int => $a->id <=> $b->id);
         usort($violations, static fn (SolutionViolation $a, SolutionViolation $b): int => $a->line() <=> $b->line());
 
         return new SolutionDiscovery($valid, $violations, $warnings, $installedJsonPath, $watched);
+    }
+
+    /**
+     * Leaves out every Solution that declares a chat command another valid Solution declares too.
+     *
+     * @param  list<InstalledSolution>  $solutions
+     * @return array{0: list<InstalledSolution>, 1: list<SolutionViolation>}
+     */
+    private function withoutCommandCollisions(array $solutions): array
+    {
+        $claims = [];
+
+        foreach ($solutions as $solution) {
+            foreach ($solution->commands as $command) {
+                $claims[$command][] = $solution->package;
+            }
+        }
+
+        $violations = [];
+        $colliding  = [];
+
+        foreach ($claims as $command => $packages) {
+            if (count($packages) < 2) {
+                continue;
+            }
+
+            sort($packages);
+            $colliding = [...$colliding, ...$packages];
+
+            $violations[] = new SolutionViolation(
+                implode(', ', $packages),
+                'extra.fapost.commands',
+                sprintf('"%s" is declared by %s', $command, 2 === count($packages) ? 'both packages' : 'all ' . count($packages) . ' packages'),
+            );
+        }
+
+        if ([] === $colliding) {
+            return [$solutions, []];
+        }
+
+        return [
+            array_values(array_filter($solutions, static fn (InstalledSolution $solution): bool => !in_array($solution->package, $colliding, true))),
+            $violations,
+        ];
     }
 
     /**

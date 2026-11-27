@@ -6,6 +6,9 @@ namespace App\Domains\Flow\Validation;
 
 use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
 use App\Domains\Flow\Commands\CommandActionType;
+use App\Domains\Flow\Commands\CommandActionTypeRegistry;
+use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
+use Fapost\Foundation\Flow\Enums\NodeConfigIssueSeverity;
 use InvalidArgumentException;
 
 /**
@@ -14,7 +17,11 @@ use InvalidArgumentException;
  * Per ADR Message Routing § Validation:
  *  - Each command must start with '/' and contain no whitespace
  *  - Commands must be unique within an assistant
- *  - Action type must be a known {@see CommandActionType}
+ *  - Action type must be a known {@see CommandActionType}, or a type a Solution
+ *    registered ({@see CommandActionTypeRegistry}) whose `validateConfig()`
+ *    finds no error in the entry's `config`; a dotted type nobody registers is
+ *    refused as not installed. A registered type of a Solution the tenant has
+ *    not activated is accepted: it simply does not match until it is.
  *  - {@code start_flow} requires a non-empty flow_id
  *  - Built-in commands (/reset, /cancel) may be redeclared only with the
  *    canonical type (terminate_session) — only the response text is overridable
@@ -28,13 +35,17 @@ final readonly class AssistantCommandsValidator
 {
     public function __construct(
         private BuiltinCommandsRegistry $builtins,
+        private CommandActionTypeRegistry $actionTypes,
     ) {
     }
 
     /**
      * @param  list<array<string, mixed>>  $commands
+     * @param  mixed  $stored  the assistant's commands as stored before this save: an entry of a dotted type nobody
+     *                         registers any more is kept when it is stored unchanged, so a removed Solution never
+     *                         blocks saving the rest
      */
-    public function validate(array $commands): void
+    public function validate(array $commands, mixed $stored = []): void
     {
         $seen = [];
 
@@ -62,10 +73,13 @@ final readonly class AssistantCommandsValidator
             }
             $seen[$command] = $index;
 
-            $type = CommandActionType::tryFrom((string) ($entry['type'] ?? ''));
+            $typeName = (string) ($entry['type'] ?? '');
+            $type     = CommandActionType::tryFrom($typeName);
 
             if (null === $type) {
-                throw new InvalidArgumentException("{$position}.type must be one of: " . $this->allowedTypes());
+                $this->validateRegistered($position, $command, $typeName, $entry['config'] ?? [], $stored);
+
+                continue;
             }
 
             if (CommandActionType::StartFlow === $type) {
@@ -91,8 +105,81 @@ final readonly class AssistantCommandsValidator
         }
     }
 
+    /**
+     * A value with every map's keys sorted: a stored entry comes back from jsonb in its own key order.
+     */
+    private static function sorted(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $value = array_map(self::sorted(...), $value);
+
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
+    }
+
+    private function validateRegistered(string $position, string $command, string $typeName, mixed $config, mixed $stored): void
+    {
+        if (! $this->actionTypes->has($typeName)) {
+            if (str_contains($typeName, '.') && $this->isStoredUnchanged($command, $typeName, $config, $stored)) {
+                return;
+            }
+
+            if (str_contains($typeName, '.')) {
+                throw new InvalidArgumentException("{$position}.type \"{$typeName}\" is not installed: no Solution registers it.");
+            }
+
+            throw new InvalidArgumentException("{$position}.type must be one of: " . $this->allowedTypes());
+        }
+
+        if ($this->builtins->has($command)) {
+            throw new InvalidArgumentException("{$position} overrides built-in '{$command}' with the type {$typeName}; only response text is overridable.");
+        }
+
+        // A config the type accepted when it was saved stays saveable after the Solution tightened its rules: the
+        // console cannot edit it, so refusing it would block every other setting.
+        if ($this->isStoredUnchanged($command, $typeName, $config, $stored)) {
+            return;
+        }
+
+        if (! is_array($config)) {
+            throw new InvalidArgumentException("{$position}.config must be an object.");
+        }
+
+        /** @var array<string, mixed> $config */
+        foreach ($this->actionTypes->get($typeName)->validateConfig($config) as $issue) {
+            if ($issue instanceof NodeConfigIssue && NodeConfigIssueSeverity::Error === $issue->severity) {
+                $field = null === $issue->field ? '' : '.' . $issue->field;
+
+                throw new InvalidArgumentException("{$position}.config{$field}: {$issue->message}");
+            }
+        }
+    }
+
+    private function isStoredUnchanged(string $command, string $typeName, mixed $config, mixed $stored): bool
+    {
+        foreach (is_array($stored) ? $stored : [] as $entry) {
+            if (is_array($entry)
+                && ($entry['command'] ?? null) === $command
+                && ($entry['type'] ?? null) === $typeName
+                && self::sorted($entry['config'] ?? []) === self::sorted($config)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function allowedTypes(): string
     {
-        return implode(', ', array_map(static fn (CommandActionType $t): string => $t->value, CommandActionType::cases()));
+        return implode(', ', [
+            ...array_map(static fn (CommandActionType $t): string => $t->value, CommandActionType::cases()),
+            ...$this->actionTypes->types(),
+        ]);
     }
 }

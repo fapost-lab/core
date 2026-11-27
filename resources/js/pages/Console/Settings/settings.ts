@@ -1,5 +1,5 @@
 import { localizedRecord } from '@fapost/ui/components/localized-field'
-import type { CommandState, MessageEntry, SettingRow, SettingsTab } from './types'
+import type { CommandState, JsonValue, MessageEntry, SettingRow, SettingsTab } from './types'
 
 /** The settings form as the page holds it; `commands` carry a list key that is never sent. */
 export interface SettingsFormData {
@@ -14,10 +14,11 @@ export interface SettingsFormData {
 
 export interface CommandPayload {
   command: string
-  type: CommandState['type']
+  type: CommandState['type'] | string
   response?: Record<string, string>
   flow_id?: string | null
   text?: Record<string, string>
+  config?: Record<string, JsonValue>
 }
 
 export interface SettingsPayload {
@@ -47,7 +48,7 @@ export function newCommand(languages: string[], key: string): CommandState {
 }
 
 /**
- * What is sent: each command with only the fields its type uses, and each localized text as the languages that have
+ * What is sent: each command (a Solution's action as stored) with only the fields its type uses, and each localized text as the languages that have
  * text. The server normalizes the same way; sending less keeps a hidden field from failing validation.
  */
 export function toPayload(data: SettingsFormData): SettingsPayload {
@@ -58,6 +59,11 @@ export function toPayload(data: SettingsFormData): SettingsPayload {
     fallback_message: localizedRecord(data.fallback_message),
     busy_message: localizedRecord(data.busy_message),
     commands: data.commands.map((command) => {
+      // A Solution's action has no editor yet: it goes back exactly as stored, so saving other settings never loses it.
+      if (command.extension) {
+        return { command: command.command.trim(), type: command.extension.type, config: command.config ?? {} }
+      }
+
       const row: CommandPayload = { command: command.command.trim(), type: command.type }
 
       if (command.type === 'terminate_session') {

@@ -111,13 +111,29 @@ function hasErrors(index: number): boolean {
           <ChevronDown v-else aria-hidden="true" />
         </Button>
         <span class="min-w-0 flex-1 truncate font-medium">{{ titleOf(command) }}</span>
-        <Badge v-if="command.type !== ''" variant="neutral">{{ labelOf.get(command.type) }}</Badge>
+        <Badge v-if="command.extension" variant="neutral">{{ command.extension.label }}</Badge>
+        <Badge v-else-if="command.type !== ''" variant="neutral">{{ labelOf.get(command.type) }}</Badge>
         <Button type="button" variant="ghost" size="icon-sm" :aria-label="interpolate(t.commands.remove, { command: titleOf(command) })" @click="remove(index)">
           <Trash2 aria-hidden="true" />
         </Button>
       </div>
 
-      <div v-if="!collapsed.has(command.key) || hasErrors(index)" class="grid gap-[18px] border-t p-4">
+      <div v-if="command.extension && (!collapsed.has(command.key) || hasErrors(index))" class="grid gap-3 border-t p-4">
+        <dl class="grid gap-[18px] sm:grid-cols-2">
+          <div class="grid gap-1">
+            <dt class="text-[12.5px] font-medium">{{ t.commands.fields.command }}</dt>
+            <dd class="text-sm">{{ titleOf(command) }}</dd>
+          </div>
+          <div class="grid gap-1">
+            <dt class="text-[12.5px] font-medium">{{ t.commands.fields.type }}</dt>
+            <dd class="text-sm">{{ command.extension.label }}</dd>
+          </div>
+        </dl>
+        <p class="text-muted-foreground text-[12.5px]">{{ t.commands.extension_help }}</p>
+        <p v-if="!command.extension.installed" role="status" class="text-destructive text-[12.5px]">{{ t.commands.extension_not_installed }}</p>
+      </div>
+
+      <div v-else-if="!collapsed.has(command.key) || hasErrors(index)" class="grid gap-[18px] border-t p-4">
         <div class="grid gap-[18px] sm:grid-cols-2">
           <FormField :id="`command-${index}`" :label="t.commands.fields.command" :error="commandErrors(errors, index).command" v-slot="{ invalid, describedBy }">
             <div class="flex items-center">

@@ -76,6 +76,8 @@ package's `require`; neither is repeated in the manifest.
 | `extra.fapost.provider` | yes | The class name of your service provider; the class must exist and extend `Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider` |
 | `extra.fapost.actions` | no | The action ids you register, each starting with `<id>.`, no duplicates |
 | `extra.fapost.nodes` | no | The flow node types you register, each `<id>.` followed by a snake_case name (`feedback.collect`), no duplicates; from `fapost/foundation` 0.36 — see [Registering node types](#registering-node-types) |
+| `extra.fapost.command_types` | no | The chat command action types you register, each `<id>.` followed by a snake_case name (`feedback.thank`), at most 64 characters, no duplicates; from `fapost/foundation` 0.50, experimental — see [Chat commands](#chat-commands) |
+| `extra.fapost.commands` | no | The chat commands you bring, each `/` followed by 1 to 32 lowercase letters, digits or underscores (`/feedback`), none of `/reset`, `/cancel`, `/start`; from `fapost/foundation` 0.50, experimental. Two installed Solutions that declare one command are both refused |
 | `extra.fapost.triggers` | no | The flow trigger types you register, each `<id>.` followed by a snake_case name (`feedback.submitted`), at most 64 characters, no duplicates; from `fapost/foundation` 0.46, experimental — see [Registering trigger types](#registering-trigger-types) |
 | `extra.fapost.state` | no | `true` when your nodes keep state in a namespace of their own, named by your id; from `fapost/foundation` 0.36 — see [Your state namespace](#your-state-namespace) |
 | `extra.fapost.ui` | no | The path of your `fapost-ui.json` relative to the package root, ending in `.json`; from `fapost/foundation` 0.15, experimental — see [Console UI](/extending/console-ui) |
@@ -140,7 +142,7 @@ Prints every problem, not just the first, and exits with code 1:
 ```
 acme/fapost-feedback: extra.fapost.id: required
 acme/fapost-feedback: extra.fapost.actions[1]: "score" must start with "feedback."
-acme/fapost-feedback: extra.fapost.routes: unknown field (schema 1 allows: schema, id, name, description, provider, actions, nodes, triggers, state, ui, migrations); a newer fapost/foundation may be required
+acme/fapost-feedback: extra.fapost.routes: unknown field (schema 1 allows: schema, id, name, description, provider, actions, nodes, triggers, command_types, commands, state, ui, migrations); a newer fapost/foundation may be required
 acme/one, acme/two: extra.fapost.id: "feedback" is declared by both packages
 ```
 
@@ -467,6 +469,41 @@ their form from `configSchema()`; a saved trigger of a Solution that is off or r
 settings. Publishing a flow with your trigger needs the *Manage automations* permission, like every trigger but a
 message one. It is refused with `trigger_type_not_installed` when your Solution is not installed, and only warned
 about (`trigger_type_solution_inactive`) when it is installed but off for the tenant.
+
+## Chat commands
+
+A global chat command (`/reset`, a tenant's `/menu`) is matched before a message reaches a flow. From
+`fapost/foundation` 0.50 (experimental) a Solution adds two things:
+
+- a **command action type**, `Fapost\Foundation\Flow\Commands\CommandActionTypeInterface`, next to Core's
+  `terminate_session`, `start_flow` and `send_message`. Its `type()` starts with your id and a dot and is declared in
+  `extra.fapost.command_types`; `label()`, `configSchema()` and `validateConfig()` describe and check the config of
+  one command of the type; `handle(CommandContext $context, array $config)` does the work. A tenant can pick the type
+  for a command of an assistant (its config is checked when the settings are saved);
+- a ready-made **chat command**, `Fapost\Foundation\Flow\Commands\SolutionCommandInterface`: its `command()`
+  (declared in `extra.fapost.commands`), the `actionType()` it takes — one of your own types, or Core's
+  `send_message` (config `text`) or `terminate_session` (config `response`) — its `config()` and a `label()`.
+
+```php
+$registrar->registerCommandActionType(ThankCommandType::class);
+$registrar->registerCommand(FeedbackCommand::class);
+```
+
+Both work only for a tenant that turned your Solution on; for any other tenant the text is not a command and goes on
+to the flow. Commands are matched in this order: the assistant's own commands, then a Solution's, then Core's built-in
+ones, so a tenant can shadow yours with a command of its own.
+
+A command runs before Core takes the conversation's lock, so `handle()` never touches the session: it returns a
+`CommandOutcome` — `reply($text)`, `none()`, `endSession($reply)` or `startFlow($flowId, $reply)` — and Core carries it
+out. For the same reason `handle()` may run twice for one contact at once, or again when the incoming update is
+retried: make what it writes safe to repeat (`$context->updateId` names the update). An exception from `handle()` is
+logged and the contact gets no answer. While your tables are still being prepared for the tenant, `handle()` is not
+called and the contact gets the assistant's busy message.
+
+Registration follows the same strict rules as actions: an undeclared type or command, a duplicate, a class that does
+not implement the interface, a command taking `start_flow` or a type that is not yours, or a config your own type
+refuses fails the boot; a declared type or command you never register fails `platform:update`. The assistant's
+settings page shows a tenant command of your type read-only for now and keeps it when the other settings are saved.
 
 ## Your state namespace
 

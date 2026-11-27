@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Infrastructure\Solution;
 
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
+use App\Domains\Flow\Commands\CommandActionTypeRegistry;
+use App\Domains\Flow\Commands\SolutionCommandRegistry;
+use App\Domains\Flow\Contracts\CommandExtensionFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Contracts\TriggerTypeFactoryInterface;
@@ -13,6 +17,7 @@ use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Solution\Contracts\SolutionRegistrarFactoryInterface;
 use App\Domains\Solution\DTO\InstalledSolution;
 use Fapost\Foundation\Contracts\CoreRegistrarInterface;
+use Psr\Log\LoggerInterface;
 
 final readonly class SolutionCoreRegistrarFactory implements SolutionRegistrarFactoryInterface
 {
@@ -23,6 +28,11 @@ final readonly class SolutionCoreRegistrarFactory implements SolutionRegistrarFa
         private StateNamespaceRegistry $namespaces,
         private TriggerTypeRegistry $triggerTypes,
         private TriggerTypeFactoryInterface $triggerTypeFactory,
+        private CommandActionTypeRegistry $commandActionTypes,
+        private SolutionCommandRegistry $commands,
+        private CommandExtensionFactoryInterface $commandFactory,
+        private BuiltinCommandsRegistry $builtinCommands,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -34,6 +44,6 @@ final readonly class SolutionCoreRegistrarFactory implements SolutionRegistrarFa
             $this->namespaces->registerSolutionNamespace($solution->id);
         }
 
-        return new SolutionCoreRegistrar($solution, $this->actions, $this->nodes, $this->nodeFactory, $this->triggerTypes, $this->triggerTypeFactory);
+        return new SolutionCoreRegistrar($solution, $this->actions, $this->nodes, $this->nodeFactory, $this->triggerTypes, $this->triggerTypeFactory, $this->commandActionTypes, $this->commands, $this->commandFactory, $this->builtinCommands, $this->logger);
     }
 }

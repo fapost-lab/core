@@ -956,10 +956,11 @@ return [
     ],
 
     'settings' => [
-        'title'       => 'Settings',
-        'description' => 'How this assistant answers: its language, default flow, messages and slash commands.',
-        'saved'       => 'Settings saved',
-        'tabs'        => [
+        'title'                   => 'Settings',
+        'description'             => 'How this assistant answers: its language, default flow, messages and slash commands.',
+        'saved'                   => 'Settings saved',
+        'saved_solution_inactive' => 'Settings saved. These commands will not run until their Solution is turned on: :commands',
+        'tabs'                    => [
             'general'  => 'General',
             'commands' => 'Commands',
             'advanced' => 'Advanced',
@@ -1020,6 +1021,8 @@ return [
                 'start_flow'        => 'Ends the current dialog and starts the selected flow.',
                 'send_message'      => 'Sends an informational reply without touching the current dialog.',
             ],
+            'extension_help'          => 'Provided by a Solution; edited by it, not here.',
+            'extension_not_installed' => 'Not installed: this action is kept as stored, but the assistant cannot run it.',
         ],
         'new_flow' => [
             'open'   => 'Create new flow',

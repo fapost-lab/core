@@ -8,17 +8,22 @@ use App\Console\Platform\PlatformMigratorInterface;
 use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Commands\CommandActionTypeRegistry;
+use App\Domains\Flow\Commands\SolutionCommandRegistry;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use Fapost\Foundation\Connector\ConnectorChannel;
+use Fapost\Foundation\Flow\Commands\SolutionCommandInterface;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
 use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\Fixtures\Connectors\Echo\EchoSender;
 use Tests\Fixtures\Solution\Actions\FeedbackScoreAction;
 use Tests\Fixtures\Solution\Actions\FeedbackSubmitAction;
+use Tests\Fixtures\Solution\Commands\FeedbackCommand;
+use Tests\Fixtures\Solution\Commands\FeedbackThankCommandType;
 use Tests\Fixtures\Solution\Nodes\FeedbackCollectNode;
 use Tests\Support\FakePlatformMigrator;
 use Tests\Support\FakeVendor;
@@ -232,6 +237,49 @@ final class UpdatePlatformCommandTest extends TestCase
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
+    public function test_a_declared_command_action_type_that_is_not_registered_fails_validation(): void
+    {
+        $this->registerFeedbackActions(commandType: false);
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+
+        $this->artisan('platform:update', ['--validate-only' => true])
+            ->expectsOutputToContain('acme/fapost-feedback: extra.fapost.command_types[0]: "feedback.thank" is declared but not registered')
+            ->expectsOutputToContain('acme/fapost-feedback: extra.fapost.commands[0]: "/feedback" takes the action type "feedback.thank", which the Solution does not register')
+            ->assertExitCode(1);
+    }
+
+    public function test_a_declared_command_that_is_not_registered_fails_the_update_before_migrations_and_cache(): void
+    {
+        $this->registerFeedbackActions(command: false);
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('acme/fapost-feedback: extra.fapost.commands[0]: "/feedback" is declared but not registered')
+            ->expectsOutputToContain('Nothing was changed')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrator->landlordRuns);
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_a_command_whose_config_its_own_action_type_refuses_fails_validation(): void
+    {
+        $this->registerFeedbackActions(commandClass: EmptyReplyFeedbackCommand::class);
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+
+        $this->artisan('platform:update', ['--validate-only' => true])
+            ->expectsOutputToContain('acme/fapost-feedback: extra.fapost.commands[0]: "/feedback": The reply text is required.')
+            ->assertExitCode(1);
+    }
+
+    public function test_declared_and_registered_commands_pass_validation(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+
+        $this->artisan('platform:update', ['--validate-only' => true])->assertExitCode(0);
+    }
+
     public function test_validate_only_also_fails_on_a_declared_action_that_is_not_registered(): void
     {
         $this->vendor->package(FakeVendor::solutionComposer())->write();
@@ -348,7 +396,7 @@ final class UpdatePlatformCommandTest extends TestCase
         $this->vendor->package(FakeVendor::solutionComposer())->write();
 
         $this->artisan('platform:update')
-            ->expectsOutputToContain('Phase 2 (boot validation): 1 declared action(s) and node type(s) are not registered. Nothing was changed.')
+            ->expectsOutputToContain('Phase 2 (boot validation): 1 declared action(s), node type(s) and command(s) are not registered or not valid. Nothing was changed.')
             ->doesntExpectOutputToContain('Phase 3 of 5')
             ->assertExitCode(1);
 
@@ -501,7 +549,7 @@ final class UpdatePlatformCommandTest extends TestCase
         );
     }
 
-    private function registerFeedbackActions(bool $score = true, bool $node = true): void
+    private function registerFeedbackActions(bool $score = true, bool $node = true, bool $commandType = true, bool $command = true, string $commandClass = FeedbackCommand::class): void
     {
         if ($node) {
             $this->app->make(NodeHandlerRegistryInterface::class)->register(FeedbackCollectNode::class, 'feedback');
@@ -513,5 +561,39 @@ final class UpdatePlatformCommandTest extends TestCase
         if ($score) {
             $registry->register(FeedbackScoreAction::class, 'feedback');
         }
+
+        if ($commandType) {
+            $this->app->make(CommandActionTypeRegistry::class)->register(FeedbackThankCommandType::class, 'feedback');
+        }
+
+        if ($command) {
+            $this->app->make(SolutionCommandRegistry::class)->register($commandClass, 'feedback');
+        }
+    }
+}
+
+/**
+ * The fixture's `/feedback` command with the config its own `feedback.thank` type refuses.
+ */
+final class EmptyReplyFeedbackCommand implements SolutionCommandInterface
+{
+    public function command(): string
+    {
+        return FeedbackCommand::COMMAND;
+    }
+
+    public function actionType(): string
+    {
+        return FeedbackThankCommandType::TYPE;
+    }
+
+    public function config(): array
+    {
+        return [];
+    }
+
+    public function label(): string
+    {
+        return 'Leave feedback';
     }
 }

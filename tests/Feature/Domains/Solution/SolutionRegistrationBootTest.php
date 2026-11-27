@@ -144,6 +144,10 @@ final class SolutionRegistrationBootTest extends TestCase
         $app->singleton(StateNamespaceRegistry::class);
         $app->singleton(TriggerTypeFactoryInterface::class, ContainerTriggerTypeFactory::class);
         $app->singleton(TriggerTypeRegistry::class);
+        $app->singleton(\App\Domains\Flow\Contracts\CommandExtensionFactoryInterface::class, \App\Infrastructure\Flow\ContainerCommandExtensionFactory::class);
+        $app->singleton(\App\Domains\Flow\Commands\CommandActionTypeRegistry::class);
+        $app->singleton(\App\Domains\Flow\Commands\SolutionCommandRegistry::class);
+        $app->instance(\Psr\Log\LoggerInterface::class, new \Psr\Log\NullLogger());
         $app->register(SolutionServiceProvider::class);
 
         return $app;

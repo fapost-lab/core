@@ -31,14 +31,20 @@ final class FakeVendor
      */
     public static function solutionComposer(array $fapost = [], array $root = []): array
     {
-        // The fixture's node and trigger types are prefixed with its id; another id means another Solution, which has
-        // none of its own.
+        // The fixture's node, trigger and command action types are prefixed with its id, and its chat command is its own;
+        // another id means another Solution, which has none of them.
         if (array_key_exists('id', $fapost) && !array_key_exists('nodes', $fapost)) {
             $fapost['nodes'] = null;
         }
 
         if (array_key_exists('id', $fapost) && !array_key_exists('triggers', $fapost)) {
             $fapost['triggers'] = null;
+        }
+
+        foreach (['command_types', 'commands'] as $key) {
+            if (array_key_exists('id', $fapost) && !array_key_exists($key, $fapost)) {
+                $fapost[$key] = null;
+            }
         }
 
         return self::adjust(dirname(__DIR__) . '/Fixtures/Solution/packages/feedback/composer.json', $fapost, $root);

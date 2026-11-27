@@ -60,7 +60,10 @@ final class AssistantSettingsRules
             'commands'              => ['nullable', 'array', 'list'],
             'commands.*'            => ['array'],
             'commands.*.command'    => ['required', 'string', 'max:64'],
-            'commands.*.type'       => ['required', 'string', Rule::enum(CommandActionType::class)],
+            // A Solution's type nobody registers any more stays acceptable while it is stored: the domain validator keeps
+            // such an entry only unchanged.
+            'commands.*.type'       => ['required', 'string', Rule::in([...$settings->commandTypes(), ...$settings->storedCommandTypes()])],
+            'commands.*.config'     => ['nullable', 'array'],
             'commands.*.flow_id'    => ['nullable', 'string', $flow],
             'commands.*.response'   => ['nullable', 'array'],
             'commands.*.response.*' => ['nullable', 'string'],
@@ -143,7 +146,7 @@ final class AssistantSettingsRules
                 }
 
                 try {
-                    $validator->validate($commands);
+                    $validator->validate($commands, $settings->assistant()->commands);
                 } catch (InvalidArgumentException $exception) {
                     $instance->errors()->add('commands', trans('console.settings.errors.commands_invalid', ['error' => $exception->getMessage()]));
                 }

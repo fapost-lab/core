@@ -38,7 +38,7 @@ paths:
   - "testing/**"
   - "tests/Feature/Testing/**"
   - tests/Support/FakeSolutionStorefront.php
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-27
 ---
 # Solution
 
@@ -56,7 +56,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   version, and each package's own `composer.json` for the manifest, so a `dev:link`ed checkout shows
   an edit at once.
 - `SolutionManifestValidator` applies the Foundation rules, then checks the provider class exists and
-  extends `AbstractSolutionServiceProvider`, and that no two packages claim one `id`. Fail closed: a
+  extends `AbstractSolutionServiceProvider`, and that no two packages claim one `id` or one chat command (`extra.fapost.commands`). Fail closed: a
   package with a violation, and both packages of a collision, never reach the catalog.
 - `InstalledSolutions` is the read-only catalog (`all`, `find`, `has`) that later work builds on
   (activation storage keyed by `id`, the registrar, the activation screen). `CoreInstalledSolutionCatalog`
@@ -70,7 +70,8 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   The port is `Contracts/SolutionRegistrarFactoryInterface`; the implementation, `SolutionCoreRegistrar`, is in
   `app/Infrastructure/Solution` because it writes into the Flow registries. It accepts
   `registerActionHandler` for ids in the Solution's `extra.fapost.actions` and `registerNodeHandler` for types in
-  `extra.fapost.nodes` (`<id>.<name>`, `category()` a `NodeCategory` value or the Solution id), and its factory
+  `extra.fapost.nodes` (`<id>.<name>`, `category()` a `NodeCategory` value or the Solution id), `registerCommandActionType`
+  and `registerCommand` for `extra.fapost.command_types` / `extra.fapost.commands` (`adr-20261127-solution-chat-commands`), and its factory
   adds the Solution's state namespace (its id) to Flow's `StateNamespaceRegistry` when the manifest says
   `state: true` (`adr-20261113-solution-node-types-and-state-namespace`); every other call, an undeclared id or
   type and a duplicate throw at boot. Whether an action may run for a tenant is asked per call through the Flow port
@@ -186,8 +187,9 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     the card's `ui.needsUpdate` all read. The proof is in `SolutionLifecycleTest`.
 - `platform:update` also checks that every action a valid manifest declares is registered in the booted
   `ActionHandlerRegistry` (`<package>: extra.fapost.actions[i]: "<id>" is declared but not registered`, exit 1), and every
-  declared node type in `NodeHandlerRegistry` (`extra.fapost.nodes[i]`), after the manifest and console UI checks and before any migration.
-  `InstalledSolution` carries `nodes` and `state`; a compiled cache without them is stale.
+  declared node type in `NodeHandlerRegistry` (`extra.fapost.nodes[i]`), every declared command action type and chat command
+  (`extra.fapost.command_types[i]`, `extra.fapost.commands[i]`, and a command whose config its own type refuses), after the manifest and console UI checks and before any migration.
+  `InstalledSolution` carries `nodes`, `state`, `commandTypes` and `commands`; a compiled cache without them is stale.
 - `platform:update` (`app/Console/Commands/Platform`) runs in five phases and reports a failure as `Phase <n> (<name>)`:
   validate (manifests, console UI bundles), boot validation (the registry checks above and the landlord-path refusal),
   then (unless `--validate-only`) migrate platform and migrate Solutions through
@@ -209,7 +211,8 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler`, `registerNodeHandler` and `registerTriggerType` (`registerMigrations` stays refused: migrations are declared in the manifest), chained or batched Solution jobs.
+- Not here yet: registrar methods other than `registerActionHandler`, `registerNodeHandler`, `registerTriggerType`,
+  `registerCommandActionType` and `registerCommand` (`registerMigrations` stays refused: migrations are declared in the manifest), chained or batched Solution jobs.
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not

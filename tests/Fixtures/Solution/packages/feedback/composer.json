@@ -20,6 +20,8 @@
             "actions": ["feedback.submit", "feedback.score"],
             "nodes": ["feedback.collect"],
             "triggers": ["feedback.submitted"],
+            "command_types": ["feedback.thank"],
+            "commands": ["/feedback"],
             "state": true
         }
     }
