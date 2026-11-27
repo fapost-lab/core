@@ -107,6 +107,6 @@ final class CallGraphValidatorTest extends TestCase
             }
         }
 
-        return new CallGraphRepository($connection);
+        return new CallGraphRepository($capsule->getDatabaseManager());
     }
 }

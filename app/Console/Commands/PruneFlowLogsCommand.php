@@ -9,7 +9,7 @@ use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
-use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -32,7 +32,7 @@ final class PruneFlowLogsCommand extends Command
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantSwitcher $tenantSwitcher,
-        private readonly DatabaseManager $database,
+        private readonly ConnectionResolverInterface $database,
     ) {
         parent::__construct();
     }
@@ -79,10 +79,9 @@ final class PruneFlowLogsCommand extends Command
      */
     private function pruneCurrentTenant(CarbonImmutable $cutoff, bool $dryRun): int
     {
-        // Built inside the switch: switching tenants purges and rebuilds the
-        // default connection, so a manager captured beforehand would still be
-        // pointing at the old schema.
-        $partitions = new FlowLogPartitionManager($this->database->connection());
+        // The manager asks the resolver for its connection each time it works,
+        // so it follows the switch to this tenant's schema.
+        $partitions = new FlowLogPartitionManager($this->database);
 
         $dropped = 0;
 

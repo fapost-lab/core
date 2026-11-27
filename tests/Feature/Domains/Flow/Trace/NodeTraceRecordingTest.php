@@ -15,6 +15,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Trace\NodeTraceWriter;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
@@ -22,12 +23,15 @@ use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\History\HistoryEventType;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\ComparesJsonColumns;
+use Tests\Support\RecordingConnectionResolver;
 
 /**
  * The node trace: every node the engine runs writes `node_entered` / `node_completed` / `node_failed` rows into
@@ -85,6 +89,24 @@ final class NodeTraceRecordingTest extends FeatureTestCase
         $last = $rows[5]->metadata;
         $this->assertSame('end', $last['type']);
         $this->assertNull($last['next']);
+    }
+
+    public function test_the_trace_row_is_written_in_a_transaction_on_the_connection_resolved_when_it_writes(): void
+    {
+        $session = $this->start($this->definition([$this->probe('a', 'ok')], []));
+
+        $resolver = new RecordingConnectionResolver($this->app->make('db'));
+        $this->app->instance(ConnectionResolverInterface::class, $resolver);
+        $this->app->forgetScopedInstances();
+
+        $writer = $this->app->make(NodeTraceWriter::class);
+
+        $this->assertSame([], $resolver->resolved, 'A connection captured when the writer is built would outlive a tenant switch.');
+
+        $writer->write(HistoryEventType::NodeEntered, $this->tenantId, (string) $session->getKey(), 'a', ['type' => 'x']);
+
+        $this->assertNotEmpty($resolver->resolved);
+        $this->assertSame([DB::getDefaultConnection()], array_values(array_unique($resolver->resolved)));
     }
 
     public function test_the_trace_is_written_with_logging_enabled_too_and_belongs_to_the_session_tenant(): void

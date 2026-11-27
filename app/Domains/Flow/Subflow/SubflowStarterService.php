@@ -19,7 +19,7 @@ use Closure;
 use DateInterval;
 use Exception;
 use Fapost\Foundation\Flow\History\HistoryEventType;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 
 /**
  * Builds out the subflow lifecycle when a {@code subflow} node executes.
@@ -39,13 +39,17 @@ final readonly class SubflowStarterService
      *                                                           depends on the node-handler registry whose factory
      *                                                           constructs this service, so resolving it eagerly
      *                                                           would recurse (same pattern as DefaultSubflowResumer).
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
      */
     public function __construct(
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowSessionRepositoryInterface $sessions,
         private Closure $engineResolver,
         private FlowGraphResolver $graphResolver,
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
         private HistoryWriterFactory $historyWriterFactory,
     ) {
     }
@@ -102,7 +106,7 @@ final readonly class SubflowStarterService
         $childExpiresAt  = $now->clone()->add($timeout);
         $parentExpiresAt = $parent->expires_at;
 
-        $child = $this->connection->transaction(function () use (
+        $child = $this->db->connection()->transaction(function () use (
             $parent,
             $definition,
             $subflowNodeId,

@@ -53,7 +53,7 @@ use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use InvalidArgumentException;
 use LogicException;
 use Psr\Log\LoggerInterface;
@@ -61,6 +61,12 @@ use Throwable;
 
 final readonly class FlowEngine implements FlowEngineInterface
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private FlowGraphResolver $graphResolver,
         private NodeHandlerRegistryInterface $registry,
@@ -72,7 +78,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private CurrentAssistantInterface $currentAssistant,
         private ContactServiceInterface $contactService,
         private LanguageResolverInterface $languageResolver,
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
         private AfterCommitDispatcherInterface $afterCommitDispatcher,
         private PlatformSettingsReaderInterface $platformSettings,
         private \App\Domains\Flow\Expression\ExpressionEngineRegistry $expressionEngines,
@@ -125,7 +131,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         // An automation run's deadline is frozen at its start; a later change of the setting never moves it.
         $deadlineAt = FlowRunKind::Automation === $origin->kind ? $this->runDeadline->for(now()) : null;
 
-        $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create(
+        $session = $this->db->connection()->transaction(fn (): FlowSession => $this->sessions->create(
             $this->newSessionRow(
                 $definition,
                 (string)(null !== $contact ? $contact->tenant_id : $definition->tenant_id),
@@ -161,7 +167,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         $entry     = $this->graphResolver->resolveEntryNode($definition);
         $baseState = $this->buildBaseState($definition, null, $origin->assistantId, $initialState);
 
-        return $this->connection->transaction(fn (): FlowSession => $this->sessions->create(
+        return $this->db->connection()->transaction(fn (): FlowSession => $this->sessions->create(
             $this->newSessionRow(
                 $definition,
                 (string)$definition->tenant_id,
@@ -184,7 +190,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             return false;
         }
 
-        return $this->connection->transaction(function () use ($session): bool {
+        return $this->db->connection()->transaction(function () use ($session): bool {
             try {
                 $session->saveWithOptimisticLock(['status' => FlowSessionStatus::Active]);
             } catch (OptimisticLockConflictException $exception) {
@@ -238,7 +244,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         $baseState = $this->buildBaseState($definition, $contact, (string)$assistant->getKey(), $initialState);
 
         $status  = null !== $nextNodeId ? FlowSessionStatus::Active : FlowSessionStatus::Completed;
-        $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
+        $session = $this->db->connection()->transaction(fn (): FlowSession => $this->sessions->create([
             'tenant_id'          => $contact->tenant_id,
             'assistant_id'       => $assistant->getKey(),
             'contact_id'         => $contact->getKey(),
@@ -288,7 +294,7 @@ final readonly class FlowEngine implements FlowEngineInterface
 
         $nextNodeId = $this->graphResolver->resolveNextNode($definition, $resumeNode, $sourceHandle);
 
-        $this->connection->transaction(function () use ($parent, $nextNodeId, $outputs): void {
+        $this->db->connection()->transaction(function () use ($parent, $nextNodeId, $outputs): void {
             $patch = [
                 'status'          => null !== $nextNodeId ? FlowSessionStatus::Active : FlowSessionStatus::Completed,
                 'current_node_id' => $nextNodeId,
@@ -601,7 +607,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                     contact: $contact,
                     sessionId: (string)$session->getKey(),
                     nodeId: $nodeId,
-                    connection: $this->connection,
+                    connection: $this->db->connection(),
                     historyWriter: $this->historyWriterFactory->for($definition),
                     schemaRegistryResolver: static fn () => $schemaRegistry,
                 );
@@ -720,7 +726,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             // it, too, which charged the same budget and already wrote this value.
             $iterationSteps = $budget->iterationSteps();
 
-            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId, $automation, $stepInLoop, $iterationSteps): void {
+            $this->db->connection()->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId, $automation, $stepInLoop, $iterationSteps): void {
                 if ($automation) {
                     $this->countRunStep($session, $stepInLoop ? 'loop_step_count' : 'step_count', $iterationSteps);
                 }
@@ -860,7 +866,7 @@ final readonly class FlowEngine implements FlowEngineInterface
      */
     private function persistStepLimitFailure(FlowSession $session): void
     {
-        $this->connection->transaction(function () use ($session): void {
+        $this->db->connection()->transaction(function () use ($session): void {
             try {
                 $session->saveWithOptimisticLock([
                     'status' => FlowSessionStatus::Failed,
@@ -943,7 +949,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         $persisted = false;
 
         try {
-            $this->connection->transaction(function () use ($session): void {
+            $this->db->connection()->transaction(function () use ($session): void {
                 $session->saveWithOptimisticLock([
                     'status' => FlowSessionStatus::Failed,
                 ]);

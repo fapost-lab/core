@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Subflow;
 
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 
 /**
  * Read/write surface over the `flow_callgraph_edges` reverse-index table.
@@ -14,8 +14,14 @@ use Illuminate\Database\ConnectionInterface;
  */
 final readonly class CallGraphRepository
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -31,7 +37,7 @@ final readonly class CallGraphRepository
         string $callerDefinitionId,
         array $calleeFlowIds,
     ): void {
-        $this->connection->table('flow_callgraph_edges')
+        $this->db->connection()->table('flow_callgraph_edges')
             ->where('caller_definition_id', $callerDefinitionId)
             ->delete();
 
@@ -48,7 +54,7 @@ final readonly class CallGraphRepository
             ];
         }
 
-        $this->connection->table('flow_callgraph_edges')->insert($rows);
+        $this->db->connection()->table('flow_callgraph_edges')->insert($rows);
     }
 
     /**
@@ -58,7 +64,7 @@ final readonly class CallGraphRepository
      */
     public function calleesOf(string $callerFlowId): array
     {
-        return $this->connection->table('flow_callgraph_edges')
+        return $this->db->connection()->table('flow_callgraph_edges')
             ->where('caller_flow_id', $callerFlowId)
             ->pluck('callee_flow_id')
             ->unique()
@@ -74,7 +80,7 @@ final readonly class CallGraphRepository
      */
     public function callersOf(string $calleeFlowId): array
     {
-        return $this->connection->table('flow_callgraph_edges')
+        return $this->db->connection()->table('flow_callgraph_edges')
             ->where('callee_flow_id', $calleeFlowId)
             ->pluck('caller_flow_id')
             ->unique()

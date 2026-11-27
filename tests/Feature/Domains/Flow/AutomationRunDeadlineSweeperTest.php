@@ -28,11 +28,14 @@ use Closure;
 use Fapost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
 use Fapost\Foundation\Analytics\DTO\AnalyticsEvent;
 use Fapost\Foundation\Analytics\Enums\AnalyticsEventType;
+use Illuminate\Database\ConnectionResolverInterface;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Mockery;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\RecordingConnectionResolver;
 
 /**
  * The deadline sweeper fails a whole automation run that is still live past its deadline, or still `pending` past
@@ -387,6 +390,26 @@ final class AutomationRunDeadlineSweeperTest extends FeatureTestCase
         $this->sweep();
 
         $this->assertFalse($service->hasLiveSessions($draft));
+    }
+
+    public function test_the_sweep_opens_its_transaction_on_the_connection_resolved_when_it_writes(): void
+    {
+        $this->automation(FlowSessionStatus::Active, ['deadline_at' => $this->now->subMinute(), 'segment_id' => (string) Str::uuid()]);
+
+        $resolver = new RecordingConnectionResolver($this->app->make('db'));
+        $this->app->instance(ConnectionResolverInterface::class, $resolver);
+        $this->app->forgetScopedInstances();
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: $this->tenantId, schemaName: 'main'));
+
+        $sweeper = $this->app->make(AutomationRunDeadlineSweeper::class);
+
+        $this->assertSame([], $resolver->resolved, 'A connection captured when the sweeper is built would outlive a tenant switch.');
+
+        $report = $sweeper->sweep($this->tenantId);
+
+        $this->assertSame(1, $report['failed_runs']);
+        $this->assertNotEmpty($resolver->resolved);
+        $this->assertContains(DB::getDefaultConnection(), $resolver->resolved, 'The platform settings read the landlord connection by name; the writes go to the default one.');
     }
 
     /**

@@ -6,7 +6,7 @@ namespace App\Domains\Flow\Trace;
 
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
 use Fapost\Foundation\Flow\History\HistoryEventType;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Carbon;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -22,8 +22,14 @@ use Throwable;
  */
 final readonly class NodeTraceWriter
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
         private LoggerInterface $logger,
     ) {
     }
@@ -39,7 +45,7 @@ final readonly class NodeTraceWriter
         array $envelope,
     ): void {
         try {
-            $this->connection->transaction(static function () use ($eventType, $tenantId, $sessionId, $nodeId, $envelope): void {
+            $this->db->connection()->transaction(static function () use ($eventType, $tenantId, $sessionId, $nodeId, $envelope): void {
                 FlowSessionHistoryEntry::query()->create([
                     'tenant_id'  => $tenantId,
                     'session_id' => $sessionId,

@@ -9,7 +9,7 @@ use App\Domains\Flow\Contracts\AutomationContinuationSchedulerInterface;
 use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowSession;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Str;
 
 /**
@@ -49,8 +49,14 @@ final readonly class SegmentHandOff
         FlowSessionStatus::Expired,
     ];
 
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
         private AfterCommitDispatcherInterface $afterCommitDispatcher,
         private AutomationContinuationSchedulerInterface $continuations,
     ) {
@@ -62,7 +68,7 @@ final readonly class SegmentHandOff
         $rootId    = $this->rootIdOf($session);
         $tenantId  = (string) $session->tenant_id;
 
-        $this->connection->transaction(function () use ($rootId, $tenantId, $segmentId): void {
+        $this->db->connection()->transaction(function () use ($rootId, $tenantId, $segmentId): void {
             FlowSession::query()->whereKey($rootId)->update(['segment_id' => $segmentId]);
 
             $this->afterCommitDispatcher->afterCommit(function () use ($tenantId, $rootId, $segmentId): void {

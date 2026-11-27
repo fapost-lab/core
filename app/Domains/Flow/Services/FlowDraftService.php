@@ -31,9 +31,9 @@ use App\Domains\Flow\Templates\TemplateUsageRepository;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -62,6 +62,12 @@ final readonly class FlowDraftService
         FlowSessionStatus::PausedSubflow,
     ];
 
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private TenantContextInterface $tenants,
         private CurrentAssistantInterface $assistant,
@@ -73,6 +79,7 @@ final readonly class FlowDraftService
         private FlowWebhookEndpointRepositoryInterface $webhookEndpoints,
         private ScheduleRegistrySync $scheduleRegistry,
         private FlowTriggerRepositoryInterface $triggers,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -227,7 +234,7 @@ final readonly class FlowDraftService
      */
     public function create(array $data, FlowKind $kind = FlowKind::Flow): FlowDraft
     {
-        return DB::transaction(function () use ($data, $kind): FlowDraft {
+        return $this->db->connection()->transaction(function () use ($data, $kind): FlowDraft {
             $flow = $this->createFlow->execute([
                 ...$data,
                 'kind'         => $kind,
@@ -256,7 +263,7 @@ final readonly class FlowDraftService
      */
     public function update(FlowDraft $flow, array $data): FlowDraft
     {
-        DB::transaction(function () use ($flow, $data): void {
+        $this->db->connection()->transaction(function () use ($flow, $data): void {
             $attributes = [
                 'name'            => $data['name'],
                 'flow_group_id'   => $data['flow_group_id'] ?? null,
@@ -283,7 +290,7 @@ final readonly class FlowDraftService
     public function setActive(FlowDraft $flow, bool $active): FlowDraft
     {
         if ($flow->is_active !== $active) {
-            DB::transaction(function () use ($flow, $active): void {
+            $this->db->connection()->transaction(function () use ($flow, $active): void {
                 $flow->update(['is_active' => $active]);
 
                 $this->recordUpdated($flow);
@@ -325,7 +332,7 @@ final readonly class FlowDraftService
             throw new FlowTemplateInUseException($flow->flow_id);
         }
 
-        DB::transaction(function () use ($flow): void {
+        $this->db->connection()->transaction(function () use ($flow): void {
             // A schedule of a flow nobody can publish again would come due every minute for ever: it stops here, and
             // leaves the landlord registry after the commit.
             $schedules = $this->triggers->stopSchedules($flow->flow_id);

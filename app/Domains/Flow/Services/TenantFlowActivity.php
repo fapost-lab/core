@@ -12,7 +12,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder;
 use RuntimeException;
@@ -32,9 +32,14 @@ final readonly class TenantFlowActivity
      */
     public const int DAYS = 14;
 
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it reads, never kept: a tenant
+     *                                         switch moves the default connection, and one taken when this is built —
+     *                                         before the switch, in a queue job — would read the wrong schema
+     */
     public function __construct(
         private TenantContextInterface $tenants,
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -103,7 +108,7 @@ final readonly class TenantFlowActivity
         $now   = $now->utc();
         $start = $now->subDays(self::DAYS - 1)->startOfDay();
 
-        $day = match ($driver = $this->connection->getDriverName()) {
+        $day = match ($driver = $this->db->connection()->getDriverName()) {
             'pgsql'  => "TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD')",
             'sqlite' => "strftime('%Y-%m-%d', created_at)",
             default  => throw new RuntimeException("TenantFlowActivity: unsupported database driver [{$driver}]."),
@@ -114,7 +119,7 @@ final readonly class TenantFlowActivity
             : [$start, $now];
 
         $ids  = null === $assistants ? null : $this->assistantIds($assistants);
-        $rows = $this->connection->table('flow_logs')
+        $rows = $this->db->connection()->table('flow_logs')
             ->selectRaw("{$day} AS day, status, COUNT(*) AS total")
             ->whereBetween('created_at', $bounds)
             ->whereIn('session_id', fn (Builder $sessions): Builder => $sessions

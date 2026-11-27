@@ -9,7 +9,7 @@ use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
-use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\ConnectionResolverInterface;
 use Throwable;
 
 /**
@@ -34,7 +34,7 @@ final class CreateNextFlowLogPartitionCommand extends Command
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantSwitcher $tenantSwitcher,
-        private readonly DatabaseManager $database,
+        private readonly ConnectionResolverInterface $database,
     ) {
         parent::__construct();
     }
@@ -54,10 +54,9 @@ final class CreateNextFlowLogPartitionCommand extends Command
             try {
                 /** @var list<string> $created */
                 $created = $this->tenantSwitcher->runForTenant($tenant, function () use ($months): array {
-                    // Built inside the switch: switching tenants purges and
-                    // rebuilds the default connection, so a manager captured
-                    // beforehand would still be pointing at the old schema.
-                    $partitions = new FlowLogPartitionManager($this->database->connection());
+                    // The manager asks the resolver for its connection each time it
+                    // works, so it follows the switch to this tenant's schema.
+                    $partitions = new FlowLogPartitionManager($this->database);
 
                     $names = [];
                     foreach ($months as $month) {

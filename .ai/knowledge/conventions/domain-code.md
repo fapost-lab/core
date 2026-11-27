@@ -8,7 +8,7 @@ paths:
   - "app/Http/Controllers/**"
   - "app/Jobs/**"
 summary: Controllers/jobs orchestrate; domain services take collaborators via constructor, not app()/resolve()
-reviewed_at: 2026-11-25
+reviewed_at: 2026-11-26
 ---
 # Domain code boundaries
 
@@ -37,6 +37,23 @@ would then open its transaction on another connection than the models' writes, a
 the write and its audit entry would silently stop being atomic.
 `CredentialWriter` and `OAuth2Consent` (`app/Domains/Credentials/`) follow this;
 `CredentialWriterTest` pins it with `tests/Support/RecordingConnectionResolver.php`.
+The same holds for a service that writes with the query builder (`->table()->insert()`) or
+runs DDL: a captured connection writes into the schema it pointed at when it was built.
+
+Where it bites: a queue job resolves its `handle()` dependencies before the body enters
+`TenantSwitcher::runForTenant()` (`StartAutomationRunJob` takes `AutomationRunner`, and with it
+the scoped `FlowEngine` graph), so anything captured there is the worker's default connection.
+While `TENANT_DB_CONNECTION` names the same connection as `DB_CONNECTION` (the default) the
+switch only moves its `search_path` in place and a captured connection happens to be the right
+object; it goes wrong as soon as the tenant connection is another one. Controllers are built
+after route middleware here, but the rule does not rely on that. Every Flow service follows it,
+and `tests/Unit/Domains/Flow/FlowConnectionInjectionTest.php` fails on a `ConnectionInterface`,
+`Connection` or `DatabaseManager` constructor parameter in `App\Domains\Flow` (and in
+`ConnectionAfterCommitDispatcher`, which must defer callbacks on the connection the transaction
+is on). The one exception is `ContactWriter`: the engine builds it for a single node step and
+hands it the connection it resolved for that step. A per-class test with
+`RecordingConnectionResolver` cannot see a capture on its own: an autowired `ConnectionInterface`
+comes from `db.connection`, not from the resolver bound in the test.
 
 ## Example
 

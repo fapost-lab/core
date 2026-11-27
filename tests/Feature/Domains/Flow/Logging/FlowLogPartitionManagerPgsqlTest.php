@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow\Logging;
 
 use App\Domains\Flow\Logging\FlowLogPartitionManager;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
@@ -59,7 +60,7 @@ final class FlowLogPartitionManagerPgsqlTest extends TestCase
     {
         DB::statement('SET search_path TO fl_test_a');
 
-        $manager = new FlowLogPartitionManager(DB::connection());
+        $manager = new FlowLogPartitionManager($this->app->make(ConnectionResolverInterface::class));
 
         $this->assertSame(
             ['flow_logs_2026_01', 'flow_logs_2026_02'],

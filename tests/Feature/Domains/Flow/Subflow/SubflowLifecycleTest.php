@@ -29,9 +29,12 @@ use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\History\HistoryEventType;
+use Illuminate\Database\ConnectionResolverInterface;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\RecordingConnectionResolver;
 
 /**
  * End-to-end coverage of the subflow lifecycle: parent invokes child,
@@ -535,6 +538,32 @@ final class SubflowLifecycleTest extends FeatureTestCase
 
         $this->expectException(SubflowPinnedVersionMissingException::class);
         $starter->start($parent, $childFlowId, new DateInterval('PT1H'), 'p-sub', [], 9);
+    }
+
+    public function test_the_starter_opens_its_transaction_on_the_connection_resolved_when_it_starts(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [['id' => 'c-mark', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'v1']]],
+            edges: [],
+        );
+        $parent = $this->runParentCalling($childFlowId, []);
+
+        $resolver = new RecordingConnectionResolver($this->app->make('db'));
+        $this->app->instance(ConnectionResolverInterface::class, $resolver);
+        $this->app->forgetScopedInstances();
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: $this->tenantId, schemaName: 'main'));
+        $this->app->make(CurrentAssistantInterface::class)->set($this->assistant);
+
+        $starter = $this->app->make(SubflowStarterService::class);
+
+        $this->assertSame([], $resolver->resolved, 'A connection captured when the starter is built would outlive a tenant switch.');
+
+        $starter->start($parent->refresh(), $childFlowId, new DateInterval('PT1H'), 'p-sub');
+
+        $this->assertNotEmpty($resolver->resolved);
+        $this->assertContains(DB::getDefaultConnection(), $resolver->resolved, 'The platform settings read the landlord connection by name; the writes go to the default one.');
     }
 
     public function test_the_handler_reports_a_missing_pinned_version_with_its_own_error_type(): void

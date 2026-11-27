@@ -118,8 +118,8 @@ final class PruneFlowLogsCommandTest extends TestCase
      * Registers the command with mocked tenant infrastructure.
      *
      * The database manager hands out a per-tenant connection based on the tenant
-     * the switcher has activated, so a partition manager built outside the
-     * switch (the bug this guards) blows up instead of silently pruning nothing.
+     * the switcher has activated, so a connection resolved outside the switch
+     * blows up instead of silently pruning nothing.
      *
      * @param array<int, TenantInterface> $tenants
      */
