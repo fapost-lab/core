@@ -6,6 +6,7 @@ namespace Tests\Unit\Console;
 
 use App\Console\Commands\Flow\NodeUsageCommand;
 use App\Domains\Flow\Contracts\NodeUsageStatisticsInterface;
+use App\Domains\Flow\Statistics\ActionUsage;
 use App\Domains\Flow\Statistics\NodeTypeUsage;
 use App\Domains\Flow\Statistics\NodeUsageReport;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
@@ -54,8 +55,8 @@ final class NodeUsageCommandTest extends TestCase
         $this->artisan('flow:node-usage')
             ->expectsOutputToContain('alpha')
             ->expectsTable(
-                ['type', 'ver', 'handler', 'active flows', 'active nodes', 'executions', 'failures', 'last run'],
-                [['usage_alpha', '1', 'yes', '2', '3', '10', '1', '2026-09-20 10:00:00']],
+                ['type', 'ver', 'handler', 'active flows', 'active nodes', 'versions', 'executions', 'failures', 'last run'],
+                [['usage_alpha', '1', 'yes', '2', '3', '2', '10', '1', '2026-09-20 10:00:00']],
             )
             ->assertSuccessful();
     }
@@ -100,9 +101,44 @@ final class NodeUsageCommandTest extends TestCase
         $payload = $this->jsonFrom($this->artisanOutput([$alpha], ['--json' => true]));
 
         $this->assertSame(['usage_alpha@2' => ['alpha']], $payload['orphaned']);
+        $this->assertSame(1, $payload['tenants']['alpha'][0]['published_versions']);
         $this->assertCount(2, $payload['tenants']['alpha']);
         $this->assertSame(5, $payload['tenants']['alpha'][0]['executions']);
         $this->assertFalse($payload['tenants']['alpha'][1]['handler_registered']);
+    }
+
+    public function test_json_output_carries_the_actions_each_tenant_sends_to(): void
+    {
+        $alpha = $this->tenant('alpha');
+
+        $this->reports[spl_object_id($alpha)] = new NodeUsageReport(
+            runtimeSince: CarbonImmutable::now()->subDays(30),
+            usages: [],
+            unusedHandlerTypes: [],
+            actions: [new ActionUsage(
+                actionId: 'crm.sync',
+                solutionId: 'crm',
+                registered: true,
+                activeFlows: 2,
+                publishedVersions: 3,
+                executions: 4,
+                failures: 1,
+                lastExecutedAt: CarbonImmutable::parse('2026-09-20 10:00:00 UTC'),
+            )],
+        );
+
+        $payload = $this->jsonFrom($this->artisanOutput([$alpha], ['--json' => true]));
+
+        $this->assertSame([[
+            'action_id'          => 'crm.sync',
+            'solution_id'        => 'crm',
+            'registered'         => true,
+            'active_flows'       => 2,
+            'published_versions' => 3,
+            'executions'         => 4,
+            'failures'           => 1,
+            'last_executed_at'   => '2026-09-20T10:00:00+00:00',
+        ]], $payload['actions']['alpha']);
     }
 
     public function test_type_filter_narrows_the_report(): void
@@ -271,6 +307,7 @@ final class NodeUsageCommandTest extends TestCase
             failures: $failures,
             lastExecutedAt: 0 === $executions ? null : CarbonImmutable::parse('2026-09-20 10:00:00 UTC'),
             handlerRegistered: $handlerRegistered,
+            publishedVersions: $activeFlows,
         );
     }
 

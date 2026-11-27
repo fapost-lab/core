@@ -6,19 +6,28 @@ namespace Tests\Feature\Domains\Flow\Statistics;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Contracts\NodeUsageStatisticsInterface;
+use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Logging\FlowLogEntry;
 use App\Domains\Flow\Logging\FlowLogStatus;
 use App\Domains\Flow\Logging\FlowLogWriter;
 use App\Domains\Flow\Models\FlowDefinition;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Statistics\ActionUsage;
 use App\Domains\Flow\Statistics\NodeTypeUsage;
 use App\Domains\Flow\Statistics\NodeUsageReport;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Models\Tenant;
 use Carbon\CarbonImmutable;
+use Fapost\Foundation\Action\ActionHandlerInterface;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
+use Fapost\Foundation\Flow\Call\CallContext;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
@@ -28,6 +37,8 @@ final class NodeUsageStatisticsServiceTest extends FeatureTestCase
 
     private FlowSession $session;
 
+    private Assistant $assistant;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -36,9 +47,11 @@ final class NodeUsageStatisticsServiceTest extends FeatureTestCase
         $registry->register(UsageAlphaTestHandler::class);
         $registry->register(UsageUnusedTestHandler::class);
 
-        $this->tenantId = (string) Str::uuid();
+        $tenant = Tenant::query()->firstOrFail();
+        $this->app->make(TenantContextInterface::class)->set($tenant);
+        $this->tenantId = (string) $tenant->getId();
 
-        $assistant = Assistant::factory()->create(['tenant_id' => $this->tenantId]);
+        $assistant = $this->assistant = Assistant::factory()->create(['tenant_id' => $this->tenantId]);
         $contact   = Contact::factory()->forTenant($this->tenantId)->create();
 
         // Three nodes of usage_alpha@1 spread over two active flows, one
@@ -180,10 +193,190 @@ final class NodeUsageStatisticsServiceTest extends FeatureTestCase
         $this->assertNotContains('usage_alpha', $report->unusedHandlerTypes);
     }
 
-    private function report(): NodeUsageReport
+    public function test_a_version_a_live_session_is_on_counts_as_a_published_version_but_not_as_an_active_flow(): void
+    {
+        $flowId = (string) Str::uuid();
+        $old    = $this->definition('Pinned', false, [['id' => 'n1', 'type' => 'usage_unused', 'version' => 1, 'config' => []]], $flowId, 1);
+        $this->definition('Pinned', true, [['id' => 'n1', 'type' => 'usage_alpha', 'version' => 1, 'config' => []]], $flowId, 2);
+        $this->sessionOn($old, $this->assistant, FlowSessionStatus::WaitingInput);
+
+        $report = $this->report();
+        $pinned = $this->usage($report, 'usage_unused', 1);
+
+        $this->assertNotNull($pinned, 'a waiting session still runs the version it started on');
+        $this->assertSame(0, $pinned->activeFlows);
+        $this->assertSame(0, $pinned->activeNodes);
+        $this->assertSame(1, $pinned->publishedVersions);
+        $this->assertNotContains('usage_unused', $report->unusedHandlerTypes, 'a type a live session still needs is not safe to retire');
+        $this->assertSame(3, $this->usage($report, 'usage_alpha', 1)?->publishedVersions, 'Alpha, Beta and the new version of Pinned');
+    }
+
+    public function test_a_version_only_ended_sessions_are_on_is_not_counted(): void
+    {
+        $old = $this->definition('Finished', false, [['id' => 'n1', 'type' => 'usage_unused', 'version' => 1, 'config' => []]]);
+        $this->sessionOn($old, $this->assistant, FlowSessionStatus::Completed);
+
+        $report = $this->report();
+
+        $this->assertNull($this->usage($report, 'usage_unused', 1));
+        $this->assertContains('usage_unused', $report->unusedHandlerTypes);
+    }
+
+    public function test_another_tenants_flows_and_runs_are_not_counted(): void
+    {
+        $otherTenant = '00000000-0000-0000-0000-0000000000ff';
+        $assistant   = Assistant::factory()->create(['tenant_id' => $otherTenant]);
+        $definition  = FlowDefinition::query()->create([
+            'tenant_id' => $otherTenant,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Elsewhere',
+            'nodes'     => [['id' => 'n1', 'type' => 'usage_foreign', 'version' => 1, 'config' => []]],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+        $session = FlowSession::query()->create([
+            'tenant_id'          => $otherTenant,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => Contact::factory()->forTenant($otherTenant)->create()->getKey(),
+            'flow_definition_id' => $definition->getKey(),
+            'flow_version'       => 1,
+            'status'             => 'active',
+            'state'              => [],
+            'version'            => 1,
+        ]);
+        $this->writeLog('usage_foreign', 1, FlowLogStatus::Executed, CarbonImmutable::now()->subHour(), $session);
+
+        $this->assertNull($this->usage($this->report(), 'usage_foreign', 1));
+    }
+
+    public function test_an_assistant_scope_counts_only_the_flows_and_runs_of_those_assistants(): void
+    {
+        $theirs = Assistant::factory()->create(['tenant_id' => $this->tenantId]);
+        $mine   = $this->definition('Mine', true, [['id' => 'n1', 'type' => 'usage_mine', 'version' => 1, 'config' => []]]);
+        $other  = $this->definition('Theirs', true, [['id' => 'n1', 'type' => 'usage_theirs', 'version' => 1, 'config' => []]]);
+        $this->draftFor($mine, $this->assistant);
+        $this->draftFor($other, $theirs);
+        $this->writeLog('usage_mine', 1, FlowLogStatus::Executed, CarbonImmutable::now()->subHour(), $this->sessionOn($mine, $this->assistant, FlowSessionStatus::Active));
+        $this->writeLog('usage_theirs', 1, FlowLogStatus::Executed, CarbonImmutable::now()->subHour(), $this->sessionOn($other, $theirs, FlowSessionStatus::Active));
+
+        $report = $this->report(Assistant::query()->whereKey($this->assistant->getKey()));
+
+        $this->assertSame(1, $this->usage($report, 'usage_mine', 1)?->activeFlows);
+        $this->assertSame(1, $this->usage($report, 'usage_mine', 1)?->executions);
+        $this->assertNull($this->usage($report, 'usage_theirs', 1));
+        $this->assertNull($this->usage($report, 'usage_alpha', 1), 'a flow without a draft belongs to no assistant');
+    }
+
+    public function test_actions_are_counted_from_the_call_nodes_that_name_them(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-11-20 12:00:00', 'UTC'));
+        $this->app->make(ActionHandlerRegistry::class)->register(UsageProbeAction::class);
+
+        $live = $this->definition('Calls', true, [
+            ['id' => 'c1', 'type' => 'call', 'version' => 1, 'config' => ['transport' => 'handler', 'target' => 'core.usage_probe']],
+            ['id' => 'c2', 'type' => 'call', 'version' => 1, 'config' => ['transport' => 'handler', 'target' => ' gone.action ']],
+            ['id' => 'c3', 'type' => 'call', 'version' => 1, 'config' => ['transport' => 'handler', 'target' => '{{ vars.action }}']],
+            ['id' => 'c4', 'type' => 'call', 'version' => 1, 'config' => ['transport' => 'http', 'target' => 'https://example.com']],
+        ]);
+        $session = $this->sessionOn($live, $this->assistant, FlowSessionStatus::Active);
+        $this->writeLog('call', 1, FlowLogStatus::Executed, CarbonImmutable::now()->subHours(2), $session, 'c1');
+        $this->writeLog('call', 1, FlowLogStatus::Failed, CarbonImmutable::now()->subHour(), $session, 'c1');
+        $this->writeLog('call', 1, FlowLogStatus::Executed, CarbonImmutable::now()->subHour(), $session, 'c4');
+        $this->writeLog('call', 1, FlowLogStatus::Executed, CarbonImmutable::now()->subDays(40), $session, 'c1');
+
+        $actions = $this->report()->actions;
+
+        $this->assertSame(['core.usage_probe', 'gone.action'], array_map(static fn (ActionUsage $action): string => $action->actionId, $actions));
+
+        [$probe, $gone] = $actions;
+        $this->assertTrue($probe->registered);
+        $this->assertNull($probe->solutionId, 'a Core action has no Solution');
+        $this->assertSame(1, $probe->activeFlows);
+        $this->assertSame(1, $probe->publishedVersions);
+        $this->assertSame(2, $probe->executions, 'the runs of its node inside the window, not those of the http call');
+        $this->assertSame(1, $probe->failures);
+        $this->assertSame(CarbonImmutable::now()->subHour()->toDateTimeString(), $probe->lastExecutedAt?->toDateTimeString());
+        $this->assertFalse($gone->registered);
+        $this->assertSame(0, $gone->executions);
+    }
+
+    public function test_the_runs_of_a_replaced_version_still_count_for_its_action(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-11-20 12:00:00', 'UTC'));
+        $flowId = (string) Str::uuid();
+        $old    = $this->definition('Republished', false, [
+            ['id' => 'c1', 'type' => 'call', 'version' => 1, 'config' => ['transport' => 'handler', 'target' => 'crm.create']],
+            ['id' => 'c2', 'type' => 'call', 'version' => 1, 'config' => ['transport' => 'handler', 'target' => 'crm.retired']],
+        ], $flowId, 1);
+        $new = $this->definition('Republished', true, [
+            ['id' => 'c1', 'type' => 'call', 'version' => 1, 'config' => ['transport' => 'handler', 'target' => 'crm.create']],
+        ], $flowId, 2);
+        $ended = $this->sessionOn($old, $this->assistant, FlowSessionStatus::Completed);
+        $this->writeLog('call', 1, FlowLogStatus::Executed, CarbonImmutable::now()->subDays(2), $ended, 'c1');
+        $this->writeLog('call', 1, FlowLogStatus::Failed, CarbonImmutable::now()->subDays(2), $ended, 'c2');
+        $this->writeLog('call', 1, FlowLogStatus::Executed, CarbonImmutable::now()->subHour(), $this->sessionOn($new, $this->assistant, FlowSessionStatus::Active), 'c1');
+
+        $actions = [];
+
+        foreach ($this->report()->actions as $action) {
+            $actions[$action->actionId] = $action;
+        }
+
+        $this->assertSame(['crm.create', 'crm.retired'], array_keys($actions));
+        $this->assertSame(2, $actions['crm.create']->executions, 'the runs of v1 in the window count, though its sessions ended');
+        $this->assertSame(1, $actions['crm.create']->publishedVersions);
+        $this->assertSame(0, $actions['crm.retired']->publishedVersions, 'only the replaced version sent to it');
+        $this->assertSame(0, $actions['crm.retired']->activeFlows);
+        $this->assertSame(1, $actions['crm.retired']->failures);
+    }
+
+    public function test_a_published_template_is_not_counted_as_a_flow(): void
+    {
+        FlowDefinition::query()->create([
+            'tenant_id' => $this->tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Template',
+            'nodes'     => [['id' => 'n1', 'type' => 'usage_template_only', 'version' => 1, 'config' => []]],
+            'edges'     => [],
+            'is_active' => true,
+            'kind'      => 'template',
+        ]);
+
+        $this->assertNull($this->usage($this->report(), 'usage_template_only', 1));
+    }
+
+    /**
+     * @param  Builder<Assistant>|null  $assistants
+     */
+    private function report(?Builder $assistants = null): NodeUsageReport
     {
         return $this->app->make(NodeUsageStatisticsInterface::class)
-            ->reportForCurrentTenant(CarbonImmutable::now()->subDays(30));
+            ->reportForCurrentTenant(CarbonImmutable::now()->subDays(30), $assistants);
+    }
+
+    private function sessionOn(FlowDefinition $definition, Assistant $assistant, FlowSessionStatus $status): FlowSession
+    {
+        return FlowSession::query()->create([
+            'tenant_id'          => $this->tenantId,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => Contact::factory()->forTenant($this->tenantId)->create()->getKey(),
+            'flow_definition_id' => $definition->getKey(),
+            'flow_version'       => $definition->version,
+            'state'              => [],
+            'status'             => $status->value,
+            'version'            => 1,
+        ]);
+    }
+
+    private function draftFor(FlowDefinition $definition, Assistant $assistant): void
+    {
+        FlowDraft::factory()->create([
+            'tenant_id'    => $this->tenantId,
+            'flow_id'      => $definition->flow_id,
+            'assistant_id' => $assistant->getKey(),
+        ]);
     }
 
     private function usage(NodeUsageReport $report, string $nodeType, int $nodeVersion): ?NodeTypeUsage
@@ -200,12 +393,12 @@ final class NodeUsageStatisticsServiceTest extends FeatureTestCase
     /**
      * @param  list<array<string, mixed>>  $nodes
      */
-    private function definition(string $name, bool $isActive, array $nodes): FlowDefinition
+    private function definition(string $name, bool $isActive, array $nodes, ?string $flowId = null, int $version = 1): FlowDefinition
     {
         return FlowDefinition::query()->create([
             'tenant_id' => $this->tenantId,
-            'flow_id'   => (string) Str::uuid(),
-            'version'   => 1,
+            'flow_id'   => $flowId ?? (string) Str::uuid(),
+            'version'   => $version,
             'name'      => $name,
             'nodes'     => $nodes,
             'edges'     => [],
@@ -219,14 +412,15 @@ final class NodeUsageStatisticsServiceTest extends FeatureTestCase
      * so a raw insert into an older month has no partition to land in. The
      * writer creates the partition for whatever `now()` says.
      */
-    private function writeLog(string $nodeType, int $nodeVersion, FlowLogStatus $status, CarbonImmutable $at): void
+    private function writeLog(string $nodeType, int $nodeVersion, FlowLogStatus $status, CarbonImmutable $at, ?FlowSession $session = null, string $nodeId = 'n1'): void
     {
+        $previous = CarbonImmutable::getTestNow();
         CarbonImmutable::setTestNow($at);
 
         try {
             $this->app->make(FlowLogWriter::class)->write(new FlowLogEntry(
-                sessionId: (string) $this->session->getKey(),
-                nodeId: 'n1',
+                sessionId: (string) ($session ?? $this->session)->getKey(),
+                nodeId: $nodeId,
                 nodeType: $nodeType,
                 nodeVersion: $nodeVersion,
                 status: $status,
@@ -236,7 +430,7 @@ final class NodeUsageStatisticsServiceTest extends FeatureTestCase
                 error: null,
             ));
         } finally {
-            CarbonImmutable::setTestNow();
+            CarbonImmutable::setTestNow($previous);
         }
     }
 }
@@ -326,5 +520,23 @@ final class UsageUnusedTestHandler implements NodeHandlerInterface
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         return NodeExecutionResult::executed();
+    }
+}
+
+final class UsageProbeAction implements ActionHandlerInterface
+{
+    public function id(): string
+    {
+        return 'core.usage_probe';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function handle(array $parameters, CallContext $context): mixed
+    {
+        return null;
     }
 }

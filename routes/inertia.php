@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\HealthController as AdminHealthController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
+use App\Http\Controllers\Admin\NodeUsageController as AdminNodeUsageController;
 use App\Http\Controllers\Admin\OnboardingAssistantController as AdminOnboardingAssistantController;
 use App\Http\Controllers\Admin\OnboardingChannelController as AdminOnboardingChannelController;
 use App\Http\Controllers\Admin\OnboardingChecklistController as AdminOnboardingChecklistController;
@@ -187,6 +188,8 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::delete('admin/api-tokens/{record}', [AdminApiTokenController::class, 'destroy'])->name('console.admin.api-tokens.destroy');
         // Activity log: who changed what in the console and the builder, read only; a new screen, so its own URI.
         Route::get('admin/activity', [AdminActivityLogController::class, 'index'])->name('console.admin.activity.index');
+        // Node usage: which node types and actions the flows use and how often they ran (`flow:node-usage` for the tenant); a new screen, so its own URI.
+        Route::get('admin/node-usage', [AdminNodeUsageController::class, 'index'])->name('console.admin.node-usage.index');
 
         // Health: Reverb and the gateway as the health service reports them (the whole installation in `single` mode, the tenant's own slice in `host`); the page polls `report`.
         Route::get('admin/health', [AdminHealthController::class, 'index'])->name('console.admin.health.index');

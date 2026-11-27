@@ -56,7 +56,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 | One-time codes | `Auth/` (`AuthCodeStore`: the keyed hash of a pending code and the per-destination cap; `OneTimeCodeSenderRegistry`, Core's `EmailOneTimeCodeSender` and `OneTimeCodeMail`), `app/Jobs/Flow/SendOneTimeCodeJob.php` — used by `auth_request@2` |
 | History and logging | `History/`, `Logging/` (partitioned `flow_logs`), `Trace/` (node trace in `flow_session_history`) |
 | Translations | `Translations/`, `app/Infrastructure/Flow/CachedContentTranslator.php` |
-| Node usage statistics | `Statistics/NodeUsageStatisticsService` behind `Contracts/NodeUsageStatisticsInterface`; command `app/Console/Commands/Flow/NodeUsageCommand.php` (`flow:node-usage`), run on demand, not scheduled |
+| Node usage statistics | `Statistics/NodeUsageStatisticsService` behind `Contracts/NodeUsageStatisticsInterface` (node types `type@version` and the actions `call` nodes send to through `handler`, `ActionUsage`; an optional assistant scope); command `app/Console/Commands/Flow/NodeUsageCommand.php` (`flow:node-usage`), run on demand, not scheduled; one tenant's report is the admin screen `Admin\NodeUsageController` (`admin/node-usage`) |
 
 ## Boundaries
 

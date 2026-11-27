@@ -155,6 +155,13 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
 - **Every `flow_logs` query has a time window** (the list a period, at most 30 days; a record ±5
   minutes around the time in its ULID), so it touches the partitions it needs. Example:
   `FlowLogInspector`.
+- **A report read on demand** (node usage, `Admin\NodeUsageController`, `Console/AdminNodeUsage`) shares its query
+  service with the command that prints the same report (`flow:node-usage`), takes the dashboard's period
+  (`FlowActivityPeriod`, here 30 days by default — the `flow_logs` retention) and is not polled. Run figures from
+  `flow_logs` are given only with `viewAny` of `FlowLog`; without it the period is ignored and rows only the log knows of
+  are left out, so the hidden columns leak nothing. A claim that holds only over the whole tenant ("no flow uses this
+  type") is given to administrators only and over the whole retention, whatever period is shown. No rollup table:
+  measured on PostgreSQL, 3M log rows of 30 days with 500k sessions read in about 1.7 s.
 - **A read of `analytics_events` is bounded the same way** (a `FlowActivityPeriod`, bounds with their offset through
   `TimestampWindow`) and finds a flow through the event's session (`payload.session_id`, cast to `uuid` only when
   well-formed, so the join uses the key; a text comparison measured ten times slower). Sessions are deleted

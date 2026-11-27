@@ -41,14 +41,22 @@ The static slice mirrors `FlowEngine::resolveNodeVersion()` exactly, so a node t
 
 ## 3. Static slice
 
-Source: `flow_definitions` where `is_active = true`, expanding the `nodes` jsonb.
+Source: the published versions that can still run — `flow_definitions` where `is_active = true`,
+plus any version a session that has not ended (`flow_sessions.status` not terminal) is still on —
+expanding the `nodes` jsonb. A session keeps the version it started on, so a handler such a
+version needs is still needed. `active flows` and `active nodes` count the active versions only;
+`versions` counts every version read. A type that only such an older version contains is not
+reported as unused. A template's published versions (`kind = template`) are left out: a template
+never runs on its own, and its nodes are already in the definition of every flow that uses it.
 
 Aggregated **in PHP**, not in SQL. Expanding jsonb in the database needs
 `jsonb_array_elements` on PostgreSQL and `json_each` on SQLite, so a single statement is not
 portable — and the test suite runs on SQLite while production runs on PostgreSQL, meaning the
 tests would exercise a different statement than the one that ships. Active definitions are
 bounded (the partial unique index `flow_definitions_active_unique` permits one per flow), so
-counting them in PHP is cheap and keeps one code path on both drivers.
+counting them in PHP is cheap and keeps one code path on both drivers. The versions live
+sessions are on add a bounded set to that; every version ever published is not read (version
+retention keeps all of them by default).
 
 ### Why not the SQL view the draft proposed
 
@@ -62,8 +70,8 @@ The draft proposed a `node_type_usage_static` view over `jsonb_array_elements`. 
 3. It answers only within one schema. "Does *any* tenant still use X" still requires walking
    tenants, which is where the answer actually has to be assembled.
 
-Also note the draft's `GROUP BY fd.tenant_id` is redundant: `flow_definitions` lives in the
-tenant schema, so every row in scope already belongs to one tenant.
+Also note the draft's `GROUP BY fd.tenant_id` is unneeded: one report is about one tenant. The
+reads still filter `tenant_id` rather than rely on the schema (§5b).
 
 ## 4. Runtime slice
 
@@ -111,14 +119,35 @@ The report marks each observed pair with `NodeHandlerRegistryInterface::has($typ
   latest version of each type. Across tenants this is an *intersection*: a type still used by
   one tenant is not retirable however many others have dropped it.
 
+## 5a. Actions
+
+An action of `ActionHandlerRegistry` (Core's or a Solution's) is used by a `call` node on the
+`handler` transport whose `target` names it as written; a target built from a template is known at
+run time only and counts for no action. `flow_logs` does not record the action, so its executions
+are the log rows of those nodes in the window, grouped by the session's version and the node id and
+matched to the node of that version. A version the static slice did not read — replaced since, its
+sessions ended — is read for its nodes too, so its runs still count for their action, and an action
+only such a version sent to is listed with no active flows and no versions. The report lists each action with its owner (the Solution id, null for
+Core), whether it is registered now, active flows, versions and the runtime figures.
+
+## 5b. Tenant and assistant scope
+
+Every read filters `tenant_id` (`flow_logs` through its session). With an assistant scope — the
+admin panel for staff who are not administrators — only flows whose draft belongs to those
+assistants and runs of their sessions are counted. Measured on PostgreSQL with 10k published
+versions (2,000 of them still runnable), 500k sessions and 3M log rows over 30 days, the whole
+report reads in about 1.7 s (static 0.5 s, node runs 0.7 s, action runs 0.5 s); the screen is
+read on demand, not polled, so no rollup table.
+
 ## 6. What was built
 
 | Piece | Where |
 |---|---|
-| Report DTOs | `app/Domains/Flow/Statistics/NodeTypeUsage.php`, `NodeUsageReport.php` |
+| Report DTOs | `app/Domains/Flow/Statistics/NodeTypeUsage.php`, `ActionUsage.php`, `NodeUsageReport.php` |
 | Aggregation | `app/Domains/Flow/Statistics/NodeUsageStatisticsService.php` |
 | Contract | `app/Domains/Flow/Contracts/NodeUsageStatisticsInterface.php` |
 | Console entry point | `app/Console/Commands/Flow/NodeUsageCommand.php` (`flow:node-usage`) |
+| Admin panel screen | `app/Http/Controllers/Admin/NodeUsageController.php` (`admin/node-usage`), `resources/js/pages/Console/AdminNodeUsage/` |
 
 ```
 php artisan flow:node-usage [--days=30] [--tenant=slug] [--type=send_message] [--json]
@@ -133,7 +162,9 @@ The retention boundary is stated in the output rather than left implicit: every 
 columns are windowed and which are not, and a `--days` larger than the 30-day retention prints
 a warning that executions beyond it were pruned and cannot be counted. `--json` carries the
 same facts as `runtime_window_days`, `log_retention_days` and `window_exceeds_retention`,
-because a machine consumer never sees the printed warning. The window is never silently
+because a machine consumer never sees the printed warning. Each usage also carries
+`published_versions`, and `actions` lists, per tenant, the actions of §5a (`--type` does not
+narrow it). The window is never silently
 shrunk to retention: if a deployment changes the prune cutoff, a hard cap would lie.
 
 ## 7. Deliberately not built
@@ -144,7 +175,6 @@ shrunk to retention: if a deployment changes the prune cutoff, a hard cap would 
 - **Redis counters.** Motivated by the `logging_enabled` gap that does not exist.
 - **`duration_ms`.** A profiling need, not a usage-statistics one; it would be a raw-level
   column on `flow_logs`.
-- **UI.** SQL and the console command for now; a console page can follow if asked for.
 
 ## 8. Related documents
 

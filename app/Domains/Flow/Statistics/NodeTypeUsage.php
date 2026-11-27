@@ -30,6 +30,11 @@ final readonly class NodeTypeUsage
         public ?CarbonImmutable $lastExecutedAt,
         /** Whether a handler is registered for exactly this `type@version`. */
         public bool $handlerRegistered,
+        /**
+         * Published versions that can still run and contain such a node: the active version of a flow, and any other
+         * version a session that has not ended is still on (a session keeps the version it started on).
+         */
+        public int $publishedVersions = 0,
     ) {
     }
 

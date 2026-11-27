@@ -91,9 +91,12 @@ webhooks are not arriving — see [Webhook gateway](/self-hosting/gateway).
 | `flow:audit-graph` | Report structural graph problems (no single entry node, unreachable nodes, duplicate handles, malformed variables) in active flow definitions and drafts, per tenant |
 
 Run `flow:node-usage` before you remove a node handler or retire a handler version.
-For each `type@version` it reports how many active flow definitions contain the node
-and how often it executed recently, then names the nodes that have no registered
-handler and the handler types no tenant uses at all.
+For each `type@version` it reports how many active flow definitions contain the node,
+how many published versions that can still run contain it (the active ones and those a
+session that has not ended is on), and how often it executed recently, then names the
+nodes that have no registered handler and the handler types no tenant uses at all. With
+`--json` it also lists, per tenant, the actions `call` nodes send to. One workspace's
+report is in the admin panel under **System** → **Node usage**.
 
 The definition counts are the authoritative answer — a node in an active definition
 runs sooner or later — while the execution counts reach back only as far as
