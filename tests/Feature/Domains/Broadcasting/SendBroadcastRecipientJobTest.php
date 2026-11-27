@@ -6,6 +6,7 @@ namespace Tests\Feature\Domains\Broadcasting;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
+use App\Domains\Broadcasting\Enums\RecipientFailureReason;
 use App\Domains\Broadcasting\Enums\RecipientStatus;
 use App\Domains\Broadcasting\Events\BroadcastCompleted;
 use App\Domains\Broadcasting\Jobs\SendBroadcastRecipientJob;
@@ -178,6 +179,22 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
 
         $this->assertCount(1, $sender->sent);
         $this->assertSame('Hello!', $sender->sent[0]->payload->text);
+    }
+
+    public function test_a_message_empty_in_every_fallback_language_is_skipped_with_the_no_text_marker(): void
+    {
+        $sender = $this->fakeSenderCapturing(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        [$broadcast, $recipient] = $this->scenario(message: ['en' => '   '], contactLanguage: 'en');
+
+        $this->send($recipient);
+
+        $recipient->refresh();
+        $this->assertCount(0, $sender->sent);
+        $this->assertSame(RecipientStatus::Skipped, $recipient->status);
+        // The report reads this marker to say "no text", whatever happens to the run afterwards.
+        $this->assertSame(RecipientFailureReason::NO_TEXT_ERROR, $recipient->error);
+        $this->assertSame(1, $broadcast->refresh()->skipped_count);
     }
 
     public function test_a_send_in_flight_when_the_run_fails_moves_its_unit_out_of_skipped(): void

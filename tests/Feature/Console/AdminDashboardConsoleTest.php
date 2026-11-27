@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Broadcasting\Enums\BroadcastStatus;
+use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Enums\FlowSessionStatus;
@@ -168,6 +170,78 @@ final class AdminDashboardConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_the_broadcasts_card_lists_the_latest_runs_of_the_tenant_newest_first(): void
+    {
+        $assistant = Assistant::factory()->create(['name' => 'Shop']);
+        $now       = CarbonImmutable::parse('2026-10-10 15:00:00', 'UTC');
+
+        // Six runs, started an hour apart: the card shows the five most recent. A draft is not a run.
+        $runs = [];
+
+        for ($hour = 6; $hour >= 1; --$hour) {
+            $runs[$hour] = $this->broadcast($assistant, "Run {$hour}", BroadcastStatus::Completed, $now->subHours($hour));
+        }
+
+        $this->broadcast($assistant, 'Draft', BroadcastStatus::Draft, null);
+        $this->broadcast(Assistant::factory()->create(['tenant_id' => self::OTHER_TENANT_ID]), 'Foreign', BroadcastStatus::Completed, $now);
+        $runs[1]->forceFill(['total_recipients' => 10, 'sent_count' => 7, 'failed_count' => 2, 'skipped_count' => 1])->save();
+
+        $this->actingAs($this->admin())
+            ->get($this->panelUrl('/admin'))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('broadcasts', 5)
+                ->where('broadcasts.0', [
+                    'id'            => (string) $runs[1]->getKey(),
+                    'name'          => 'Run 1',
+                    'assistantName' => 'Shop',
+                    'status'        => 'completed',
+                    'stopReason'    => null,
+                    'sent'          => 7,
+                    'total'         => 10,
+                    'failed'        => 2,
+                    'skipped'       => 1,
+                    'startedAt'     => $now->subHour()->toIso8601String(),
+                    'reportUrl'     => "/assistant/{$assistant->getKey()}/broadcasts/{$runs[1]->getKey()}",
+                ])
+                ->where('broadcasts.4.name', 'Run 5')
+                ->etc());
+    }
+
+    public function test_the_broadcasts_card_is_for_who_may_manage_broadcasts_and_only_their_assistants(): void
+    {
+        $mine   = Assistant::factory()->create();
+        $theirs = Assistant::factory()->create();
+        $this->broadcast($mine, 'Mine', BroadcastStatus::Running, CarbonImmutable::now());
+        $this->broadcast($theirs, 'Theirs', BroadcastStatus::Running, CarbonImmutable::now());
+
+        $withoutPermission = User::factory()->create();
+        $withoutPermission->givePermissionTo(Permission::ManageAssistants->value);
+        $withoutPermission->assistants()->attach($mine);
+
+        $this->actingAs($withoutPermission)
+            ->get($this->panelUrl('/admin'))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('broadcasts', null)->etc());
+
+        // The broadcast permission alone, on an assigned assistant: the card lists its runs, and their report opens.
+        $user = User::factory()->create();
+        $user->givePermissionTo(Permission::ManageBroadcast->value);
+        $user->assistants()->attach($mine);
+        $reportUrl = null;
+
+        $this->actingAs($user)
+            ->get($this->panelUrl('/admin'))
+            ->assertOk()
+            ->assertInertia(function (AssertableInertia $page) use (&$reportUrl): void {
+                $page->has('broadcasts', 1)->where('broadcasts.0.name', 'Mine')->etc();
+                $reportUrl = $page->toArray()['props']['broadcasts'][0]['reportUrl'];
+            });
+
+        $this->assertIsString($reportUrl);
+        $this->actingAs($user)->get($this->panelUrl($reportUrl))->assertOk();
+    }
+
     public function test_the_activity_counts_completions_as_executed_and_only_the_tenants_last_fourteen_days(): void
     {
         $now = CarbonImmutable::parse('2026-10-10 15:00:00', 'UTC');
@@ -287,6 +361,19 @@ final class AdminDashboardConsoleTest extends FeatureTestCase
             'node_version' => 1,
             'status'       => $status,
             'created_at'   => $at,
+        ]);
+    }
+
+    private function broadcast(Assistant $assistant, string $name, BroadcastStatus $status, ?CarbonImmutable $startedAt): Broadcast
+    {
+        return Broadcast::query()->create([
+            'tenant_id'    => $assistant->tenant_id,
+            'assistant_id' => $assistant->getKey(),
+            'name'         => $name,
+            'message'      => ['en' => 'Hello'],
+            'target_type'  => 'all',
+            'status'       => $status->value,
+            'started_at'   => $startedAt,
         ]);
     }
 

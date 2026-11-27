@@ -66,7 +66,7 @@ final class ContactController extends Controller
                     'shortId'    => mb_substr((string) $contact->getKey(), 0, 8),
                     'platform'   => $contact->platform,
                     'externalId' => $contact->external_id,
-                    'name'       => $this->displayName($contact),
+                    'name'       => $contact->displayName(),
                     'language'   => '' === (string) $contact->language ? null : $contact->language,
                     'createdAt'  => $contact->created_at?->toIso8601String(),
                     'viewUrl'    => $this->url('show', ['record' => $contact->getKey()]),
@@ -98,8 +98,8 @@ final class ContactController extends Controller
                 'platform'   => $contact->platform,
                 'externalId' => $contact->external_id,
                 'language'   => '' === (string) $contact->language ? null : $contact->language,
-                'username'   => $this->metaText($contact, 'username'),
-                'name'       => $this->displayName($contact),
+                'username'   => $contact->metaText('username'),
+                'name'       => $contact->displayName(),
                 'createdAt'  => $contact->created_at?->toIso8601String(),
                 'updatedAt'  => $contact->updated_at?->toIso8601String(),
                 'tags'       => $this->contacts->tags($contact),
@@ -163,36 +163,6 @@ final class ContactController extends Controller
             ->get(['id', 'name'])
             ->map(static fn (ContactGroup $group): array => ['id' => (string) $group->getKey(), 'name' => $group->name])
             ->all();
-    }
-
-    /**
-     * The name the platform gave: first and last name, else `@username`, else none.
-     */
-    private function displayName(Contact $contact): ?string
-    {
-        $full = mb_trim(($this->metaText($contact, 'first_name') ?? '') . ' ' . ($this->metaText($contact, 'last_name') ?? ''));
-
-        if ('' !== $full) {
-            return $full;
-        }
-
-        $username = $this->metaText($contact, 'username');
-
-        return null === $username ? null : '@' . $username;
-    }
-
-    private function metaText(Contact $contact, string $key): ?string
-    {
-        $meta  = $contact->getAttribute('meta');
-        $value = is_array($meta) ? ($meta[$key] ?? null) : null;
-
-        if (! is_string($value) && ! is_int($value)) {
-            return null;
-        }
-
-        $text = mb_trim((string) $value);
-
-        return '' === $text ? null : $text;
     }
 
     /**

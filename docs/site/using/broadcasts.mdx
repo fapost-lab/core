@@ -88,6 +88,42 @@ Large sends are split into batches and paced, so they cannot delay replies to
 people in live conversations. How aggressively is a tenant-wide setting; see
 [Settings](/using/tenant-settings).
 
+## The report
+
+A broadcast that has started has a **report**: open it from its name in the list,
+or from **Open report** in the row's menu. It needs the same permission as the
+list, and it covers the whole run, also while it is still going — the figures
+refresh every few seconds until it finishes.
+
+At the top, the recipients are counted by outcome:
+
+| | |
+|---|---|
+| **Recipients** | Everyone the run wrote down when it fixed the audience |
+| **Sent** | The message was handed to the channel |
+| **Queued** | Not processed yet |
+| **Failed** | The channel did not accept the message, or the contact or channel was deleted first |
+| **Skipped** | The run stopped before reaching them, or there was no text for them |
+
+A contact deleted after the run leaves the report with their delivery record, so
+once contacts are deleted the report counts fewer recipients than the list's
+*Sent* column, which keeps the run's own totals.
+
+Below, every recipient is listed with their outcome, filterable by it. A recipient
+who did not get the message carries a short reason — the run was interrupted, the
+sending limit was reached, the run was cancelled, the channel refused the message,
+the contact is gone, or there was no text in their language or any it falls back
+to. The reason is a category, not the provider's error: that text can contain
+connection details, and it stays in the application's records.
+
+<Note>
+  **Sent** means the platform handed the message to the channel, not that the
+  person received or read it. Delivery and read receipts are not tracked yet.
+</Note>
+
+Administrators and anyone who manages broadcasts also see the latest runs on the
+[dashboard](/using/admin-overview#the-dashboard), each linked to its report.
+
 ## Broadcasts from flows
 
 A flow's **Send message** block addressed to tags or a segment starts a

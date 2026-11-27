@@ -1,5 +1,6 @@
 import type { ShellPageProps } from '@console/shell'
 import type { UsageAction, UsageRowData, UsageTranslations } from '../AdminUsage/types'
+import type { BroadcastStatus, BroadcastStopReason } from '../Broadcasts/types'
 
 /** One UTC day of the flow activity chart, as `TenantFlowActivity::daily()` builds it. */
 export interface ActivityDay {
@@ -29,6 +30,21 @@ export interface UsageWidgetData {
   url: string
 }
 
+/** One run of the "Recent broadcasts" card, as `DashboardController::broadcastRow()` builds it. */
+export interface DashboardBroadcast {
+  id: string
+  name: string
+  assistantName: string
+  status: BroadcastStatus
+  stopReason: BroadcastStopReason | null
+  sent: number
+  total: number
+  failed: number
+  skipped: number
+  startedAt: string | null
+  reportUrl: string
+}
+
 export interface AdminDashboardTranslations {
   title: string
   description: string
@@ -52,6 +68,7 @@ export interface AdminDashboardTranslations {
     string
   >
   usage: { title: string; description: string; all: string; none: string; more: string; unavailable: string }
+  broadcasts: { title: string; description: string; empty: string; progress: string; failed: string; skipped: string; preparing: string }
   activity: { title: string; description: string; executed: string; failed: string; day: string; empty: string }
 }
 
