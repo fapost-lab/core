@@ -188,7 +188,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   moves on only with the next inbound message.
 - Console: `flow:sweep-subflow-timeouts`, `flow:sweep-overdue-automation-runs` and `flow:fire-scheduled-triggers` (every minute), `flow:rebuild-schedule-registry` (hourly), `logs:prune-flow`, `logs:create-partition`
   (`routes/console.php`; the prune drops a partition under `lock_timeout` 5s through
-  `Shared/Infrastructure/PostgresMonthlyPartitions`, and on a timeout the tenant is marked ✘ and the next run retries); `flow:node-usage` is run by hand and is not scheduled.
+  `Shared/Infrastructure/PostgresMonthlyPartitions`, and on a timeout the tenant is marked ✘ and the next run retries); `flow:prune-automation-runs` (04:30) and `flow:prune-versions` (05:00) delete old automation runs and old published versions (see RULES.md); `flow:node-usage` is run by hand and is not scheduled.
 - Bindings: `Providers/FlowServiceProvider.php`. Registries are singletons, frozen after boot
   (not in the testing environment); engine, orchestrator, router and repositories are `scoped`.
   The node handler registry holds handler classes and builds each handler per `resolve()`

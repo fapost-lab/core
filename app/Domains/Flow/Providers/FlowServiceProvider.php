@@ -140,6 +140,7 @@ use App\Domains\Flow\Repositories\FlowWebhookEndpointRepository;
 use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
 use App\Domains\Flow\Retention\AutomationRunRetention;
+use App\Domains\Flow\Retention\FlowVersionRetention;
 use App\Domains\Flow\Retention\SessionHistoryRetention;
 use App\Domains\Flow\Routing\DropPolicy;
 use App\Domains\Flow\Routing\DropPolicyInterface;
@@ -436,6 +437,19 @@ final class FlowServiceProvider extends ServiceProvider
             unit: 'days',
             min: 0,
             max: SessionHistoryRetention::MAX_DAYS,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: FlowVersionRetention::SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.versions.keep_last',
+            fallback: FlowVersionRetention::DEFAULT_KEEP,
+            label: 'Published flow versions kept',
+            description: 'How many of the latest published versions of each flow are kept, for every tenant; 50 is recommended. The daily flow:prune-versions deletes older ones; deleting is irreversible. It never deletes the active or the latest version, nor one that any session, an old inline button or a subflow pin still uses. 0 keeps every version.',
+            group: 'Flow',
+            unit: 'versions',
+            min: 0,
+            max: FlowVersionRetention::MAX_KEEP,
         ));
 
         $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(

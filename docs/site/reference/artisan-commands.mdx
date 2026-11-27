@@ -134,6 +134,14 @@ media are kept. See [Conversation retention](/self-hosting/observability#convers
 
 `flow:prune-automation-runs` and `flow:prune-session-history` accept `--dry-run`, which only counts. Deleting is irreversible.
 
+## Flow version retention
+
+| Command | Does |
+|---|---|
+| `flow:prune-versions` | Delete published flow versions older than the last N of each flow, N being the platform setting `flow.versions.keep_last`, in every active tenant. The active and the latest version are always kept, and so is a version that any session (finished ones included), an inline button sent earlier, or a subflow node pinned to it still uses. Does nothing while the setting is `0`, the default; 50 is recommended. Scheduled daily at 05:00 |
+
+`flow:prune-versions` accepts `--dry-run`, which only counts. Deleting is irreversible.
+
 ## Activity log retention
 
 | Command | Does |

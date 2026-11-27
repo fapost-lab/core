@@ -22,5 +22,7 @@ Schedule::command('credentials:refresh-oauth2-grants')->dailyAt('02:30')->withou
 Schedule::command('api-tokens:notify-expiring')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('flow:prune-automation-runs')->dailyAt('04:30')->withoutOverlapping();
 Schedule::command('flow:prune-session-history')->dailyAt('04:45')->withoutOverlapping();
+// After the automation run prune, so the versions its deleted runs held are freed the same night.
+Schedule::command('flow:prune-versions')->dailyAt('05:00')->withoutOverlapping();
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
 Schedule::command('tenants:start-deletions')->everyMinute()->withoutOverlapping();

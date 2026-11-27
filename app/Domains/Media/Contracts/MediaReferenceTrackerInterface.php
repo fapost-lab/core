@@ -16,4 +16,9 @@ use App\Domains\Flow\Models\FlowDefinition;
 interface MediaReferenceTrackerInterface
 {
     public function trackFlowDefinition(FlowDefinition $definition): void;
+
+    /**
+     * Removes every reference a deleted definition held. The media files themselves are kept.
+     */
+    public function forgetFlowDefinition(FlowDefinition $definition): void;
 }

@@ -36,9 +36,23 @@ authority next to the code and the existing tables.
 
 ### Retention of old definitions
 
-Old `flow_definitions` rows are kept: publishing never prunes them. A "keep the last N versions per flow" limit
-(a once-planned default of 50) is **not implemented**; if it is ever added it must skip definitions that live sessions
-are pinned to.
+Publishing never prunes old `flow_definitions` rows. `flow:prune-versions` (`PruneFlowVersionsCommand`,
+`FlowVersionPruner`), daily at 05:00, deletes a tenant's versions outside the last N of each flow, N being the platform
+setting `flow.versions.keep_last` (default `0`, which keeps every version; 50 recommended). It never deletes:
+
+- the active version or the flow's highest one (the next publish numbers itself `max + 1`);
+- a version any `flow_sessions` row points at, whatever its status (the foreign key restricts it anyway), so versions of
+  conversation flows with traffic stay until their sessions go;
+- a version a `persistent_inline_buttons` row points at (an old button would cancel the contact's session and do
+  nothing);
+- a version a subflow node pins (`config.flow_version`) in any draft or published version.
+
+Each batch is locked `FOR UPDATE SKIP LOCKED` and checked again, with the pins of its flows read again; a publish holds
+`FOR KEY SHARE` on the versions it pins while it validates, so it either keeps such a version or is refused when it is gone.
+`FOR KEY SHARE`, not `FOR SHARE`: it conflicts only with the delete's `FOR UPDATE`, not with the `is_active = false`
+update (`FOR NO KEY UPDATE`) another publish makes, so two publishes pinning each other's active versions never deadlock.
+A deleted version takes its call graph edges and template usages (database cascade) and its `media_file_references`
+(Media listens to `FlowDefinition::deleted`); media files stay.
 
 ---
 

@@ -16,8 +16,10 @@
 > - Version pinning exists (2026-11, node still `subflow@1`): the optional `flow_version` pins the node to one published
 >   version of the child, active or superseded; without it the child's latest active version runs, as in V1. Validate
 >   and publish refuse a pin to a version the target flow never published; a pin that no longer resolves at runtime
->   fails the node with `error_type = subflow_pinned_version_missing`. Definitions are never deleted, so a published
->   version stays pinnable.
+>   fails the node with `error_type = subflow_pinned_version_missing`. A pinned version is never deleted: the flow
+>   version retention (`flow:prune-versions`, 2026-11, off by default) deletes only old versions nothing pins, runs or
+>   points at, so a version outside the kept last N that nothing pins may be gone and can no longer be newly pinned
+>   (see `docs/platform/architecture/platform/09-flow-versioning.md`).
 
 **Status:** Accepted
 **Date:** Апрель 2026

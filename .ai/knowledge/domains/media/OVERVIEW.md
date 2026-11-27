@@ -45,7 +45,8 @@ definitions reference which file, so a file in use is not deleted silently.
   it reaches the payload as `media.url` with `mime_type`, `size`, `file_name` and `kind`. The channel never mints
   links.
 - Depends on Flow's concrete `FlowDefinition` for reference tracking, through a
-  `FlowDefinition::saved` hook registered in `Providers/MediaServiceProvider.php`. *(inferred:
+  `FlowDefinition::saved` hook (and a `deleted` one that drops a pruned version's references) registered in
+  `Providers/MediaServiceProvider.php`. *(inferred:
   this dependency points the wrong way; Flow could report references to Media through a port)*
 - Depends on the `Channel` model; Telegram's media adapters throw Media's exceptions, so Media
   and Channels import each other.

@@ -11,6 +11,7 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\Orchestration\StrandedAutomationRunRecovery;
 use App\Domains\Flow\Retention\AutomationRunRetention;
+use App\Domains\Flow\Retention\FlowVersionRetention;
 use App\Domains\Flow\Retention\SessionHistoryRetention;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Flow\Webhook\FlowWebhookReceiver;
@@ -117,6 +118,7 @@ final class PlatformSettingsTest extends FeatureTestCase
             FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING,
             SessionHistoryRetention::SETTING,
             NodeTraceRecorder::PAYLOADS_SETTING,
+            FlowVersionRetention::SETTING,
             FlowWebhookReceiver::PER_TOKEN_SETTING,
             WebhookSyncWait::WAIT_SECONDS_SETTING,
             WebhookSyncWait::INSTALLATION_WAITERS_SETTING,
@@ -139,6 +141,7 @@ final class PlatformSettingsTest extends FeatureTestCase
         $this->assertSame(2, $byKey[WebhookSyncWait::TENANT_WAITERS_SETTING]->default);
         $this->assertFalse($byKey[NodeTraceRecorder::PAYLOADS_SETTING]->hostModeOnly);
         $this->assertTrue($byKey[NodeTraceRecorder::PAYLOADS_SETTING]->default);
+        $this->assertSame(0, $byKey[FlowVersionRetention::SETTING]->default, 'Every flow version is kept until an operator sets how many.');
         $this->assertTrue($byKey[self::REDIRECT]->hostModeOnly);
         $this->assertSame(30, $byKey[AutomationRunRetention::FAILED_SETTING]->default);
         $this->assertSame(7, $byKey[AutomationRunRetention::SUCCEEDED_SETTING]->default);

@@ -20,6 +20,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Retention\FlowVersionPruner;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Services\SaveDraftService;
 use App\Domains\Flow\Services\ValidateFlowService;
@@ -242,6 +243,26 @@ final class FlowTemplatePublishTest extends FeatureTestCase
         $newContact = Contact::factory()->forTenant($this->tenantId)->create();
         $this->app->make(FlowEngineInterface::class)->start($active, $newContact);
         $this->assertSame('v2', FlowSession::query()->where('contact_id', $newContact->getKey())->sole()->state['flow']['inside'] ?? null);
+    }
+
+    public function test_a_template_publish_still_republishes_a_host_whose_old_versions_were_pruned(): void
+    {
+        $template = $this->publishedTemplate(withButtons: false);
+        $host     = $this->hostDraft($template->flow_id);
+
+        $this->publish($host->flow_id);
+        $this->publish($host->flow_id);
+        $kept = $this->publish($host->flow_id);
+
+        $this->assertSame(2, (new FlowVersionPruner())->prune($this->tenantId, 1), 'the host\'s first two versions');
+        $this->assertSame([3], FlowDefinition::query()->where('flow_id', $host->flow_id)->pluck('version')->map(static fn ($v): int => (int) $v)->all());
+
+        $this->publish($template->flow_id);
+
+        $active = FlowDefinition::query()->where('flow_id', $host->flow_id)->active()->sole();
+        $this->assertSame(4, $active->version);
+        $this->assertSame($template->flow_id, $active->republished_by_template_flow_id);
+        $this->assertNotSame((string) $kept->getKey(), (string) $active->getKey());
     }
 
     public function test_a_template_republish_keeps_the_host_live_triggers_and_ignores_its_unpublished_trigger_edits(): void
