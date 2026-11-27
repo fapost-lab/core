@@ -12,6 +12,12 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Call\CallTester;
+use App\Domains\Flow\Commands\CommandActionTypeRegistry;
+use App\Domains\Flow\Commands\CommandMatcher;
+use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
+use App\Domains\Flow\Commands\ResolvedCommand;
+use App\Domains\Flow\Commands\SolutionCommandRegistry;
+use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Models\FlowDefinition;
@@ -54,10 +60,11 @@ use Illuminate\Testing\TestResponse;
 use Inertia\Inertia;
 use Mockery;
 use Tests\Feature\FeatureTestCase;
+use Tests\Fixtures\Solution\Commands\FeedbackCommand;
 use Tests\Fixtures\Solution\FeedbackCalls;
 use Tests\Fixtures\Solution\FeedbackProbe;
-use Tests\Support\FakeSolutionEntitlement;
 use Tests\Support\FakePlatformMigrator;
+use Tests\Support\FakeSolutionEntitlement;
 use Tests\Support\FakeVendor;
 use Tests\Support\InMemorySolutionActivationStore;
 use Tests\Support\InstallsFeedbackSolution;
@@ -306,6 +313,59 @@ final class SolutionLifecycleTest extends FeatureTestCase
 
         $this->deactivate($this->alpha, 'feedback');
         $this->assertSame(['end' => 'refused', 'error' => 'solution_inactive: feedback', 'state' => null], $this->nodeFlowResult($this->alpha));
+    }
+
+    public function test_a_chat_command_of_the_solution_matches_and_runs_for_the_tenant_that_activated_it_only(): void
+    {
+        $beta = $this->secondTenant();
+        $sent = new class () implements FallbackMessageServiceInterface {
+            /** @var list<string> */
+            public array $texts = [];
+
+            public function send(Contact $contact, string $assistantId, string $text): void
+            {
+                $this->texts[] = $text;
+            }
+        };
+        $this->app->instance(FallbackMessageServiceInterface::class, $sent);
+
+        $this->artisan('platform:update')->assertExitCode(0);
+        $this->forgetSolutionState();
+
+        // The command and its type are the image's, whoever has the Solution on.
+        $this->assertSame('feedback', $this->app->make(SolutionCommandRegistry::class)->ownerOf(FeedbackCommand::COMMAND));
+        $this->assertSame('feedback', $this->app->make(CommandActionTypeRegistry::class)->ownerOf('feedback.thank'));
+
+        // Installed is not active.
+        $this->assertNull($this->commandMatch($this->alpha));
+
+        $this->activate($this->alpha, 'feedback');
+
+        $matched = $this->commandMatch($this->alpha);
+        $this->assertNotNull($matched);
+        $this->assertSame('solution', $matched->origin);
+        $this->assertSame('feedback.thank', $matched->actionType);
+        $this->assertSame('feedback', $matched->owner);
+        $this->assertSame([FeedbackCommand::REPLY], $sent->texts);
+        $this->assertCount(1, $this->calls->calls);
+        $this->assertSame('feedback.thank', $this->calls->calls[0]['action']);
+        $this->assertSame($this->alpha->getId(), $this->calls->calls[0]['tenant_id']);
+
+        // Beta, in the same process, has activated nothing: the text goes on to the flow.
+        $this->app->forgetScopedInstances();
+        $this->assertNull($this->commandMatch($beta));
+        $this->assertCount(1, $this->calls->calls, 'The type was not run for beta.');
+
+        // Switching alpha off stops the command; switching it on again brings it back.
+        $this->app->forgetScopedInstances();
+        $this->deactivate($this->alpha, 'feedback');
+        $this->assertNull($this->commandMatch($this->alpha));
+
+        $this->app->forgetScopedInstances();
+        $this->activate($this->alpha, 'feedback');
+        $this->assertNotNull($this->commandMatch($this->alpha));
+        $this->assertSame([FeedbackCommand::REPLY, FeedbackCommand::REPLY], $sent->texts);
+        $this->assertCount(2, $this->calls->calls);
     }
 
     public function test_the_operator_commands_drive_the_same_chain_on_the_real_store(): void
@@ -767,6 +827,27 @@ final class SolutionLifecycleTest extends FeatureTestCase
                 'end_status' => null === $session->end_status ? null : (string) $session->end_status,
                 'call_error' => null === $log?->error ? null : (string) (json_decode((string) $log->error, true)['message'] ?? $log->error),
             ];
+        });
+    }
+
+    /**
+     * Types `/feedback` to a new contact of the tenant the way the router does: the matcher resolves it and, when it
+     * does, the executor runs it.
+     */
+    private function commandMatch(TenantInterface $tenant): ?ResolvedCommand
+    {
+        return $this->inTenant($tenant, function () use ($tenant): ?ResolvedCommand {
+            $tenantId  = $tenant->getId();
+            $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+            $contact   = Contact::factory()->forTenant($tenantId)->create();
+
+            $resolved = $this->app->make(CommandMatcher::class)->match(FeedbackCommand::COMMAND, $assistant);
+
+            if (null !== $resolved) {
+                $this->app->make(GlobalCommandExecutorInterface::class)->execute($resolved, $contact, (string) $assistant->getKey(), $assistant, 'telegram', 'update-1');
+            }
+
+            return $resolved;
         });
     }
 

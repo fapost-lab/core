@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { errorsByLocale } from '@fapost/ui/components/localized-field'
+import type { CommandState } from './types'
 import { commandErrors, emptyEntries, firstError, isTab, newCommand, tabsWithErrors, toPayload, type SettingsFormData } from './settings'
 
 const languages = ['en', 'ru']
@@ -39,6 +40,27 @@ describe('toPayload', () => {
       { command: 'go', type: 'start_flow', flow_id: 'f-2' },
       { command: 'help', type: 'send_message', text: { ru: 'Помощь' } },
     ])
+  })
+})
+
+describe('toPayload with a Solution action', () => {
+  it('sends the row as stored and nothing else', () => {
+    const row: CommandState = {
+      ...newCommand(languages, 'x'),
+      command: ' thanks ',
+      type: 'feedback.thank' as CommandState['type'],
+      response: [{ locale: 'en', text: 'ignored' }],
+      config: { note: 'x', nested: { a: 1 } },
+      extension: { type: 'feedback.thank', label: 'Thank', installed: false },
+    }
+
+    expect(toPayload(form({ commands: [row] })).commands).toEqual([{ command: 'thanks', type: 'feedback.thank', config: { note: 'x', nested: { a: 1 } } }])
+  })
+
+  it('sends an empty config when none was stored', () => {
+    const row: CommandState = { ...newCommand(languages, 'x'), command: 'thanks', config: null, extension: { type: 'feedback.thank', label: 'Thank', installed: true } }
+
+    expect(toPayload(form({ commands: [row] })).commands).toEqual([{ command: 'thanks', type: 'feedback.thank', config: {} }])
   })
 })
 

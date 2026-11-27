@@ -20,6 +20,8 @@ final class InstalledSolutionTest extends TestCase
         yield 'latestMigration' => ['latestMigration'];
         yield 'migrationsDigest' => ['migrationsDigest'];
         yield 'triggers' => ['triggers'];
+        yield 'commandTypes' => ['commandTypes'];
+        yield 'commands' => ['commands'];
     }
 
     /**
@@ -84,6 +86,14 @@ final class InstalledSolutionTest extends TestCase
         $this->assertNull($restored->latestMigration);
     }
 
+    public function test_command_types_and_commands_survive_the_compiled_catalog(): void
+    {
+        $restored = InstalledSolution::fromArray($this->solution()->toArray());
+
+        $this->assertSame(['feedback.thank'], $restored->commandTypes);
+        $this->assertSame(['/feedback'], $restored->commands);
+    }
+
     #[DataProvider('missingKeys')]
     public function test_a_cache_written_before_migrations_is_refused_as_stale(string $missing): void
     {
@@ -111,6 +121,8 @@ final class InstalledSolutionTest extends TestCase
             latestMigration: $latestMigration,
             migrationsDigest: $migrationsDigest,
             triggers: ['feedback.submitted'],
+            commandTypes: ['feedback.thank'],
+            commands: ['/feedback'],
         );
     }
 }

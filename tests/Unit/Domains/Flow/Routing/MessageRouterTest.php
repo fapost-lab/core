@@ -11,7 +11,6 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Contracts\ConversationOwnershipInterface;
 use App\Domains\Conversation\Contracts\OperatorRequestsInterface;
-use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
 use App\Domains\Flow\Commands\CommandMatcher;
 use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
 use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
@@ -557,7 +556,7 @@ final class MessageRouterTest extends TestCase
     ): MessageRouter {
         // Use real CommandMatcher (final class). Built-ins include /reset and
         // /cancel — assistant.commands stays empty so no tenant overrides apply.
-        $matcher = new CommandMatcher(new BuiltinCommandsRegistry());
+        $matcher = $this->app->make(CommandMatcher::class);
 
         [$defaultPolicy, $defaultManager] = $this->acquiringLock(true);
 

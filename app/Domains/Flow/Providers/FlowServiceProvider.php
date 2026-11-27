@@ -32,9 +32,11 @@ use App\Domains\Flow\Call\RedisCallExecutionLedger;
 use App\Domains\Flow\Call\Transports\HandlerTransport;
 use App\Domains\Flow\Call\Transports\HttpTransport;
 use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
+use App\Domains\Flow\Commands\CommandActionTypeRegistry;
 use App\Domains\Flow\Commands\CommandMatcher;
 use App\Domains\Flow\Commands\GlobalCommandExecutor;
 use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
+use App\Domains\Flow\Commands\SolutionCommandRegistry;
 use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
 use App\Domains\Flow\Concurrency\LockHeartbeat;
 use App\Domains\Flow\Concurrency\SessionLockManager;
@@ -44,6 +46,7 @@ use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationServiceInterface;
 use App\Domains\Flow\Contracts\AudienceBroadcasterInterface;
+use App\Domains\Flow\Contracts\CommandExtensionFactoryInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
@@ -210,6 +213,7 @@ use App\Infrastructure\Flow\BroadcastingAudienceBroadcaster;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
+use App\Infrastructure\Flow\ContainerCommandExtensionFactory;
 use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
 use App\Infrastructure\Flow\ContainerTriggerTypeFactory;
 use App\Infrastructure\Flow\DnsHostResolver;
@@ -544,6 +548,8 @@ final class FlowServiceProvider extends ServiceProvider
                 $this->app->make(StateNamespaceRegistry::class)->freeze();
                 $this->app->make(RagAdapterRegistry::class)->freeze();
                 $this->app->make(TriggerTypeRegistry::class)->freeze();
+                $this->app->make(CommandActionTypeRegistry::class)->freeze();
+                $this->app->make(SolutionCommandRegistry::class)->freeze();
                 $this->app->make(OneTimeCodeSenderRegistry::class)->freeze();
             }
         });
@@ -803,6 +809,10 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->singleton(HttpTransport::class);
         $this->app->singleton(HandlerTransport::class);
         $this->app->singleton(BuiltinCommandsRegistry::class);
+        // Command action types and ready-made commands Solutions register next to the built-in ones.
+        $this->app->singleton(CommandExtensionFactoryInterface::class, ContainerCommandExtensionFactory::class);
+        $this->app->singleton(CommandActionTypeRegistry::class);
+        $this->app->singleton(SolutionCommandRegistry::class);
         $this->app->singleton(CommandMatcher::class);
         $this->app->singleton(AssistantCommandsValidator::class);
 

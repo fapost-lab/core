@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-11-25
+reviewed_at: 2026-11-27
 ---
 # Flow rules
 
@@ -266,6 +266,17 @@ broken.
   run for a tenant that switched the Solution off, and a removed Solution must not take the flow list down with it
   (`adr-20261123-solution-trigger-types`). Enforced: `RegisteredTriggerTypesTest`, `RegisteredTriggerTypePublishTest`,
   `TriggerTypeRegistryTest`, `SolutionCoreRegistrarTest`, `FlowsConsoleTest`. *(proposed)*
+- **A Solution's chat command, and a tenant command of a Solution's type, run only while that Solution is active, and
+  never touch the session.** `CommandMatcher` looks up tenant → Solution (`SolutionCommandRegistry`) → built-in and asks
+  `SolutionAvailabilityInterface` on every match; an inactive owner means no match and the text goes on to the flow.
+  `GlobalCommandExecutor` runs a registered type's `handle()` (from `CommandActionTypeRegistry`, classes built per
+  call, owner = Solution id, frozen after boot) only when the Solution is ready (else the busy message), and carries
+  out the returned `CommandOutcome` itself, because a command runs before the session lock; an exception is logged and
+  the message counts as handled. `AssistantCommandsValidator` refuses a dotted type nobody registers unless the entry
+  is stored unchanged. Why: a Solution must not run for a tenant that switched it off, and Solution code must not bypass
+  the lock (`adr-20261127-solution-chat-commands`). Enforced: `CommandMatcherTest`, `GlobalCommandExecutorRegisteredTypeTest`,
+  `AssistantCommandsValidatorTest`, `SolutionCommandRegistryTest`, `CommandActionTypeRegistryTest`,
+  `SolutionCoreRegistrarTest`, `SolutionLifecycleTest`. *(proposed)*
 - **An event trigger's `assistant_filter` matches the assistant that emitted the event, never the trigger's own, and a
   Core event takes none.** `config.assistant_filter` is a list of assistant ids; empty or absent is any assistant. A
   flow event passes when the assistant of its emitting session (`flow_sessions.assistant_id`, read by

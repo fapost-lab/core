@@ -93,7 +93,7 @@ final readonly class MessageRouter
             $resolved = $this->commandMatcher->match($message->text, $assistant);
 
             if (null !== $resolved) {
-                $this->commandExecutor->execute($resolved, $contact, $assistantId);
+                $this->commandExecutor->execute($resolved, $contact, $assistantId, $assistant, (string) $channel->type, $message->updateId);
 
                 return RoutingOutcome::commandHandled($resolved->command);
             }

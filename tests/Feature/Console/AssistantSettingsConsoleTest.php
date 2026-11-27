@@ -6,6 +6,8 @@ namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Audit\Models\ActivityEntry;
+use App\Domains\Flow\Commands\CommandActionTypeRegistry;
+use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\Permission;
@@ -17,6 +19,7 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
+use Tests\Fixtures\Solution\Commands\FeedbackThankCommandType;
 use Tests\Support\ComparesJsonColumns;
 
 /**
@@ -32,6 +35,8 @@ final class AssistantSettingsConsoleTest extends FeatureTestCase
     private const string OTHER_TENANT_ID = '00000000-0000-0000-0000-0000000000ff';
 
     private Assistant $assistant;
+
+    private ?SolutionAvailabilityInterface $availability = null;
 
     protected function setUp(): void
     {
@@ -209,6 +214,69 @@ final class AssistantSettingsConsoleTest extends FeatureTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->where('settings.commands.0.type', '')->etc());
 
         $this->put($this->url(), $this->payload(['commands' => [['command' => 'legacy', 'type' => '']]]))->assertSessionHasErrors('commands.0.type');
+    }
+
+    public function test_a_solution_command_is_shown_read_only_and_survives_a_save_unchanged(): void
+    {
+        $stored = [['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['note' => 'x']]];
+        $this->assistant->update(['commands' => $stored]);
+
+        // No Solution registers the type in this test, so it is shown as not installed.
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('settings.commands.0.command', 'thanks')
+                ->where('settings.commands.0.extension.type', 'feedback.thank')
+                ->where('settings.commands.0.extension.installed', false)
+                ->where('settings.commands.0.config', ['note' => 'x'])
+                ->etc());
+
+        $this->put($this->url(), $this->payload(['commands' => [['command' => 'thanks', 'type' => 'feedback.thank', 'config' => ['note' => 'x']]]]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertEquals($stored, $this->assistant->fresh()?->commands);
+    }
+
+    public function test_the_stored_config_of_a_solution_command_survives_the_form_round_trip_untouched(): void
+    {
+        $stored = [['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['note' => '', 'pad' => ' x ']]];
+        $this->assistant->update(['commands' => $stored]);
+        $row = ['command' => 'thanks', 'type' => 'feedback.thank', 'config' => ['note' => '', 'pad' => ' x ']];
+
+        // Nobody registers the type: the entry is kept as stored.
+        $this->actingAs($this->admin())->put($this->url(), $this->payload(['commands' => [$row]]))->assertSessionHasNoErrors();
+        $this->assertEquals($stored, $this->assistant->fresh()?->commands);
+    }
+
+    public function test_the_stored_config_of_a_registered_solution_command_survives_the_form_round_trip_untouched(): void
+    {
+        $this->app->make(CommandActionTypeRegistry::class)->register(FeedbackThankCommandType::class, 'feedback');
+        $this->availability(true);
+        $config = ['text' => 'Hi', 'note' => '', 'pad' => ' x '];
+        $stored = [['command' => '/thanks', 'type' => 'feedback.thank', 'config' => $config]];
+        $this->assistant->update(['commands' => $stored]);
+
+        $this->actingAs($this->admin())
+            ->put($this->url(), $this->payload(['commands' => [['command' => 'thanks', 'type' => 'feedback.thank', 'config' => $config]]]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertEquals($stored, $this->assistant->fresh()?->commands);
+    }
+
+    public function test_the_save_says_which_commands_wait_for_an_inactive_solution_and_is_plain_otherwise(): void
+    {
+        $this->app->make(CommandActionTypeRegistry::class)->register(FeedbackThankCommandType::class, 'feedback');
+        $this->assistant->update(['commands' => [['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['text' => 'Hi']]]]);
+        $payload = $this->payload(['commands' => [['command' => 'thanks', 'type' => 'feedback.thank', 'config' => ['text' => 'Hi']]]]);
+
+        $this->availability(false);
+        $this->actingAs($this->admin())->put($this->url(), $payload)
+            ->assertSessionHasNoErrors()
+            ->assertInertiaFlash('success', trans('console.settings.saved_solution_inactive', ['commands' => '/thanks']));
+
+        $this->availability(true);
+        $this->actingAs($this->admin())->put($this->url(), $payload)
+            ->assertInertiaFlash('success', trans('console.settings.saved'));
     }
 
     public function test_the_default_language_is_kept_once_the_assistant_has_flows(): void
@@ -476,6 +544,28 @@ final class AssistantSettingsConsoleTest extends FeatureTestCase
             'settings'            => [],
             ...$overrides,
         ];
+    }
+
+    private function availability(bool $available): void
+    {
+        if (null === $this->availability) {
+            $this->availability = new class () implements SolutionAvailabilityInterface {
+                public bool $available = true;
+
+                public function isAvailable(?string $solutionId): bool
+                {
+                    return $this->available;
+                }
+
+                public function isReady(string $solutionId): bool
+                {
+                    return true;
+                }
+            };
+            $this->app->instance(SolutionAvailabilityInterface::class, $this->availability);
+        }
+
+        $this->availability->available = $available;
     }
 
     /**

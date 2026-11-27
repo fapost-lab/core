@@ -127,6 +127,36 @@ final class SolutionManifestValidatorTest extends TestCase
         );
     }
 
+    public function test_two_packages_that_declare_one_chat_command_are_both_left_out_and_both_named(): void
+    {
+        $this->vendor
+            ->package(FakeVendor::solutionComposer())
+            ->package(FakeVendor::solutionComposer(['id' => 'survey', 'actions' => null, 'commands' => ['/feedback']], ['name' => 'acme/fapost-survey']))
+            ->package(FakeVendor::solutionComposer(['id' => 'hr', 'actions' => null, 'commands' => ['/vacation']], ['name' => 'acme/fapost-hr']));
+
+        $discovery = $this->discover();
+
+        $this->assertSame(['hr'], array_map(static fn ($solution): string => $solution->id, $discovery->valid));
+        $this->assertSame(
+            ['acme/fapost-feedback, acme/fapost-survey: extra.fapost.commands: "/feedback" is declared by both packages'],
+            $this->lines($discovery),
+        );
+    }
+
+    public function test_packages_that_declare_different_chat_commands_are_both_valid(): void
+    {
+        $this->vendor
+            ->package(FakeVendor::solutionComposer())
+            ->package(FakeVendor::solutionComposer(['id' => 'survey', 'actions' => null, 'commands' => ['/survey']], ['name' => 'acme/fapost-survey']));
+
+        $discovery = $this->discover();
+
+        $this->assertSame(['feedback', 'survey'], array_map(static fn ($solution): string => $solution->id, $discovery->valid));
+        $this->assertSame([], $this->lines($discovery));
+        $this->assertSame(['/feedback'], $discovery->valid[0]->commands);
+        $this->assertSame(['feedback.thank'], $discovery->valid[0]->commandTypes);
+    }
+
     public function test_a_solution_type_package_without_a_manifest_is_a_violation(): void
     {
         $this->vendor->package(['name' => 'acme/bare', 'type' => 'fapost-solution', 'require' => ['fapost/foundation' => '^0.13']]);

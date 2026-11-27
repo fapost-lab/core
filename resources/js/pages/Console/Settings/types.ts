@@ -54,6 +54,8 @@ export interface SettingsTranslations {
     fields: { command: string; type: string; response: string; flow: string; text: string }
     types: Record<CommandType, string>
     types_help: Record<CommandType, string>
+    extension_help: string
+    extension_not_installed: string
   }
   new_flow: { open: string; title: string; hint: string; name: string; submit: string }
   errors: { commands_invalid: string; unknown_language: string; command_not_start_flow: string; has_errors: string }
@@ -91,6 +93,21 @@ export interface CommandState {
   flowId: string | null
   flowMissing: boolean
   text: MessageEntry[]
+  /** The stored config of a Solution's action; the form has no editor for it and sends it back unchanged. */
+  config?: Record<string, JsonValue> | null
+  /** Set for a Solution's action: the row is read-only and the dotted type lives here; `type` is then not used. */
+  extension?: CommandExtension | null
+}
+
+/** What a Solution's action config holds: plain JSON, which the form passes through untouched (kept loose: a recursive type is too deep for the form helper). */
+export type JsonValue = string | number | boolean | null | object
+
+/** An action a Solution registered, as the server describes a stored command of its type. */
+export interface CommandExtension {
+  /** The dotted type, e.g. `feedback.thank`. */
+  type: string
+  label: string
+  installed: boolean
 }
 
 export interface SettingRow {

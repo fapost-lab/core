@@ -8,6 +8,10 @@ use App\Console\Platform\PlatformMigratorInterface;
 use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
+use App\Domains\Flow\Commands\CommandActionType;
+use App\Domains\Flow\Commands\CommandActionTypeRegistry;
+use App\Domains\Flow\Commands\SolutionCommandRegistry;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Solution\DTO\ConnectorDiscovery;
 use App\Domains\Solution\DTO\ExtensionDiscovery;
@@ -20,6 +24,7 @@ use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Solution\Services\SolutionUiPublisher;
+use Fapost\Foundation\Flow\Enums\NodeConfigIssueSeverity;
 use Illuminate\Console\Command;
 use Illuminate\Database\Migrations\Migrator;
 
@@ -67,6 +72,9 @@ final class UpdatePlatformCommand extends Command
         PlatformMigratorInterface $migrator,
         ActionHandlerRegistry $actions,
         NodeHandlerRegistryInterface $nodes,
+        CommandActionTypeRegistry $commandActionTypes,
+        SolutionCommandRegistry $commands,
+        BuiltinCommandsRegistry $builtinCommands,
         SolutionUiPublisher $publisher,
         PublishedSolutionUi $published,
         SolutionUiCompatibility $compatibility,
@@ -122,10 +130,13 @@ final class UpdatePlatformCommand extends Command
 
         $this->phase(2, 'registries and migration paths');
 
-        $unregistered = $this->unregisteredActions($discovery, $actions, $nodes);
+        $unregistered = [
+            ...$this->unregisteredActions($discovery, $actions, $nodes),
+            ...$this->unregisteredCommands($discovery, $commandActionTypes, $commands, $builtinCommands),
+        ];
 
         if ([] !== $unregistered) {
-            return $this->refuse(2, sprintf('%d declared action(s) and node type(s) are not registered. Nothing was changed.', count($unregistered)), $unregistered);
+            return $this->refuse(2, sprintf('%d declared action(s), node type(s) and command(s) are not registered or not valid. Nothing was changed.', count($unregistered)), $unregistered);
         }
 
         $unregisteredChannels = $this->unregisteredChannels($all->connectors, $connectorChannels);
@@ -273,6 +284,59 @@ final class UpdatePlatformCommand extends Command
             foreach ($solution->nodes as $index => $nodeType) {
                 if ($nodes->ownerOf($nodeType) !== $solution->id) {
                     $lines[] = sprintf('%s: extra.fapost.nodes[%d]: "%s" is declared but not registered', $solution->package, $index, $nodeType);
+                }
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * Command action types and chat commands the manifests declare but the providers never registered, and a Solution
+     * command whose config its own action type refuses: a tenant would type it and get nothing.
+     *
+     * @return list<string>
+     */
+    private function unregisteredCommands(SolutionDiscovery $discovery, CommandActionTypeRegistry $types, SolutionCommandRegistry $commands, BuiltinCommandsRegistry $builtins): array
+    {
+        $lines = [];
+
+        foreach ($discovery->valid as $solution) {
+            foreach ($solution->commandTypes as $index => $type) {
+                if ($types->ownerOf($type) !== $solution->id) {
+                    $lines[] = sprintf('%s: extra.fapost.command_types[%d]: "%s" is declared but not registered', $solution->package, $index, $type);
+                }
+            }
+
+            foreach ($solution->commands as $index => $name) {
+                // A command Core took as built-in after the Solution declared it is skipped at registration, not fatal.
+                if ($builtins->has($name)) {
+                    continue;
+                }
+
+                if ($commands->ownerOf($name) !== $solution->id) {
+                    $lines[] = sprintf('%s: extra.fapost.commands[%d]: "%s" is declared but not registered', $solution->package, $index, $name);
+
+                    continue;
+                }
+
+                $command    = $commands->get($name);
+                $actionType = $command->actionType();
+
+                if (null !== CommandActionType::tryFrom($actionType)) {
+                    continue;
+                }
+
+                if ($types->ownerOf($actionType) !== $solution->id) {
+                    $lines[] = sprintf('%s: extra.fapost.commands[%d]: "%s" takes the action type "%s", which the Solution does not register', $solution->package, $index, $name, $actionType);
+
+                    continue;
+                }
+
+                foreach ($types->get($actionType)->validateConfig($command->config()) as $issue) {
+                    if (NodeConfigIssueSeverity::Error === $issue->severity) {
+                        $lines[] = sprintf('%s: extra.fapost.commands[%d]: "%s": %s', $solution->package, $index, $name, $issue->message);
+                    }
                 }
             }
         }

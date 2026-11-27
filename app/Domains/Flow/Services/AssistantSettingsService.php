@@ -12,6 +12,8 @@ use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Commands\CommandActionType;
+use App\Domains\Flow\Commands\CommandActionTypeRegistry;
+use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
@@ -42,6 +44,9 @@ final readonly class AssistantSettingsService
     /** A new flow made from the form is the flow a `start_flow` command starts. */
     public const string TARGET_COMMAND = 'command';
 
+    /** The shape of a command action type a Solution registers: "<solution id>.<snake_case>". */
+    private const string REGISTERED_TYPE_PATTERN = '/^[a-z][a-z0-9_]{1,31}\.[a-z][a-z0-9_]*$/D';
+
     /**
      * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
      *                                         switch moves the default connection the models write through, and a
@@ -54,6 +59,8 @@ final readonly class AssistantSettingsService
         private TenantSettings $tenantSettings,
         private CreateFlowAction $createFlow,
         private AssistantCommandsValidator $commandsValidator,
+        private CommandActionTypeRegistry $commandActionTypes,
+        private SolutionAvailabilityInterface $solutions,
         private AuditTrailInterface $audit,
         private ConnectionResolverInterface $db,
     ) {
@@ -207,15 +214,30 @@ final readonly class AssistantSettingsService
                 continue;
             }
 
-            $command = is_string($entry['command'] ?? null) ? mb_trim($entry['command']) : '';
-            $type    = CommandActionType::tryFrom(is_string($entry['type'] ?? null) ? $entry['type'] : '');
+            $command  = is_string($entry['command'] ?? null) ? mb_trim($entry['command']) : '';
+            $typeName = is_string($entry['type'] ?? null) ? $entry['type'] : '';
+            $type     = CommandActionType::tryFrom($typeName);
 
-            if ('' === $command || null === $type) {
+            if ('' === $command) {
+                continue;
+            }
+
+            $command = str_starts_with($command, '/') ? $command : '/' . $command;
+
+            if (null === $type) {
+                // A Solution's type: the form shows it read-only and has no editor for its config, so the stored config of the
+                // same command and type is kept as stored — the request's copy went through the client and the input
+                // middleware (trimmed strings, empty ones as null). A new entry keeps the config as given; the validator
+                // judges both. Any other unknown type is dropped.
+                if (1 === preg_match(self::REGISTERED_TYPE_PATTERN, $typeName)) {
+                    $normalized[] = ['command' => $command, 'type' => $typeName, 'config' => $this->storedConfig($command, $typeName) ?? (is_array($entry['config'] ?? null) ? $entry['config'] : [])];
+                }
+
                 continue;
             }
 
             $row = [
-                'command' => str_starts_with($command, '/') ? $command : '/' . $command,
+                'command' => $command,
                 'type'    => $type->value,
             ];
 
@@ -305,6 +327,59 @@ final readonly class AssistantSettingsService
     }
 
     /**
+     * The stored commands whose type a Solution registered but the current tenant has not turned on: they are kept and
+     * do not match until it is.
+     *
+     * @return list<string>
+     */
+    public function commandsOfInactiveSolutions(): array
+    {
+        $commands = [];
+
+        foreach (is_array($this->assistant()->commands) ? $this->assistant()->commands : [] as $stored) {
+            $type  = is_array($stored) && is_string($stored['type'] ?? null) ? $stored['type'] : '';
+            $owner = $this->commandActionTypes->ownerOf($type);
+
+            if (null !== $owner && ! $this->solutions->isAvailable($owner) && is_string($stored['command'] ?? null)) {
+                $commands[] = $stored['command'];
+            }
+        }
+
+        return $commands;
+    }
+
+    /**
+     * Every command action type the form may send: the built-in ones, then the ones Solutions registered.
+     *
+     * @return list<string>
+     */
+    public function commandTypes(): array
+    {
+        return [
+            ...array_map(static fn (CommandActionType $type): string => $type->value, CommandActionType::cases()),
+            ...$this->commandActionTypes->types(),
+        ];
+    }
+
+    /**
+     * The types of the stored commands, whatever they are.
+     *
+     * @return list<string>
+     */
+    public function storedCommandTypes(): array
+    {
+        $types = [];
+
+        foreach (is_array($this->assistant()->commands) ? $this->assistant()->commands : [] as $command) {
+            if (is_array($command) && is_string($command['type'] ?? null)) {
+                $types[] = $command['type'];
+            }
+        }
+
+        return array_values(array_unique($types));
+    }
+
+    /**
      * The flows the stored settings point at: the default flow and the flows of `start_flow` commands.
      *
      * @return list<string>
@@ -343,6 +418,22 @@ final readonly class AssistantSettingsService
     }
 
     /**
+     * The config of the stored command with this command and type, or null when none is stored.
+     *
+     * @return array<array-key, mixed>|null
+     */
+    private function storedConfig(string $command, string $typeName): ?array
+    {
+        foreach (is_array($this->assistant()->commands) ? $this->assistant()->commands : [] as $stored) {
+            if (is_array($stored) && ($stored['command'] ?? null) === $command && ($stored['type'] ?? null) === $typeName) {
+                return is_array($stored['config'] ?? null) ? $stored['config'] : [];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param  array{default_language?: string|null, available_countries?: list<string>|null, default_flow_id?: string|null, fallback_message?: mixed, busy_message?: mixed, commands?: list<array<string, mixed>>|null, settings?: list<array{key: string, value?: string|null}>|null}  $fields
      *
      * @throws InvalidArgumentException when the commands break a rule of {@see AssistantCommandsValidator}
@@ -352,7 +443,7 @@ final readonly class AssistantSettingsService
         $assistant = $this->assistant();
         $commands  = $this->normalizeCommands($fields['commands'] ?? []);
 
-        $this->commandsValidator->validate($commands);
+        $this->commandsValidator->validate($commands, $assistant->commands);
 
         $attributes = [
             'available_countries' => array_values(array_unique(array_map(

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Console;
 use App\Domains\Assistant\Support\ContentLanguages;
 use App\Domains\Assistant\Support\CountryCatalog;
 use App\Domains\Flow\Commands\CommandActionType;
+use App\Domains\Flow\Commands\CommandActionTypeRegistry;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Services\AssistantSettingsService;
 use App\Domains\Flow\Services\FlowDraftService;
@@ -33,6 +34,7 @@ final class AssistantSettingsController extends Controller
     public function __construct(
         private readonly AssistantSettingsService $settings,
         private readonly FlowDraftService $flows,
+        private readonly CommandActionTypeRegistry $commandActionTypes,
     ) {
     }
 
@@ -92,7 +94,12 @@ final class AssistantSettingsController extends Controller
     {
         $this->settings->save($request->fields());
 
-        Inertia::flash('success', trans('console.settings.saved'));
+        // A command of a Solution's type is kept while the Solution is off for the tenant, but it does not run.
+        $inactive = $this->settings->commandsOfInactiveSolutions();
+
+        Inertia::flash('success', [] === $inactive
+            ? trans('console.settings.saved')
+            : trans('console.settings.saved_solution_inactive', ['commands' => implode(', ', $inactive)]));
 
         return redirect()->back(fallback: $this->url('console.settings.edit'));
     }
@@ -133,18 +140,25 @@ final class AssistantSettingsController extends Controller
                 continue;
             }
 
-            $flowId = is_string($command['flow_id'] ?? null) && '' !== $command['flow_id'] ? $command['flow_id'] : null;
-            $exists = null !== $flowId && in_array($flowId, $existingFlows, true);
+            $flowId   = is_string($command['flow_id'] ?? null) && '' !== $command['flow_id'] ? $command['flow_id'] : null;
+            $exists   = null !== $flowId && in_array($flowId, $existingFlows, true);
+            $typeName = is_string($command['type'] ?? null) ? $command['type'] : '';
             // An unknown action is no action: the form asks for one, as Filament's did, instead of saving a guess.
-            $type = CommandActionType::tryFrom(is_string($command['type'] ?? null) ? $command['type'] : '');
+            $type = CommandActionType::tryFrom($typeName);
+            // A Solution's type is shown read-only and sent back as stored; the form has no editor for its config yet.
+            $extension = null === $type && str_contains($typeName, '.')
+                ? ['type' => $typeName, 'label' => $this->commandActionTypes->has($typeName) ? $this->commandActionTypes->get($typeName)->label() : $typeName, 'installed' => $this->commandActionTypes->has($typeName)]
+                : null;
 
             $rows[] = [
                 'command'     => mb_ltrim(is_string($command['command'] ?? null) ? $command['command'] : '', '/'),
-                'type'        => $type?->value ?? '',
+                'type'        => $type?->value ?? ($extension['type'] ?? ''),
                 'response'    => $this->entries($command['response'] ?? null, $locales),
                 'flowId'      => $exists ? $flowId : null,
                 'flowMissing' => null !== $flowId && ! $exists,
                 'text'        => $this->entries($command['text'] ?? null, $locales),
+                'config'      => null !== $extension && is_array($command['config'] ?? null) ? $command['config'] : null,
+                'extension'   => $extension,
             ];
         }
 

@@ -103,7 +103,8 @@ Credentials' OAuth2 types fetch their tokens through Flow's `GuardedHttpClient`,
   block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
   domain). A tenant's Solution activation is stored in its schema and read only through `ActiveSolutions`
   (`adr-20261014-solution-activation-in-tenant-schema`). Core implements `CoreRegistrarInterface` for
-  Solutions, per Solution, for action handlers, node types and trigger types (`App\Infrastructure\Solution`),
+  Solutions, per Solution, for action handlers, node types, trigger types, chat command action types and chat commands
+  (`adr-20261127-solution-chat-commands`) (`App\Infrastructure\Solution`),
   registered once per process and checked against the tenant's activation at call time
   (`adr-20261014-solution-actions-registered-per-process`, `adr-20261113-solution-node-types-and-state-namespace`,
   `adr-20261123-solution-trigger-types`). The console extension contract is built
