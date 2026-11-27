@@ -10,7 +10,6 @@ use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\BroadcastTarget;
 use App\Domains\Broadcasting\Jobs\RunBroadcastJob;
 use App\Domains\Broadcasting\Models\Broadcast;
-use App\Domains\Contact\Jobs\SendContactNotificationJob;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
@@ -41,7 +40,7 @@ final class NotifyContactsBroadcastTest extends FeatureTestCase
 
         $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
         TenantSettings::fake(['content_base_language' => 'en', 'available_languages' => ['en', 'ru']]);
-        Queue::fake([RunBroadcastJob::class, SendContactNotificationJob::class]);
+        Queue::fake([RunBroadcastJob::class]);
 
         $flowAssistant       = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
         $this->nodeAssistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
@@ -86,7 +85,6 @@ final class NotifyContactsBroadcastTest extends FeatureTestCase
         $this->assertSame(1, $broadcast->chain_depth);
         $this->assertStringStartsWith('Seasonal sale — ', $broadcast->name);
         Queue::assertPushed(RunBroadcastJob::class, 1);
-        Queue::assertNotPushed(SendContactNotificationJob::class);
     }
 
     public function test_an_all_node_broadcasts_to_everyone(): void

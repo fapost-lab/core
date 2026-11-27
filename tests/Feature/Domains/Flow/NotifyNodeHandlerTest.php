@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow;
 
-use App\Domains\Contact\Jobs\SendContactNotificationJob;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\DTOs\AudienceBroadcastResult;
@@ -178,7 +177,7 @@ final class NotifyNodeHandlerTest extends TestCase
         $this->assertSame(hash('sha256', 'idem-1:node-notify'), $request->originKey);
         $this->assertSame(1, $request->chainDepth);
 
-        Bus::assertNotDispatched(SendContactNotificationJob::class);
+        Bus::assertNothingDispatched();
     }
 
     public function test_contacts_mode_to_all_names_everyone_without_tags(): void
@@ -208,7 +207,7 @@ final class NotifyNodeHandlerTest extends TestCase
         $this->assertSame(NodeExecutionStatus::Executed, $result->status);
         $this->assertSame([], $result->stateChanges);
         $this->assertSame([], $this->broadcaster->requests);
-        Bus::assertNotDispatched(SendContactNotificationJob::class);
+        Bus::assertNothingDispatched();
     }
 
     #[DataProvider('refusals')]
@@ -273,7 +272,7 @@ final class NotifyNodeHandlerTest extends TestCase
         $this->assertTrue($result->stateChanges[SystemStateKeys::CONTACTS_NOTIFIED_PREFIX . '.node-notify']);
         $this->assertSame([], $this->broadcaster->requests);
         $this->assertTrue($this->logged('flow.notify_contacts_refused', 'contact_expression_refused'));
-        Bus::assertNotDispatched(SendContactNotificationJob::class);
+        Bus::assertNothingDispatched();
     }
 
     public function test_contacts_mode_throws_without_assistant(): void

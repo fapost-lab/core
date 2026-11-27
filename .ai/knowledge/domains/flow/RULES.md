@@ -390,8 +390,7 @@ broken.
   version (mode, assistant, audience, tags, message, after template expansion) is refused with `notify_contacts_retired`;
   an unchanged one only warns (`notify_contacts_deprecated`), and a template republishing its hosts is not checked. At
   run time the node starts a broadcast of its own `assistant_id` through `AudienceBroadcasterInterface` (tags, or
-  everyone — an audience only this node may name), with `send_message`'s key, live limit and chain depth, never
-  dispatches `SendContactNotificationJob`, refuses a text reading `contact.*`/`module.*`, keeps its
+  everyone — an audience only this node may name), with `send_message`'s key, live limit and chain depth, refuses a text reading `contact.*`/`module.*`, keeps its
   `system.contacts_notified.<node>` marker and always leaves through `default`, the outcome in `broadcast_outcome`
   (`adr-20261125-notify-contacts-retired-through-broadcasting`). Enforced: `NotifyNodeHandlerTest`,
   `NotifyContactsBroadcastTest`, `NotifyContactsPublishTest`.

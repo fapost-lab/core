@@ -6,7 +6,6 @@ namespace Tests\Unit\Architecture;
 
 use App\Domains\Broadcasting\Jobs\RunBroadcastJob;
 use App\Domains\Broadcasting\Jobs\SendBroadcastRecipientJob;
-use App\Domains\Contact\Jobs\SendContactNotificationJob;
 use App\Domains\Conversation\Jobs\FetchConversationMediaJob;
 use App\Domains\Conversation\Jobs\NotifyOperatorRequestJob;
 use App\Domains\Conversation\Jobs\PersistConversationMessageJob;
@@ -35,7 +34,6 @@ use App\Jobs\Flow\StartAutomationRunJob;
 use App\Jobs\Flow\StartFlowForContactJob;
 use App\Jobs\Flow\StartFlowFromEventJob;
 use App\Jobs\Media\CleanupSoftDeletedMediaJob;
-use App\Jobs\Messaging\BroadcastSendJob;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use App\Jobs\Solution\PrepareSolutionSchemaJob;
 use Fapost\Foundation\Solution\Queue\SolutionJob;
@@ -73,7 +71,6 @@ final class RuntimeJobAccessModeTest extends TestCase
         StartFlowForContactJob::class,
         StartAutomationRunJob::class,
         ContinueAutomationRunJob::class,
-        SendContactNotificationJob::class,
         SendStaffNotificationJob::class,
         SendOneTimeCodeJob::class,
         ResumeDelayedFlowSessionJob::class,
@@ -84,7 +81,6 @@ final class RuntimeJobAccessModeTest extends TestCase
         NotifyOperatorRequestJob::class,
         RunBroadcastJob::class,
         SendBroadcastRecipientJob::class,
-        BroadcastSendJob::class,
     ];
 
     /**

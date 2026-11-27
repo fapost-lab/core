@@ -75,9 +75,8 @@ broken.
   Skipped with the reason and the broadcast moves Running → Cancelled with `stop_reason`
   (`limit_reached`), set by one conditional update; later recipient jobs of a Cancelled broadcast
   skip without asking the operator. "Completed is set only by the last recipient" therefore holds
-  for runs that were not stopped. A deprecated `BroadcastSendJob` an older release queued
-  logs the refusal and drops.
-  Enforced: `OutboundVolumeLimitTest`, `BroadcastSendJobTest`.
+  for runs that were not stopped.
+  Enforced: `OutboundVolumeLimitTest`.
 
 ## Rules
 
