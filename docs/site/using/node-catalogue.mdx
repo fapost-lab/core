@@ -241,7 +241,10 @@ is not a valid variable name.
 By default the subflow runs the flow's active version, so republishing the child
 changes what every parent runs. To keep a parent on a tested version, enter its
 number in **Pinned version**: that version keeps running after the child is
-republished. Publishing refuses a version the child never published.
+republished. Publishing refuses a version the child never published, or one that
+was deleted: when the operator turns on [flow version retention](/self-hosting/platform-settings),
+old versions are deleted unless something pins or uses them, and a pinned version is
+always kept.
 
 ### Start flow for contact
 

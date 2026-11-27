@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domains\Flow\Retention\AutomationRunRetention;
+use App\Domains\Flow\Retention\FlowVersionRetention;
 use App\Domains\Flow\Retention\SessionHistoryRetention;
 
 return [
@@ -74,6 +75,16 @@ return [
     // by it: their history goes with the run.
     'session_history' => [
         'retention_days' => SessionHistoryRetention::parseDays(env('FLOW_SESSION_HISTORY_RETENTION_DAYS')),
+    ],
+
+    // Only the default of the platform setting `flow.versions.keep_last`: how many published versions of each flow the
+    // daily `flow:prune-versions` keeps. 0, the default, keeps every version; 50 is the recommended value. A value that
+    // is not a whole number from 0 to 10000 is ignored.
+    'versions' => [
+        'keep_last' => FlowVersionRetention::parseKeep(
+            env('FLOW_VERSIONS_KEEP_LAST'),
+            FlowVersionRetention::DEFAULT_KEEP,
+        ),
     ],
 
     // Only the default of the platform setting `flow.trace.payloads`: whether an automation run's node trace keeps each

@@ -57,7 +57,7 @@ use Illuminate\Support\ServiceProvider;
 
 /**
  * Wires Media Domain bindings, the channel adapter registries, and the listener that
- * keeps media_file_references in sync with FlowDefinition saves.
+ * keeps media_file_references in sync with FlowDefinition saves and deletes.
  *
  * The three channel registries are scoped, not singletons: they hold the services built from the connector tags, and a
  * service that injects a scoped binding would stay pinned to the first job's tenant for the whole worker process.
@@ -68,6 +68,11 @@ final class MediaServiceProvider extends ServiceProvider
     {
         FlowDefinition::saved(static function (FlowDefinition $definition): void {
             app(TrackFlowDefinitionMediaReferences::class)->handle($definition);
+        });
+
+        // A deleted version (the flow version retention) takes its references with it; the files stay.
+        FlowDefinition::deleted(static function (FlowDefinition $definition): void {
+            app(MediaReferenceTrackerInterface::class)->forgetFlowDefinition($definition);
         });
 
         Gate::policy(MediaFile::class, MediaFilePolicy::class);

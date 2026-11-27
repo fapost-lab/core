@@ -50,6 +50,7 @@ use Exception;
 use Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface;
 use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
 use Fapost\Foundation\Flow\Enums\NodeConfigIssueSeverity;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
@@ -1019,16 +1020,10 @@ final readonly class ValidateFlowService
         $pins = [];
 
         foreach ($nodeMap as $nodeId => $node) {
-            if (\App\Domains\Flow\Handlers\SubflowNodeHandler::TYPE !== ($node['type'] ?? null)) {
-                continue;
-            }
+            $target = SubflowPin::target($node);
 
-            $config  = is_array($node['config'] ?? null) ? $node['config'] : [];
-            $target  = $config['flow_id'] ?? null;
-            $version = SubflowPin::read($config);
-
-            if (is_int($version) && is_string($target) && '' !== mb_trim($target) && ! str_contains($target, '{{')) {
-                $pins[(string) $nodeId] = [mb_trim($target), $version];
+            if (null !== $target) {
+                $pins[(string) $nodeId] = $target;
             }
         }
 
@@ -1039,8 +1034,17 @@ final readonly class ValidateFlowService
         $published = [];
 
         FlowDefinition::query()
-            ->whereIn('flow_id', array_values(array_unique(array_column($pins, 0))))
+            ->where(static function (Builder $query) use ($pins): void {
+                foreach ($pins as [$target, $version]) {
+                    $query->orWhere(static fn (Builder $pair): Builder => $pair->where('flow_id', $target)->where('version', $version));
+                }
+            })
             ->runnable()
+            // Inside a publish, each pinned version is held until the publish commits, so the flow version retention
+            // (FlowVersionPruner, which skips a locked version) cannot delete it in between; outside a transaction the
+            // lock ends with the read. FOR KEY SHARE, not FOR SHARE: it blocks only a delete (FOR UPDATE), never the
+            // `is_active = false` update another publish makes, so two publishes pinning each other cannot deadlock.
+            ->lock('for key share')
             ->get(['flow_id', 'version'])
             ->each(static function (FlowDefinition $definition) use (&$published): void {
                 $published[$definition->flow_id][$definition->version] = true;

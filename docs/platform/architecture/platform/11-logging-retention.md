@@ -21,6 +21,9 @@ Both tables live in the tenant schema.
   succeeded runs after `flow.automation_runs.succeeded_retention_days` (7), every other terminal run after
   `flow.automation_runs.failed_retention_days` (30), both platform settings. A subflow chain goes only as a whole.
   Conversation sessions and their history are not pruned by anything yet (spec `data-lifecycle`).
+- `flow:prune-versions` (`PruneFlowVersionsCommand`, `FlowVersionPruner`) deletes old published flow versions, daily at
+  05:00, after the automation run prune so the versions its deleted runs held can go the same night. Off while
+  `flow.versions.keep_last` is `0`; what it never deletes is in `09-flow-versioning.md`.
 
 ### Node trace in `flow_session_history`
 

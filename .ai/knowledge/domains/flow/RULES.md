@@ -361,6 +361,21 @@ broken.
   by it — their history goes with the run. Enforced: `SessionHistoryPrunerTest` (status × kind × age, chains of three
   levels, tenant, batches), `PruneSessionHistoryCommandTest`, `PlatformSettingsTest`
   (`adr-20261127-conversation-session-history-retention`).
+- **A published version is deleted only by version retention, and never one something still needs.**
+  `FlowVersionPruner` (daily `flow:prune-versions`, after the run prune) deletes a tenant's version (tenant passed
+  explicitly) only outside the last `flow.versions.keep_last` of its flow — a per-install platform setting, 0 by default,
+  which keeps every version. It never deletes the active version or the flow's highest one (the next publish numbers
+  itself `max + 1`, and a pin would then name another graph), one a row of `FlowVersionPruner::HOLDERS`
+  (`flow_sessions` of any status, `persistent_inline_buttons`) points at, or one a subflow node pins
+  (`config.flow_version`) in any draft or version of the schema. Each batch is locked `FOR UPDATE SKIP LOCKED` and
+  re-checked, the pins of its flows read again; `ValidateFlowService` takes `FOR KEY SHARE` on the versions a publish
+  pins — never `FOR SHARE`, which conflicts with another publish's `is_active = false` update (`FOR NO KEY UPDATE`) and
+  deadlocks two publishes that pin each other. So a version is never deleted between a publish's pin check and its
+  commit, and the prune never waits on a publish. A deletion runs through the model, so Media drops its references.
+  Why: a deleted version cannot come back, and each of these would break a run, an old button or a publish without a
+  trace. A new table that points at `flow_definitions.id` must be added to `HOLDERS` (review only). Enforced:
+  `FlowVersionPrunerTest`, `PruneFlowVersionsCommandTest`, `FlowVersionPinLockTest` (PostgreSQL only),
+  `FlowTemplatePublishTest::test_a_template_publish_still_republishes_a_host_whose_old_versions_were_pruned`.
 - **A node that needs a contact is never published into a flow whose trigger gives none.** A handler declares
   `contact`, `none` or `any` through Foundation's `DeclaresContextRequirementInterface` (Solutions too); one that
   declares nothing needs a contact. Under a `schedule`, `webhook` or `api` trigger, or an `event` trigger on a Core event (`TriggerContactContext`), validate and publish refuse such a node, and

@@ -44,4 +44,12 @@ final readonly class MediaReferenceTracker implements MediaReferenceTrackerInter
             }
         });
     }
+
+    public function forgetFlowDefinition(FlowDefinition $definition): void
+    {
+        MediaFileReference::query()
+            ->where('reference_type', MediaFileReference::TYPE_FLOW_DEFINITION)
+            ->where('reference_id', $definition->id)
+            ->delete();
+    }
 }

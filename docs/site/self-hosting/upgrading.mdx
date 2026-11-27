@@ -358,6 +358,15 @@ still delivered, and are removed in the release after it: upgrade to 0.25 first 
 mode still queued when a later release starts cannot run: it fails into the failed jobs, a retry fails again, and
 its notification is not sent.
 
+## Old flow versions can be pruned
+
+Every publish keeps the previous version of a flow, and nothing removed them so far. The daily
+`flow:prune-versions` (05:00) now deletes versions older than the last N of each flow, N being the
+[platform setting](/self-hosting/platform-settings) `flow.versions.keep_last`. It is `0` after the upgrade, which keeps
+every version and deletes nothing; set it to 50, the recommended value, to start pruning. A version that is active or
+the latest, that any session ran, that an inline button sent earlier points at, or that a subflow node is pinned to is
+never deleted. Deleting is irreversible; `php artisan flow:prune-versions --dry-run` counts first.
+
 ## Stricter publish checks
 
 Publishing now refuses structurally broken graphs, loop mistakes, variable path clashes, invalid
