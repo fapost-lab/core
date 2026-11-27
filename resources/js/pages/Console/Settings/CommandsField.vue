@@ -9,14 +9,16 @@ import { Input } from '@fapost/ui/components/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import { interpolate } from '@console/shell'
 import FlowSelect from './FlowSelect.vue'
+import CommandConfigFields from './CommandConfigFields.vue'
 import { errorsByLocale, LocalizedField } from '@fapost/ui/components/localized-field'
-import { commandErrors, newCommand } from './settings'
-import type { CommandState, CommandType, CommandTypeOption, FlowOption, SettingsPageProps } from './types'
+import { commandErrors, defaultConfig, newCommand } from './settings'
+import type { CommandState, CommandTypeOption, FlowOption, SettingsPageProps } from './types'
 
 /**
  * The slash commands, as collapsible cards in their stored order. Each shows only the fields its action uses: an
  * acknowledgement for ending the session, a flow for starting one (with a button that creates it), a message for
- * sending one. Errors arrive keyed by the command's position.
+ * sending one, and for an action a Solution registered the form its config schema describes. Errors arrive keyed by
+ * the command's position.
  */
 const props = defineProps<{
   languages: string[]
@@ -53,8 +55,26 @@ const localizedLanguages = computed(() => props.languages.map((code) => ({ code 
 const collapsed = ref<Set<string>>(new Set())
 let added = 0
 
-const helpOf = computed(() => new Map(props.types.map((type) => [type.value, type.help])))
+const helpOf = computed(() => new Map(props.types.map((type) => [type.value, type.help === '' ? undefined : type.help])))
 const labelOf = computed(() => new Map(props.types.map((type) => [type.value, type.label])))
+const optionOf = computed(() => new Map(props.types.map((type) => [type.value, type])))
+
+/** The actions a command may pick: a Solution's action whose Solution is off only where it is already chosen. */
+function typesFor(command: CommandState): CommandTypeOption[] {
+  return props.types.filter((type) => type.available !== false || type.value === command.type)
+}
+
+/** A Solution's action is the one whose option brings a config form; Core's own come without one. */
+function isSolutionAction(command: CommandState): boolean {
+  return optionOf.value.get(command.type)?.schema !== undefined
+}
+
+/** Another action has another config: a Solution's starts from its schema's defaults, Core's own have none. */
+function changeType(index: number, type: string): void {
+  const schema = optionOf.value.get(type)?.schema
+
+  update(index, { type, config: schema === undefined ? null : defaultConfig(schema), warnings: [] })
+}
 
 function titleOf(command: CommandState): string {
   const name = command.command.trim()
@@ -154,12 +174,12 @@ function hasErrors(index: number): boolean {
           </FormField>
 
           <FormField :id="`command-${index}-type`" :label="t.commands.fields.type" :hint="command.type === '' ? undefined : helpOf.get(command.type)" :error="commandErrors(errors, index).type" v-slot="{ invalid, describedBy }">
-            <Select :model-value="command.type === '' ? undefined : command.type" @update:model-value="(value) => update(index, { type: value as CommandType })">
+            <Select :model-value="command.type === '' ? undefined : command.type" @update:model-value="(value) => changeType(index, String(value))">
               <SelectTrigger :id="`command-${index}-type`" class="w-full" :aria-invalid="invalid" :aria-describedby="describedBy">
                 <SelectValue :placeholder="t.commands.fields.type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="type in types" :key="type.value" :value="type.value">{{ type.label }}</SelectItem>
+                <SelectItem v-for="type in typesFor(command)" :key="type.value" :value="type.value">{{ type.label }}</SelectItem>
               </SelectContent>
             </Select>
           </FormField>
@@ -211,6 +231,18 @@ function hasErrors(index: number): boolean {
             @update:model-value="(value) => update(index, { text: value })"
           />
         </FormField>
+
+        <template v-if="isSolutionAction(command)">
+          <p v-if="optionOf.get(command.type)?.available === false" role="status" class="text-destructive text-[12.5px]">{{ t.commands.solution_inactive }}</p>
+          <CommandConfigFields
+            :id="`command-${index}`"
+            :model-value="command.config ?? {}"
+            :schema="optionOf.get(command.type)?.schema"
+            :errors="commandErrors(errors, index)"
+            :warnings="command.warnings ?? []"
+            @update:model-value="(value) => update(index, { config: value, warnings: [] })"
+          />
+        </template>
       </div>
     </div>
 

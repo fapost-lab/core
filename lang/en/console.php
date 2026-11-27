@@ -1062,8 +1062,10 @@ return [
                 'start_flow'        => 'Ends the current dialog and starts the selected flow.',
                 'send_message'      => 'Sends an informational reply without touching the current dialog.',
             ],
-            'extension_help'          => 'Provided by a Solution; edited by it, not here.',
+            'extension_help'          => 'Provided by a Solution that is no longer installed; it cannot be edited here.',
             'extension_not_installed' => 'Not installed: this action is kept as stored, but the assistant cannot run it.',
+            'solution_inactive'       => 'This action\'s Solution is turned off: the command is kept, but it will not run until the Solution is turned on.',
+            'config_unsupported'      => 'This field cannot be edited here; it is kept as stored.',
         ],
         'new_flow' => [
             'open'   => 'Create new flow',

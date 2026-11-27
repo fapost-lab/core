@@ -40,10 +40,14 @@ final readonly class AssistantCommandsValidator
     }
 
     /**
-     * @param  list<array<string, mixed>>  $commands
+     * @param  array<int|string, array<string, mixed>>  $commands  a list, or keyed by the position the caller reports an
+     *                                                         error at (the form's row, when blank rows were dropped)
      * @param  mixed  $stored  the assistant's commands as stored before this save: an entry of a dotted type nobody
      *                         registers any more is kept when it is stored unchanged, so a removed Solution never
      *                         blocks saving the rest
+     *
+     * @throws InvalidCommandConfigException when a Solution's type refuses an entry's config
+     * @throws InvalidArgumentException      when any other rule is broken
      */
     public function validate(array $commands, mixed $stored = []): void
     {
@@ -77,7 +81,7 @@ final readonly class AssistantCommandsValidator
             $type     = CommandActionType::tryFrom($typeName);
 
             if (null === $type) {
-                $this->validateRegistered($position, $command, $typeName, $entry['config'] ?? [], $stored);
+                $this->validateRegistered($index, $position, $command, $typeName, $entry['config'] ?? [], $stored);
 
                 continue;
             }
@@ -123,7 +127,10 @@ final readonly class AssistantCommandsValidator
         return $value;
     }
 
-    private function validateRegistered(string $position, string $command, string $typeName, mixed $config, mixed $stored): void
+    /**
+     * @param  int|string  $index  the entry's key, which a refused config reports
+     */
+    private function validateRegistered(int|string $index, string $position, string $command, string $typeName, mixed $config, mixed $stored): void
     {
         if (! $this->actionTypes->has($typeName)) {
             if (str_contains($typeName, '.') && $this->isStoredUnchanged($command, $typeName, $config, $stored)) {
@@ -141,8 +148,8 @@ final readonly class AssistantCommandsValidator
             throw new InvalidArgumentException("{$position} overrides built-in '{$command}' with the type {$typeName}; only response text is overridable.");
         }
 
-        // A config the type accepted when it was saved stays saveable after the Solution tightened its rules: the
-        // console cannot edit it, so refusing it would block every other setting.
+        // A config the type accepted when it was saved stays saveable after the Solution tightened its rules: refusing
+        // an entry nobody touched would block every other setting.
         if ($this->isStoredUnchanged($command, $typeName, $config, $stored)) {
             return;
         }
@@ -152,12 +159,15 @@ final readonly class AssistantCommandsValidator
         }
 
         /** @var array<string, mixed> $config */
-        foreach ($this->actionTypes->get($typeName)->validateConfig($config) as $issue) {
-            if ($issue instanceof NodeConfigIssue && NodeConfigIssueSeverity::Error === $issue->severity) {
-                $field = null === $issue->field ? '' : '.' . $issue->field;
+        $errors = array_values(array_filter(
+            $this->actionTypes->get($typeName)->validateConfig($config),
+            static fn (mixed $issue): bool => $issue instanceof NodeConfigIssue && NodeConfigIssueSeverity::Error === $issue->severity,
+        ));
 
-                throw new InvalidArgumentException("{$position}.config{$field}: {$issue->message}");
-            }
+        if ([] !== $errors) {
+            $field = null === $errors[0]->field ? '' : '.' . $errors[0]->field;
+
+            throw new InvalidCommandConfigException("{$position}.config{$field}: {$errors[0]->message}", $index, $errors);
         }
     }
 

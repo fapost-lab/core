@@ -67,11 +67,22 @@ final class AssistantSettingsController extends Controller
                 'languages'    => $this->options(ContentLanguages::options()),
                 'countries'    => $this->options($countries->options()),
                 'flows'        => $this->settings->flowOptions(),
-                'commandTypes' => array_map(static fn (CommandActionType $type): array => [
-                    'value' => $type->value,
-                    'label' => trans('console.settings.commands.types.' . $type->value),
-                    'help'  => trans('console.settings.commands.types_help.' . $type->value),
-                ], CommandActionType::cases()),
+                'commandTypes' => [
+                    ...array_map(static fn (CommandActionType $type): array => [
+                        'value' => $type->value,
+                        'label' => trans('console.settings.commands.types.' . $type->value),
+                        'help'  => trans('console.settings.commands.types_help.' . $type->value),
+                    ], CommandActionType::cases()),
+                    // A Solution's types bring their config form; one whose Solution is off is offered only where it is
+                    // already chosen.
+                    ...array_map(static fn (array $type): array => [
+                        'value'     => $type['type'],
+                        'label'     => $type['label'],
+                        'help'      => '',
+                        'schema'    => $type['schema'],
+                        'available' => $type['available'],
+                    ], $this->settings->registeredCommandTypes()),
+                ],
             ],
             'limit' => [
                 'reached' => $limit->reached,
@@ -145,19 +156,23 @@ final class AssistantSettingsController extends Controller
             $typeName = is_string($command['type'] ?? null) ? $command['type'] : '';
             // An unknown action is no action: the form asks for one, as Filament's did, instead of saving a guess.
             $type = CommandActionType::tryFrom($typeName);
-            // A Solution's type is shown read-only and sent back as stored; the form has no editor for its config yet.
-            $extension = null === $type && str_contains($typeName, '.')
-                ? ['type' => $typeName, 'label' => $this->commandActionTypes->has($typeName) ? $this->commandActionTypes->get($typeName)->label() : $typeName, 'installed' => $this->commandActionTypes->has($typeName)]
+            // A type a Solution registered is edited through its config form; a dotted type nobody registers any more
+            // has no form: it is shown read-only and sent back as stored.
+            $registered = null === $type && $this->commandActionTypes->has($typeName);
+            $extension  = null === $type && ! $registered && str_contains($typeName, '.')
+                ? ['type' => $typeName, 'label' => $typeName, 'installed' => false]
                 : null;
+            $config = ($registered || null !== $extension) && is_array($command['config'] ?? null) ? $command['config'] : null;
 
             $rows[] = [
                 'command'     => mb_ltrim(is_string($command['command'] ?? null) ? $command['command'] : '', '/'),
-                'type'        => $type?->value ?? ($extension['type'] ?? ''),
+                'type'        => $type?->value ?? ($registered || null !== $extension ? $typeName : ''),
                 'response'    => $this->entries($command['response'] ?? null, $locales),
                 'flowId'      => $exists ? $flowId : null,
                 'flowMissing' => null !== $flowId && ! $exists,
                 'text'        => $this->entries($command['text'] ?? null, $locales),
-                'config'      => null !== $extension && is_array($command['config'] ?? null) ? $command['config'] : null,
+                'config'      => $registered ? ($config ?? []) : $config,
+                'warnings'    => $registered ? $this->settings->commandConfigWarnings($typeName, $config ?? []) : [],
                 'extension'   => $extension,
             ];
         }

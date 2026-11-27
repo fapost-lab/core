@@ -1,5 +1,7 @@
 import { localizedRecord } from '@fapost/ui/components/localized-field'
-import type { CommandState, JsonValue, MessageEntry, SettingRow, SettingsTab } from './types'
+import { resolveVisibility } from '@builder/composables/useFieldVisibility'
+import { schemaSections } from '@builder/components/editor/config/schemaSections'
+import type { CommandState, ConfigSchema, JsonValue, MessageEntry, SettingRow, SettingsTab } from './types'
 
 /** The settings form as the page holds it; `commands` carry a list key that is never sent. */
 export interface SettingsFormData {
@@ -14,7 +16,7 @@ export interface SettingsFormData {
 
 export interface CommandPayload {
   command: string
-  type: CommandState['type'] | string
+  type: string
   response?: Record<string, string>
   flow_id?: string | null
   text?: Record<string, string>
@@ -59,7 +61,7 @@ export function toPayload(data: SettingsFormData): SettingsPayload {
     fallback_message: localizedRecord(data.fallback_message),
     busy_message: localizedRecord(data.busy_message),
     commands: data.commands.map((command) => {
-      // A Solution's action has no editor yet: it goes back exactly as stored, so saving other settings never loses it.
+      // A type no Solution registers has no form: it goes back exactly as stored, so saving other settings never loses it.
       if (command.extension) {
         return { command: command.command.trim(), type: command.extension.type, config: command.config ?? {} }
       }
@@ -70,8 +72,11 @@ export function toPayload(data: SettingsFormData): SettingsPayload {
         row.response = localizedRecord(command.response)
       } else if (command.type === 'start_flow') {
         row.flow_id = command.flowId
-      } else {
+      } else if (command.type === 'send_message') {
         row.text = localizedRecord(command.text)
+      } else if (command.config) {
+        // A Solution's action: its whole config, keys its form does not show included.
+        row.config = command.config
       }
 
       return row
@@ -79,6 +84,87 @@ export function toPayload(data: SettingsFormData): SettingsPayload {
     // A row with neither key nor value was added and left: it is dropped, not an error.
     settings: data.settings.filter((row) => row.key.trim() !== '' || row.value.trim() !== ''),
   }
+}
+
+/** One field of a Solution action's config form. */
+export interface ConfigField {
+  key: string
+  schema: Record<string, unknown>
+  required: boolean
+}
+
+/** The field types the console's config form edits; any other is shown read-only and sent back as it is. */
+const EDITABLE_FIELD_TYPES = new Set(['string', 'text', 'number', 'boolean', 'enum', 'enum-cards'])
+
+export function isEditableField(field: ConfigField): boolean {
+  return EDITABLE_FIELD_TYPES.has(String(field.schema.type ?? 'string'))
+}
+
+/**
+ * The fields of a config form in the order they are shown: the declared sections' fields, section after section, or
+ * every field when the schema declares none — read as the builder reads a node's `config_schema`.
+ */
+export function configFields(schema: ConfigSchema | undefined): ConfigField[] {
+  return schemaSections(schema, { key: 'config', label: '' }).flatMap((section) => section.fields)
+}
+
+/** The fields a config shows now: a field's `visible_when` is checked against the config being edited. */
+export function visibleConfigFields(schema: ConfigSchema | undefined, config: Record<string, JsonValue>): ConfigField[] {
+  return configFields(schema).filter((field) => resolveVisibility(field.schema, config))
+}
+
+/** The config a command starts with when its Solution action is chosen: each field's default, then the schema's `default_config`. */
+export function defaultConfig(schema: ConfigSchema | undefined): Record<string, JsonValue> {
+  const config: Record<string, JsonValue> = {}
+
+  for (const field of configFields(schema)) {
+    if (field.schema.default !== undefined) {
+      config[field.key] = field.schema.default as JsonValue
+    }
+  }
+
+  const declared = schema?.default_config
+
+  return declared !== null && typeof declared === 'object' && !Array.isArray(declared) ? { ...config, ...(declared as Record<string, JsonValue>) } : config
+}
+
+/**
+ * An `enum` field's choices: its `options` (or the older `values`) as a list of values, a list of `{value, label}`
+ * cards (`enum-cards`), or a map of value to label.
+ */
+export function enumChoices(field: ConfigField): { value: string; label: string }[] {
+  const raw = field.schema.options ?? field.schema.values ?? []
+
+  if (Array.isArray(raw)) {
+    return raw.map((entry) => {
+      if (entry !== null && typeof entry === 'object' && 'value' in entry) {
+        const card = entry as { value: unknown; label?: unknown }
+
+        return { value: String(card.value), label: String(card.label ?? card.value) }
+      }
+
+      return { value: String(entry), label: String(entry) }
+    })
+  }
+
+  if (raw !== null && typeof raw === 'object') {
+    return Object.entries(raw as Record<string, unknown>).map(([value, label]) => ({ value, label: String(label) }))
+  }
+
+  return []
+}
+
+/**
+ * The form's commands with the warnings of the commands as saved: each takes those of the saved command with its name
+ * and type, and none when there is no such command.
+ */
+export function refreshWarnings(commands: CommandState[], saved: Omit<CommandState, 'key'>[]): CommandState[] {
+  const name = (command: string): string => command.trim().replace(/^\/+/, '')
+
+  return commands.map((command) => ({
+    ...command,
+    warnings: saved.find((row) => name(row.command) === name(command.command) && row.type === command.type)?.warnings ?? [],
+  }))
 }
 
 /** The tab a validation error belongs to, by the key the server reports it under. */
