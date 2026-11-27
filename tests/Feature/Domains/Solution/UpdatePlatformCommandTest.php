@@ -15,12 +15,12 @@ use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
-use Symfony\Component\Console\Output\OutputInterface;
 use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\Fixtures\Connectors\Echo\EchoSender;
 use Tests\Fixtures\Solution\Actions\FeedbackScoreAction;
 use Tests\Fixtures\Solution\Actions\FeedbackSubmitAction;
 use Tests\Fixtures\Solution\Nodes\FeedbackCollectNode;
+use Tests\Support\FakePlatformMigrator;
 use Tests\Support\FakeVendor;
 use Tests\TestCase;
 
@@ -33,9 +33,7 @@ final class UpdatePlatformCommandTest extends TestCase
 
     private SolutionCache $cache;
 
-    private int $migrations = 0;
-
-    private bool $migrationsSucceed = true;
+    private FakePlatformMigrator $migrator;
 
     /** @var list<array{tenant: string, type: string, count: int}> */
     private array $unserved = [];
@@ -44,10 +42,8 @@ final class UpdatePlatformCommandTest extends TestCase
     {
         parent::setUp();
 
-        $this->vendor            = new FakeVendor();
-        $this->cache             = new SolutionCache(dirname($this->vendor->path) . '/fapost-solutions.php');
-        $this->migrations        = 0;
-        $this->migrationsSucceed = true;
+        $this->vendor = new FakeVendor();
+        $this->cache  = new SolutionCache(dirname($this->vendor->path) . '/fapost-solutions.php');
 
         $this->app->instance(SolutionCache::class, $this->cache);
         $this->app->instance(SolutionDiscoverer::class, new SolutionDiscoverer(
@@ -65,16 +61,8 @@ final class UpdatePlatformCommandTest extends TestCase
                 return $this->test->unserved();
             }
         });
-        $this->app->instance(PlatformMigratorInterface::class, new class ($this) implements PlatformMigratorInterface {
-            public function __construct(private readonly UpdatePlatformCommandTest $test)
-            {
-            }
-
-            public function migrate(OutputInterface $output): bool
-            {
-                return $this->test->recordMigration();
-            }
-        });
+        $this->migrator = new FakePlatformMigrator();
+        $this->app->instance(PlatformMigratorInterface::class, $this->migrator);
     }
 
     protected function tearDown(): void
@@ -92,13 +80,6 @@ final class UpdatePlatformCommandTest extends TestCase
         return $this->unserved;
     }
 
-    public function recordMigration(): bool
-    {
-        $this->migrations++;
-
-        return $this->migrationsSucceed;
-    }
-
     public function test_validate_only_passes_on_a_valid_manifest_and_touches_nothing(): void
     {
         $this->registerFeedbackActions();
@@ -109,7 +90,7 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('acme/fapost-feedback')
             ->assertExitCode(0);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
@@ -154,7 +135,7 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('acme/fapost-connector-echo: extra.fapost.provider')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
@@ -179,7 +160,7 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('Nothing was changed')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
@@ -197,7 +178,7 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('Tenant "globex" has 1 channel(s) of type "viber"')
             ->assertExitCode(0);
 
-        $this->assertSame(1, $this->migrations);
+        $this->assertSame(1, $this->migrator->landlordRuns);
         $this->assertFileExists($this->cache->path());
     }
 
@@ -233,7 +214,7 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('Nothing was changed')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
@@ -247,7 +228,7 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('Nothing was changed')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
@@ -269,7 +250,7 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('Nothing was changed')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
@@ -283,21 +264,95 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('horizon:terminate')
             ->assertExitCode(0);
 
-        $this->assertSame(1, $this->migrations);
+        $this->assertSame(1, $this->migrator->landlordRuns);
         $this->assertSame('feedback', $this->cache->read()[0]->id ?? null);
     }
 
-    public function test_a_failed_migration_fails_the_update_and_leaves_no_cache(): void
+    public function test_a_failed_landlord_migration_stops_the_update_in_its_phase_and_leaves_no_cache(): void
     {
         $this->registerFeedbackActions();
         $this->vendor->package(FakeVendor::solutionComposer())->write();
-        $this->migrationsSucceed = false;
+        $this->migrator->landlordSucceeds = false;
 
         $this->artisan('platform:update')
-            ->expectsOutputToContain('Migrations failed')
+            ->expectsOutputToContain('Phase 3 (migrate platform): Landlord migrations failed. Nothing after them ran')
+            ->doesntExpectOutputToContain('Phase 4 of 5')
+            ->assertExitCode(1);
+
+        $this->assertSame([], $this->migrator->solutionRuns);
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_a_failed_tenant_still_lets_the_solutions_migrate_but_skips_activation(): void
+    {
+        $this->registerFeedbackActions();
+        $this->installFeedbackWithMigrations();
+        $this->migrator->tenantsSucceed = false;
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('Phase 3 (migrate platform): tenant migrations failed for at least one tenant')
+            ->expectsOutputToContain('Phase 3 (migrate platform): The update stopped before activation')
+            ->doesntExpectOutputToContain('Phase 5 of 5')
+            ->assertExitCode(1);
+
+        $this->assertSame([['feedback']], $this->migrator->solutionRuns);
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_solution_failures_after_a_failed_tenant_say_the_tenant_may_be_the_cause(): void
+    {
+        $this->registerFeedbackActions();
+        $this->installFeedbackWithMigrations();
+        $this->migrator->tenantsSucceed   = false;
+        $this->migrator->failingSolutions = ['feedback'];
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('Phase 4 (migrate Solutions): Solution "feedback" failed to migrate in at least one tenant')
+            ->expectsOutputToContain('A tenant that failed in phase 3 fails every Solution')
             ->assertExitCode(1);
 
         $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_a_failed_solution_is_named_and_the_update_still_activates_everything(): void
+    {
+        $this->registerFeedbackActions();
+        $this->installFeedbackWithMigrations();
+        $this->migrator->failingSolutions = ['feedback'];
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('Phase 4 (migrate Solutions): Solution "feedback" failed to migrate')
+            ->expectsOutputToContain('Phase 5 of 5: activate')
+            ->expectsOutputToContain('Solution catalog cached')
+            ->expectsOutputToContain('Phase 4 (migrate Solutions): The update finished for everything else, but 1 Solution(s) failed to migrate: feedback.')
+            ->assertExitCode(1);
+
+        $this->assertSame('feedback', $this->cache->read()[0]->id ?? null);
+    }
+
+    public function test_only_solutions_that_ship_migrations_are_migrated(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('Phase 4 of 5: migrate Solutions')
+            ->assertExitCode(0);
+
+        $this->assertSame([[]], $this->migrator->solutionRuns);
+    }
+
+    public function test_a_validation_failure_names_its_phase(): void
+    {
+        $this->registerFeedbackActions(score: false);
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('Phase 2 (boot validation): 1 declared action(s) and node type(s) are not registered. Nothing was changed.')
+            ->doesntExpectOutputToContain('Phase 3 of 5')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrator->landlordRuns);
     }
 
     public function test_an_install_without_solutions_updates_cleanly(): void
@@ -342,7 +397,7 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('acme/fapost-feedback: "' . $path . '" is registered with loadMigrationsFrom()')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations, 'The migrator never ran.');
+        $this->assertSame(0, $this->migrator->landlordRuns, 'The migrator never ran.');
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
@@ -367,7 +422,7 @@ final class UpdatePlatformCommandTest extends TestCase
             ->expectsOutputToContain('acme/fapost-connector-echo: ')
             ->assertExitCode(1);
 
-        $this->assertSame(0, $this->migrations);
+        $this->assertSame(0, $this->migrator->landlordRuns);
     }
 
     public function test_every_registered_path_inside_a_package_is_listed(): void
@@ -393,7 +448,7 @@ final class UpdatePlatformCommandTest extends TestCase
 
         $this->artisan('platform:update')->assertExitCode(0);
 
-        $this->assertSame(1, $this->migrations);
+        $this->assertSame(1, $this->migrator->landlordRuns);
     }
 
     public function test_a_sibling_directory_whose_name_starts_like_a_package_is_not_inside_it(): void
@@ -405,6 +460,18 @@ final class UpdatePlatformCommandTest extends TestCase
         $this->app->make('migrator')->path($sibling);
 
         $this->artisan('platform:update')->assertExitCode(0);
+    }
+
+    /**
+     * The fixture Solution with one tenant migration in its package, so its manifest carries a migrations digest.
+     */
+    private function installFeedbackWithMigrations(): void
+    {
+        $this->vendor->package(FakeVendor::solutionComposer(['migrations' => 'database/migrations']))->write();
+
+        $directory = $this->vendor->path . '/acme/fapost-feedback/database/migrations';
+        mkdir($directory, 0o777, true);
+        file_put_contents($directory . '/2026_11_27_000001_create_feedback_entries_table.php', "<?php\n");
     }
 
     /**

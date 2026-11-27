@@ -27,7 +27,7 @@ Commands FaPost Core registers, beyond Laravel's own.
 
 | Command | Does |
 |---|---|
-| `platform:update` | The one upgrade command: validate the installed Solutions' manifests and console UI (and that every declared action is registered), run the landlord migrations and `ops:tenants-migrate`, then `solutions:migrate` (see [Solutions](#solutions)), publish the Solutions' console UI to `public/solutions/` (see [Console UI](/extending/console-ui#publication)), then cache the Solution catalog |
+| `platform:update` | The one upgrade command, in five phases: validate the installed Solutions' manifests and console UI; check that every declared action, node type and channel type is registered; run the landlord migrations and `ops:tenants-migrate`; run `solutions:migrate` once per Solution that ships migrations (see [Solutions](#solutions)); then publish the Solutions' console UI to `public/solutions/` (see [Console UI](/extending/console-ui#publication)) and cache the Solution catalog. A failure names its phase. A failing Solution is rolled back alone and the last phase still runs, with exit code 1 ([When the update fails](/self-hosting/upgrading#when-the-update-fails)) |
 | `platform:update --validate-only` | Only validate the manifests, console UI and registered actions. Needs no database and changes nothing; exit code 1 and one `<package>: <field>: <message>` line per problem when a manifest is wrong or a declared action is not registered |
 | `solutions:cache` | Compile the Solution catalog into `bootstrap/cache/fapost-solutions.php` (part of `optimize`) |
 | `solutions:clear` | Remove that file (part of `optimize:clear`) |

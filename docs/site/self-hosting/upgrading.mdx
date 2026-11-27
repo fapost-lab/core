@@ -16,6 +16,7 @@ Four things happen, and the order is not interchangeable:
 
 `php artisan platform:update` repeats the check and does step 3 in one command, then publishes the Solutions'
 [console UI](/extending/console-ui#publication) and caches the catalog of installed Solutions. Step 4 stays yours.
+It works in five phases and names the one that failed; see [When the update fails](#when-the-update-fails).
 
 Step 4 is the one most often forgotten. Horizon workers are long-lived PHP
 processes: until they are restarted they keep executing the old code against the
@@ -97,6 +98,23 @@ tenant schema untouched.
 
 A release can contain either kind or both. Running both commands unconditionally
 is safe — an already-applied migration is skipped.
+
+## When the update fails
+
+`platform:update` runs in five phases and prints a heading for each. A failure is reported as
+`Phase <n> (<name>): …`, says what did not run, and exits with code 1:
+
+| Phase | What it does | When it fails |
+|---|---|---|
+| 1. validate | Reads every Solution and connector manifest and checks the console UI bundles | Nothing was changed |
+| 2. boot validation | Checks that what the manifests declare (actions, node types, channel types) is registered, and that no extension registered a landlord migration path | Nothing was changed. `--validate-only` stops after this phase |
+| 3. migrate platform | Landlord migrations, then `ops:tenants-migrate` | A landlord failure stops the update there. A failed tenant does not hold the others back, and the Solutions are still migrated, but phase 5 is skipped |
+| 4. migrate Solutions | `solutions:migrate --solution=<id>` once for each installed Solution that ships migrations | Only that Solution is rolled back, and only in the tenants it failed in (listed as `✘ <tenant> <id>: …`). It answers `solution_not_ready` there until a run succeeds; the platform and the other Solutions stay migrated, and phase 5 still runs |
+| 5. activate | Warns about channels no installed connector serves, publishes the console UI and caches the Solution catalog | — |
+
+Nothing an earlier phase applied is taken back: migrations only go up. A Solution's run in one tenant schema is one
+transaction, which is what rolls it back alone. Fix the cause and run `platform:update` again; what already applied is
+skipped.
 
 ## Before upgrading
 
@@ -366,6 +384,13 @@ Every publish keeps the previous version of a flow, and nothing removed them so 
 every version and deletes nothing; set it to 50, the recommended value, to start pruning. A version that is active or
 the latest, that any session ran, that an inline button sent earlier points at, or that a subflow node is pinned to is
 never deleted. Deleting is irreversible; `php artisan flow:prune-versions --dry-run` counts first.
+
+## `platform:update` reports its phases
+
+`platform:update` now names the phase that failed ([When the update fails](#when-the-update-fails)). A Solution whose
+migrations fail no longer stops the update for everything else. Its migrations are rolled back in the tenants where
+they failed, and the console UI is still published and the catalog cached. The command still exits with code 1, so a
+pipeline that checks the exit code still stops.
 
 ## Stricter publish checks
 
