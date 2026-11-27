@@ -7,15 +7,21 @@ namespace App\Domains\Flow\Logging;
 use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Shared\Infrastructure\PostgresMonthlyPartitions;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Collection;
 
 final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerInterface
 {
     private const string PARENT_TABLE = 'flow_logs';
 
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
         private PostgresMonthlyPartitions $partitions = new PostgresMonthlyPartitions(),
     ) {
     }
@@ -24,7 +30,7 @@ final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerI
     {
         // Range partitioning is Postgres-only; other drivers (the sqlite test
         // connection) keep flow_logs as one plain table.
-        if ('pgsql' !== $this->connection->getDriverName()) {
+        if ('pgsql' !== $this->db->connection()->getDriverName()) {
             return;
         }
 
@@ -32,7 +38,7 @@ final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerI
         $end   = $start->addMonth();
         $name  = $this->partitionName($start);
 
-        $this->connection->statement(
+        $this->db->connection()->statement(
             sprintf(
                 "CREATE TABLE IF NOT EXISTS %s PARTITION OF flow_logs FOR VALUES FROM ('%s') TO ('%s')",
                 $name,
@@ -57,7 +63,7 @@ final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerI
      */
     public function listMonthlyPartitions(): Collection
     {
-        return collect($this->partitions->list($this->connection, self::PARENT_TABLE));
+        return collect($this->partitions->list($this->db->connection(), self::PARENT_TABLE));
     }
 
     /**
@@ -69,6 +75,6 @@ final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerI
      */
     public function dropPartition(string $partitionName): void
     {
-        $this->partitions->drop($this->connection, self::PARENT_TABLE, $partitionName);
+        $this->partitions->drop($this->db->connection(), self::PARENT_TABLE, $partitionName);
     }
 }

@@ -8,13 +8,20 @@ use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Exceptions\DraftVersionConflictException;
 use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
 use App\Domains\Flow\Models\FlowDraft;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\ConnectionResolverInterface;
 
 final class SaveDraftService
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private readonly EmittedEventCollector $emittedEvents,
         private readonly TenantEventRepositoryInterface $tenantEvents,
+        private readonly ConnectionResolverInterface $db,
     ) {
     }
 
@@ -31,7 +38,7 @@ final class SaveDraftService
     {
         $triggerList = null === $triggers ? null : FlowTriggerSet::fromPayload($triggers);
 
-        return DB::transaction(function () use ($flowId, $nodes, $edges, $triggerList, $expectedDraftVersion): int {
+        return $this->db->connection()->transaction(function () use ($flowId, $nodes, $edges, $triggerList, $expectedDraftVersion): int {
             $draft = FlowDraft::query()
                 ->where('flow_id', $flowId)
                 ->where('draft_version', $expectedDraftVersion)

@@ -32,8 +32,8 @@ use App\Domains\Flow\Support\FlowTriggerComparison;
 use App\Domains\Flow\Templates\TemplateExpander;
 use App\Domains\Flow\Templates\TemplateUsageRepository;
 use Closure;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use stdClass;
 
@@ -42,6 +42,12 @@ use stdClass;
  */
 final readonly class PublishFlowService
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private ValidateFlowService $validator,
         private CallGraphRepository $callGraph,
@@ -57,6 +63,7 @@ final readonly class PublishFlowService
         private FlowWebhookEndpointRepositoryInterface $webhookEndpoints,
         private ScheduleRegistrySync $scheduleRegistry,
         private FlowPublishChanges $changes,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -69,7 +76,7 @@ final readonly class PublishFlowService
     public function execute(string $flowId, ?Closure $authorize = null): FlowDefinition
     {
         /** @var FlowDefinition $definition */
-        $definition = DB::transaction(function () use ($flowId, $authorize): FlowDefinition {
+        $definition = $this->db->connection()->transaction(function () use ($flowId, $authorize): FlowDefinition {
             $this->lockAssistantTemplatesBeforeOwnDraft($flowId);
 
             $draft = FlowDraft::query()

@@ -12,7 +12,9 @@ use App\Domains\Conversation\Settings\ConversationSettings;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Connection;
+use Illuminate\Database\ConnectionResolverInterface;
+use LogicException;
 use Spatie\LaravelSettings\Support\SettingsCacheFactory;
 
 /**
@@ -26,12 +28,19 @@ use Spatie\LaravelSettings\Support\SettingsCacheFactory;
  */
 final readonly class TenantSettingsEditor
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private TenantSettings $settings,
         private TenantContextInterface $tenant,
         private ConversationSettings $conversation,
         private AuditTrailInterface $audit,
         private SettingsCacheFactory $settingsCache,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -130,8 +139,14 @@ final readonly class TenantSettingsEditor
      */
     private function transaction(callable $write): void
     {
-        DB::transaction(function () use ($write): void {
-            DB::afterRollBack(fn () => $this->settingsCache->build(TenantSettings::repository())->clear());
+        $connection = $this->db->connection();
+
+        if (!$connection instanceof Connection) {
+            throw new LogicException(sprintf('The connection %s cannot run a callback after a rollback.', $connection::class));
+        }
+
+        $connection->transaction(function () use ($connection, $write): void {
+            $connection->afterRollBack(fn () => $this->settingsCache->build(TenantSettings::repository())->clear());
 
             $write();
         });

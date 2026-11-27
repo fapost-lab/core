@@ -21,7 +21,7 @@ use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use DateTimeZone;
 use Illuminate\Contracts\Bus\Dispatcher;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -84,8 +84,14 @@ final readonly class ScheduleTriggerFirer
     /** The most passed-over slots one claim counts; a minutely schedule passes over at most five within the bound. */
     private const int MAX_PASSED_OVER = 10;
 
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
         private ScheduleClock $clock,
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowDraftRepositoryInterface $drafts,
@@ -188,7 +194,7 @@ final readonly class ScheduleTriggerFirer
 
         $next = $this->clock->nextSlotAfter($config, $slot->greaterThan($now) ? $slot : $now);
 
-        return $this->connection->transaction(function () use ($tenantId, $trigger, $readSlot, $slot, $next, $now, $config, $context): ?string {
+        return $this->db->connection()->transaction(function () use ($tenantId, $trigger, $readSlot, $slot, $next, $now, $config, $context): ?string {
             if (! $this->triggers->moveScheduleSlot($trigger, $readSlot, $next, $slot, $now)) {
                 return null;
             }

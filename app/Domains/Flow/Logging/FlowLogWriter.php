@@ -6,14 +6,20 @@ namespace App\Domains\Flow\Logging;
 
 use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Str;
 use JsonException;
 
 final readonly class FlowLogWriter
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
         private FlowLogPartitionManagerInterface $partitions,
     ) {
     }
@@ -32,7 +38,7 @@ final readonly class FlowLogWriter
         // PostgresConversationStore does for conversation_messages.
         $this->partitions->ensureMonthlyPartition($createdAt);
 
-        $this->connection->table('flow_logs')->insert([
+        $this->db->connection()->table('flow_logs')->insert([
             'id'            => Str::ulid()->toRfc4122(),
             'session_id'    => $entry->sessionId,
             'node_id'       => $entry->nodeId,

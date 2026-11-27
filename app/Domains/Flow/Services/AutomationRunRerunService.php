@@ -20,7 +20,7 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Orchestration\RerunFireKey;
 use App\Jobs\Flow\StartAutomationRunJob;
 use Illuminate\Contracts\Bus\Dispatcher;
-use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
@@ -48,13 +48,19 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
  */
 final readonly class AutomationRunRerunService
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private FlowTriggerRepositoryInterface $triggers,
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowDraftRepositoryInterface $drafts,
         private FlowTriggerStateRepositoryInterface $triggerStates,
         private AuditTrailInterface $audit,
-        private DatabaseManager $db,
+        private ConnectionResolverInterface $db,
         private Dispatcher $dispatcher,
     ) {
     }
@@ -108,7 +114,7 @@ final readonly class AutomationRunRerunService
         $flowId   = (string) $source->flowDefinition?->flow_id;
         $fireKey  = RerunFireKey::for($sourceId, $attempt);
 
-        $this->db->transaction(function () use ($source, $sourceId, $fireKey, $check): void {
+        $this->db->connection()->transaction(function () use ($source, $sourceId, $fireKey, $check): void {
             $this->audit->record(new AuditRecord(
                 action: AuditAction::FlowRunRerun,
                 subject: $source,

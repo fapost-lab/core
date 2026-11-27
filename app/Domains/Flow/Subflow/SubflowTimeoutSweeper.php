@@ -13,7 +13,7 @@ use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\SegmentHandOff;
 use DateTimeInterface;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -53,8 +53,14 @@ final readonly class SubflowTimeoutSweeper
     /** Subflow chains are at most 3 deep (ADR-11); the bound only guards against a corrupt parent loop. */
     private const int MAX_CHAIN_DEPTH = 5;
 
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
         private SubflowResumerInterface $resumer,
         private FlowExecutionGuardInterface $guard,
         private SegmentHandOff $handOff,
@@ -219,7 +225,7 @@ final readonly class SubflowTimeoutSweeper
 
     private function forceFailChild(FlowSession $child): void
     {
-        $this->connection->transaction(function () use ($child): void {
+        $this->db->connection()->transaction(function () use ($child): void {
             try {
                 $child->saveWithOptimisticLock([
                     'status'          => FlowSessionStatus::Ended,
@@ -239,7 +245,7 @@ final readonly class SubflowTimeoutSweeper
 
     private function markExpired(FlowSession $parent): void
     {
-        $this->connection->transaction(function () use ($parent): void {
+        $this->db->connection()->transaction(function () use ($parent): void {
             try {
                 $parent->saveWithOptimisticLock([
                     'status'          => FlowSessionStatus::Expired,

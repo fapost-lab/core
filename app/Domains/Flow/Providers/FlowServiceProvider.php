@@ -226,7 +226,7 @@ use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Fapost\Foundation\Settings\Enums\PlatformSettingType;
-use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -661,7 +661,7 @@ final class FlowServiceProvider extends ServiceProvider
             // registry — eager resolution would recurse.
             engineResolver: fn (): FlowEngineInterface => $app->make(FlowEngineInterface::class),
             graphResolver: $app->make(FlowGraphResolver::class),
-            connection: $app->make(\Illuminate\Database\ConnectionInterface::class),
+            db: $app->make(ConnectionResolverInterface::class),
             historyWriterFactory: $app->make(HistoryWriterFactory::class),
         ));
         $this->app->scoped(SubflowTimeoutSweeper::class);
@@ -785,7 +785,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(
             AfterCommitDispatcherInterface::class,
             fn ($app): AfterCommitDispatcherInterface => new ConnectionAfterCommitDispatcher(
-                $app->make(DatabaseManager::class)->connection(),
+                $app->make(ConnectionResolverInterface::class),
             ),
         );
 

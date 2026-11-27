@@ -13,9 +13,9 @@ use App\Domains\Flow\Exceptions\FlowGroupNotEmptyException;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -28,10 +28,17 @@ use Illuminate\Support\Str;
  */
 final readonly class FlowGroupService
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private TenantContextInterface $tenants,
         private CurrentAssistantInterface $assistant,
         private AuditTrailInterface $audit,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -80,7 +87,7 @@ final readonly class FlowGroupService
      */
     public function create(array $data): FlowGroup
     {
-        return DB::transaction(function () use ($data): FlowGroup {
+        return $this->db->connection()->transaction(function () use ($data): FlowGroup {
             $group = FlowGroup::query()->create([
                 'tenant_id'    => $this->tenantId(),
                 'assistant_id' => $this->assistantId(),
@@ -104,7 +111,7 @@ final readonly class FlowGroupService
      */
     public function update(FlowGroup $group, array $data): FlowGroup
     {
-        DB::transaction(function () use ($group, $data): void {
+        $this->db->connection()->transaction(function () use ($group, $data): void {
             $group->update(['name' => $data['name']]);
 
             $changes = AuditChanges::ofSavedModel($group, ['name']);
@@ -134,7 +141,7 @@ final readonly class FlowGroupService
             throw new FlowGroupNotEmptyException((string) $group->getKey());
         }
 
-        DB::transaction(function () use ($group): void {
+        $this->db->connection()->transaction(function () use ($group): void {
             $group->delete();
 
             $this->audit->record(new AuditRecord(

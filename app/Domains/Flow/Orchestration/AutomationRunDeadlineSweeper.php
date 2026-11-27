@@ -20,7 +20,7 @@ use DateTimeImmutable;
 use Fapost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
 use Fapost\Foundation\Analytics\DTO\AnalyticsEvent;
 use Fapost\Foundation\Analytics\Enums\AnalyticsEventType;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -46,8 +46,14 @@ use Throwable;
  */
 final readonly class AutomationRunDeadlineSweeper
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
         private FlowExecutionGuardInterface $guard,
         private SegmentHandOff $handOff,
         private AutomationRunDeadline $deadline,
@@ -160,7 +166,7 @@ final readonly class AutomationRunDeadlineSweeper
             ? FlowRunFailureReason::StartLost
             : FlowRunFailureReason::DeadlineExceeded;
 
-        $this->connection->transaction(function () use ($live, $top, $reason): void {
+        $this->db->connection()->transaction(function () use ($live, $top, $reason): void {
             foreach ($live as $session) {
                 $attributes = [
                     'status'         => FlowSessionStatus::Failed,

@@ -12,7 +12,7 @@ use App\Domains\Flow\Contracts\FlowTriggerStateRepositoryInterface;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\ConnectionResolverInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -23,6 +23,12 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class TriggerPauseService
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private FlowTriggerRepositoryInterface $triggers,
         private FlowTriggerStateRepositoryInterface $states,
@@ -30,7 +36,7 @@ final readonly class TriggerPauseService
         private TriggerRefusals $refusals,
         private TenantContextInterface $tenantContext,
         private AuditTrailInterface $audit,
-        private DatabaseManager $db,
+        private ConnectionResolverInterface $db,
         private LoggerInterface $logger,
     ) {
     }
@@ -88,7 +94,7 @@ final readonly class TriggerPauseService
         }
 
         $tenantId  = (string) $this->tenantContext->get()->getId();
-        $wasPaused = $this->db->transaction(function () use ($draft, $trigger): bool {
+        $wasPaused = $this->db->connection()->transaction(function () use ($draft, $trigger): bool {
             if (! $this->states->resume($trigger->id, CarbonImmutable::now())) {
                 return false;
             }

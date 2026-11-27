@@ -44,7 +44,7 @@ use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Redis\Connections\Connection;
 use Mockery;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -191,7 +191,7 @@ final class MessageRouterTest extends TestCase
             engine: $engine,
             scheduler: Mockery::mock(DelayResumeSchedulerInterface::class)->shouldIgnoreMissing(),
             handOff: new SegmentHandOff(
-                Mockery::mock(ConnectionInterface::class)->shouldIgnoreMissing(),
+                Mockery::mock(ConnectionResolverInterface::class)->shouldIgnoreMissing(),
                 Mockery::mock(AfterCommitDispatcherInterface::class)->shouldIgnoreMissing(),
                 Mockery::mock(AutomationContinuationSchedulerInterface::class)->shouldIgnoreMissing(),
             ),
@@ -595,7 +595,7 @@ final class MessageRouterTest extends TestCase
             engine: Mockery::mock(FlowEngineInterface::class)->shouldIgnoreMissing(),
             scheduler: Mockery::mock(DelayResumeSchedulerInterface::class)->shouldIgnoreMissing(),
             handOff: new SegmentHandOff(
-                Mockery::mock(ConnectionInterface::class)->shouldIgnoreMissing(),
+                Mockery::mock(ConnectionResolverInterface::class)->shouldIgnoreMissing(),
                 Mockery::mock(AfterCommitDispatcherInterface::class)->shouldIgnoreMissing(),
                 Mockery::mock(AutomationContinuationSchedulerInterface::class)->shouldIgnoreMissing(),
             ),

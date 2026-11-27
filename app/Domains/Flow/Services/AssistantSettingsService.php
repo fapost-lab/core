@@ -18,8 +18,8 @@ use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -42,6 +42,12 @@ final readonly class AssistantSettingsService
     /** A new flow made from the form is the flow a `start_flow` command starts. */
     public const string TARGET_COMMAND = 'command';
 
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private TenantContextInterface $tenants,
         private CurrentAssistantInterface $assistant,
@@ -49,6 +55,7 @@ final readonly class AssistantSettingsService
         private CreateFlowAction $createFlow,
         private AssistantCommandsValidator $commandsValidator,
         private AuditTrailInterface $audit,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -142,7 +149,7 @@ final readonly class AssistantSettingsService
     public function save(array $fields): Assistant
     {
         // The settings and their audit entry commit together.
-        return DB::transaction(fn (): Assistant => $this->write($fields, $this->languageLocked()));
+        return $this->db->connection()->transaction(fn (): Assistant => $this->write($fields, $this->languageLocked()));
     }
 
     /**
@@ -160,7 +167,7 @@ final readonly class AssistantSettingsService
     {
         $languageLocked = $this->languageLocked();
 
-        return DB::transaction(function () use ($fields, $name, $target, $commandIndex, $languageLocked): FlowDraft {
+        return $this->db->connection()->transaction(function () use ($fields, $name, $target, $commandIndex, $languageLocked): FlowDraft {
             $flow = $this->createFlow->execute([
                 'assistant_id' => (string) $this->assistant()->getKey(),
                 'name'         => $name,

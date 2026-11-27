@@ -15,7 +15,7 @@ use App\Domains\Flow\Services\FlowTriggerSet;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Support\TenantHost;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use InvalidArgumentException;
 
@@ -36,12 +36,18 @@ final readonly class FlowWebhookEndpointService
 
     public const int MAX_SECRET_LENGTH = 512;
 
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
         private FlowWebhookEndpointRepositoryInterface $endpoints,
         private FlowTriggerSet $triggerSet,
         private TenantContextInterface $tenantContext,
         private AuditTrailInterface $audit,
-        private DatabaseManager $db,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -81,7 +87,7 @@ final readonly class FlowWebhookEndpointService
         ]);
 
         try {
-            $this->db->transaction(function () use ($endpoint, $draft): void {
+            $this->db->connection()->transaction(function () use ($endpoint, $draft): void {
                 $this->endpoints->save($endpoint);
 
                 $this->audit->record(new AuditRecord(
@@ -171,7 +177,7 @@ final readonly class FlowWebhookEndpointService
     {
         $endpoint = $this->ensure($draft, $triggerId);
 
-        $this->db->transaction(function () use ($endpoint, $secret, $draft): void {
+        $this->db->connection()->transaction(function () use ($endpoint, $secret, $draft): void {
             $endpoint->secret            = $secret;
             $endpoint->secret_rotated_at = CarbonImmutable::now();
             $this->endpoints->save($endpoint);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Templates;
 
-use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\ConnectionResolverInterface;
 
 /**
  * Read/write surface over `flow_template_usages`, the reverse index of which flows carry a copy of a template.
@@ -13,8 +13,14 @@ use Illuminate\Database\ConnectionInterface;
  */
 final readonly class TemplateUsageRepository
 {
+    /**
+     * @param  ConnectionResolverInterface  $db  asked for its connection at the moment it writes, never kept: a tenant
+     *                                         switch moves the default connection the models write through, and a
+     *                                         transaction on a connection taken when this is built — before the
+     *                                         switch, in a queue job — would not cover them
+     */
     public function __construct(
-        private ConnectionInterface $connection,
+        private ConnectionResolverInterface $db,
     ) {
     }
 
@@ -36,13 +42,13 @@ final readonly class TemplateUsageRepository
         }
 
         if ([] !== $rows) {
-            $this->connection->table('flow_template_usages')->insert($rows);
+            $this->db->connection()->table('flow_template_usages')->insert($rows);
         }
     }
 
     public function forgetHost(string $hostFlowId): void
     {
-        $this->connection->table('flow_template_usages')
+        $this->db->connection()->table('flow_template_usages')
             ->where('host_flow_id', $hostFlowId)
             ->delete();
     }
@@ -56,7 +62,7 @@ final readonly class TemplateUsageRepository
     public function hostsOf(string $templateFlowId): array
     {
         /** @var list<string> */
-        return $this->connection->table('flow_template_usages')
+        return $this->db->connection()->table('flow_template_usages')
             ->where('template_flow_id', $templateFlowId)
             ->orderBy('host_flow_id')
             ->distinct()
@@ -80,7 +86,7 @@ final readonly class TemplateUsageRepository
 
         $hosts = [];
 
-        $rows = $this->connection->table('flow_template_usages')
+        $rows = $this->db->connection()->table('flow_template_usages')
             ->whereIn('template_flow_id', $templateFlowIds)
             ->orderBy('host_flow_id')
             ->distinct()

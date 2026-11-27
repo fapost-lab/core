@@ -30,6 +30,7 @@ use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
+use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,7 @@ use Mockery\MockInterface;
 use ReflectionProperty;
 use RuntimeException;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\RecordingConnectionResolver;
 
 final class FlowEngineTest extends FeatureTestCase
 {
@@ -469,6 +471,22 @@ final class FlowEngineTest extends FeatureTestCase
 
         $this->assertSame(FlowSessionStatus::Completed, $session->status);
         $this->assertSame(1, DB::table('flow_logs')->where('session_id', $session->getKey())->count());
+    }
+
+    public function test_the_engine_opens_its_transactions_on_the_connection_resolved_when_it_writes(): void
+    {
+        $resolver = new RecordingConnectionResolver($this->app->make('db'));
+        $this->app->instance(ConnectionResolverInterface::class, $resolver);
+        $this->app->forgetScopedInstances();
+
+        $this->app->make(FlowEngineInterface::class);
+
+        $this->assertSame([], $resolver->resolved, 'A connection captured when the engine is built would outlive a tenant switch.');
+
+        $this->startLinearFlow();
+
+        $this->assertNotEmpty($resolver->resolved);
+        $this->assertContains(DB::getDefaultConnection(), $resolver->resolved, 'The platform settings read the landlord connection by name; the writes go to the default one.');
     }
 
     public function test_broken_flow_log_write_does_not_abort_execution(): void
