@@ -95,6 +95,40 @@ final class Contact extends BaseModel
         return $this->belongsToMany(ContactGroup::class, 'contact_group_members');
     }
 
+    /**
+     * The name the platform gave, as the console shows it: first and last name, else `@username`, else null (the
+     * screen falls back to the external id).
+     */
+    public function displayName(): ?string
+    {
+        $full = mb_trim(($this->metaText('first_name') ?? '') . ' ' . ($this->metaText('last_name') ?? ''));
+
+        if ('' !== $full) {
+            return $full;
+        }
+
+        $username = $this->metaText('username');
+
+        return null === $username ? null : '@' . $username;
+    }
+
+    /**
+     * A text the platform put in the contact's meta, trimmed; null when it is missing, empty or not a scalar text.
+     */
+    public function metaText(string $key): ?string
+    {
+        $meta  = $this->getAttribute('meta');
+        $value = is_array($meta) ? ($meta[$key] ?? null) : null;
+
+        if (! is_string($value) && ! is_int($value)) {
+            return null;
+        }
+
+        $text = mb_trim((string) $value);
+
+        return '' === $text ? null : $text;
+    }
+
     protected static function newFactory(): ContactFactory
     {
         return ContactFactory::new();

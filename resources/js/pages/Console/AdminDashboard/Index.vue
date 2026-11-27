@@ -15,8 +15,9 @@ import { EmptyState } from '@fapost/ui/components/empty-state'
 import { OnboardingChecklistList, interpolate } from '@console/shell'
 import { SolutionWidgets } from '../../../console/solutions'
 import ActivityChart from './ActivityChart.vue'
+import BroadcastsWidget from './BroadcastsWidget.vue'
 import UsageWidget from './UsageWidget.vue'
-import type { ActivityDay, AdminDashboardPageProps, AdminStats, UsageWidgetData } from './types'
+import type { ActivityDay, AdminDashboardPageProps, AdminStats, DashboardBroadcast, UsageWidgetData } from './types'
 
 /** How long the page keeps refreshing its figures before it stops asking. */
 const POLL_FOR_MS = 60 * 60 * 1000
@@ -27,6 +28,8 @@ const props = defineProps<{
   pollSeconds: number
   /** The limits card; null for a user who may not open the usage page. Not part of the polling refresh. */
   usage?: UsageWidgetData | null
+  /** The latest broadcast runs; null for a user who may not manage broadcasts. */
+  broadcasts?: DashboardBroadcast[] | null
 }>()
 
 const page = usePage<AdminDashboardPageProps>()
@@ -64,11 +67,11 @@ const tiles = computed(() => {
 })
 
 const number = computed(() => new Intl.NumberFormat(page.props.locale))
-const nothing = computed(() => tiles.value.length === 0 && props.activity === null)
+const nothing = computed(() => tiles.value.length === 0 && props.activity === null && !props.broadcasts)
 
 // The figures refresh as the Filament widgets polled (Inertia slows polling in a background tab); a page left open
 // stops asking after an hour and says so, with a button that refreshes once and starts the hour again.
-const poll = usePoll(props.pollSeconds * 1000, { only: ['stats', 'activity'] })
+const poll = usePoll(props.pollSeconds * 1000, { only: ['stats', 'activity', 'broadcasts'] })
 const stopped = ref(false)
 const refreshing = ref(false)
 let deadline = setTimeout(expire, POLL_FOR_MS)
@@ -81,7 +84,7 @@ function expire(): void {
 function refresh(): void {
   refreshing.value = true
   router.reload({
-    only: ['stats', 'activity'],
+    only: ['stats', 'activity', 'broadcasts'],
     onFinish: () => {
       refreshing.value = false
     },
@@ -143,6 +146,8 @@ onBeforeUnmount(() => {
     </div>
 
     <UsageWidget v-if="usage" :usage="usage" />
+
+    <BroadcastsWidget v-if="broadcasts" :broadcasts="broadcasts" />
 
     <SolutionWidgets target="admin" :columns="3" />
 

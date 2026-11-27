@@ -35,6 +35,7 @@ use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\BroadcastController;
+use App\Http\Controllers\Console\BroadcastReportController;
 use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
@@ -295,6 +296,8 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::get('assistant/{assistant}/broadcasts/create', [BroadcastController::class, 'create'])->name('console.broadcasts.create');
         Route::get('assistant/{assistant}/broadcasts/reach', [BroadcastController::class, 'reach'])->middleware('throttle:30,1')->name('console.broadcasts.reach');
         Route::get('assistant/{assistant}/broadcasts/{record}/edit', [BroadcastController::class, 'edit'])->name('console.broadcasts.edit');
+        // The report of one broadcast: its outcomes and its recipients. Registered after `create` and `reach`, which it would match.
+        Route::get('assistant/{assistant}/broadcasts/{record}', [BroadcastReportController::class, 'show'])->name('console.broadcasts.show');
         Route::post('assistant/{assistant}/broadcasts', [BroadcastController::class, 'store'])->name('console.broadcasts.store');
         Route::put('assistant/{assistant}/broadcasts/{record}', [BroadcastController::class, 'update'])->name('console.broadcasts.update');
         Route::post('assistant/{assistant}/broadcasts/{record}/send', [BroadcastController::class, 'send'])->name('console.broadcasts.send');

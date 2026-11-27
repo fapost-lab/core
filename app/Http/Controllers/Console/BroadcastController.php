@@ -275,10 +275,12 @@ final class BroadcastController extends Controller
             'targetTags'      => $isDraft ? array_values($broadcast->target_tags ?? []) : [],
             'targetSegmentId' => $isDraft ? $broadcast->target_segment_id : null,
             'createdAt'       => $broadcast->created_at?->toIso8601String(),
-            'editUrl'         => $isDraft && $can['update'] ? $this->url('edit', ['record' => $id]) : null,
-            'sendUrl'         => $isDraft && $can['send'] ? $this->url('send', ['record' => $id]) : null,
-            'cancelUrl'       => BroadcastStatus::Running === $broadcast->status && $can['cancel'] ? $this->url('cancel', ['record' => $id]) : null,
-            'deleteUrl'       => BroadcastStatus::Running !== $broadcast->status && $can['delete'] ? $this->url('destroy', ['record' => $id]) : null,
+            // A run has a report; a draft has nothing to report yet. Opening the list already needed the permission it asks.
+            'reportUrl' => $isDraft ? null : $this->url('show', ['record' => $id]),
+            'editUrl'   => $isDraft && $can['update'] ? $this->url('edit', ['record' => $id]) : null,
+            'sendUrl'   => $isDraft && $can['send'] ? $this->url('send', ['record' => $id]) : null,
+            'cancelUrl' => BroadcastStatus::Running === $broadcast->status && $can['cancel'] ? $this->url('cancel', ['record' => $id]) : null,
+            'deleteUrl' => BroadcastStatus::Running !== $broadcast->status && $can['delete'] ? $this->url('destroy', ['record' => $id]) : null,
         ];
     }
 

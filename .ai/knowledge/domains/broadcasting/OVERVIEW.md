@@ -15,7 +15,9 @@ paths:
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-reviewed_at: 2026-11-19
+  - app/Http/Controllers/Console/BroadcastReportController.php
+  - tests/Feature/Console/BroadcastReportConsoleTest.php
+reviewed_at: 2026-11-27
 ---
 # Broadcasting
 
@@ -49,6 +51,12 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
 - Console UI: `app/Http/Controllers/Console/BroadcastController.php` over
   `Services/BroadcastService.php` (the console's writes and the send guard), with the requests in
   `app/Http/Requests/Console/*Broadcast*` and the pages in `resources/js/pages/Console/Broadcasts`. The list shows a row's `stop_reason` under its status.
+- The report: `app/Http/Controllers/Console/BroadcastReportController.php` (`console.broadcasts.show`, behind the
+  `view` policy) over `Services/BroadcastReport.php`, the read-only query service: outcomes counted over the recipient
+  rows (a deleted contact's row cascades away, so they can fall below the broadcast's counters), the recipients for the
+  drill-down, and the latest runs for the admin dashboard's card (`Admin\DashboardController`). A recipient's failure
+  is shown as `Enums/RecipientFailureReason`. There is no "delivered" figure until delivery statuses are ingested
+  (spec `data-lifecycle`).
 - `Services/AutomationBroadcasts.php`: the automation's entry, called by Flow's `send_message` and by a `notify` node
   published in its retired `contacts` mode, through `App\Infrastructure\Flow\BroadcastingAudienceBroadcaster`
   (`AudienceBroadcasterInterface`); it creates the broadcast as `origin = automation` and starts it at once. The console

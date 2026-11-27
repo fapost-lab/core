@@ -16,7 +16,9 @@ paths:
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-reviewed_at: 2026-11-25
+  - app/Http/Controllers/Console/BroadcastReportController.php
+  - tests/Feature/Console/BroadcastReportConsoleTest.php
+reviewed_at: 2026-11-27
 ---
 # Broadcasting rules
 
@@ -77,6 +79,14 @@ broken.
   skip without asking the operator. "Completed is set only by the last recipient" therefore holds
   for runs that were not stopped.
   Enforced: `OutboundVolumeLimitTest`.
+
+- **A recipient's stored `error` never leaves the server.** It is whatever the send path recorded — for a failed send,
+  the sender's exception message, which can carry the provider's request URL and with it the bot token. The broadcast
+  report reads it only to choose a `RecipientFailureReason` category, and only the category reaches the page. The texts
+  the send path writes are therefore a contract the report reads: `run_failed` and `limit_reached` (the run's stop
+  reasons), `RecipientFailureReason::CONTACT_MISSING_ERROR` and `NO_TEXT_ERROR`; a new skip or fail reason gets its
+  own marker and category, or it reads as "stopped" / "delivery failed". Enforced: `BroadcastReportConsoleTest`
+  (`test_the_stored_error_text_never_reaches_the_page`), `RecipientFailureReasonTest`, `SendBroadcastRecipientJobTest`.
 
 ## Rules
 

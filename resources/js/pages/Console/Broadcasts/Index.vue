@@ -7,7 +7,7 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Head, Link, router, usePage, usePoll } from '@inertiajs/vue3'
-import { Ban, EllipsisVertical, Pencil, Plus, SearchX, Send, Trash2 } from '@lucide/vue'
+import { Ban, ChartColumn, EllipsisVertical, Pencil, Plus, SearchX, Send, Trash2 } from '@lucide/vue'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { interpolate } from '@console/shell'
 import SendDialog from './SendDialog.vue'
+import { BROADCAST_TONES } from './tones'
 import type { BroadcastRow, BroadcastStatus, BroadcastsPageProps, SelectOption } from './types'
 
 const props = defineProps<{
@@ -35,8 +36,6 @@ const ALL = '__all'
 const POLL_MS = 5000
 const POLL_LIMIT_MS = 60 * 60 * 1000
 
-const TONES = { draft: 'neutral', running: 'info', completed: 'success', cancelled: 'warning', failed: 'danger' } as const
-
 const page = usePage<BroadcastsPageProps>()
 const t = computed(() => page.props.translations.console.broadcasts)
 const common = computed(() => page.props.translations.console.form)
@@ -53,7 +52,7 @@ const columns = computed<DataTableColumn[]>(() => [
 ])
 
 function hasMenu(row: BroadcastRow): boolean {
-  return Boolean(row.editUrl || row.sendUrl || row.cancelUrl || row.deleteUrl)
+  return Boolean(row.reportUrl || row.editUrl || row.sendUrl || row.cancelUrl || row.deleteUrl)
 }
 
 // Polling runs only while the page shows a running broadcast, and gives up after an hour on the page.
@@ -190,7 +189,8 @@ function deleteOne(): void {
       </template>
 
       <template #cell-name="{ row }">
-        <span class="font-medium">{{ row.name }}</span>
+        <Link v-if="row.reportUrl" :href="row.reportUrl" class="font-medium hover:underline" data-test="broadcast-report-link">{{ row.name }}</Link>
+        <span v-else class="font-medium">{{ row.name }}</span>
         <div v-if="row.origin === 'automation'" class="mt-1 flex items-center gap-2 text-xs text-muted-foreground" data-test="broadcast-origin">
           <Badge variant="neutral">{{ t.origin.automation }}</Badge>
           <template v-if="row.flowName">
@@ -205,7 +205,7 @@ function deleteOne(): void {
       </template>
 
       <template #cell-status="{ row }">
-        <StatusDot :tone="TONES[row.status]">{{ t.statuses[row.status] }}</StatusDot>
+        <StatusDot :tone="BROADCAST_TONES[row.status]">{{ t.statuses[row.status] }}</StatusDot>
         <p v-if="row.stopReason && t.stop_reasons[row.stopReason]" class="mt-0.5 text-xs text-muted-foreground">{{ t.stop_reasons[row.stopReason] }}</p>
       </template>
 
@@ -237,6 +237,12 @@ function deleteOne(): void {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem v-if="row.reportUrl" as-child>
+              <Link :href="row.reportUrl">
+                <ChartColumn aria-hidden="true" />
+                {{ t.actions.report }}
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem v-if="row.editUrl" as-child>
               <Link :href="row.editUrl">
                 <Pencil aria-hidden="true" />
@@ -252,7 +258,7 @@ function deleteOne(): void {
               {{ t.actions.cancel }}
             </DropdownMenuItem>
             <template v-if="row.deleteUrl">
-              <DropdownMenuSeparator v-if="row.editUrl || row.sendUrl || row.cancelUrl" />
+              <DropdownMenuSeparator v-if="row.reportUrl || row.editUrl || row.sendUrl || row.cancelUrl" />
               <DropdownMenuItem variant="destructive" @select="askToDelete(row)">
                 <Trash2 aria-hidden="true" />
                 {{ t.actions.delete }}

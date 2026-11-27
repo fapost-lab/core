@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Broadcasting\Jobs;
 
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
+use App\Domains\Broadcasting\Enums\RecipientFailureReason;
 use App\Domains\Broadcasting\Enums\RecipientStatus;
 use App\Domains\Broadcasting\Events\BroadcastCompleted;
 use App\Domains\Broadcasting\Models\Broadcast;
@@ -121,7 +122,7 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
             }
 
             if (null === $contact || null === $channel) {
-                $this->finish($recipient, RecipientStatus::Failed, 'contact or channel missing');
+                $this->finish($recipient, RecipientStatus::Failed, RecipientFailureReason::CONTACT_MISSING_ERROR);
 
                 return;
             }
@@ -135,7 +136,7 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
             $text = $translator->resolveField($broadcast->message, $language);
 
             if ('' === mb_trim($text)) {
-                $this->finish($recipient, RecipientStatus::Skipped);
+                $this->finish($recipient, RecipientStatus::Skipped, RecipientFailureReason::NO_TEXT_ERROR);
 
                 return;
             }
