@@ -26,7 +26,7 @@ an activated Solution provides, and stops reaching it after deactivation.
       overwriting (after: activation storage — registration has to ask what is active)
 - [x] `solution-lifecycle-suite` — Lifecycle test suite over the whole chain: install → activate → handler available →
       deactivate → gone, with the tenant boundary asserted
-- [ ] Commands and command action types registered by a Solution (ADR-09) — moved from the closed spec `flow-engine-v1x` on 2026-11-23; needs the Core registrar (after: `solution-core-registrar`)
+- [ ] `solution-commands-registrar` — Commands and command action types registered by a Solution (ADR-09) — moved from the closed spec `flow-engine-v1x` on 2026-11-23; needs the Core registrar (after: `solution-core-registrar`)
 
 ## Phase 3 — An operator can do it without a developer
 
