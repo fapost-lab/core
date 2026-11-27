@@ -72,6 +72,11 @@ own storage — so a later per-blob router and a move command can tell where a b
 - **Blob size is the byte count of the buffer (`ftell`), never `mb_strlen`/`strlen` of a chunk.** Pint's
   `mb_str_functions` fixer rewrites `strlen` to `mb_strlen`, which counts characters. Enforced:
   `MediaUploaderTest`. Blobs written before the fix are corrected by `media:recount-blob-sizes`.
+- **A channel download is read once, from where its stream stands, and never required to rewind.**
+  Foundation's `DownloadResult` does not promise a seekable stream, and a connector's downloader may hand over
+  the body of a streamed HTTP response (Slack does); `MediaUploader::storeFromStream()` rewinds only a
+  seekable stream. Requiring a rewind loses every file a person sends through such a channel (#380).
+  Enforced: `MediaUploaderTest::test_stores_a_stream_that_cannot_be_rewound`.
 - **Force delete reaps an unreferenced blob.** `MediaService::forceDelete()` deletes the file, then the blob row
   and the stored object when no file, trashed ones included, still uses it; the cleanup job, the REST
   `files/{id}/force` and the admin screen's permanent delete (`MediaLibraryService::forceDelete`) all go through it. The row goes first so the
