@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('logs:prune-flow')->dailyAt('03:00');
 Schedule::command('conversations:prune')->dailyAt('03:15');
 Schedule::command('logs:create-partition')->monthlyOn(1, '00:00');
+Schedule::command('conversations:create-partition')->dailyAt('02:45');
 Schedule::job(new CleanupSoftDeletedMediaJob())->dailyAt('03:30');
 Schedule::command('flow:sweep-subflow-timeouts')->everyMinute()->withoutOverlapping();
 // A pass killed mid-way must not silence the sweeper for the default 24 h mutex.

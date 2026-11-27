@@ -47,7 +47,7 @@ What to watch:
 
 ## The scheduler
 
-Twelve scheduled tasks matter, and all fail silently if the scheduler is not
+Thirteen scheduled tasks matter, and all fail silently if the scheduler is not
 running:
 
 | Task | When | If it does not run |
@@ -58,6 +58,7 @@ running:
 | `flow:sweep-overdue-automation-runs` | Every minute | Overdue automation runs stay live; their triggers stay blocked and their flows cannot be deleted. Runs whose job was lost are not handed on and wait for their deadline |
 | `logs:create-partition` | Monthly, on the 1st | Next month's flow-log partition is missing |
 | `credentials:refresh-oauth2-grants` | Daily, 02:30 | A rarely used [OAuth 2.0 connection](/using/credentials#connecting-with-user-consent) can lapse and must be reconnected |
+| `conversations:create-partition` | Daily, 02:45 | Next month's transcript partition is created by the first message of the month instead, on the write path |
 | `logs:prune-flow` | Daily, 03:00 | Old log partitions accumulate |
 | `conversations:prune` | Daily, 03:15 | Nothing is pruned; the transcript keeps growing (a no-op while retention is `0`) |
 | `audit:prune` | Daily, 04:15 | The [activity log](/using/activity-log) keeps growing past its retention |

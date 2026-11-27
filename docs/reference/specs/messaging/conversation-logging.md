@@ -109,6 +109,9 @@ A column-store driver may buffer and batch inside the driver; the port does not 
 - Retention: the daily `conversations:prune` command (`app/Console/Commands/PruneConversationMessagesCommand.php`)
   drops whole monthly partitions older than `conversation.retention_days` (env `CONVERSATION_RETENTION_DAYS`,
   per install, unset = keep forever). Threads and media are not pruned.
+- Partitions ahead of writes: the daily `conversations:create-partition` command
+  (`app/Console/Commands/CreateConversationMessagePartitionsCommand.php`) creates the current and the next UTC month
+  in every active tenant schema; `ensureMonthlyPartition` on each insert remains as a safety net.
 - The console's conversation inbox (`ConversationController`, `ConversationInbox`; list and view) with operator
   reply and ownership handover; the router skips the flow engine for staff-owned threads.
 
@@ -123,8 +126,6 @@ A column-store driver may buffer and batch inside the driver; the port does not 
 
 - Read port `ConversationReaderInterface` and a ClickHouse driver (see the spec item "Transcript read port"
   in `.ai/specs/data-lifecycle/`).
-- Partitions are created on write (`ensureMonthlyPartition` per insert) plus the three created by the
-  migration; there is no scheduled pre-creation.
 - PII redaction hook (`PiiRedactorInterface`); text is stored verbatim.
 - Delivery status ingestion: `updateDeliveryStatus()` and its job exist, but no webhook (WhatsApp
   sent/delivered/read) calls them yet.
