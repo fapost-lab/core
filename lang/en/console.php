@@ -2181,6 +2181,56 @@ return [
         ],
     ],
 
+    'node_usage' => [
+        'navigation'  => 'Node usage',
+        'title'       => 'Node usage',
+        'description' => 'Which node types and actions your flows use, in how many flows and published versions, and how often they ran.',
+        'period'      => 'Period',
+        'periods'     => [
+            '1h'  => 'Last hour',
+            '24h' => 'Last 24 hours',
+            '7d'  => 'Last 7 days',
+            '30d' => 'Last 30 days',
+        ],
+        'window'      => 'Runs are counted from the flow log, which keeps about 30 days. Active flows and versions read the published flows now and have no period.',
+        'runs_hidden' => 'Run figures are shown to staff who may view the flow log.',
+        'scoped'      => 'Counted for the assistants you have access to.',
+        'nodes'       => [
+            'title'       => 'Node types',
+            'description' => 'Each node type and version found in a published flow or in the flow log of the period.',
+            'empty'       => 'No published flow uses a node yet.',
+        ],
+        'actions' => [
+            'title'       => 'Actions',
+            'description' => 'Actions that call nodes send to through the handler transport, Core\'s and those of Solutions. A target built from a template is not counted.',
+            'empty'       => 'No published flow calls an action.',
+        ],
+        'unused' => [
+            'title'       => 'Node types no flow uses',
+            'description' => 'Registered node types that no published flow contains and that did not run in the last 30 days.',
+        ],
+        'columns' => [
+            'node'         => 'Node type',
+            'action'       => 'Action',
+            'active_flows' => 'Active flows',
+            'active_nodes' => 'Nodes',
+            'versions'     => 'Versions',
+            'executions'   => 'Runs',
+            'failures'     => 'Failed',
+            'last_run'     => 'Last run',
+        ],
+        'hints' => [
+            'active_flows' => 'Flows whose active version contains it',
+            'active_nodes' => 'How many times it occurs in active versions',
+            'versions'     => 'Published versions that can still run: the active ones, and those a session that has not ended is on',
+        ],
+        'core'     => 'Core',
+        'solution' => 'Solution :id',
+        'missing'  => 'No handler',
+        'orphaned' => 'No handler — flows fail at this node',
+        'never'    => '—',
+    ],
+
     'search' => [
         'open'        => 'Search all applications',
         'placeholder' => 'Applications, pages, assistants, users…',

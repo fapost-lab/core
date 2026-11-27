@@ -14,12 +14,14 @@ final readonly class NodeUsageReport
     /**
      * @param  list<NodeTypeUsage>  $usages              ordered by type, then version
      * @param  list<string>         $unusedHandlerTypes  registered types with no usage at all
+     * @param  list<ActionUsage>    $actions             actions the `call` nodes send to, ordered by id
      */
     public function __construct(
         /** Start of the runtime window; `flow_logs` retention caps how far back it can reach. */
         public CarbonImmutable $runtimeSince,
         public array $usages,
         public array $unusedHandlerTypes,
+        public array $actions = [],
     ) {
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands\Flow;
 
 use App\Domains\Flow\Contracts\NodeUsageStatisticsInterface;
+use App\Domains\Flow\Statistics\ActionUsage;
 use App\Domains\Flow\Statistics\NodeTypeUsage;
 use App\Domains\Flow\Statistics\NodeUsageReport;
 use App\Domains\Tenancy\Contracts\TenantInterface;
@@ -156,7 +157,7 @@ final class NodeUsageCommand extends Command
             ));
         }
 
-        $this->line('  "executions"/"failures"/"last run" see only this window; "active flows"/"active nodes" read current definitions and have no window.');
+        $this->line('  "executions"/"failures"/"last run" see only this window; "active flows"/"active nodes" read the active versions and "versions" also the versions live sessions are on, with no window.');
     }
 
     /**
@@ -177,7 +178,7 @@ final class NodeUsageCommand extends Command
             }
 
             $this->table(
-                ['type', 'ver', 'handler', 'active flows', 'active nodes', 'executions', 'failures', 'last run'],
+                ['type', 'ver', 'handler', 'active flows', 'active nodes', 'versions', 'executions', 'failures', 'last run'],
                 array_map(
                     static fn (NodeTypeUsage $usage): array => [
                         $usage->nodeType,
@@ -185,6 +186,7 @@ final class NodeUsageCommand extends Command
                         $usage->handlerRegistered ? 'yes' : 'MISSING',
                         (string) $usage->activeFlows,
                         (string) $usage->activeNodes,
+                        (string) $usage->publishedVersions,
                         (string) $usage->executions,
                         (string) $usage->failures,
                         $usage->lastExecutedAt?->toDateTimeString() ?? '-',
@@ -316,6 +318,7 @@ final class NodeUsageCommand extends Command
         int $failed,
     ): array {
         $tenants = [];
+        $actions = [];
 
         foreach ($reports as $slug => $report) {
             $tenants[$slug] = array_map(
@@ -325,11 +328,27 @@ final class NodeUsageCommand extends Command
                     'handler_registered' => $usage->handlerRegistered,
                     'active_flows'       => $usage->activeFlows,
                     'active_nodes'       => $usage->activeNodes,
+                    'published_versions' => $usage->publishedVersions,
                     'executions'         => $usage->executions,
                     'failures'           => $usage->failures,
                     'last_executed_at'   => $usage->lastExecutedAt?->toIso8601String(),
                 ],
                 $this->filterUsages($report->usages, $typeFilter),
+            );
+
+            // An action is not a node type, so `--type` does not narrow it.
+            $actions[$slug] = array_map(
+                static fn (ActionUsage $action): array => [
+                    'action_id'          => $action->actionId,
+                    'solution_id'        => $action->solutionId,
+                    'registered'         => $action->registered,
+                    'active_flows'       => $action->activeFlows,
+                    'published_versions' => $action->publishedVersions,
+                    'executions'         => $action->executions,
+                    'failures'           => $action->failures,
+                    'last_executed_at'   => $action->lastExecutedAt?->toIso8601String(),
+                ],
+                $report->actions,
             );
         }
 
@@ -342,6 +361,7 @@ final class NodeUsageCommand extends Command
             'window_exceeds_retention' => $days > self::LOG_RETENTION_DAYS,
             'failed_tenants'           => $failed,
             'tenants'                  => $tenants,
+            'actions'                  => $actions,
             'orphaned'                 => $this->orphanedAcrossTenants($reports, $typeFilter),
             'unused_everywhere'        => $this->unusedEverywhere($reports, $typeFilter),
         ];

@@ -138,6 +138,7 @@ final readonly class NavigationBuilder
             ),
             $this->entry($media, 'console.admin.translations.index', __('staff.tenant_translations.navigation'), 'languages', 60, $user->can(Permission::ManageTranslations->value)),
             $this->entry($system, 'console.admin.activity.index', __('console.activity_log.title'), 'file-text', 90, $this->canViewAny($user, ActivityEntry::class)),
+            $this->entry($system, 'console.admin.node-usage.index', __('console.node_usage.navigation'), 'blocks', 85, $this->canViewAny($user, FlowDraft::class)),
             $this->entry($system, 'console.admin.tenant-settings.edit', __('staff.tenant_settings.navigation'), 'sliders-horizontal', 100, $user->can(Permission::ManageSettings->value)),
             $this->entry(
                 $system,

@@ -1,6 +1,7 @@
 import type {Component} from 'vue'
 import {
     ArrowLeftRight,
+    Blocks,
     Circle,
     CircleUser,
     FileText,
@@ -37,6 +38,7 @@ import {
  */
 const ICONS: Record<string, Component> = {
     'arrow-left-right': ArrowLeftRight,
+    'blocks': Blocks,
     'circle-user': CircleUser,
     'file-text': FileText,
     'folder-open': FolderOpen,

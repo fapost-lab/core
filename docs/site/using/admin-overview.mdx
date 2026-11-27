@@ -90,6 +90,27 @@ without *published flows* changing usually means a flow asks a question nobody i
 answering; *channels configured but not connected* means messages are arriving
 nowhere.
 
+## Node usage
+
+**System** → **Node usage** shows which node types and actions your flows use, for
+staff who may manage flows. Each node type and version (`send_message@1`) lists:
+
+- **Active flows** and **Nodes** — the flows whose active version contains it, and how
+  many times it occurs there;
+- **Versions** — the published versions that can still run it: the active ones, and
+  older versions a session that has not ended is still on;
+- **Runs**, **Failed** and **Last run** over a period you pick — the last hour, 24
+  hours, 7 days or 30 days (the default). These come from the flow log, which keeps
+  about 30 days, and need the permission to view flow sessions.
+
+A node whose version has no handler is marked **No handler**; in an active flow it
+means the flow fails when it reaches that node. **Actions** lists, the same way, the
+actions that `call` nodes send to through the `handler` transport — Core's own and
+those of Solutions; a target built from a template is not counted. Administrators
+also see the registered node types no flow uses. Everyone else counts only the
+flows and runs of their assigned assistants. The same report, for every workspace at
+once, is the `flow:node-usage` command.
+
 ## Switching applications
 
 A narrow rail on the far left of every page holds the applications you work in:
