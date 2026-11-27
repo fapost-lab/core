@@ -1,12 +1,36 @@
 import type { ShellPageProps } from '@console/shell'
 import type { UsageAction, UsageRowData, UsageTranslations } from '../AdminUsage/types'
 import type { BroadcastStatus, BroadcastStopReason } from '../Broadcasts/types'
+import type { ActivityPeriod } from '../FlowSessions/types'
 
 /** One UTC day of the flow activity chart, as `TenantFlowActivity::daily()` builds it. */
 export interface ActivityDay {
   date: string
   executed: number
   failed: number
+}
+
+/** Runs started, completed and failed of one kind of flow over the period. */
+export interface FlowRunFigures {
+  started: number
+  completed: number
+  failed: number
+}
+
+/** The runs per flow card, as `FlowRunAnalytics::perFlow()` builds it plus the period the controller applied. */
+export interface FlowRuns {
+  /** The busiest flows of the period, at most ten. */
+  flows: (FlowRunFigures & { flow_id: string; name: string })[]
+  /** How many flows had any run in the period. */
+  total: number
+  /** Runs whose session is gone (pruned, or its contact deleted); null for a user who sees only some assistants. */
+  unattributed: FlowRunFigures | null
+  period: ActivityPeriod
+  /** The period applied without `?runs_period` (FlowActivityPeriod::default()). */
+  default: ActivityPeriod
+  /** The query parameter that carries the period (DashboardController::RUNS_PERIOD). */
+  param: string
+  periods: ActivityPeriod[]
 }
 
 /** The figures the user may see; a figure they may not is `null`. */
@@ -70,6 +94,21 @@ export interface AdminDashboardTranslations {
   usage: { title: string; description: string; all: string; none: string; more: string; unavailable: string }
   broadcasts: { title: string; description: string; empty: string; progress: string; failed: string; skipped: string; preparing: string }
   activity: { title: string; description: string; executed: string; failed: string; day: string; empty: string }
+  flow_runs: {
+    title: string
+    description: string
+    period: string
+    periods: Record<ActivityPeriod, string>
+    flow: string
+    started: string
+    completed: string
+    failed: string
+    unnamed: string
+    unattributed: string
+    unattributed_hint: string
+    more: string
+    empty: string
+  }
 }
 
 export type AdminDashboardPageProps = ShellPageProps & {

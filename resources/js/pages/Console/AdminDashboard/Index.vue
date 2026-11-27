@@ -16,8 +16,9 @@ import { OnboardingChecklistList, interpolate } from '@console/shell'
 import { SolutionWidgets } from '../../../console/solutions'
 import ActivityChart from './ActivityChart.vue'
 import BroadcastsWidget from './BroadcastsWidget.vue'
+import FlowRunsCard from './FlowRunsCard.vue'
 import UsageWidget from './UsageWidget.vue'
-import type { ActivityDay, AdminDashboardPageProps, AdminStats, DashboardBroadcast, UsageWidgetData } from './types'
+import type { ActivityDay, AdminDashboardPageProps, AdminStats, DashboardBroadcast, FlowRuns, UsageWidgetData } from './types'
 
 /** How long the page keeps refreshing its figures before it stops asking. */
 const POLL_FOR_MS = 60 * 60 * 1000
@@ -25,6 +26,8 @@ const POLL_FOR_MS = 60 * 60 * 1000
 const props = defineProps<{
   stats: AdminStats
   activity: ActivityDay[] | null
+  /** Runs per flow; null for a user who may not list flow sessions. */
+  flowRuns: FlowRuns | null
   pollSeconds: number
   /** The limits card; null for a user who may not open the usage page. Not part of the polling refresh. */
   usage?: UsageWidgetData | null
@@ -67,11 +70,11 @@ const tiles = computed(() => {
 })
 
 const number = computed(() => new Intl.NumberFormat(page.props.locale))
-const nothing = computed(() => tiles.value.length === 0 && props.activity === null && !props.broadcasts)
+const nothing = computed(() => tiles.value.length === 0 && props.activity === null && !props.broadcasts && props.flowRuns === null)
 
 // The figures refresh as the Filament widgets polled (Inertia slows polling in a background tab); a page left open
 // stops asking after an hour and says so, with a button that refreshes once and starts the hour again.
-const poll = usePoll(props.pollSeconds * 1000, { only: ['stats', 'activity', 'broadcasts'] })
+const poll = usePoll(props.pollSeconds * 1000, { only: ['stats', 'activity', 'broadcasts', 'flowRuns'] })
 const stopped = ref(false)
 const refreshing = ref(false)
 let deadline = setTimeout(expire, POLL_FOR_MS)
@@ -84,7 +87,7 @@ function expire(): void {
 function refresh(): void {
   refreshing.value = true
   router.reload({
-    only: ['stats', 'activity', 'broadcasts'],
+    only: ['stats', 'activity', 'broadcasts', 'flowRuns'],
     onFinish: () => {
       refreshing.value = false
     },
@@ -160,5 +163,7 @@ onBeforeUnmount(() => {
         <ActivityChart :days="activity" :locale="page.props.locale" :labels="t.activity" />
       </CardContent>
     </Card>
+
+    <FlowRunsCard v-if="flowRuns" :runs="flowRuns" />
   </div>
 </template>

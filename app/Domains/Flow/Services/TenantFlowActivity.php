@@ -10,6 +10,7 @@ use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Logging\FlowLogStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Support\TimestampWindow;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\ConnectionResolverInterface;
@@ -114,9 +115,7 @@ final readonly class TenantFlowActivity
             default  => throw new RuntimeException("TenantFlowActivity: unsupported database driver [{$driver}]."),
         };
 
-        $bounds = 'pgsql' === $driver
-            ? [$start->format('Y-m-d H:i:sP'), $now->format('Y-m-d H:i:sP')]
-            : [$start, $now];
+        $bounds = TimestampWindow::bounds($driver, $start, $now);
 
         $ids  = null === $assistants ? null : $this->assistantIds($assistants);
         $rows = $this->db->connection()->table('flow_logs')
