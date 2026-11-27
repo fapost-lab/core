@@ -66,13 +66,21 @@ Whoever may manage broadcasts sees **Recent broadcasts**: the last five runs, ho
 far each got and how many failed or were skipped, each linked to its
 [report](/using/broadcasts#the-report).
 
+**Runs per flow** lists the ten busiest flows of a period you pick — the last
+hour, 24 hours (the default), 7 days or 30 days — with how many runs of each
+started, completed and failed. Every published version of a flow counts as that
+flow. A run whose session has since been removed — a finished automation run past
+its retention, or a run of a deleted contact — can no longer be tied to its
+flow; administrators see such runs on a separate **Runs no longer on record** row.
+The card needs the permission to view flow sessions.
+
 You see a counter only if your role lets you open that kind of record — channels
 need the permission to manage channels, staff users the permission to manage
 users, and so on. A user whose role opens none of them sees an empty dashboard.
 Administrators count the whole installation; everyone else counts only the
 assistants assigned to them, so their channels, published flows, waiting sessions,
-activity chart and recent broadcasts cover those assistants alone. Contacts and
-staff users are always the installation's totals.
+activity chart, recent broadcasts and runs per flow cover those assistants alone.
+Contacts and staff users are always the installation's totals.
 
 The figures refresh every minute while the page is open. After an hour they stop,
 and a **Refresh** button brings them up to date and starts the hour again.

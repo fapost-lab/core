@@ -2159,6 +2159,26 @@ return [
             'skipped'     => ':count skipped',
             'preparing'   => 'Preparing…',
         ],
+        'flow_runs' => [
+            'title'       => 'Runs per flow',
+            'description' => 'Runs started, completed and failed in each flow, the busiest first.',
+            'period'      => 'Period',
+            'periods'     => [
+                '1h'  => 'Last hour',
+                '24h' => 'Last 24 hours',
+                '7d'  => 'Last 7 days',
+                '30d' => 'Last 30 days',
+            ],
+            'flow'              => 'Flow',
+            'started'           => 'Started',
+            'completed'         => 'Completed',
+            'failed'            => 'Failed',
+            'unnamed'           => 'Untitled flow',
+            'unattributed'      => 'Runs no longer on record',
+            'unattributed_hint' => 'Runs whose session has since been removed — a finished automation run past its retention, or the run of a deleted contact — are counted here, without their flow.',
+            'more'              => 'Showing the :shown busiest of :total flows.',
+            'empty'             => 'No flow started, completed or failed in this period.',
+        ],
     ],
 
     'search' => [

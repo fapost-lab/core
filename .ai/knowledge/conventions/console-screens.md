@@ -155,6 +155,12 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
 - **Every `flow_logs` query has a time window** (the list a period, at most 30 days; a record ±5
   minutes around the time in its ULID), so it touches the partitions it needs. Example:
   `FlowLogInspector`.
+- **A read of `analytics_events` is bounded the same way** (a `FlowActivityPeriod`, bounds with their offset through
+  `TimestampWindow`) and finds a flow through the event's session (`payload.session_id`, cast to `uuid` only when
+  well-formed, so the join uses the key; a text comparison measured ten times slower). Sessions are deleted
+  (automation-run retention, a contact's deletion), so events whose session is gone are counted apart for
+  administrators, never dropped, and not at all for staff narrowed to some assistants. No rollup table: 13k events of
+  30 days against 500k sessions read in about 0.1 s on PostgreSQL. Example: `FlowRunAnalytics`, `FlowRunsCard.vue`.
 - **The builder is a separate Inertia app**: reach it with a plain `<a>` or `Inertia::location()`
   to the named route `builder.flows.show`, never a `<Link>` or a redirect. A related record
   created from inside a form (a flow's new group) uses its own `*-inline` route that redirects
