@@ -72,7 +72,7 @@ media — with no Slack code in Core. (Viber until 2026-10-26: parked until a cu
       length) beside the capability flags, and flow validation warns when a flow exceeds them (after:
       Capability-aware validation — it adds limits to the same check; built with the Slack connector package,
       so the contract is shaped by two channels' limits, not Telegram's alone)
-- [ ] Slack end to end — the package installed through the overlay against a Slack app in a free
+- [x] Slack end to end — the package installed through the overlay against a Slack app in a free
       workspace; the gaps found go back into the contract (after: Slack connector package)
 - [ ] fog: session windows — how broadcasting and quotas treat bot-initiated messages outside a 24-hour
       window; to be shaped with WhatsApp, Messenger and Instagram in view (Slack has none)
