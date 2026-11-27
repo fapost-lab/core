@@ -10,9 +10,9 @@ conversation messages, session history and old flow versions, and next month's m
 exists before the first write of the month.
 
 - [x] `conversation-retention` — Conversation retention: `retention_days` read and enforced by a scheduled prune
-- [ ] Message partitions pre-created ahead of writes
-- [ ] `flow_session_history` retention
-- [ ] Keep the last N published flow versions
+- [ ] `message-partitions-ahead` — Message partitions pre-created ahead of writes
+- [ ] `flow-session-history-retention` — `flow_session_history` retention
+- [ ] `keep-last-flow-versions` — Keep the last N published flow versions
 
 - [x] `fix-flow-log-partition-listing` — `logs:prune-flow` sees and counts only the current tenant schema's `flow_logs` partitions and reads a partition's month correctly on any day (after: `conversation-retention` — found in its review)
 
