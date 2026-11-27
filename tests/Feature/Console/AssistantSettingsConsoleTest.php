@@ -263,6 +263,102 @@ final class AssistantSettingsConsoleTest extends FeatureTestCase
         $this->assertEquals($stored, $this->assistant->fresh()?->commands);
     }
 
+    public function test_a_registered_solution_type_is_offered_with_its_config_form_and_its_command_is_editable(): void
+    {
+        $this->app->make(CommandActionTypeRegistry::class)->register(FeedbackThankCommandType::class, 'feedback');
+        $this->availability(true);
+        $longText = str_repeat('a', FeedbackThankCommandType::LONG_TEXT + 1);
+        $this->assistant->update(['commands' => [['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['text' => $longText]]]]);
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('options.commandTypes.3', [
+                    'value'     => 'feedback.thank',
+                    'label'     => 'Thank the contact',
+                    'help'      => '',
+                    'schema'    => ['text' => ['type' => 'string', 'label' => 'Reply']],
+                    'available' => true,
+                ])
+                ->where('settings.commands.0.type', 'feedback.thank')
+                ->where('settings.commands.0.config', ['text' => $longText])
+                ->where('settings.commands.0.extension', null)
+                // A warning of the type's own validation is shown; it does not refuse the save.
+                ->where('settings.commands.0.warnings', [['field' => 'text', 'message' => 'A long reply may be cut by the channel.']])
+                ->etc());
+
+        $this->availability(false);
+        $this->get($this->url())->assertInertia(fn (AssertableInertia $page) => $page->where('options.commandTypes.3.available', false)->etc());
+    }
+
+    public function test_an_edited_config_of_a_registered_solution_command_is_saved_as_sent(): void
+    {
+        $this->app->make(CommandActionTypeRegistry::class)->register(FeedbackThankCommandType::class, 'feedback');
+        $this->availability(true);
+        $this->assistant->update(['commands' => [['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['text' => 'Hi', 'note' => 'kept']]]]);
+
+        $this->actingAs($this->admin())
+            ->put($this->url(), $this->payload(['commands' => [
+                ['command' => 'thanks', 'type' => 'feedback.thank', 'config' => ['text' => '  Thank you  ', 'note' => 'kept']],
+                ['command' => 'new', 'type' => 'feedback.thank', 'config' => ['text' => 'Welcome']],
+            ]]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertEquals([
+            ['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['text' => 'Thank you', 'note' => 'kept']],
+            ['command' => '/new', 'type' => 'feedback.thank', 'config' => ['text' => 'Welcome']],
+        ], $this->assistant->fresh()?->commands);
+    }
+
+    public function test_the_fields_of_an_edited_config_that_came_back_unchanged_keep_their_stored_values(): void
+    {
+        $this->app->make(CommandActionTypeRegistry::class)->register(FeedbackThankCommandType::class, 'feedback');
+        $this->availability(true);
+        $this->assistant->update(['commands' => [['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['text' => 'Hi', 'meta' => ['suffix' => ' ', 'pad' => ' x ']]]]]);
+
+        // Only the text is edited; the field the form shows as stored comes back as the middleware leaves it.
+        $this->actingAs($this->admin())
+            ->put($this->url(), $this->payload(['commands' => [['command' => 'thanks', 'type' => 'feedback.thank', 'config' => ['text' => 'Thank you', 'meta' => ['suffix' => ' ', 'pad' => ' x ']]]]]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertEquals(
+            [['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['text' => 'Thank you', 'meta' => ['suffix' => ' ', 'pad' => ' x ']]]],
+            $this->assistant->fresh()?->commands,
+        );
+    }
+
+    public function test_a_config_its_type_refuses_is_reported_under_its_field_at_the_forms_row(): void
+    {
+        $this->app->make(CommandActionTypeRegistry::class)->register(FeedbackThankCommandType::class, 'feedback');
+        $this->availability(true);
+        // A stored entry of an unknown, undotted type passes the field rules and is dropped when normalized: the
+        // refused config still belongs to the form's second row.
+        $this->assistant->update(['commands' => [['command' => '/legacy', 'type' => 'legacy'], ['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['text' => 'Hi']]]]);
+
+        $this->actingAs($this->admin())
+            ->put($this->url(), $this->payload(['commands' => [
+                ['command' => 'legacy', 'type' => 'legacy'],
+                ['command' => 'thanks', 'type' => 'feedback.thank', 'config' => ['text' => '']],
+            ]]))
+            ->assertSessionHasErrors(['commands.1.config.text' => 'The reply text is required.'])
+            ->assertSessionDoesntHaveErrors('commands');
+    }
+
+    public function test_an_untouched_registered_solution_command_its_type_now_refuses_is_kept(): void
+    {
+        $this->app->make(CommandActionTypeRegistry::class)->register(FeedbackThankCommandType::class, 'feedback');
+        $this->availability(true);
+        // Saved before the type asked for a text: an entry nobody touched never blocks saving the rest.
+        $stored = [['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['note' => ' x ']]];
+        $this->assistant->update(['commands' => $stored]);
+
+        $this->actingAs($this->admin())
+            ->put($this->url(), $this->payload(['commands' => [['command' => 'thanks', 'type' => 'feedback.thank', 'config' => ['note' => ' x ']]]]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertEquals($stored, $this->assistant->fresh()?->commands);
+    }
+
     public function test_the_save_says_which_commands_wait_for_an_inactive_solution_and_is_plain_otherwise(): void
     {
         $this->app->make(CommandActionTypeRegistry::class)->register(FeedbackThankCommandType::class, 'feedback');

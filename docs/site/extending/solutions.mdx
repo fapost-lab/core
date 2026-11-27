@@ -502,8 +502,17 @@ called and the contact gets the assistant's busy message.
 
 Registration follows the same strict rules as actions: an undeclared type or command, a duplicate, a class that does
 not implement the interface, a command taking `start_flow` or a type that is not yours, or a config your own type
-refuses fails the boot; a declared type or command you never register fails `platform:update`. The assistant's
-settings page shows a tenant command of your type read-only for now and keeps it when the other settings are saved.
+refuses fails the boot; a declared type or command you never register fails `platform:update`.
+
+In the assistant's settings, staff pick your type for a command and fill in its config in a form built from
+`configSchema()`. The form edits `string`, `text`, `number`, `boolean`, `enum` and `enum-cards` fields and honours
+`visible_when`; a field of any other type is shown as stored and kept unchanged. Choosing the type starts from the
+fields' `default` values and `default_config`. Each error `validateConfig()` returns refuses the save and is shown under
+its `field`; each warning is shown under the field when the settings are opened. Your messages are shown as you write
+them. A command nobody changed is saved as it is stored, even when your rules have since become stricter. Your type is
+offered only while your Solution is on for the tenant. A command of your type that is already saved stays editable
+while your Solution is off and does not run until the Solution is turned on. A command of a type that is no longer
+installed is shown read-only and kept.
 
 ## Your state namespace
 

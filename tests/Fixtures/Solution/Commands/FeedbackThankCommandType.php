@@ -11,12 +11,14 @@ use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
 use Tests\Fixtures\Solution\FeedbackCalls;
 
 /**
- * The `feedback.thank` command action type of the fixture Solution: it replies with the configured `text` (required)
- * and, when a test binds {@see FeedbackCalls}, records the call there with the tenant it ran for.
+ * The `feedback.thank` command action type of the fixture Solution: it replies with the configured `text` (required;
+ * longer than {@see LONG_TEXT} characters is a warning) and, when a test binds {@see FeedbackCalls}, records the call there with the tenant it ran for.
  */
 final class FeedbackThankCommandType implements CommandActionTypeInterface
 {
     final public const string TYPE = 'feedback.thank';
+
+    final public const int LONG_TEXT = 160;
 
     public function __construct(
         private readonly ?FeedbackCalls $calls = null,
@@ -42,6 +44,10 @@ final class FeedbackThankCommandType implements CommandActionTypeInterface
     {
         if (! is_string($config['text'] ?? null) || '' === $config['text']) {
             return [NodeConfigIssue::error('missing_text', 'The reply text is required.', 'text')];
+        }
+
+        if (mb_strlen($config['text']) > self::LONG_TEXT) {
+            return [NodeConfigIssue::warning('long_text', 'A long reply may be cut by the channel.', 'text')];
         }
 
         return [];

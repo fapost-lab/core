@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import { errorsByLocale } from '@fapost/ui/components/localized-field'
 import type { CommandState } from './types'
-import { commandErrors, emptyEntries, firstError, isTab, newCommand, tabsWithErrors, toPayload, type SettingsFormData } from './settings'
+import {
+  commandErrors,
+  configFields,
+  defaultConfig,
+  emptyEntries,
+  enumChoices,
+  firstError,
+  isEditableField,
+  isTab,
+  newCommand,
+  refreshWarnings,
+  tabsWithErrors,
+  toPayload,
+  visibleConfigFields,
+  type SettingsFormData,
+} from './settings'
 
 const languages = ['en', 'ru']
 
@@ -61,6 +76,96 @@ describe('toPayload with a Solution action', () => {
     const row: CommandState = { ...newCommand(languages, 'x'), command: 'thanks', config: null, extension: { type: 'feedback.thank', label: 'Thank', installed: true } }
 
     expect(toPayload(form({ commands: [row] })).commands).toEqual([{ command: 'thanks', type: 'feedback.thank', config: {} }])
+  })
+})
+
+describe('toPayload with an editable Solution action', () => {
+  it('sends its whole config and none of the built-in fields', () => {
+    const row: CommandState = {
+      ...newCommand(languages, 'x'),
+      command: ' thanks ',
+      type: 'feedback.thank',
+      response: [{ locale: 'en', text: 'ignored' }],
+      text: [{ locale: 'en', text: 'ignored' }],
+      config: { text: 'Hi', hidden: { kept: true } },
+    }
+
+    expect(toPayload(form({ commands: [row] })).commands).toEqual([{ command: 'thanks', type: 'feedback.thank', config: { text: 'Hi', hidden: { kept: true } } }])
+  })
+
+  it('does not take a Solution action for a message', () => {
+    const row: CommandState = { ...newCommand(languages, 'x'), command: 'thanks', type: 'feedback.thank', config: null }
+
+    expect(toPayload(form({ commands: [row] })).commands).toEqual([{ command: 'thanks', type: 'feedback.thank' }])
+  })
+})
+
+describe('config schema helpers', () => {
+  const schema = {
+    required: ['mode'],
+    default_config: { mode: 'short' },
+    sections: [
+      { key: 'reply', label: 'Reply', fields: ['mode', 'text', 'undeclared'] },
+      { key: 'more', label: 'More', fields: ['count'] },
+    ],
+    mode: { type: 'enum', label: 'Mode', options: { short: 'Short', long: 'Long' }, default: 'long' },
+    text: { type: 'text', label: 'Text', default: '', visible_when: { mode: 'long' } },
+    count: { type: 'number', label: 'Count' },
+    payload: { type: 'json', label: 'Payload' },
+  }
+
+  it('lists the fields section after section, the required ones marked', () => {
+    expect(configFields(schema).map((field) => [field.key, field.required])).toEqual([
+      ['mode', true],
+      ['text', false],
+      ['count', false],
+    ])
+  })
+
+  it('lists every field when no section is declared', () => {
+    expect(configFields({ text: { type: 'string' }, payload: { type: 'json' } }).map((field) => field.key)).toEqual(['text', 'payload'])
+    expect(configFields(undefined)).toEqual([])
+  })
+
+  it('shows a field only while its visible_when holds', () => {
+    expect(visibleConfigFields(schema, { mode: 'short' }).map((field) => field.key)).toEqual(['mode', 'count'])
+    expect(visibleConfigFields(schema, { mode: 'long' }).map((field) => field.key)).toEqual(['mode', 'text', 'count'])
+  })
+
+  it('starts from the field defaults with default_config over them', () => {
+    expect(defaultConfig(schema)).toEqual({ mode: 'short', text: '' })
+    expect(defaultConfig(undefined)).toEqual({})
+  })
+
+  it('reads enum choices from a map or a list', () => {
+    expect(enumChoices({ key: 'mode', schema: schema.mode, required: true })).toEqual([
+      { value: 'short', label: 'Short' },
+      { value: 'long', label: 'Long' },
+    ])
+    expect(enumChoices({ key: 'tone', schema: { type: 'enum-cards', options: [{ value: 'warm', label: 'Warm', hint: 'Friendly' }, { value: 'dry' }] }, required: false })).toEqual([
+      { value: 'warm', label: 'Warm' },
+      { value: 'dry', label: 'dry' },
+    ])
+    expect(enumChoices({ key: 'size', schema: { type: 'enum', values: ['s', 'm'] }, required: false })).toEqual([
+      { value: 's', label: 's' },
+      { value: 'm', label: 'm' },
+    ])
+  })
+
+  it('edits only the field types the form knows', () => {
+    expect(isEditableField({ key: 'count', schema: schema.count, required: false })).toBe(true)
+    expect(isEditableField({ key: 'payload', schema: schema.payload, required: false })).toBe(false)
+  })
+})
+
+describe('refreshWarnings', () => {
+  it('takes the warnings of the saved command with the same name and type', () => {
+    const warning = { field: 'text', message: 'Long' }
+    const edited: CommandState = { ...newCommand(languages, 'a'), command: ' thanks ', type: 'feedback.thank', warnings: [] }
+    const other: CommandState = { ...newCommand(languages, 'b'), command: 'bye', type: 'feedback.thank', warnings: [warning] }
+    const saved = [{ ...newCommand(languages, 'z'), command: 'thanks', type: 'feedback.thank', warnings: [warning] }]
+
+    expect(refreshWarnings([edited, other], saved).map((row) => row.warnings)).toEqual([[warning], []])
   })
 })
 

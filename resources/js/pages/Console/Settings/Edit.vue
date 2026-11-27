@@ -22,7 +22,7 @@ import { errorsByLocale, LocalizedField } from '@fapost/ui/components/localized-
 import FlowSelect from './FlowSelect.vue'
 import KeyValueField from './KeyValueField.vue'
 import NewFlowDialog from './NewFlowDialog.vue'
-import { firstError, isTab, tabsWithErrors, toPayload, type SettingsFormData } from './settings'
+import { firstError, isTab, refreshWarnings, tabsWithErrors, toPayload, type SettingsFormData } from './settings'
 import type { SettingsOptions, SettingsPageProps, SettingsState, SettingsTab } from './types'
 
 /**
@@ -93,7 +93,13 @@ watch(errorTabs, (tabs) => {
 })
 
 function save(): void {
-  form.transform((data) => toPayload(data)).put(props.urls.submit, { preserveScroll: true })
+  form.transform((data) => toPayload(data)).put(props.urls.submit, {
+    preserveScroll: true,
+    // The form keeps what was typed; what a Solution's action warns about is read again from what was saved.
+    onSuccess: () => {
+      form.commands = refreshWarnings(form.commands, props.settings.commands)
+    },
+  })
 }
 
 /* A flow made from inside the form: for the default flow (`null`) or for the command at that position. */

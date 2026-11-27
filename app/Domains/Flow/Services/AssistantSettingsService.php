@@ -19,9 +19,13 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
+use Fapost\Foundation\Flow\Commands\CommandActionTypeInterface;
+use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
+use Fapost\Foundation\Flow\Enums\NodeConfigIssueSeverity;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Database\ConnectionResolverInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -207,9 +211,22 @@ final readonly class AssistantSettingsService
      */
     public function normalizeCommands(array $commands): array
     {
+        return array_values($this->normalizeCommandsByPosition($commands));
+    }
+
+    /**
+     * {@see normalizeCommands()}, each kept command under the key it was given at, so an error found in it can be
+     * reported at the form's row even when a blank row before it was dropped.
+     *
+     * @param  array<array-key, mixed>  $commands
+     *
+     * @return array<array-key, array<string, mixed>>
+     */
+    public function normalizeCommandsByPosition(array $commands): array
+    {
         $normalized = [];
 
-        foreach ($commands as $entry) {
+        foreach ($commands as $position => $entry) {
             if (! is_array($entry)) {
                 continue;
             }
@@ -225,12 +242,9 @@ final readonly class AssistantSettingsService
             $command = str_starts_with($command, '/') ? $command : '/' . $command;
 
             if (null === $type) {
-                // A Solution's type: the form shows it read-only and has no editor for its config, so the stored config of the
-                // same command and type is kept as stored — the request's copy went through the client and the input
-                // middleware (trimmed strings, empty ones as null). A new entry keeps the config as given; the validator
-                // judges both. Any other unknown type is dropped.
+                // A Solution's type keeps its config; any other unknown type is dropped.
                 if (1 === preg_match(self::REGISTERED_TYPE_PATTERN, $typeName)) {
-                    $normalized[] = ['command' => $command, 'type' => $typeName, 'config' => $this->storedConfig($command, $typeName) ?? (is_array($entry['config'] ?? null) ? $entry['config'] : [])];
+                    $normalized[$position] = ['command' => $command, 'type' => $typeName, 'config' => $this->submittedConfig($command, $typeName, $entry['config'] ?? null)];
                 }
 
                 continue;
@@ -253,7 +267,7 @@ final readonly class AssistantSettingsService
                 $row['text'] = $text;
             }
 
-            $normalized[] = $row;
+            $normalized[$position] = $row;
         }
 
         return $normalized;
@@ -362,6 +376,57 @@ final readonly class AssistantSettingsService
     }
 
     /**
+     * The command action types Solutions registered, as the form offers them: each with its label, its config form
+     * ({@see CommandActionTypeInterface::configSchema()}) and whether its Solution is on for the current tenant — a
+     * command of a type whose Solution is off is kept but does not run.
+     *
+     * @return list<array{type: string, label: string, schema: array<string, mixed>, available: bool}>
+     */
+    public function registeredCommandTypes(): array
+    {
+        $types = [];
+
+        foreach ($this->commandActionTypes->types() as $typeName) {
+            $type = $this->commandActionTypes->get($typeName);
+
+            $types[] = [
+                'type'      => $typeName,
+                'label'     => $type->label(),
+                'schema'    => $type->configSchema(),
+                'available' => $this->solutions->isAvailable($this->commandActionTypes->ownerOf($typeName)),
+            ];
+        }
+
+        return $types;
+    }
+
+    /**
+     * What a Solution's type warns about in a command's config ({@see CommandActionTypeInterface::validateConfig()}
+     * warnings; its errors refuse the save instead). Empty for a type nobody registers.
+     *
+     * @param  array<array-key, mixed>  $config
+     *
+     * @return list<array{field: string|null, message: string}>
+     */
+    public function commandConfigWarnings(string $typeName, array $config): array
+    {
+        if (! $this->commandActionTypes->has($typeName)) {
+            return [];
+        }
+
+        $warnings = [];
+
+        /** @var array<string, mixed> $config */
+        foreach ($this->commandActionTypes->get($typeName)->validateConfig($config) as $issue) {
+            if ($issue instanceof NodeConfigIssue && NodeConfigIssueSeverity::Warning === $issue->severity) {
+                $warnings[] = ['field' => $issue->field, 'message' => $issue->message];
+            }
+        }
+
+        return $warnings;
+    }
+
+    /**
      * The types of the stored commands, whatever they are.
      *
      * @return list<string>
@@ -418,6 +483,43 @@ final readonly class AssistantSettingsService
     }
 
     /**
+     * A stored value as it reaches the request after Laravel's `TrimStrings` and `ConvertEmptyStringsToNull`, which
+     * every console request passes.
+     */
+    private static function asSubmitted(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            return array_map(self::asSubmitted(...), $value);
+        }
+
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $trimmed = Str::trim($value);
+
+        return '' === $trimmed ? null : $trimmed;
+    }
+
+    /**
+     * A value with every map's keys sorted: a stored entry comes back from jsonb in its own key order.
+     */
+    private static function sortedKeys(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $value = array_map(self::sortedKeys(...), $value);
+
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
+    }
+
+    /**
      * The config of the stored command with this command and type, or null when none is stored.
      *
      * @return array<array-key, mixed>|null
@@ -431,6 +533,37 @@ final readonly class AssistantSettingsService
         }
 
         return null;
+    }
+
+    /**
+     * The config to keep for a command of a Solution's type. The request's copy went through the input middleware
+     * (strings trimmed, empty ones as null), so each top-level field that comes back as its stored value would after
+     * that is the stored field, untouched: it is kept exactly as stored, and an untouched config stays the stored one.
+     * A field the form edited, or a new one, is taken as sent; the validator judges the result. A type nobody registers
+     * has no editor, so its stored config is kept whatever was sent.
+     *
+     * @return array<array-key, mixed>
+     */
+    private function submittedConfig(string $command, string $typeName, mixed $sent): array
+    {
+        $sent   = is_array($sent) ? $sent : [];
+        $stored = $this->storedConfig($command, $typeName);
+
+        if (null === $stored) {
+            return $sent;
+        }
+
+        if (! $this->commandActionTypes->has($typeName) || self::sortedKeys(self::asSubmitted($stored)) === self::sortedKeys($sent)) {
+            return $stored;
+        }
+
+        foreach ($sent as $key => $value) {
+            if (array_key_exists($key, $stored) && self::sortedKeys(self::asSubmitted($stored[$key])) === self::sortedKeys($value)) {
+                $sent[$key] = $stored[$key];
+            }
+        }
+
+        return $sent;
     }
 
     /**

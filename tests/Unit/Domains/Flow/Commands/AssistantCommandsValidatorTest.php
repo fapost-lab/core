@@ -6,6 +6,8 @@ namespace Tests\Unit\Domains\Flow\Commands;
 
 use App\Domains\Flow\Commands\CommandActionTypeRegistry;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
+use App\Domains\Flow\Validation\InvalidCommandConfigException;
+use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
 use InvalidArgumentException;
 use Tests\Fixtures\Solution\Commands\FeedbackThankCommandType;
 use Tests\TestCase;
@@ -257,6 +259,23 @@ final class AssistantCommandsValidatorTest extends TestCase
         $this->app->make(AssistantCommandsValidator::class)->validate([
             ['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['text' => '', 'other' => 1]],
         ], $stored);
+    }
+
+    public function test_a_refused_config_carries_the_entrys_key_and_its_errors_but_not_its_warnings(): void
+    {
+        $this->registerFeedbackType();
+
+        try {
+            $this->app->make(AssistantCommandsValidator::class)->validate([
+                3 => ['command' => '/long', 'type' => 'feedback.thank', 'config' => ['text' => str_repeat('a', FeedbackThankCommandType::LONG_TEXT + 1)]],
+                5 => ['command' => '/thanks', 'type' => 'feedback.thank', 'config' => ['text' => '']],
+            ]);
+            $this->fail('The empty reply text was accepted.');
+        } catch (InvalidCommandConfigException $exception) {
+            $this->assertSame(5, $exception->position);
+            $this->assertSame('commands[5].config.text: The reply text is required.', $exception->getMessage());
+            $this->assertSame(['missing_text'], array_map(static fn (NodeConfigIssue $issue): string => $issue->code, $exception->issues));
+        }
     }
 
     private function registerFeedbackType(): void

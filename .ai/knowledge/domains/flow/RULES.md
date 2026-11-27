@@ -273,7 +273,9 @@ broken.
   call, owner = Solution id, frozen after boot) only when the Solution is ready (else the busy message), and carries
   out the returned `CommandOutcome` itself, because a command runs before the session lock; an exception is logged and
   the message counts as handled. `AssistantCommandsValidator` refuses a dotted type nobody registers unless the entry
-  is stored unchanged. Why: a Solution must not run for a tenant that switched it off, and Solution code must not bypass
+  is stored unchanged, and a registered type's config only once it changed: `AssistantSettingsService` keeps each
+  config field that comes back as its stored value after the input middleware, so an untouched entry is never
+  re-validated. Why: a Solution must not run for a tenant that switched it off, and Solution code must not bypass
   the lock (`adr-20261127-solution-chat-commands`). Enforced: `CommandMatcherTest`, `GlobalCommandExecutorRegisteredTypeTest`,
   `AssistantCommandsValidatorTest`, `SolutionCommandRegistryTest`, `CommandActionTypeRegistryTest`,
   `SolutionCoreRegistrarTest`, `SolutionLifecycleTest`. *(proposed)*

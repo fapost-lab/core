@@ -11,6 +11,7 @@ use App\Domains\Flow\Commands\CommandActionType;
 use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Services\AssistantSettingsService;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
+use App\Domains\Flow\Validation\InvalidCommandConfigException;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -138,7 +139,8 @@ final class AssistantSettingsRules
                     return;
                 }
 
-                $commands = $settings->normalizeCommands(self::commands($request));
+                // Keyed by the form's row, so a refused config is reported under its own fields.
+                $commands = $settings->normalizeCommandsByPosition(self::commands($request));
 
                 // The command a new flow is made for gets it when saving; until then a placeholder stands in for it.
                 if (null !== $awaitingFlow && isset($commands[$awaitingFlow])) {
@@ -147,6 +149,11 @@ final class AssistantSettingsRules
 
                 try {
                     $validator->validate($commands, $settings->assistant()->commands);
+                } catch (InvalidCommandConfigException $exception) {
+                    // A Solution's type words its own errors (in English, as its label): each goes under its field.
+                    foreach ($exception->issues as $issue) {
+                        $instance->errors()->add("commands.{$exception->position}.config" . (null === $issue->field ? '' : ".{$issue->field}"), $issue->message);
+                    }
                 } catch (InvalidArgumentException $exception) {
                     $instance->errors()->add('commands', trans('console.settings.errors.commands_invalid', ['error' => $exception->getMessage()]));
                 }

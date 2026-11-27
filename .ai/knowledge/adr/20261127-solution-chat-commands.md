@@ -53,7 +53,8 @@ recommended answers, 2026-11-27).
   a dotted type nobody registers as not installed, but keeps an entry stored unchanged (compared with keys sorted:
   jsonb) so a removed Solution, or one that tightened its rules, never blocks saving. The console shows such an entry
   read-only and the save keeps its stored config (the client's copy went through the input middleware); saving tells
-  the staff user which commands will not run because their Solution is off. An editor for the config is follow-up work. `platform:update` reports declared but unregistered types and commands and a Solution
+  the staff user which commands will not run because their Solution is off. An editor for the config is follow-up work
+  (built 2026-11-27, see Amendment). `platform:update` reports declared but unregistered types and commands and a Solution
   command whose config its own type refuses.
 
 ## Alternatives
@@ -78,3 +79,16 @@ recommended answers, 2026-11-27).
   they silently never match.
 - A Solution command is not listed in a channel's command menu (Telegram `setMyCommands`); that is separate work.
 - A new place that reads `assistants.commands` must expect a dotted `type` with a `config` key and no built-in fields.
+
+## Amendment 2026-11-27 — the console edits a registered type's config
+
+Task `solution-command-config-editor`. The assistant settings now offer every registered type whose Solution is on for
+the tenant (one that is off only on a row that already has it, with a note), and a command of a registered type is
+edited through a form built from `configSchema()`: `string`, `text`, `number`, `boolean`, `enum`, `enum-cards` and
+`visible_when`; a field of another schema type is shown as stored and sent back unchanged. Choosing the type starts
+from the fields' defaults and `default_config`. Only a dotted type nobody registers stays read-only. The save takes the
+config as sent, but each top-level field that comes back as its stored value would after `TrimStrings` and
+`ConvertEmptyStringsToNull` keeps its stored value, so an untouched entry is still stored unchanged and exempt from a
+stricter `validateConfig()`. `validateConfig()` errors refuse the save under `commands.<row>.config.<field>` (the form's
+row, through `AssistantCommandsValidator`'s `InvalidCommandConfigException`); its warnings are shown under the field
+when the page opens.

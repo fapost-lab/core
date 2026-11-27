@@ -202,10 +202,13 @@ Credentials' OAuth2 types fetch their tokens through Flow's `GuardedHttpClient`,
   own variables point at it in both themes. The console shell and live updates are Core's own code
   (`resources/js/console/shell`, `resources/js/console/lib`, alias `@console`), not the kit; the
   theme helpers the console and the builder share are in `resources/js/shared/theme`. The console's run graph
-  (`resources/js/console/run-graph`, a lazy chunk with `@vue-flow/core` and `elkjs`) is the one console code that
-  imports builder source — its presentational pieces `NodeIcon.vue`, `nodeColors.ts`, `nodeAvailability.ts`, the
+  (`resources/js/console/run-graph`, a lazy chunk with `@vue-flow/core` and `elkjs`) imports builder source — its presentational pieces `NodeIcon.vue`, `nodeColors.ts`, `nodeAvailability.ts`, the
   shared drawing code `utils/graphFrames.ts` (branch frames) and `utils/graphLayout.ts` (ELK) — and the
-  node palette `resources/css/node-palette.css`, so a run is drawn with the builder's node cards. The builder's own
+  node palette `resources/css/node-palette.css`, so a run is drawn with the builder's node cards. The only other console
+  code that does is the assistant settings' config form for a Solution's command action
+  (`resources/js/pages/Console/Settings/settings.ts`), which reads a `config_schema` through the builder's pure helpers
+  `schemaSections.ts` and `useFieldVisibility.ts`, so a schema means the same there as in a node's form; its fields are
+  kit components, not the builder's. The builder's own
   graph mode (`components/editor/graph/`, a lazy chunk with the same two libraries) uses that drawing code too; the
   builder never imports the console (`adr-20261123-flow-builder-graph-mode`). The public site (`resources/css/app.css`) keeps its own
   palette by decision (D5, spec `ui-foundation`). The front-end build needs nothing from Composer's
