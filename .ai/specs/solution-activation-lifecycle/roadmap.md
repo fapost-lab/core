@@ -26,7 +26,7 @@ an activated Solution provides, and stops reaching it after deactivation.
       overwriting (after: activation storage — registration has to ask what is active)
 - [x] `solution-lifecycle-suite` — Lifecycle test suite over the whole chain: install → activate → handler available →
       deactivate → gone, with the tenant boundary asserted
-- [ ] `solution-commands-registrar` — Commands and command action types registered by a Solution (ADR-09) — moved from the closed spec `flow-engine-v1x` on 2026-11-23; needs the Core registrar (after: `solution-core-registrar`)
+- [x] `solution-commands-registrar` — Commands and command action types registered by a Solution (ADR-09) — moved from the closed spec `flow-engine-v1x` on 2026-11-23; needs the Core registrar (after: `solution-core-registrar`)
 
 ## Phase 3 — An operator can do it without a developer
 
@@ -49,7 +49,7 @@ Goal: a broken or failing Solution degrades only itself. Done when: a Solution w
 leaves the install serving every other flow, and a Solution migration that fails during
 `platform:update` is rolled back alone while the platform migrations stay applied.
 
-- [ ] Failure isolation at boot: a Solution that fails to boot is marked degraded, new sessions of
+- [ ] `solution-boot-failure-isolation` — Failure isolation at boot: a Solution that fails to boot is marked degraded, new sessions of
       its flows do not start, running ones finish (after: activation storage — degraded is a state
       of an activation)
 - [x] `platform-update-phased-rollback` — `platform:update` with per-phase rollback: validate, migrate platform, migrate each Solution
