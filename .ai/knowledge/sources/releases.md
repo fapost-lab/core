@@ -8,8 +8,8 @@ paths:
   - .github/workflows/release-tag.yml
 source: docs/site/contributing/releases.mdx
 summary: Versioning in 0.x, image tags, hotfix and pre-release procedure
-source_hash: 5779c00dea62050257e56973bf5e84aa70c52c54
-reviewed_at: 2026-10-28
+source_hash: 8df73163bbb2db0d0fe3ec394f61b850a9b2fda1
+reviewed_at: 2026-11-27
 ---
 # Releases and versioning
 
