@@ -21,5 +21,6 @@ Schedule::command('audit:prune')->dailyAt('04:15');
 Schedule::command('credentials:refresh-oauth2-grants')->dailyAt('02:30')->withoutOverlapping();
 Schedule::command('api-tokens:notify-expiring')->dailyAt('09:00')->withoutOverlapping();
 Schedule::command('flow:prune-automation-runs')->dailyAt('04:30')->withoutOverlapping();
+Schedule::command('flow:prune-session-history')->dailyAt('04:45')->withoutOverlapping();
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
 Schedule::command('tenants:start-deletions')->everyMinute()->withoutOverlapping();

@@ -216,7 +216,8 @@ broken.
   and read by screens for statuses, its data one visit at a time behind `ViewRunPayloads`.** `FlowEngine` calls `NodeTraceRecorder` for every node of every session: `node_entered`,
   then `node_completed` or `node_failed`, into `flow_session_history`, whatever `logging_enabled` (which still gates
   `state_change` and `subflow_*`). Only an automation run's rows carry `input`/`output`, and only while
-  `flow.trace.payloads` is on: nothing deletes a conversation's history, so a conversation's trace keeps no payloads
+  `flow.trace.payloads` is on: a conversation's history is kept forever unless an operator sets
+  `flow.session_history.retention_days`, so a conversation's trace keeps no payloads
   (gate decision of `flow-node-trace`, D-3). Payloads pass `TracePayloadMasker` (sensitive key names, also inside a
   JSON document held in a string; URL passwords and query parameters, also `query.<name>` call parameters and
   form-urlencoded bodies; literal secrets) and then `TracePayloadLimiter` (1 MiB a row); masking is a deny-list, so a secret
@@ -347,6 +348,19 @@ broken.
   Enforced: `AutomationRunPrunerTest` (status × kind × end status × age matrix, enum completeness, `TERMINAL` equal to
   `FlowSessionStatus::terminal()`, chains, tenant),
   `PruneAutomationRunsCommandTest`.
+- **Session history retention deletes only the whole history of a finished conversation session, never the session.**
+  `SessionHistoryPruner` (daily `flow:prune-session-history`) deletes a session's `flow_session_history` only when the
+  session is the tenant's (passed explicitly), `run_kind = conversation`, in the terminal whitelist
+  `AutomationRunRetention::TERMINAL` and finished (`updated_at`) before `now − flow.session_history.retention_days`;
+  a subflow chain — a root and every session below it by `parent_session_id` — goes only as a whole, once every member
+  qualifies, and a child is never picked alone. Each session's whole history goes, rows newer than the cutoff included,
+  and the session's own conditions are repeated in the `DELETE`. The setting is per install and defaults to 0 (keep forever): conversation
+  history already existed when retention arrived, and the owner chose that nothing be deleted until an operator sets a
+  period. Why: terminal statuses are never left, so no lock is needed; a whole history, not rows by age, so a trace
+  never loses its beginning; a chain as a whole, so a run graph never loses a part while any member is live or young. Automation runs are not governed
+  by it — their history goes with the run. Enforced: `SessionHistoryPrunerTest` (status × kind × age, chains of three
+  levels, tenant, batches), `PruneSessionHistoryCommandTest`, `PlatformSettingsTest`
+  (`adr-20261127-conversation-session-history-retention`).
 - **A node that needs a contact is never published into a flow whose trigger gives none.** A handler declares
   `contact`, `none` or `any` through Foundation's `DeclaresContextRequirementInterface` (Solutions too); one that
   declares nothing needs a contact. Under a `schedule`, `webhook` or `api` trigger, or an `event` trigger on a Core event (`TriggerContactContext`), validate and publish refuse such a node, and

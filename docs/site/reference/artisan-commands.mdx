@@ -130,8 +130,9 @@ media are kept. See [Conversation retention](/self-hosting/observability#convers
 | Command | Does |
 |---|---|
 | `flow:prune-automation-runs` | Delete finished automation runs, with their session history and flow logs, older than the platform settings `flow.automation_runs.succeeded_retention_days` (default 7) and `flow.automation_runs.failed_retention_days` (default 30), in every active tenant. Conversation sessions, runs still going and a subflow chain with any such member are never deleted. Does nothing when both are `0`. Scheduled daily at 04:30 |
+| `flow:prune-session-history` | Delete the whole session history of finished conversation sessions that ended longer ago than the platform setting `flow.session_history.retention_days` (default 0), in every active tenant. The sessions stay; a session still going, a subflow whose parent is still going, and automation runs are never touched. Does nothing when it is `0`. Scheduled daily at 04:45 |
 
-`flow:prune-automation-runs` accepts `--dry-run`, which only counts. Deleting is irreversible.
+`flow:prune-automation-runs` and `flow:prune-session-history` accept `--dry-run`, which only counts. Deleting is irreversible.
 
 ## Activity log retention
 

@@ -18,8 +18,8 @@ use Throwable;
  *
  * A row's `metadata` is its envelope: the node's type and version, the loops it runs in, and for `node_completed` its
  * status, handle, next node, duration, error message and — for an automation run while {@see self::PAYLOADS_SETTING}
- * is on — its `input` and `output`. A conversation's rows never carry `input`/`output`: nothing deletes them yet, and a
- * conversation is a person's data (gate decision D-3). Payloads are masked ({@see TracePayloadMasker}), then limited
+ * is on — its `input` and `output`. A conversation's rows never carry `input`/`output`: they are kept forever unless
+ * an operator sets `flow.session_history.retention_days`, and a conversation is a person's data (gate decision D-3). Payloads are masked ({@see TracePayloadMasker}), then limited
  * ({@see TracePayloadLimiter}), and written nowhere else.
  *
  * Nothing here may break a step: every failure, from building the envelope to the insert, ends in the warning

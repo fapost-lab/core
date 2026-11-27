@@ -11,6 +11,7 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Orchestration\AutomationRunDeadline;
 use App\Domains\Flow\Orchestration\StrandedAutomationRunRecovery;
 use App\Domains\Flow\Retention\AutomationRunRetention;
+use App\Domains\Flow\Retention\SessionHistoryRetention;
 use App\Domains\Flow\Trace\NodeTraceRecorder;
 use App\Domains\Flow\Webhook\FlowWebhookReceiver;
 use App\Domains\Flow\Webhook\WebhookSyncWait;
@@ -114,6 +115,7 @@ final class PlatformSettingsTest extends FeatureTestCase
             RedisCallExecutionLedger::TTL_SETTING,
             self::ITERATIONS,
             FlowEngineInterface::MAX_LOOP_ITERATIONS_SETTING,
+            SessionHistoryRetention::SETTING,
             NodeTraceRecorder::PAYLOADS_SETTING,
             FlowWebhookReceiver::PER_TOKEN_SETTING,
             WebhookSyncWait::WAIT_SECONDS_SETTING,
@@ -140,6 +142,7 @@ final class PlatformSettingsTest extends FeatureTestCase
         $this->assertTrue($byKey[self::REDIRECT]->hostModeOnly);
         $this->assertSame(30, $byKey[AutomationRunRetention::FAILED_SETTING]->default);
         $this->assertSame(7, $byKey[AutomationRunRetention::SUCCEEDED_SETTING]->default);
+        $this->assertSame(0, $byKey[SessionHistoryRetention::SETTING]->default, 'Session history is kept forever until an operator sets a period.');
         $this->assertSame(24, $byKey[AutomationRunDeadline::SETTING]->default);
         $this->assertSame(1, $byKey[AutomationRunDeadline::SETTING]->min);
         $this->assertSame(720, $byKey[AutomationRunDeadline::SETTING]->max, 'A run may live at most 30 days.');
