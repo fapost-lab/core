@@ -9,8 +9,8 @@ Owner, 2026-10-26, while choosing the outside channel that proves the `channel-c
 to check the contract, Teams as a separate spec." And the reason Teams came up at all: "the thought is to
 go to the corporate market in Ukraine first, that is why Teams surfaced."
 
-Viber, discussed in the same conversation, may be needed too, but only on a customer's request; it is a
-fog item of `channel-connectors`, not part of this spec.
+Viber, discussed in the same conversation, may be needed too, but only on a customer's request; it is the
+parked task `viber-connector-idea` (from `channel-connectors`), not part of this spec.
 
 ## Goal and problem
 
@@ -60,7 +60,8 @@ Not run yet.
 - Not doing (proposed):
   - Slack — it is the contract's proof inside `channel-connectors`.
   - Microsoft Graph integrations (calendars, files, directory) — integrations, not a channel.
-  - Viber and Meta channels — `channel-connectors` fog items, each on a customer's request.
+  - Viber and Meta channels — each on a customer's request (`viber-connector-idea`; the Meta session window
+    is `session-window-accounting-idea`).
 
 ## Decisions
 
@@ -75,7 +76,10 @@ Not run yet.
   channel at all.
 - One multi-tenant FaPost app versus an app registered by each customer — depends on Azure's current rules
   for bot registration and on how customers' admins prefer to install. It is the same routing question as a
-  Slack app distributed across workspaces (`channel-connectors`).
+  Slack app distributed across workspaces, moved here when `channel-connectors` closed (2026-11-27): one
+  Slack app with one Request URL, installed into many workspaces by OAuth and routed by `team_id`, against
+  Core's one webhook per channel — the Slack connector today uses one single-workspace app per channel.
+  Decided once for both connectors, when a customer needs a distributed app.
 - How SaaS and self-hosted differ: in SaaS the operator may own the Azure registration; self-hosted, the
   installation's owner does.
 - A test tenant: the M365 Developer Program sandbox is restricted now — whether a paid M365 tenant is needed
@@ -84,7 +88,9 @@ Not run yet.
   a contact, no contact or location requests, approvals as cards) — may be a Solution's job rather than the
   connector's.
 - Must `channel-connectors` close first, or can this start on its epic — depends on when the contract is
-  proven by Slack.
+  proven by Slack. **Answered (2026-11-27):** Slack proved the contract end to end and `channel-connectors`
+  is closed; this spec starts from `main` and the published connector contract
+  (`docs/site/extending/channel-drivers.mdx`).
 
 ## Assumptions left untested
 
