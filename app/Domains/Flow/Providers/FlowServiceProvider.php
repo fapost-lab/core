@@ -140,6 +140,7 @@ use App\Domains\Flow\Repositories\FlowWebhookEndpointRepository;
 use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
 use App\Domains\Flow\Retention\AutomationRunRetention;
+use App\Domains\Flow\Retention\SessionHistoryRetention;
 use App\Domains\Flow\Routing\DropPolicy;
 use App\Domains\Flow\Routing\DropPolicyInterface;
 use App\Domains\Flow\Routing\MessageRouter;
@@ -422,6 +423,19 @@ final class FlowServiceProvider extends ServiceProvider
             unit: 'days',
             min: 0,
             max: AutomationRunRetention::MAX_DAYS,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: SessionHistoryRetention::SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.session_history.retention_days',
+            fallback: SessionHistoryRetention::DEFAULT_DAYS,
+            label: 'Conversation session history retention',
+            description: 'How many days the history of a finished conversation session (its node trace and state changes) is kept, for every tenant. The daily flow:prune-session-history deletes the whole history of sessions that finished earlier; the sessions themselves stay, and sessions still going are never touched. Deleting is irreversible. 0 keeps it forever. Automation runs keep their history as long as the run.',
+            group: 'Flow',
+            unit: 'days',
+            min: 0,
+            max: SessionHistoryRetention::MAX_DAYS,
         ));
 
         $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(

@@ -20,6 +20,11 @@ Supersedes, in part, ADR-10 (`docs/platform/architecture/adr/10-state-writer-sem
 node entry, exit and error events are no longer gated by `logging_enabled`. Approved by the owner at the design gate
 of task `flow-node-trace` (decisions D-1, D-3, D-5, D-6).
 
+> **Amended (2026-11-27).** A conversation's history is no longer kept unconditionally: once an operator sets
+> `flow.session_history.retention_days`, `flow:prune-session-history` deletes a finished conversation session's whole
+> history, trace included (`adr-20261127-conversation-session-history-retention`). The default 0 keeps it forever, so
+> D-3 stands.
+
 ## Context
 
 ADR-10 made `flow_session_history` opt-in per flow: with `logging_enabled = false` no row is written, and node

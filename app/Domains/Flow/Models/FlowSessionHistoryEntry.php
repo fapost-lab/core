@@ -20,8 +20,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * {@see \App\Domains\Flow\Trace\RunPayloadReader}).
  *
  * Distinct from flow_logs (operational, 30-day retention, partitioned). Rows go with their session: an automation
- * run's with the run (AutomationRunPruner), a contact's sessions' with the contact (foreign key cascade); a
- * conversation's rows are otherwise kept, which is why its trace rows carry no input or output.
+ * run's with the run (AutomationRunPruner), a contact's sessions' with the contact (foreign key cascade); a finished
+ * conversation session's whole history after `flow.session_history.retention_days` (SessionHistoryPruner), which is 0
+ * — keep forever — by default, which is why its trace rows carry no input or output.
  *
  * @property string                                  $id
  * @property string                                  $tenant_id

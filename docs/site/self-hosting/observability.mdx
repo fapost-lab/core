@@ -47,7 +47,7 @@ What to watch:
 
 ## The scheduler
 
-Thirteen scheduled tasks matter, and all fail silently if the scheduler is not
+Fourteen scheduled tasks matter, and all fail silently if the scheduler is not
 running:
 
 | Task | When | If it does not run |
@@ -63,6 +63,7 @@ running:
 | `conversations:prune` | Daily, 03:15 | Nothing is pruned; the transcript keeps growing (a no-op while retention is `0`) |
 | `audit:prune` | Daily, 04:15 | The [activity log](/using/activity-log) keeps growing past its retention |
 | `flow:prune-automation-runs` | Daily, 04:30 | Finished automation runs and their history keep growing |
+| `flow:prune-session-history` | Daily, 04:45 | Finished conversation sessions' history keeps growing (a no-op while retention is `0`) |
 | `api-tokens:notify-expiring` | Daily, 09:00 | Administrators are not warned before an [API token](/using/api-tokens) expires |
 | `horizon:snapshot` | Every five minutes | Horizon's metrics and the health page's jobs-per-minute figures stop moving |
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domains\Flow\Retention\AutomationRunRetention;
+use App\Domains\Flow\Retention\SessionHistoryRetention;
 
 return [
     // Only the defaults of the platform settings `flow.execution.max_iterations` (steps outside loops, and steps of one
@@ -65,6 +66,14 @@ return [
             env('FLOW_AUTOMATION_FAILED_RETENTION_DAYS'),
             AutomationRunRetention::DEFAULT_FAILED_DAYS,
         ),
+    ],
+
+    // Only the default of the platform setting `flow.session_history.retention_days`: how many days the history of a
+    // finished conversation session is kept before the daily `flow:prune-session-history` deletes it. 0, the default,
+    // keeps it forever; a value that is not a whole number from 0 to 3650 is ignored. Automation runs are not governed
+    // by it: their history goes with the run.
+    'session_history' => [
+        'retention_days' => SessionHistoryRetention::parseDays(env('FLOW_SESSION_HISTORY_RETENTION_DAYS')),
     ],
 
     // Only the default of the platform setting `flow.trace.payloads`: whether an automation run's node trace keeps each
