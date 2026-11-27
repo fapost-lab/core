@@ -49,7 +49,7 @@ Goal: a broken or failing Solution degrades only itself. Done when: a Solution w
 leaves the install serving every other flow, and a Solution migration that fails during
 `platform:update` is rolled back alone while the platform migrations stay applied.
 
-- [ ] Failure isolation at boot: a Solution that fails to boot is marked degraded, new sessions of
+- [ ] `solution-boot-failure-isolation` — Failure isolation at boot: a Solution that fails to boot is marked degraded, new sessions of
       its flows do not start, running ones finish (after: activation storage — degraded is a state
       of an activation)
 - [x] `platform-update-phased-rollback` — `platform:update` with per-phase rollback: validate, migrate platform, migrate each Solution
