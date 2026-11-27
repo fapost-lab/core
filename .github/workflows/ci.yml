@@ -24,10 +24,13 @@ on:
 permissions:
   contents: read
 
-# A new push to the same pull request supersedes the previous run.
+# A new push to the same pull request supersedes the previous run. A push to
+# main gets a group of its own commit, so it is neither cancelled nor dropped
+# while pending: the Release tag workflow waits for it to be green before it
+# tags the commit, and a later merge must not take that check away.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PHP_VERSION: "8.5"
@@ -393,6 +396,19 @@ jobs:
       # should fail here rather than at release time.
       - run: npm run build
         if: needs.changes.outputs.frontend == 'true'
+
+  # The checks the Release tag workflow makes before it pushes a tag. Seconds
+  # long, so it always runs; not a required check.
+  release-scripts:
+    name: Release scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: shellcheck .github/scripts/*.sh
+
+      - run: bash .github/scripts/release-tag.test.sh
 
   images:
     name: Images

@@ -46,8 +46,9 @@ see [Coding agents and Jig](https://docs.fapost.in/contributing/coding-agents).
 
 ## Releases
 
-- A release is an annotated `vMAJOR.MINOR.PATCH` tag on `main`. Pushing it
-  builds and publishes the container images; nothing else needs bumping.
+- A release is an annotated `vMAJOR.MINOR.PATCH` tag on `main`. Merging the
+  release notes pull request pushes it (the Release tag workflow), which builds
+  and publishes the container images; nothing else needs bumping.
 - Pre-1.0: MINOR for new behaviour or a contract change, PATCH for fixes only.
 - A hotfix is a `fix/` branch to `main` and the next PATCH tag. A tag is never
   moved or deleted.

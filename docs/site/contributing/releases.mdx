@@ -4,7 +4,9 @@ description: "How a change on main becomes a version an operator can install."
 ---
 
 A release is a git tag on `main`. Nothing else: no release branch, no version
-file to bump, no manual image build. Pushing the tag is the act of releasing.
+file to bump, no manual image build. The tag is pushed by the **Release tag**
+workflow when the release notes pull request merges, so merging that pull
+request is the act of releasing.
 
 ## Version numbers
 
@@ -29,10 +31,11 @@ the tag name at build time (`org.opencontainers.image.version`), and
 
 ## What a tag produces
 
-Pushing a `v*` tag runs the **Publish images** workflow, which builds `core`,
+A `v*` tag runs the **Publish images** workflow, which builds `core`,
 `web` and `gateway` for amd64 and arm64 and pushes them to GitHub Container
 Registry under every tag an operator might pin to, then publishes the GitHub
-release for the tag:
+release for the tag. The Release tag workflow calls it directly after tagging;
+a tag pushed by hand starts it on its own:
 
 | Image tag  | From `v1.4.2`              | Moves?                       |
 | ---------- | -------------------------- | ---------------------------- |
@@ -54,7 +57,53 @@ fix is fine too.
    include are merged.
 2. Decide the number: did anything in `git log <previous-tag>..main` change a
    contract? Then MINOR, otherwise PATCH.
-3. Tag and push. The tag is annotated so that it carries an author and a date:
+3. Open the release notes pull request. It is the last pull request of the
+   release, cut from the current `main`, opened by an owner, member or
+   collaborator of the repository, and titled `docs(release): ...` with the
+   version in it, such as `docs(release): notes for v0.4.2`. Its **body**
+   carries, each on lines of their own (the squash commit on `main` is the
+   title and the body, so only the body reaches it), outside any HTML comment —
+   the workflow ignores comments, as GitHub does not render them (a comment
+   inside a fenced code block is kept; one in inline code is dropped):
+   - `Release-Version: v0.4.2`;
+   - `Release-Notes-Through: <sha>`, the full sha of the commit of `main` the
+     notes describe. The project's agent tooling (`jig task ship`) also writes
+     it into the branch commit; the body line is what survives a squash into a
+     release epic;
+   - the release text between a line `<!-- release-notes:start -->` and a line
+     `<!-- release-notes:end -->`, with breaking changes and required operator
+     actions (a migration, a new environment variable, a restart order) at the
+     top, where they are impossible to miss. It is required: a release without
+     it is refused rather than published with generated notes.
+4. Merge it. The [Release tag](https://github.com/fapost-lab/core/actions/workflows/release-tag.yml)
+   workflow waits for CI on the merged commit, pushes the annotated tag
+   `v0.4.2` on it and runs Publish images. The GitHub release gets the text
+   between the markers, exactly as it was when the workflow checked it: do not
+   edit the body after the merge, or the release is not published.
+5. Check that the run finished and the three images exist under the new tag.
+
+A release epic, whose tasks ship together, is released by the pull request that
+merges the epic into `main`. It is titled like a notes pull request
+(`docs(release): ... v0.4.2`), and its body carries the same three things,
+copied from the notes pull request: the `Release-Version:` line, the
+`Release-Notes-Through:` line naming the commit of `main` merged into the epic
+last, and the release text between the markers.
+
+A pull request that reads like a release — a `docs(release)` title, a
+`Release-Version:` or `Release-Notes-Through:` line, a release text marker —
+is either a release or a refused one, never let through. The workflow refuses,
+with a red run and no tag, whenever anything is in doubt: the title is not
+`docs(release): ... vX.Y.Z`; the author is not an owner, member or
+collaborator; no pull request is found for the commit; the version is malformed, stated twice differently, already tagged, not above
+the latest tag, or not the next patch, minor or major after the latest release
+(a pre-release of one is fine); the trailer is missing or does not name the merged commit's
+parent, so something reached `main` that the notes do not describe; the
+release text markers are missing or broken; or CI on the merged commit is not
+green.
+Fix the cause and re-run the failed jobs, or tag by hand.
+
+Agents never push a tag. A maintainer tags by hand only for a maintenance
+branch, or when the workflow refused a release that should go out as it is:
 
 ```bash
 git switch main && git pull --ff-only
@@ -62,18 +111,11 @@ git tag -a v0.4.2 -m "v0.4.2"
 git push origin v0.4.2
 ```
 
-4. Check that the [Publish images](https://github.com/fapost-lab/core/actions/workflows/publish-images.yml)
-   run finished and the three images exist under the new tag. Once they do, the
-   same run publishes the GitHub release with notes generated from the merged
-   pull request titles. A release already published for the tag is left as it is,
-   so notes written by hand beforehand win.
-5. Edit the notes so that breaking changes and required operator actions (a
-   migration, a new environment variable, a restart order) are at the top and
-   impossible to miss:
-
-```bash
-gh release edit v0.4.2 --notes-file notes.md
-```
+A tag pushed this way runs Publish images too. The release text is taken from
+the merged pull request's markers when the tagged commit is one; otherwise, and
+only for a tag pushed by hand, the release gets notes generated from the merged
+pull request titles, to be edited with `gh release edit`. A release already
+published for the tag is left as it is.
 
 A pushed tag is not undone. If a release turns out to be broken, the fix is the
 next patch tag, not a moved or deleted one — an operator may already have pulled

@@ -39,8 +39,12 @@ to the code.
 - Commit messages and pull request titles use Conventional Commits:
   `type(scope): subject`. Full rules: https://docs.fapost.in/contributing/commits
 - Do not commit or push unless explicitly asked to.
-- Never create or push a tag without an explicit instruction: a pushed tag publishes images and is
-  not undone. How a release is proposed: `.ai/knowledge/conventions/release-proposals.md`.
+- Merging the release notes pull request is the instruction to release: the Release tag workflow
+  then tags it. Agents never create or push a tag by hand — a pushed tag publishes images and is
+  not undone. A notes task writes its pull request title and body to the release pull request
+  contract in https://docs.fapost.in/contributing/releases (title, `Release-Version:` and
+  `Release-Notes-Through:` lines, release text markers); that page owns the contract and the
+  refusals. How a release is proposed: `.ai/knowledge/conventions/release-proposals.md`.
 - Do not add dependencies without agreement.
 - Process documentation: `CONTRIBUTING.md` (short), `docs/site/contributing/` (full).
 
