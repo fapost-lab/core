@@ -2,7 +2,7 @@
 id: rule-contact
 type: rule
 status: active
-summary: Idempotent contact and tag creation, fail-closed segments, duplicated audience logic
+summary: Idempotent contact and tag creation, fail-closed segments, contact visibility and the inbound gate
 domains:
   - contact
 topics: []
@@ -44,10 +44,6 @@ broken.
   Enforced: `SegmentConditionTypeTest`, `ContactSegmentsConsoleTest`.
 - **Attribute keys are validated against a pattern before they reach SQL**
   (`ContactSegmentResolver`).
-- **The notify fan-out runs once per `(session, node)`** (a `Cache::add` guard in
-  `SendContactNotificationJob`). The job is deprecated and no longer dispatched; the guard matters only for jobs
-  an older release queued before the retired `notify` contacts mode moved to Broadcasting.
-
 - **A contact is visible in an assistant's console only through `channel_contacts` to
   `channels.assistant_id`, and every query filters `tenant_id` explicitly.** A contact belongs to the
   tenant and has no assistant of its own; nothing scopes a query to the tenant implicitly, so a filter on
@@ -60,13 +56,3 @@ broken.
   reply. Refusals are kept in `limit_refusals` (pseudonymous hash, counters, per limit key, person,
   channel and UTC day) for 90 days (`limit-refusals:prune`); logs carry no external ids or text.
   Enforced: `InboundContactGateTest`, `PruneLimitRefusalsCommandTest`.
-
-## Rules
-
-- **The "deliverable contact" query and the language fallback exist twice** — the query in
-  `SendContactNotificationJob::deliverableChannelContacts` and in Broadcasting's
-  `BroadcastRecipientResolver`; the language fallback in `resolveLanguage` of
-  `SendContactNotificationJob` and of Broadcasting's `SendBroadcastRecipientJob`; the job's `resolveField` copies
-  Flow's `CachedContentTranslator::resolveField` so it imports nothing of Flow. Change them together, or extract them
-  first. Review only. *(proposed)* The job is deprecated and goes once a Core release has shipped it without a
-  dispatcher, which ends the duplication.

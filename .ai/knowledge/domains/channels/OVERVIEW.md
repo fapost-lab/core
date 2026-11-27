@@ -104,8 +104,6 @@ Messaging, and its tests still use the `Tests\Unit\Domains\Messaging\Telegram` n
   provider's webhook registered against a hash the router now reads as another type.
   `Telegram/TelegramWebhookOptions.php` holds the update types and the `max_connections` bounds.
 - `app/Domains/Messaging/MessageSender.php`, `app/Domains/Messaging/Typing/`.
-- Jobs in `app/Jobs/Messaging/`: `BroadcastSendJob` (`messaging.broadcast`; deprecated, nothing dispatches it,
-  kept a release to deliver what an older release queued) and
-  `SyncChannelWebhookJob` (`messaging.system`). `messaging.transactional` is reserved and has no
+- Jobs in `app/Jobs/Messaging/`: `SyncChannelWebhookJob` (`messaging.system`). `messaging.transactional` is reserved and has no
   job (the unused `SendTransactionalMessageJob` was removed in 2026-10). Flow replies are sent inline by
   `FlowMessageSender` → `MessageSender::send()` inside the `flow.execution` job.

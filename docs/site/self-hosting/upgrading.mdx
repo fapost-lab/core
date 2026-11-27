@@ -353,8 +353,10 @@ broadcast of the node is running another pass sends nothing, and a text with `{{
 use *Send message* to tags or a segment instead. See [Broadcasts](/using/broadcasts).
 
 The two jobs the old mode queued are kept in 0.25 so that notifications queued before the upgrade are
-still delivered, and are removed after it: upgrade to 0.25 first and let the `messaging.broadcast`
-queue drain there before moving to a later release.
+still delivered, and are removed in the release after it: upgrade to 0.25 first and wait until the
+`messaging.broadcast` queue shows no pending jobs in Horizon before moving to a later release. A job of the old
+mode still queued when a later release starts cannot run: it fails into the failed jobs, a retry fails again, and
+its notification is not sent.
 
 ## Stricter publish checks
 

@@ -114,7 +114,7 @@ broken.
   separate credentials DTO (a second way beside `ChannelInterface`). Only a synchronous deregister carries a snapshot,
   because a deleted row cannot be loaded. Why: exception text and job payloads end up in logs,
   `jobs` and `failed_jobs`. Enforced: `TelegramBotApiClientRedactionTest`,
-  `SyncChannelWebhookJobCredentialsTest`, `BroadcastSendJobTest`, `MessageSenderTest`.
+  `SyncChannelWebhookJobCredentialsTest`, `MessageSenderTest`.
 - **Pick the queue by purpose:** replies in an active dialogue `messaging.transactional`,
   broadcasts `messaging.broadcast`, service and lifecycle work `messaging.system`. Source:
   `conventions/queues.md`.

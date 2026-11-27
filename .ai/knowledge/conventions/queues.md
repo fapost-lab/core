@@ -54,10 +54,7 @@ Queue assignment by purpose, as it exists in the codebase today:
 - `messaging.transactional`: reserved like `sync.external` — no job targets it. A reply delivered
   out of band (outside the `flow.execution` job that produced it) is what it is kept for.
 - `messaging.broadcast`: `app/Domains/Broadcasting/Jobs/RunBroadcastJob.php` and
-  `SendBroadcastRecipientJob.php`. Two deprecated jobs nothing dispatches stay on it for one release, for
-  payloads an older release queued: `app/Jobs/Messaging/BroadcastSendJob.php`, which still delivers its prepared
-  message, and `app/Domains/Contact/Jobs/SendContactNotificationJob.php`, the retired `notify` contacts-mode fan-out, which
-  still fans out what was queued (a service notification on the low-priority broadcast queue, as before).
+  `SendBroadcastRecipientJob.php`.
 - `messaging.system`: `app/Jobs/Messaging/SyncChannelWebhookJob.php`,
   `app/Jobs/Flow/SendOneTimeCodeJob.php` (the encrypted one-time code of an `auth_request` node),
   `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,

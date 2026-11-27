@@ -73,8 +73,8 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   for reference tracking), Staff (`FlowSession` in the notification job), Broadcasting
   (`ContentTranslatorInterface`) and Contact (`ContactCard` reads the variable schema registry). Contact↔Flow is an
   import cycle through `ContactCard`. The retired `notify` contacts mode no longer passes through Contact: it starts a
-  broadcast through `AudienceBroadcasterInterface`, and Contact's deprecated fan-out job, kept to deliver what an older
-  release queued, imports nothing of Flow (`adr-20261125-notify-contacts-retired-through-broadcasting`).
+  broadcast through `AudienceBroadcasterInterface`, and Contact's old fan-out job was removed after 0.25
+  (`adr-20261125-notify-contacts-retired-through-broadcasting`).
 
 ## Entry points
 

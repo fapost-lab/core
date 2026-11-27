@@ -30,7 +30,7 @@ lock timeout (`engine_lock_timeout`) is retried by `IncomingMessageJob`.
 | --- | --- |
 | `flow.execution` | `IncomingMessageJob`, `ResumeDelayedFlowSessionJob`, `ResumeTimedOutSendMessageNodeJob` |
 | `messaging.transactional` | Reserved, no job; supervised together with `flow.execution` |
-| `messaging.broadcast` | `RunBroadcastJob`, `SendBroadcastRecipientJob`; deprecated and no longer dispatched: `SendContactNotificationJob` and `BroadcastSendJob`, kept a release to deliver jobs an older release queued |
+| `messaging.broadcast` | `RunBroadcastJob`, `SendBroadcastRecipientJob` |
 | `messaging.system` | Staff notifications, channel webhook sync, media cleanup |
 | `messaging.logging` | Conversation transcript jobs (`PersistConversationMessageJob`, `UpdateConversationDeliveryStatusJob`, `FetchConversationMediaJob`) |
 | `scheduled.triggers` | Event-chain jobs (`DispatchFlowTriggerEventJob`, `StartFlowFromEventJob`) |
@@ -51,7 +51,7 @@ and `messaging.broadcast` + `messaging.system` + `messaging.logging` (low priori
   provisioning stores 30 in every tenant schema. `messaging.rate_limit_per_minute` (`MESSAGING_RATE_LIMIT_PER_MINUTE`,
   default 30) is only a fallback used outside a tenant and when the tenant's row is absent. Exceeding it throws `RateLimitExceededException` and releases
   the idempotency reservation so the job can retry.
-- Broadcast backpressure lives in `RunBroadcastJob`, not in `BroadcastSendJob`. When the tenant setting
+- Broadcast backpressure lives in `RunBroadcastJob`, not in the per-recipient `SendBroadcastRecipientJob`. When the tenant setting
   `broadcast_backpressure` is on and the `messaging.broadcast` queue holds more than 1000 jobs, the run is re-dispatched
   with a 30s delay before any recipient rows are created. Otherwise recipients are fanned out in per-second chunks
   (`broadcast_chunk_size`).

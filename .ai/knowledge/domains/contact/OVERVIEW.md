@@ -2,7 +2,7 @@
 id: domain-contact
 type: domain
 status: active
-summary: Contact identity, channel links, tags, groups, segments and the notify fan-out job
+summary: Contact identity, channel links, tags, groups and segments
 domains:
   - contact
 topics: []
@@ -27,10 +27,9 @@ what the filters and segment rules offer) — and the link between a contact and
 `last_interaction_at`). It groups contacts three ways: tags (free-form strings), groups
 (explicit member lists) and segments (saved rules evaluated on demand). A segment rule on a platform no
 installed integration serves any more is kept and still evaluated, but the segment cannot be saved again until that
-condition is removed (`ContactSegmentRequest` validates against `ContactPlatforms`, failing closed). It also holds
-`SendContactNotificationJob`, which fanned Flow's `notify` node out to contacts: deprecated and no longer dispatched
-(the node's retired `contacts` mode sends through Broadcasting), kept one more release to deliver jobs an older release
-queued, and no longer importing Flow (`adr-20261125-notify-contacts-retired-through-broadcasting`).
+condition is removed (`ContactSegmentRequest` validates against `ContactPlatforms`, failing closed). It sends nothing
+itself: the `notify` node's retired `contacts` mode sends through Broadcasting, and its old fan-out job was removed
+after 0.25 (`adr-20261125-notify-contacts-retired-through-broadcasting`).
 
 ## Boundaries
 
@@ -49,15 +48,14 @@ queued, and no longer importing Flow (`adr-20261125-notify-contacts-retired-thro
     `ContactSegment` and `ChannelContact`.
   - Conversation uses the `Contact` and `ChannelContact` models.
 - Depends on Flow (`VariableSchemaRegistryInterface`, `VariableType` in `ContactCard`) — an import cycle with
-  Flow — and on the `Channel` model, Staff policies' `Permission`/`User`, Conversation's `MessageOrigin`, and
-  `App\Jobs\Messaging\BroadcastSendJob` (both from the deprecated `SendContactNotificationJob`).
+  Flow — and on Channels (the `Channel` model, `ChannelTypeCast`, `ChannelRegistryInterface` in `ContactPlatforms`),
+  Staff policies' `Permission`/`User`, the `Assistant` model, Audit's trail contracts in the console services, and
+  Tenancy (`TenantContextInterface`, and `PeriodQuota`/`RefusedWork` in `InboundContactGate`).
 
 ## Entry points
 
 - `Services/ContactService.php`, `Repositories/ContactTagRepository.php`,
   `Services/ContactSegmentResolver.php`.
-- `Jobs/SendContactNotificationJob.php` (queue `messaging.broadcast`; deprecated, nothing dispatches it, removed a
-  release later).
 - Policies `ContactPolicy`, `ContactGroupPolicy`.
 - Inertia console: `App\Http\Controllers\Console\ContactController` with `Services/AssistantContactService.php`
   (the assistant's contacts and the two writes, tags and groups) and `Services/ContactCard.php` (the card's

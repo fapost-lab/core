@@ -50,8 +50,6 @@ These areas are planned or partial and should not be documented as finished prod
 - `RagAdapterRegistry`, `RagQueryNodeHandler`, and validation exist, but no provider or knowledge-base storage is wired.
 - Loop runtime/builder work exists, including `loop_end` management and execution budget. Some array/property edge cases
   are still tracked in `docs/platform/TASKS.md`.
-- `SendContactNotificationJob` and `BroadcastSendJob` are deprecated and no longer dispatched: they only deliver what an
-  older release queued for the retired `notify` contacts fan-out.
 - Conversation Logging is implemented end to end, but only the write side is a port: `ConversationStoreInterface`
   (bound to `PostgresConversationStore` by driver config) covers `ensureConversation` / `appendMessage` /
   `updateMessageMedia` / `updateStatus`. There is no reader port; the console inbox (`ConversationInbox`) reads the `Conversation`

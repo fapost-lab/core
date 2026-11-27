@@ -11,7 +11,6 @@ use App\Domains\Broadcasting\Jobs\SendBroadcastRecipientJob;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
-use App\Domains\Contact\Jobs\SendContactNotificationJob;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Staff\Jobs\SendStaffNotificationJob;
@@ -23,12 +22,9 @@ use App\Jobs\Flow\ResumeTimedOutSendMessageNodeJob;
 use App\Jobs\Flow\StartFlowForContactJob;
 use App\Jobs\Flow\StartFlowFromEventJob;
 use App\Jobs\Media\CleanupSoftDeletedMediaJob;
-use App\Jobs\Messaging\BroadcastSendJob;
 use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Fapost\Foundation\Messaging\DeliveryResult;
-use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\MessageSenderInterface;
-use Fapost\Foundation\Messaging\OutboundMessage;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Fapost\Foundation\Tenancy\DTO\TenantAccessState;
 use Illuminate\Contracts\Debug\ExceptionHandler;
@@ -71,16 +67,7 @@ final class StoppedTenantRuntimeTest extends FeatureTestCase
             'flow start by event'    => [StartFlowFromEventJob::class, static fn (): object => new StartFlowFromEventJob($tenant, 'flow-1', 'assistant-1', 'contact-1', [], 'employee_registered')],
             'flow start for contact' => [StartFlowForContactJob::class, static fn (): object => new StartFlowForContactJob($tenant, 'flow-1', 'contact-1', [], 'exec-1:node-1', 1, 30)],
             'broadcast recipient'    => [SendBroadcastRecipientJob::class, static fn (): object => new SendBroadcastRecipientJob($tenant, 'recipient-1')],
-            'contact notification'   => [SendContactNotificationJob::class, static fn (): object => new SendContactNotificationJob($tenant, 'assistant-1', 'tag', ['vip'], 'Hi', 'session-1', 'node-1')],
             'staff notification'     => [SendStaffNotificationJob::class, static fn (): object => new SendStaffNotificationJob($tenant, 'session-1', 'node-1', [], ['email'], 'Hi')],
-            'contact message'        => [BroadcastSendJob::class, static fn (): object => new BroadcastSendJob(new OutboundMessage(
-                idempotencyKey: 'idem-1',
-                tenantId: $tenant,
-                channelId: 'channel-1',
-                channelType: 'telegram',
-                chatId: 'chat-1',
-                payload: new MessagePayload(type: 'text', text: 'Hello'),
-            ))],
         ];
     }
 
@@ -130,7 +117,7 @@ final class StoppedTenantRuntimeTest extends FeatureTestCase
     public function test_flow_triggered_work_is_dropped_with_a_log_line(string $class, callable $make): void
     {
         Log::spy();
-        Bus::fake([StartFlowFromEventJob::class, BroadcastSendJob::class]);
+        Bus::fake([StartFlowFromEventJob::class]);
 
         $job = $make();
         $this->assertFalse($this->passThrough($job));
